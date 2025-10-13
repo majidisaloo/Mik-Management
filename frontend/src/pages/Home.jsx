@@ -10,29 +10,13 @@ const Home = () => {
 
       <h2>Installation Guide</h2>
       <ol>
-        <li>On Ubuntu, install dependencies: <code>sudo apt update &amp;&amp; sudo apt install nodejs npm rpm -y</code>.</li>
-        <li>
-          Clone the repository where you want to work:
-          <code>git clone https://github.com/majidisaloo/Mik-Management.git</code>.
-        </li>
-        <li>
-          Install backend dependencies: <code>cd backend</code> then
-          <code>npm install</code>.
-        </li>
-        <li>Run the API locally with <code>npm run dev</code> (it listens on port 4000).</li>
-        <li>
-          In a new terminal, install frontend dependencies:
-          <code>cd frontend &amp;&amp; npm install</code>.
-        </li>
-        <li>Launch the React app with <code>npm run dev</code> and open <code>http://localhost:5173</code>.</li>
+        <li>Install Node.js 18 or newer on your machine.</li>
+        <li>Clone the repository: <code>git clone https://example.com/mik-management.git</code>.</li>
+        <li>Install dependencies in both folders: <code>cd backend &amp;&amp; npm install</code> and <code>cd frontend &amp;&amp; npm install</code>.</li>
+        <li>Start the database-backed API by running <code>npm run dev</code> inside the <code>backend</code> directory.</li>
+        <li>Launch the web client with <code>npm run dev</code> inside the <code>frontend</code> directory.</li>
+        <li>Open <code>http://localhost:5173</code> in your browser and use the Register link.</li>
       </ol>
-
-      <h2>Deploying Behind Nginx</h2>
-      <p>
-        Build the frontend with <code>npm run build</code>, run the API with a process manager such as PM2, and
-        configure Nginx to serve <code>frontend/dist</code> at the root domain while proxying
-        <code>/api</code> to <code>http://127.0.0.1:4000</code>.
-      </p>
 
       <h2>Quick Git Tips</h2>
       <ul>
