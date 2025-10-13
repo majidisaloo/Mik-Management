@@ -1,7 +1,16 @@
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import BrandMark from './BrandMark.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const Layout = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -9,10 +18,21 @@ const Layout = () => {
           <BrandMark />
         </Link>
         <nav>
-          <NavLink to="/register">Register</NavLink>
-          <NavLink to="/" end>
-            Login
-          </NavLink>
+          {user ? (
+            <>
+              <NavLink to="/dashboard">Dashboard</NavLink>
+              <button type="button" onClick={handleSignOut} className="link-button">
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <NavLink to="/register">Register</NavLink>
+              <NavLink to="/" end>
+                Login
+              </NavLink>
+            </>
+          )}
         </nav>
       </header>
       <main className="app-main">

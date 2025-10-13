@@ -81,6 +81,14 @@ const bootstrap = async () => {
     }
   });
 
+  const mapUserRow = (row) => ({
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    createdAt: row.created_at
+  });
+
   app.post('/api/login', async (req, res) => {
     const { email, password } = req.body ?? {};
 
@@ -92,7 +100,10 @@ const bootstrap = async () => {
     }
 
     try {
-      const user = await db.get('SELECT password_hash FROM users WHERE email = ?', [normalizedEmail]);
+      const user = await db.get(
+        'SELECT id, first_name, last_name, email, password_hash, created_at FROM users WHERE email = ?',
+        [normalizedEmail]
+      );
 
       if (!user) {
         return res.status(401).json({ message: 'Invalid credentials.' });
@@ -104,10 +115,90 @@ const bootstrap = async () => {
         return res.status(401).json({ message: 'Invalid credentials.' });
       }
 
-      res.json({ message: 'Login successful.' });
+      res.json({ message: 'Login successful.', user: mapUserRow(user) });
     } catch (error) {
       console.error('Login error', error);
       res.status(500).json({ message: 'Unexpected error. Please try again.' });
+    }
+  });
+
+  app.get('/api/users/:id', async (req, res) => {
+    const userId = Number.parseInt(req.params.id, 10);
+
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(400).json({ message: 'A valid user id is required.' });
+    }
+
+    try {
+      const user = await db.get(
+        'SELECT id, first_name, last_name, email, created_at FROM users WHERE id = ?',
+        [userId]
+      );
+
+      if (!user) {
+        return res.status(404).json({ message: 'User not found.' });
+      }
+
+      res.json({ user: mapUserRow(user) });
+    } catch (error) {
+      console.error('Fetch user error', error);
+      res.status(500).json({ message: 'Unable to load the requested user.' });
+    }
+  });
+
+  app.put('/api/users/:id', async (req, res) => {
+    const userId = Number.parseInt(req.params.id, 10);
+
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(400).json({ message: 'A valid user id is required.' });
+    }
+
+    const { firstName, lastName, email } = req.body ?? {};
+
+    const normalizedFirstName = normalizeString(firstName);
+    const normalizedLastName = normalizeString(lastName);
+    const normalizedEmail = normalizeString(email).toLowerCase();
+
+    if (!normalizedFirstName) {
+      return res.status(400).json({ message: 'First name is required.' });
+    }
+
+    if (!normalizedLastName) {
+      return res.status(400).json({ message: 'Last name is required.' });
+    }
+
+    if (!normalizedEmail) {
+      return res.status(400).json({ message: 'Email is required.' });
+    }
+
+    if (!emailPattern.test(normalizedEmail)) {
+      return res.status(400).json({ message: 'Email must follow the format name@example.com.' });
+    }
+
+    try {
+      const result = await db.run(
+        'UPDATE users SET first_name = ?, last_name = ?, email = ? WHERE id = ?',
+        [normalizedFirstName, normalizedLastName, normalizedEmail, userId]
+      );
+
+      if (result.changes === 0) {
+        return res.status(404).json({ message: 'User not found.' });
+      }
+
+      const updatedUser = await db.get(
+        'SELECT id, first_name, last_name, email, created_at FROM users WHERE id = ?',
+        [userId]
+      );
+
+      res.json({ message: 'User updated successfully.', user: mapUserRow(updatedUser) });
+    } catch (error) {
+      if (error.message.includes('UNIQUE constraint failed')) {
+        res.status(409).json({ message: 'Another account already uses this email address.' });
+        return;
+      }
+
+      console.error('Update user error', error);
+      res.status(500).json({ message: 'Unable to update the user at this time.' });
     }
   });
 

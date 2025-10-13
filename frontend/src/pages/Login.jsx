@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const Login = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, login } = useAuth();
   const registrationContext = location.state?.registered ? 'Your account has been created. Please sign in.' : '';
   const initialEmail = location.state?.email ?? '';
   const cameFromRegistration = Boolean(location.state?.registered);
@@ -15,10 +17,15 @@ const Login = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    if (user) {
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+
     if (cameFromRegistration) {
       navigate('.', { replace: true, state: initialEmail ? { email: initialEmail } : null });
     }
-  }, [cameFromRegistration, initialEmail, navigate]);
+  }, [cameFromRegistration, initialEmail, navigate, user]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -58,8 +65,12 @@ const Login = () => {
         throw new Error(message);
       }
 
-      setStatus({ type: 'success', message: 'Login successful.' });
-      setForm({ email: form.email, password: '' });
+      const payload = await response.json();
+      if (payload?.user) {
+        login(payload.user);
+      }
+
+      navigate('/dashboard', { replace: true });
     } catch (error) {
       setStatus({ type: 'error', message: error.message || 'Login failed.' });
     } finally {

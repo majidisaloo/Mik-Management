@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const initialState = {
   firstName: '',
@@ -48,11 +49,18 @@ const evaluatePasswordStrength = (password) => {
 };
 
 const Register = () => {
+  const { user } = useAuth();
   const [form, setForm] = useState(initialState);
   const [status, setStatus] = useState({ type: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(evaluatePasswordStrength(''));
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [navigate, user]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;

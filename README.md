@@ -7,6 +7,7 @@ A full-stack registration experience built with React, Vite, Express, and SQLite
 - [Project Structure](#project-structure)
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
+- [Dashboard Overview](#dashboard-overview)
 - [Ubuntu Deployment Quick Start](#ubuntu-deployment-quick-start)
 - [Production Deployment on Ubuntu with Nginx](#production-deployment-on-ubuntu-with-nginx)
 - [Updating an Existing Installation](#updating-an-existing-installation)
@@ -84,7 +85,14 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
    npm run dev
    ```
 7. Visit the site at http://localhost:5173. The **Login** screen loads first—use the **Register** link in the header to create an
-   account, then sign in with the credentials you just added.
+   account, sign in with the credentials you just added, and you will land on the **Dashboard**. The dashboard presents a Users
+   table with your operator record and a form to update your first name, last name, or email address at any time.
+
+### Dashboard Overview
+
+- **Users card** – Lists the signed-in operator with the ID, email, and creation timestamp for quick verification.
+- **Profile form** – Update the first name, last name, or email address and submit to persist the changes in SQLite instantly.
+- **Session controls** – Use the header Logout button to clear the session and return to the Login screen.
 
 ## Ubuntu Deployment Quick Start
 
@@ -258,6 +266,10 @@ The backend uses SQLite and automatically creates the database file at `backend/
   - Visit `journalctl -u mik-api` (or check the terminal) for backend logs—validation errors such as duplicate emails or short passwords will be reported with a specific message that is also surfaced in the UI.
   - Confirm the API is running (`curl http://127.0.0.1:4000/health` should return `{"status":"ok"}`).
   - Verify the SQLite database folder exists (`ls backend/data`) so the server can persist new users. It is created automatically on first launch, but missing directories will prevent registrations.
+- **Browser shows `502 Bad Gateway` from Nginx during registration or login**
+  - Ensure the API service is running: `pm2 status mik-api` (or restart with `pm2 restart mik-api`). A stopped upstream will force Nginx to return 502.
+  - Validate the backend responds locally: `curl http://127.0.0.1:4000/health` should produce `{"status":"ok"}`. If it fails, inspect `/opt/mik-management/backend` logs with `pm2 logs mik-api`.
+  - Confirm the proxy block includes `/api/` (see the sample Nginx config above) and reload Nginx after edits: `sudo systemctl reload nginx`.
 
 ## Useful npm Scripts
 
@@ -295,6 +307,24 @@ The backend uses SQLite and automatically creates the database file at `backend/
   - `400`: Missing credentials
   - `401`: Invalid email or password
   - `500`: Unexpected server error
+
+`GET /api/users/:id`
+
+- **Success**: `200 OK` with `{ user }`
+- **Errors**:
+  - `400`: Invalid ID parameter
+  - `404`: User not found
+  - `500`: Unable to load the requested user
+
+`PUT /api/users/:id`
+
+- **Body**: `{ firstName, lastName, email }`
+- **Success**: `200 OK`
+- **Errors**:
+  - `400`: Missing or invalid fields
+  - `404`: User not found
+  - `409`: Email already used by another account
+  - `500`: Unable to update the user
 
 ## License
 
