@@ -1,7 +1,24 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
-const Modal = ({ title, description, children, onClose, footer, size = 'md' }) => {
+const Modal = ({ title, description, children, actions, onClose }) => {
+  const dialogRef = useRef(null);
+
   useEffect(() => {
+    const previouslyFocused = document.activeElement;
+    const dialog = dialogRef.current;
+
+    if (dialog) {
+      const focusable = dialog.querySelector(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+
+      if (focusable) {
+        focusable.focus();
+      } else {
+        dialog.focus();
+      }
+    }
+
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -10,25 +27,36 @@ const Modal = ({ title, description, children, onClose, footer, size = 'md' }) =
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+
+      if (previouslyFocused && previouslyFocused.focus) {
+        previouslyFocused.focus();
+      }
+    };
   }, [onClose]);
 
+  const handleBackdropClick = (event) => {
+    if (event.target === event.currentTarget) {
+      onClose();
+    }
+  };
+
+  const labelId = `${title?.replace(/\s+/g, '-').toLowerCase() || 'modal'}-heading`;
+
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-description">
-      <div className={`modal-panel modal-panel--${size}`}>
-        <div className="modal-header">
-          <h2 id="modal-title">{title}</h2>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Close dialog">
+    <div className="modal" role="dialog" aria-modal="true" aria-labelledby={labelId} onClick={handleBackdropClick}>
+      <div className="modal__dialog" ref={dialogRef} tabIndex={-1}>
+        <div className="modal__header">
+          <h2 id={labelId}>{title}</h2>
+          <button type="button" className="modal__close" onClick={onClose} aria-label="Close">
             ×
           </button>
         </div>
-        {description ? (
-          <p id="modal-description" className="modal-description">
-            {description}
-          </p>
-        ) : null}
-        <div className="modal-body">{children}</div>
-        {footer ? <div className="modal-footer">{footer}</div> : null}
+        {description ? <p className="modal__description">{description}</p> : null}
+        <div className="modal__body">{children}</div>
+        {actions ? <div className="modal__actions">{actions}</div> : null}
       </div>
     </div>
   );
