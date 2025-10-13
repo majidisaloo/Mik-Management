@@ -40,7 +40,7 @@ const Login = () => {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ message: 'Login failed.' }));
         throw new Error(error.message || 'Login failed.');
       }
 

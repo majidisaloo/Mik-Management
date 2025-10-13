@@ -8,11 +8,10 @@ const Layout = () => {
           Mik Management
         </Link>
         <nav>
-          <NavLink to="/" end>
-            Home
-          </NavLink>
           <NavLink to="/register">Register</NavLink>
-          <NavLink to="/login">Login</NavLink>
+          <NavLink to="/" end>
+            Login
+          </NavLink>
         </nav>
       </header>
       <main className="app-main">

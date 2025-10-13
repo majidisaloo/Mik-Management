@@ -41,7 +41,7 @@ const Register = () => {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ message: 'Registration failed.' }));
         throw new Error(error.message || 'Registration failed.');
       }
 
@@ -99,6 +99,7 @@ const Register = () => {
             onChange={handleChange}
             autoComplete="new-password"
             required
+            minLength={8}
           />
         </label>
         <label>
@@ -110,6 +111,7 @@ const Register = () => {
             onChange={handleChange}
             autoComplete="new-password"
             required
+            minLength={8}
           />
         </label>
         <button type="submit" disabled={isSubmitting} className="primary-button">

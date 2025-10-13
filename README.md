@@ -83,8 +83,8 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
    ```bash
    npm run dev
    ```
-7. Visit the site at http://localhost:5173, create an account from the **Register** page, and sign in from the **Login** page to
-   confirm your credentials.
+7. Visit the site at http://localhost:5173. The **Login** screen loads first—use the **Register** link in the header to create an
+   account, then sign in with the credentials you just added.
 
 ## Ubuntu Deployment Quick Start
 
@@ -249,8 +249,9 @@ The backend uses SQLite and automatically creates the database file at `backend/
   - Retry `npm install` to ensure all packages resolve correctly.
 - **Browser message "The string did not match the expected pattern" on registration**
   - Reload the page with a hard refresh to ensure the latest frontend bundle is loaded.
-  - Confirm that both password fields are filled and match; the backend now accepts any matching string.
-  - If the warning persists, rebuild and redeploy the frontend (`npm run build`) so browsers receive the updated form validation.
+  - Confirm that both password fields are filled, match exactly, and contain at least eight characters.
+  - Ensure the email address follows the format `name@example.com`.
+  - If the warning persists, rebuild and redeploy the frontend (`npm run build`) so browsers receive the updated form validation and backend validation rules.
 
 ## Useful npm Scripts
 
@@ -276,7 +277,7 @@ The backend uses SQLite and automatically creates the database file at `backend/
 - **Body**: `{ firstName, lastName, email, password, passwordConfirmation? }`
 - **Success**: `201 Created`
 - **Errors**:
-  - `400`: Missing fields or mismatched passwords
+  - `400`: Missing names or email, invalid email format, password under eight characters, or mismatched passwords
   - `409`: Email already registered
   - `500`: Unexpected server error
 
