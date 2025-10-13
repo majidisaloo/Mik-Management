@@ -1,0 +1,12 @@
+{
+  "name": "mik-management-backend",
+  "version": "0.0.2",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js",
+    "prepare:db": "node src/scripts/prepare.js"
+  },
+  "dependencies": {}
+}
