@@ -3,6 +3,110 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
+const RoleDropdown = ({ roles, selectedIds, onToggle, disabled = false, placeholder = 'Assign roles' }) => {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (disabled && open) {
+      setOpen(false);
+    }
+  }, [disabled, open]);
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    const handleClick = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+
+    const handleKey = (event) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [open]);
+
+  const selectedRoles = roles.filter((role) => selectedIds.includes(role.id));
+  const summary = selectedRoles.length
+    ? selectedRoles.map((role) => (
+        <span key={role.id} className="role-chip">
+          {role.name}
+        </span>
+      ))
+    : [
+        <span key="placeholder" className="role-chip role-chip--placeholder">
+          {placeholder}
+        </span>
+      ];
+
+  return (
+    <div
+      ref={containerRef}
+      className={`role-dropdown${open ? ' role-dropdown--open' : ''}${disabled ? ' role-dropdown--disabled' : ''}`}
+    >
+      <button
+        type="button"
+        className="role-dropdown__button"
+        onClick={() => (!disabled ? setOpen((current) => !current) : undefined)}
+        aria-expanded={open}
+        disabled={disabled}
+      >
+        <span className="role-dropdown__summary-label">{summary}</span>
+        <span aria-hidden="true">{open ? '▲' : '▼'}</span>
+      </button>
+      <div className="role-dropdown__panel" role="listbox" aria-label="Available roles">
+        {roles.length === 0 ? (
+          <span className="empty-hint">No roles available.</span>
+        ) : (
+          roles.map((role) => (
+            <label key={role.id} className="role-dropdown__option">
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(role.id)}
+                onChange={() => onToggle(role.id)}
+              />
+              <span>{role.name}</span>
+            </label>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+const formatDateTime = (value) => {
+  if (!value) {
+    return '—';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return '—';
+  }
+
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
 const permissionCatalog = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'users', label: 'Users' },
@@ -36,82 +140,6 @@ const emptyRoleForm = {
   permissions: permissionCatalog.reduce((acc, { key }) => ({ ...acc, [key]: false }), {})
 };
 
-const RolePicker = ({ label, options, selectedIds, onToggle, disabled }) => {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef(null);
-  const normalizedSelected = Array.isArray(selectedIds) ? selectedIds : [];
-
-  useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
-
-    const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [open]);
-
-  const selectedLabels = useMemo(() => {
-    const labels = options.filter((option) => normalizedSelected.includes(option.value)).map((option) => option.label);
-    if (labels.length === 0) {
-      return 'No roles selected';
-    }
-
-    if (labels.length <= 2) {
-      return labels.join(', ');
-    }
-
-    return `${labels.slice(0, 2).join(', ')} +${labels.length - 2}`;
-  }, [options, selectedIds]);
-
-  return (
-    <div className={`role-selector${disabled ? ' role-selector--disabled' : ''}`} ref={containerRef}>
-      <button
-        type="button"
-        className="role-selector__trigger"
-        onClick={() => (disabled ? null : setOpen((current) => !current))}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        disabled={disabled}
-      >
-        <span className="role-selector__label">{label}</span>
-        <span className="role-selector__value">{selectedLabels}</span>
-      </button>
-      {open ? (
-        <div className="role-selector__panel" role="listbox" aria-label={label}>
-          {options.length === 0 ? (
-            <p className="role-selector__empty">No roles available.</p>
-          ) : (
-            options.map((option) => {
-              const selected = normalizedSelected.includes(option.value);
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={`role-selector__option${selected ? ' role-selector__option--selected' : ''}`}
-                  onClick={() => onToggle(option.value)}
-                  role="option"
-                  aria-selected={selected}
-                >
-                  <span className="role-selector__check" aria-hidden="true">
-                    {selected ? '✓' : ''}
-                  </span>
-                  {option.label}
-                </button>
-              );
-            })
-          )}
-        </div>
-      ) : null}
-    </div>
-  );
-};
-
 const Users = ({ initialTab = 'users' }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -124,38 +152,21 @@ const Users = ({ initialTab = 'users' }) => {
   const [status, setStatus] = useState({ type: '', message: '' });
   const [filters, setFilters] = useState({ users: '', roles: '' });
 
-  const roleOptions = useMemo(
-    () => roles.map((role) => ({ value: role.id, label: role.name ?? `Role ${role.id}` })),
-    [roles]
-  );
-
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const [createUserForm, setCreateUserForm] = useState(emptyCreateUserForm);
   const [createUserBusy, setCreateUserBusy] = useState(false);
 
-  const [manageUserState, setManageUserState] = useState({
-    open: false,
-    mode: 'edit',
-    userId: null,
-    form: emptyManageUserForm,
-    record: null
-  });
+  const [manageUserState, setManageUserState] = useState({ open: false, userId: null, form: emptyManageUserForm, mode: 'edit' });
   const [manageUserBusy, setManageUserBusy] = useState(false);
-  const [deletePrompt, setDeletePrompt] = useState({ open: false, record: null, busy: false });
+  const [deleteUserBusy, setDeleteUserBusy] = useState(false);
 
   const [createRoleOpen, setCreateRoleOpen] = useState(false);
   const [createRoleForm, setCreateRoleForm] = useState(emptyRoleForm);
   const [createRoleBusy, setCreateRoleBusy] = useState(false);
 
-  const [manageRoleState, setManageRoleState] = useState({
-    open: false,
-    mode: 'edit',
-    roleId: null,
-    form: emptyRoleForm,
-    record: null
-  });
+  const [manageRoleState, setManageRoleState] = useState({ open: false, roleId: null, form: emptyRoleForm });
   const [manageRoleBusy, setManageRoleBusy] = useState(false);
-  const [roleDeletePrompt, setRoleDeletePrompt] = useState({ open: false, record: null, busy: false });
+  const [deleteRoleBusy, setDeleteRoleBusy] = useState(false);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -272,7 +283,7 @@ const Users = ({ initialTab = 'users' }) => {
   }, [filters.roles, roles]);
 
   const openCreateUserModal = () => {
-    setCreateUserForm({ ...emptyCreateUserForm, roleIds: [] });
+    setCreateUserForm(emptyCreateUserForm);
     setCreateUserOpen(true);
     setStatus({ type: '', message: '' });
   };
@@ -280,9 +291,7 @@ const Users = ({ initialTab = 'users' }) => {
   const openManageUserModal = (record, mode = 'edit') => {
     setManageUserState({
       open: true,
-      mode,
       userId: record.id,
-      record,
       form: {
         firstName: record.firstName ?? '',
         lastName: record.lastName ?? '',
@@ -290,27 +299,48 @@ const Users = ({ initialTab = 'users' }) => {
         password: '',
         passwordConfirmation: '',
         roleIds: Array.isArray(record.roleIds) ? record.roleIds : []
-      }
+      },
+      mode
     });
     setStatus({ type: '', message: '' });
   };
 
-  const openDeleteUserPrompt = (record) => {
-    setDeletePrompt({ open: true, record, busy: false });
-    setStatus({ type: '', message: '' });
-  };
-
   const closeManageUserModal = () => {
-    setManageUserState({ open: false, mode: 'edit', userId: null, record: null, form: emptyManageUserForm });
+    setManageUserState({ open: false, userId: null, form: emptyManageUserForm, mode: 'edit' });
     setManageUserBusy(false);
+    setDeleteUserBusy(false);
   };
 
-  const closeDeletePrompt = () => {
-    setDeletePrompt({ open: false, record: null, busy: false });
+  const toggleCreateUserRole = (roleId) => {
+    setCreateUserForm((current) => {
+      const currentRoles = new Set(current.roleIds ?? []);
+      if (currentRoles.has(roleId)) {
+        currentRoles.delete(roleId);
+      } else {
+        currentRoles.add(roleId);
+      }
+
+      return { ...current, roleIds: Array.from(currentRoles) };
+    });
   };
 
-  const enableUserEditing = () => {
-    setManageUserState((current) => ({ ...current, mode: 'edit' }));
+  const toggleManageUserRole = (roleId) => {
+    setManageUserState((current) => {
+      const currentRoles = new Set(current.form.roleIds ?? []);
+      if (currentRoles.has(roleId)) {
+        currentRoles.delete(roleId);
+      } else {
+        currentRoles.add(roleId);
+      }
+
+      return {
+        ...current,
+        form: {
+          ...current.form,
+          roleIds: Array.from(currentRoles)
+        }
+      };
+    });
   };
 
   const handleCreateUserFieldChange = (event) => {
@@ -318,31 +348,15 @@ const Users = ({ initialTab = 'users' }) => {
     setCreateUserForm((current) => ({ ...current, [name]: value }));
   };
 
-  const toggleCreateUserRole = (roleId) => {
-    const normalizedId = Number.parseInt(roleId, 10);
-    if (Number.isNaN(normalizedId)) {
-      return;
-    }
-
-    setCreateUserForm((current) => {
-      const currentRoles = new Set(Array.isArray(current.roleIds) ? current.roleIds : []);
-
-      if (currentRoles.has(normalizedId)) {
-        currentRoles.delete(normalizedId);
-      } else {
-        currentRoles.add(normalizedId);
-      }
-
-      return { ...current, roleIds: Array.from(currentRoles) };
-    });
-  };
-
   const handleManageUserFieldChange = (event) => {
-    if (manageUserState.mode !== 'edit') {
+    const { name, value, type, checked } = event.target;
+    if (type === 'checkbox') {
+      setManageUserState((current) => ({
+        ...current,
+        form: { ...current.form, [name]: checked }
+      }));
       return;
     }
-
-    const { name, value } = event.target;
 
     setManageUserState((current) => ({
       ...current,
@@ -350,46 +364,10 @@ const Users = ({ initialTab = 'users' }) => {
     }));
   };
 
-  const handleUserRoleToggle = (roleId) => {
-    if (manageUserState.mode !== 'edit') {
-      return;
-    }
-
-    const normalizedId = Number.parseInt(roleId, 10);
-
-    setManageUserState((current) => {
-      if (!current.open) {
-        return current;
-      }
-
-      const currentRoles = new Set(Array.isArray(current.form.roleIds) ? current.form.roleIds : []);
-
-      if (currentRoles.has(normalizedId)) {
-        currentRoles.delete(normalizedId);
-      } else {
-        currentRoles.add(normalizedId);
-      }
-
-      return {
-        ...current,
-        form: { ...current.form, roleIds: Array.from(currentRoles) }
-      };
-    });
-  };
-
   const handleCreateUser = async (event) => {
     event.preventDefault();
     setCreateUserBusy(true);
     setStatus({ type: '', message: '' });
-
-    const payload = {
-      firstName: createUserForm.firstName,
-      lastName: createUserForm.lastName,
-      email: createUserForm.email,
-      password: createUserForm.password,
-      passwordConfirmation: createUserForm.passwordConfirmation,
-      roles: createUserForm.roleIds
-    };
 
     try {
       const response = await fetch('/api/users', {
@@ -397,7 +375,7 @@ const Users = ({ initialTab = 'users' }) => {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(createUserForm)
       });
 
       const payload = await response.json().catch(() => ({}));
@@ -411,15 +389,43 @@ const Users = ({ initialTab = 'users' }) => {
         throw new Error(message);
       }
 
-      if (payload?.user) {
-        setUsers((current) => [...current, payload.user]);
-      } else {
-        await refreshUsers();
+      const createdUser = payload?.user ?? null;
+      let roleAssignmentFailed = false;
+
+      if (createdUser && Array.isArray(createUserForm.roleIds) && createUserForm.roleIds.length > 0) {
+        try {
+          const roleResponse = await fetch(`/api/users/${createdUser.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              firstName: createdUser.firstName,
+              lastName: createdUser.lastName,
+              email: createdUser.email,
+              roles: createUserForm.roleIds
+            })
+          });
+
+          if (!roleResponse.ok) {
+            roleAssignmentFailed = true;
+          }
+        } catch (roleError) {
+          console.error('Automatic role assignment failed', roleError);
+          roleAssignmentFailed = true;
+        }
       }
 
-      setStatus({ type: 'success', message: 'User created successfully.' });
+      await refreshUsers();
+
+      setStatus({
+        type: roleAssignmentFailed ? 'warning' : 'success',
+        message: roleAssignmentFailed
+          ? 'User created. Open the Edit dialog to finish assigning roles because the automatic update was blocked.'
+          : 'User created successfully.'
+      });
       setCreateUserOpen(false);
-      setCreateUserForm({ ...emptyCreateUserForm, roleIds: [] });
+      setCreateUserForm(emptyCreateUserForm);
     } catch (error) {
       setStatus({ type: 'error', message: error.message });
     } finally {
@@ -429,7 +435,7 @@ const Users = ({ initialTab = 'users' }) => {
 
   const handleUpdateUser = async (event) => {
     event.preventDefault();
-    if (!manageUserState.userId || manageUserState.mode !== 'edit') {
+    if (!manageUserState.userId) {
       return;
     }
 
@@ -490,15 +496,15 @@ const Users = ({ initialTab = 'users' }) => {
   };
 
   const handleDeleteUser = async () => {
-    if (!deletePrompt.record) {
+    if (!manageUserState.userId) {
       return;
     }
 
-    setDeletePrompt((current) => ({ ...current, busy: true }));
+    setDeleteUserBusy(true);
     setStatus({ type: '', message: '' });
 
     try {
-      const response = await fetch(`/api/users/${deletePrompt.record.id}`, {
+      const response = await fetch(`/api/users/${manageUserState.userId}`, {
         method: 'DELETE'
       });
 
@@ -509,18 +515,18 @@ const Users = ({ initialTab = 'users' }) => {
         throw new Error(message);
       }
 
-      setUsers((current) => current.filter((entry) => entry.id !== deletePrompt.record.id));
+      setUsers((current) => current.filter((entry) => entry.id !== manageUserState.userId));
 
-      if (user && deletePrompt.record.id === user.id) {
+      if (user && manageUserState.userId === user.id) {
         logout();
       }
 
       setStatus({ type: 'success', message: 'User removed successfully.' });
-      closeDeletePrompt();
+      closeManageUserModal();
     } catch (error) {
       setStatus({ type: 'error', message: error.message });
     } finally {
-      setDeletePrompt((current) => ({ ...current, busy: false }));
+      setDeleteUserBusy(false);
     }
   };
 
@@ -538,10 +544,6 @@ const Users = ({ initialTab = 'users' }) => {
   };
 
   const handleManageRoleFieldChange = (event) => {
-    if (manageRoleState.mode !== 'edit') {
-      return;
-    }
-
     const { name, value, type, checked } = event.target;
 
     if (type === 'checkbox') {
@@ -567,12 +569,10 @@ const Users = ({ initialTab = 'users' }) => {
     setStatus({ type: '', message: '' });
   };
 
-  const openManageRoleModal = (roleRecord, mode = 'edit') => {
+  const openManageRoleModal = (roleRecord) => {
     setManageRoleState({
       open: true,
-      mode,
       roleId: roleRecord.id,
-      record: roleRecord,
       form: {
         name: roleRecord.name ?? '',
         permissions: { ...emptyRoleForm.permissions, ...(roleRecord.permissions ?? {}) }
@@ -582,21 +582,9 @@ const Users = ({ initialTab = 'users' }) => {
   };
 
   const closeManageRoleModal = () => {
-    setManageRoleState({ open: false, mode: 'edit', roleId: null, record: null, form: emptyRoleForm });
+    setManageRoleState({ open: false, roleId: null, form: emptyRoleForm });
     setManageRoleBusy(false);
-  };
-
-  const openRoleDeletePrompt = (roleRecord) => {
-    setRoleDeletePrompt({ open: true, record: roleRecord, busy: false });
-    setStatus({ type: '', message: '' });
-  };
-
-  const closeRoleDeletePrompt = () => {
-    setRoleDeletePrompt({ open: false, record: null, busy: false });
-  };
-
-  const enableRoleEditing = () => {
-    setManageRoleState((current) => ({ ...current, mode: 'edit' }));
+    setDeleteRoleBusy(false);
   };
 
   const handleCreateRole = async (event) => {
@@ -639,7 +627,7 @@ const Users = ({ initialTab = 'users' }) => {
   const handleUpdateRole = async (event) => {
     event.preventDefault();
 
-    if (!manageRoleState.roleId || manageRoleState.mode !== 'edit') {
+    if (!manageRoleState.roleId) {
       return;
     }
 
@@ -679,15 +667,15 @@ const Users = ({ initialTab = 'users' }) => {
   };
 
   const handleDeleteRole = async () => {
-    if (!roleDeletePrompt.record) {
+    if (!manageRoleState.roleId) {
       return;
     }
 
-    setRoleDeletePrompt((current) => ({ ...current, busy: true }));
+    setDeleteRoleBusy(true);
     setStatus({ type: '', message: '' });
 
     try {
-      const response = await fetch(`/api/roles/${roleDeletePrompt.record.id}`, {
+      const response = await fetch(`/api/roles/${manageRoleState.roleId}`, {
         method: 'DELETE'
       });
 
@@ -698,14 +686,14 @@ const Users = ({ initialTab = 'users' }) => {
         throw new Error(message);
       }
 
-      setRoles((current) => current.filter((entry) => entry.id !== roleDeletePrompt.record.id));
+      setRoles((current) => current.filter((entry) => entry.id !== manageRoleState.roleId));
       await refreshUsers();
       setStatus({ type: 'success', message: 'Role removed successfully.' });
-      setRoleDeletePrompt({ open: false, record: null, busy: false });
+      closeManageRoleModal();
     } catch (error) {
       setStatus({ type: 'error', message: error.message });
     } finally {
-      setRoleDeletePrompt((current) => ({ ...current, busy: false }));
+      setDeleteRoleBusy(false);
     }
   };
 
@@ -719,67 +707,56 @@ const Users = ({ initialTab = 'users' }) => {
     }
 
     return (
-      <div className="directory-grid" role="list" aria-live="polite">
-        {filteredUsers.map((entry) => {
-          const fullName = `${entry.firstName ?? ''} ${entry.lastName ?? ''}`.trim() || entry.email;
-          const createdLabel = entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '—';
-          const roleNames = Array.isArray(entry.roles)
-            ? entry.roles.map((role) => role.name).filter(Boolean)
-            : [];
-
-          return (
-            <article key={entry.id} className="directory-card" role="listitem">
-              <header className="directory-card__header">
-                <div>
-                  <h3 className="directory-card__title">{fullName}</h3>
-                  <p className="directory-card__subtitle">{entry.email}</p>
-                </div>
-                <span className="directory-card__badge">ID {entry.id}</span>
-              </header>
-              <dl className="directory-card__meta">
-                <div>
-                  <dt>Created</dt>
-                  <dd>{createdLabel}</dd>
-                </div>
-                <div>
-                  <dt>Roles</dt>
-                  <dd>{roleNames.length > 0 ? roleNames.join(', ') : '—'}</dd>
-                </div>
-              </dl>
-              {roleNames.length > 0 ? (
-                <ul className="directory-card__chips">
-                  {entry.roles.map((role) => (
-                    <li key={`${entry.id}-${role.id}`}>{role.name}</li>
-                  ))}
-                </ul>
-              ) : null}
-              <footer className="directory-card__actions">
-                <button
-                  type="button"
-                  className="action-chip"
-                  onClick={() => openManageUserModal(entry, 'view')}
-                >
-                  View
-                </button>
-                <button
-                  type="button"
-                  className="action-chip action-chip--primary"
-                  onClick={() => openManageUserModal(entry, 'edit')}
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  className="action-chip action-chip--danger"
-                  onClick={() => openDeleteUserPrompt(entry)}
-                >
-                  Delete
-                </button>
-              </footer>
-            </article>
-          );
-        })}
-      </div>
+      <ul className="management-list" aria-live="polite">
+        {filteredUsers.map((entry) => (
+          <li key={entry.id} className="management-list__item">
+            <div className="management-list__summary">
+              <span className="management-list__title">
+                {entry.firstName} {entry.lastName}
+              </span>
+              <div className="management-list__meta">
+                <span>ID: {entry.id}</span>
+                <span>Email: {entry.email ?? '—'}</span>
+                <span>Created {formatDateTime(entry.createdAt)}</span>
+              </div>
+              <div className="management-list__meta management-list__meta--chips">
+                {Array.isArray(entry.roles) && entry.roles.length > 0 ? (
+                  entry.roles.map((role) => (
+                    <span key={role.id ?? role.name} className="role-chip">
+                      {role.name}
+                    </span>
+                  ))
+                ) : (
+                  <span className="role-chip role-chip--placeholder">No roles assigned</span>
+                )}
+              </div>
+            </div>
+            <div className="management-list__actions">
+              <button
+                type="button"
+                className="action-button action-button--ghost"
+                onClick={() => openManageUserModal(entry, 'view')}
+              >
+                View
+              </button>
+              <button
+                type="button"
+                className="action-button action-button--primary"
+                onClick={() => openManageUserModal(entry, 'edit')}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                className="action-button action-button--danger"
+                onClick={() => openManageUserModal(entry, 'delete')}
+              >
+                Delete
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
     );
   };
 
@@ -793,77 +770,34 @@ const Users = ({ initialTab = 'users' }) => {
     }
 
     return (
-      <div className="directory-grid" role="list" aria-live="polite">
-        {filteredRoles.map((entry) => {
-          const createdLabel = entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '—';
-          const permissionLabels = permissionCatalog
-            .filter((permission) => Boolean(entry.permissions?.[permission.key]))
-            .map((permission) => permission.label);
-
-          return (
-            <article key={entry.id} className="directory-card" role="listitem">
-              <header className="directory-card__header">
-                <div>
-                  <h3 className="directory-card__title">{entry.name}</h3>
-                  <p className="directory-card__subtitle">
-                    Assigned to {entry.assignedCount ?? 0}{' '}
-                    {entry.assignedCount === 1 ? 'user' : 'users'}
-                  </p>
-                </div>
-                <span className="directory-card__badge">ID {entry.id}</span>
-              </header>
-              <dl className="directory-card__meta">
-                <div>
-                  <dt>Created</dt>
-                  <dd>{createdLabel}</dd>
-                </div>
-                <div>
-                  <dt>Permissions</dt>
-                  <dd>{permissionLabels.length > 0 ? permissionLabels.join(', ') : '—'}</dd>
-                </div>
-              </dl>
-              {permissionLabels.length > 0 ? (
-                <ul className="directory-card__chips">
+      <ul className="management-list" aria-live="polite">
+        {filteredRoles.map((entry) => (
+          <li key={entry.id} className="management-list__item">
+            <div className="management-list__summary">
+              <span className="management-list__title">{entry.name}</span>
+              <div className="management-list__meta">
+                <span>Created {new Date(entry.createdAt).toLocaleString()}</span>
+                <span>
+                  Permissions:{' '}
                   {permissionCatalog
                     .filter((permission) => Boolean(entry.permissions?.[permission.key]))
-                    .map((permission) => (
-                      <li key={`${entry.id}-${permission.key}`}>{permission.label}</li>
-                    ))}
-                </ul>
-              ) : (
-                <p className="directory-card__empty">No permissions assigned yet.</p>
-              )}
-              <footer className="directory-card__actions">
-                <button
-                  type="button"
-                  className="action-chip"
-                  onClick={() => openManageRoleModal(entry, 'view')}
-                >
-                  View
-                </button>
-                <button
-                  type="button"
-                  className="action-chip action-chip--primary"
-                  onClick={() => openManageRoleModal(entry, 'edit')}
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  className="action-chip action-chip--danger"
-                  onClick={() => openRoleDeletePrompt(entry)}
-                >
-                  Delete
-                </button>
-              </footer>
-            </article>
-          );
-        })}
-      </div>
+                    .map((permission) => permission.label)
+                    .join(', ') || '—'}
+                </span>
+              </div>
+            </div>
+            <div className="management-list__actions">
+              <button type="button" className="action-button action-button--ghost" onClick={() => openManageRoleModal(entry)}>
+                Edit
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
     );
   };
 
-  const renderPermissionCheckboxes = (form, onChange, { disabled = false } = {}) => (
+  const renderPermissionCheckboxes = (form, onChange) => (
     <div className="permission-grid">
       {permissionCatalog.map((permission) => (
         <label key={permission.key} className="permission-checkbox">
@@ -872,7 +806,6 @@ const Users = ({ initialTab = 'users' }) => {
             name={permission.key}
             checked={Boolean(form.permissions?.[permission.key])}
             onChange={onChange}
-            disabled={disabled}
           />
           <span>{permission.label}</span>
         </label>
@@ -880,75 +813,42 @@ const Users = ({ initialTab = 'users' }) => {
     </div>
   );
 
-  const userModalMode = manageUserState.mode || 'edit';
-  const userReadOnly = userModalMode !== 'edit';
-  const manageUserCreated = manageUserState.record?.createdAt
-    ? new Date(manageUserState.record.createdAt).toLocaleString()
-    : null;
-  const manageUserActions =
-    userModalMode === 'edit'
-      ? [
-          {
-            label: 'Cancel',
-            variant: 'ghost',
-            onClick: closeManageUserModal,
-            disabled: manageUserBusy
-          },
-          {
-            label: manageUserBusy ? 'Saving…' : 'Save changes',
-            variant: 'primary',
-            type: 'submit',
-            form: 'manage-user-form',
-            disabled: manageUserBusy
-          }
-        ]
-      : [
-          {
-            label: 'Close',
-            variant: 'ghost',
-            onClick: closeManageUserModal
-          },
-          {
-            label: 'Edit user',
-            variant: 'primary',
-            onClick: enableUserEditing
-          }
-        ];
-
-  const roleModalMode = manageRoleState.mode || 'edit';
-  const roleReadOnly = roleModalMode !== 'edit';
-  const manageRoleCreated = manageRoleState.record?.createdAt
-    ? new Date(manageRoleState.record.createdAt).toLocaleString()
-    : null;
-  const manageRoleActions =
-    roleModalMode === 'edit'
-      ? [
-          {
-            label: 'Cancel',
-            variant: 'ghost',
-            onClick: closeManageRoleModal,
-            disabled: manageRoleBusy
-          },
-          {
-            label: manageRoleBusy ? 'Saving…' : 'Save changes',
-            variant: 'primary',
-            type: 'submit',
-            form: 'manage-role-form',
-            disabled: manageRoleBusy
-          }
-        ]
-      : [
-          {
-            label: 'Close',
-            variant: 'ghost',
-            onClick: closeManageRoleModal
-          },
-          {
-            label: 'Edit role',
-            variant: 'primary',
-            onClick: enableRoleEditing
-          }
-        ];
+  const manageMode = manageUserState.mode ?? 'edit';
+  const isEditMode = manageMode === 'edit';
+  const isViewMode = manageMode === 'view';
+  const isDeleteMode = manageMode === 'delete';
+  const manageTitle = isDeleteMode ? 'Remove user' : isViewMode ? 'View user' : 'Manage user';
+  const manageModalActions = [
+    isDeleteMode
+      ? {
+          label: deleteUserBusy ? 'Deleting…' : 'Delete user',
+          variant: 'danger',
+          onClick: handleDeleteUser,
+          disabled: manageUserBusy || deleteUserBusy
+        }
+      : null,
+    isViewMode
+      ? {
+          label: 'Edit user',
+          variant: 'primary',
+          onClick: () => setManageUserState((current) => ({ ...current, mode: 'edit' }))
+        }
+      : isEditMode
+      ? {
+          label: manageUserBusy ? 'Saving…' : 'Save changes',
+          variant: 'primary',
+          type: 'submit',
+          form: 'manage-user-form',
+          disabled: manageUserBusy
+        }
+      : null,
+    {
+      label: 'Close',
+      variant: 'ghost',
+      onClick: closeManageUserModal,
+      disabled: manageUserBusy || deleteUserBusy
+    }
+  ].filter(Boolean);
 
   return (
     <div className="management-page">
@@ -1087,145 +987,108 @@ const Users = ({ initialTab = 'users' }) => {
               required
             />
           </label>
-          <div className="form-field-group wide">
-            <RolePicker
-              label="Assign roles"
-              options={roleOptions}
-              selectedIds={createUserForm.roleIds}
+          <div className="form-grid__field wide">
+            <span className="form-field-label">Roles</span>
+            <RoleDropdown
+              roles={roles}
+              selectedIds={createUserForm.roleIds ?? []}
               onToggle={toggleCreateUserRole}
-              disabled={createUserBusy || roles.length === 0}
+              placeholder="Select starting roles (optional)"
             />
-            <p className="field-hint">
-              {roles.length === 0
-                ? 'Create your first role in the Roles tab to assign access.'
-                : 'Select one or more roles to grant access immediately.'}
-            </p>
           </div>
         </form>
       </Modal>
 
       <Modal
-        title="Remove user"
-        open={deletePrompt.open}
-        onClose={deletePrompt.busy ? () => {} : closeDeletePrompt}
-        actions={[
-          {
-            label: 'Cancel',
-            variant: 'ghost',
-            onClick: closeDeletePrompt,
-            disabled: deletePrompt.busy
-          },
-          {
-            label: deletePrompt.busy ? 'Deleting…' : 'Delete user',
-            variant: 'danger',
-            onClick: handleDeleteUser,
-            disabled: deletePrompt.busy
-          }
-        ]}
-      >
-        <p className="management-list__subtitle">
-          Removing <strong>{deletePrompt.record?.email ?? 'this account'}</strong> will revoke their access immediately. This
-          action cannot be undone.
-        </p>
-      </Modal>
-
-      <Modal
-        title="Manage user"
+        title={manageTitle}
         open={manageUserState.open}
         onClose={closeManageUserModal}
-        actions={manageUserActions}
+        actions={manageModalActions}
       >
-        <form id="manage-user-form" className="form-sections" onSubmit={handleUpdateUser}>
-          <div className="management-list__meta">
-            <span>ID: {manageUserState.record?.id ?? '—'}</span>
-            {manageUserCreated ? <span>Created: {manageUserCreated}</span> : null}
-          </div>
-          <div className="form-section">
-            <p className="form-section__title">Profile</p>
-            <div className="form-section__grid">
-              <label>
-                <span>First name</span>
-                <input
-                  name="firstName"
-                  value={manageUserState.form.firstName}
-                  onChange={handleManageUserFieldChange}
-                  autoComplete="given-name"
-                  required
-                  disabled={userReadOnly || manageUserBusy}
-                />
-              </label>
-              <label>
-                <span>Last name</span>
-                <input
-                  name="lastName"
-                  value={manageUserState.form.lastName}
-                  onChange={handleManageUserFieldChange}
-                  autoComplete="family-name"
-                  required
-                  disabled={userReadOnly || manageUserBusy}
-                />
-              </label>
-              <label>
-                <span>Email</span>
-                <input
-                  type="email"
-                  name="email"
-                  value={manageUserState.form.email}
-                  onChange={handleManageUserFieldChange}
-                  autoComplete="email"
-                  required
-                  disabled={userReadOnly || manageUserBusy}
-                />
-              </label>
-            </div>
-          </div>
-          <div className="form-section">
-            <p className="form-section__title">Credentials</p>
-            <div className="form-section__grid">
-              <label>
-                <span>New password</span>
-                <input
-                  type="password"
-                  name="password"
-                  value={manageUserState.form.password}
-                  onChange={handleManageUserFieldChange}
-                  minLength={8}
-                  autoComplete="new-password"
-                  placeholder={userReadOnly ? '••••••••' : 'Set a new password'}
-                  disabled={userReadOnly || manageUserBusy}
-                />
-              </label>
-              <label>
-                <span>Confirm password</span>
-                <input
-                  type="password"
-                  name="passwordConfirmation"
-                  value={manageUserState.form.passwordConfirmation}
-                  onChange={handleManageUserFieldChange}
-                  minLength={8}
-                  autoComplete="new-password"
-                  placeholder={userReadOnly ? '••••••••' : 'Confirm new password'}
-                  disabled={userReadOnly || manageUserBusy}
-                />
-              </label>
-            </div>
-          </div>
-          <div className="form-section">
-            <p className="form-section__title">Roles</p>
-            <RolePicker
-              label="Assigned roles"
-              options={roleOptions}
-              selectedIds={manageUserState.form.roleIds}
-              onToggle={handleUserRoleToggle}
-              disabled={userReadOnly || manageUserBusy || roles.length === 0}
-            />
-            <p className="field-hint">
-              {roles.length === 0
-                ? 'No roles are available yet. Create one from the Roles tab.'
-                : 'Use the selector above to adjust access while keeping the modal compact.'}
+        {isDeleteMode ? (
+          <div className="confirm-panel">
+            <p>
+              Are you sure you want to remove{' '}
+              <strong>
+                {manageUserState.form.firstName} {manageUserState.form.lastName}
+              </strong>
+              ?
             </p>
+            <p>Email: {manageUserState.form.email ?? '—'}</p>
+            <p>This action revokes all access for the operator. Existing audit logs remain available.</p>
           </div>
-        </form>
+        ) : (
+          <form id="manage-user-form" className="form-grid" onSubmit={handleUpdateUser}>
+            <label>
+              <span>First name</span>
+              <input
+                name="firstName"
+                value={manageUserState.form.firstName}
+                onChange={handleManageUserFieldChange}
+                required
+                disabled={!isEditMode}
+              />
+            </label>
+            <label>
+              <span>Last name</span>
+              <input
+                name="lastName"
+                value={manageUserState.form.lastName}
+                onChange={handleManageUserFieldChange}
+                required
+                disabled={!isEditMode}
+              />
+            </label>
+            <label className="wide">
+              <span>Email</span>
+              <input
+                type="email"
+                name="email"
+                value={manageUserState.form.email}
+                onChange={handleManageUserFieldChange}
+                required
+                disabled={!isEditMode}
+              />
+            </label>
+            <div className="form-grid__field wide">
+              <span className="form-field-label">Roles</span>
+              <RoleDropdown
+                roles={roles}
+                selectedIds={manageUserState.form.roleIds ?? []}
+                onToggle={toggleManageUserRole}
+                disabled={!isEditMode}
+                placeholder="No roles assigned"
+              />
+            </div>
+            <label>
+              <span>New password</span>
+              <input
+                type="password"
+                name="password"
+                value={manageUserState.form.password}
+                onChange={handleManageUserFieldChange}
+                minLength={8}
+                autoComplete="new-password"
+                placeholder="Leave blank to keep current password"
+                disabled={!isEditMode}
+              />
+            </label>
+            <label>
+              <span>Confirm password</span>
+              <input
+                type="password"
+                name="passwordConfirmation"
+                value={manageUserState.form.passwordConfirmation}
+                onChange={handleManageUserFieldChange}
+                minLength={8}
+                autoComplete="new-password"
+                placeholder="Repeat the new password"
+                disabled={!isEditMode}
+              />
+            </label>
+            <p className="field-hint">Created {formatDateTime(users.find((u) => u.id === manageUserState.userId)?.createdAt)}</p>
+          </form>
+        )}
       </Modal>
 
       <Modal
@@ -1264,63 +1127,38 @@ const Users = ({ initialTab = 'users' }) => {
         title="Manage role"
         open={manageRoleState.open}
         onClose={closeManageRoleModal}
-        actions={manageRoleActions}
-      >
-        <form id="manage-role-form" className="form-sections" onSubmit={handleUpdateRole}>
-          <div className="management-list__meta">
-            <span>ID: {manageRoleState.record?.id ?? '—'}</span>
-            {manageRoleCreated ? <span>Created: {manageRoleCreated}</span> : null}
-          </div>
-          <div className="form-section">
-            <p className="form-section__title">Role details</p>
-            <div className="form-section__grid">
-              <label>
-                <span>Role name</span>
-                <input
-                  name="name"
-                  value={manageRoleState.form.name}
-                  onChange={handleManageRoleFieldChange}
-                  required
-                  disabled={roleReadOnly || manageRoleBusy}
-                />
-              </label>
-            </div>
-          </div>
-          <div className="form-section">
-            <p className="form-section__title">Permissions</p>
-            {renderPermissionCheckboxes(manageRoleState.form, handleManageRoleFieldChange, {
-              disabled: roleReadOnly || manageRoleBusy
-            })}
-            <p className="management-list__subtitle">
-              Toggle the areas of MikroManage that members of this role can access.
-            </p>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        title="Remove role"
-        open={roleDeletePrompt.open}
-        onClose={roleDeletePrompt.busy ? () => {} : closeRoleDeletePrompt}
         actions={[
+          {
+            label: deleteRoleBusy ? 'Deleting…' : 'Delete',
+            variant: 'danger',
+            onClick: handleDeleteRole,
+            disabled: manageRoleBusy || deleteRoleBusy
+          },
           {
             label: 'Cancel',
             variant: 'ghost',
-            onClick: closeRoleDeletePrompt,
-            disabled: roleDeletePrompt.busy
+            onClick: closeManageRoleModal,
+            disabled: manageRoleBusy
           },
           {
-            label: roleDeletePrompt.busy ? 'Deleting…' : 'Delete role',
-            variant: 'danger',
-            onClick: handleDeleteRole,
-            disabled: roleDeletePrompt.busy
+            label: manageRoleBusy ? 'Saving…' : 'Save changes',
+            variant: 'primary',
+            type: 'submit',
+            form: 'manage-role-form',
+            disabled: manageRoleBusy
           }
         ]}
       >
-        <p className="management-list__subtitle">
-          Removing the <strong>{roleDeletePrompt.record?.name ?? 'selected role'}</strong> role will unassign it from any users.
-          Confirm that no critical accounts depend on it before continuing.
-        </p>
+        <form id="manage-role-form" className="form-grid" onSubmit={handleUpdateRole}>
+          <label className="wide">
+            <span>Role name</span>
+            <input name="name" value={manageRoleState.form.name} onChange={handleManageRoleFieldChange} required />
+          </label>
+          <fieldset className="wide">
+            <legend>Permissions</legend>
+            {renderPermissionCheckboxes(manageRoleState.form, handleManageRoleFieldChange)}
+          </fieldset>
+        </form>
       </Modal>
     </div>
   );
