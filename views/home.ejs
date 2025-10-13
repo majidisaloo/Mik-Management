@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mik Management - Welcome</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero__content">
+        <h1>Welcome to Mik Management</h1>
+        <p>Your quick start guide to running the registration portal locally.</p>
+        <a class="button" href="/register">Go to Registration</a>
+      </div>
+    </header>
+
+    <main class="container">
+      <section>
+        <h2>Installation Guide</h2>
+        <ol>
+          <li>Install <strong>Node.js</strong> version 18 or newer from the official website.</li>
+          <li>Clone this repository with <code>git clone &lt;repository-url&gt;</code>.</li>
+          <li>Open the project folder and run <code>npm install</code> to install dependencies.</li>
+          <li>Start the server with <code>npm start</code>.</li>
+          <li>Visit <a href="http://localhost:3000">http://localhost:3000</a> in your browser.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>Essential Git Usage</h2>
+        <p>The following commands are all you need to collaborate with this project:</p>
+        <ul>
+          <li><code>git status</code> – check what changed.</li>
+          <li><code>git add .</code> – stage your updates.</li>
+          <li><code>git commit -m "Describe your change"</code> – save your work.</li>
+          <li><code>git push origin main</code> – publish your commit to the remote repository.</li>
+        </ul>
+        <p>Always pull the latest updates with <code>git pull</code> before you start a new change.</p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>&copy; <span id="year"></span> Mik Management. All rights reserved.</p>
+    </footer>
+
+    <script>
+      document.getElementById('year').textContent = new Date().getFullYear();
+    </script>
+  </body>
+</html>
