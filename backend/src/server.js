@@ -27,16 +27,12 @@ const bootstrap = async () => {
   app.post('/api/register', async (req, res) => {
     const { firstName, lastName, email, password, passwordConfirmation } = req.body;
 
-    if (!firstName || !lastName || !email || !password || !passwordConfirmation) {
+    if (!firstName || !lastName || !email || !password) {
       return res.status(400).json({ message: 'All fields are required.' });
     }
 
-    if (password !== passwordConfirmation) {
+    if (passwordConfirmation !== undefined && password !== passwordConfirmation) {
       return res.status(400).json({ message: 'Passwords must match.' });
-    }
-
-    if (password.length < 8) {
-      return res.status(400).json({ message: 'Password must be at least 8 characters long.' });
     }
 
     try {
@@ -53,6 +49,34 @@ const bootstrap = async () => {
       }
 
       console.error('Registration error', error);
+      res.status(500).json({ message: 'Unexpected error. Please try again.' });
+    }
+  });
+
+  app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required.' });
+    }
+
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const user = await db.get('SELECT password_hash FROM users WHERE email = ?', [normalizedEmail]);
+
+      if (!user) {
+        return res.status(401).json({ message: 'Invalid credentials.' });
+      }
+
+      const passwordIsValid = await bcrypt.compare(password, user.password_hash);
+
+      if (!passwordIsValid) {
+        return res.status(401).json({ message: 'Invalid credentials.' });
+      }
+
+      res.json({ message: 'Login successful.' });
+    } catch (error) {
+      console.error('Login error', error);
       res.status(500).json({ message: 'Unexpected error. Please try again.' });
     }
   });

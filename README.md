@@ -9,8 +9,10 @@ A full-stack registration experience built with React, Vite, Express, and SQLite
 - [Getting Started](#getting-started)
 - [Ubuntu Deployment Quick Start](#ubuntu-deployment-quick-start)
 - [Production Deployment on Ubuntu with Nginx](#production-deployment-on-ubuntu-with-nginx)
+- [Updating an Existing Installation](#updating-an-existing-installation)
 - [Environment Variables](#environment-variables)
 - [Database](#database)
+- [Troubleshooting](#troubleshooting)
 - [Useful npm Scripts](#useful-npm-scripts)
 - [Quick Git Reference](#quick-git-reference)
 - [API Overview](#api-overview)
@@ -81,7 +83,8 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
    ```bash
    npm run dev
    ```
-7. Visit the site at http://localhost:5173 and use the **Register** link to create an account.
+7. Visit the site at http://localhost:5173, create an account from the **Register** page, and sign in from the **Login** page to
+   confirm your credentials.
 
 ## Ubuntu Deployment Quick Start
 
@@ -197,6 +200,39 @@ Follow these steps to deploy the application so it is accessible from the server
    ```
 6. **Visit the application** at `http://<server-ip>/`. The React build will load without a port number, and `/api` requests will be proxied to the Express backend.
 
+## Updating an Existing Installation
+
+Keep your deployment in sync with GitHub using the following workflow:
+
+1. Navigate to the project directory:
+   ```bash
+   cd /opt/mik-management
+   ```
+2. Pull the latest changes and update subdirectories:
+   ```bash
+   sudo git fetch origin
+   sudo git reset --hard origin/main
+   ```
+   If you maintain local commits, replace the reset with `git pull --rebase` and resolve any conflicts using the guidance in
+   `MERGE_RESOLUTION_NOTES.md`.
+3. Reinstall dependencies when package manifests change:
+   ```bash
+   cd backend && npm install
+   cd ../frontend && npm install
+   ```
+4. Rebuild the frontend and restart the API:
+   ```bash
+   npm run build
+   pm2 restart mik-api
+   ```
+5. Reload Nginx if its configuration changed:
+   ```bash
+   sudo nginx -t
+   sudo systemctl reload nginx
+   ```
+
+After these steps, refresh the browser and confirm the Login page accepts your new credentials.
+
 ## Environment Variables
 
 The default configuration works without custom variables. For production deployments you can override the port with `PORT=5000 npm run dev` in the backend.
@@ -211,6 +247,10 @@ The backend uses SQLite and automatically creates the database file at `backend/
   - Pull the latest repository changes: `git pull`.
   - If the error persists, update the dependency manually: `cd backend && npm install sqlite@^5.2.4`.
   - Retry `npm install` to ensure all packages resolve correctly.
+- **Browser message "The string did not match the expected pattern" on registration**
+  - Reload the page with a hard refresh to ensure the latest frontend bundle is loaded.
+  - Confirm that both password fields are filled and match; the backend now accepts any matching string.
+  - If the warning persists, rebuild and redeploy the frontend (`npm run build`) so browsers receive the updated form validation.
 
 ## Useful npm Scripts
 
@@ -233,11 +273,20 @@ The backend uses SQLite and automatically creates the database file at `backend/
 
 `POST /api/register`
 
-- **Body**: `{ firstName, lastName, email, password, passwordConfirmation }`
+- **Body**: `{ firstName, lastName, email, password, passwordConfirmation? }`
 - **Success**: `201 Created`
 - **Errors**:
-  - `400`: Missing fields, mismatched passwords, or weak password
+  - `400`: Missing fields or mismatched passwords
   - `409`: Email already registered
+  - `500`: Unexpected server error
+
+`POST /api/login`
+
+- **Body**: `{ email, password }`
+- **Success**: `200 OK`
+- **Errors**:
+  - `400`: Missing credentials
+  - `401`: Invalid email or password
   - `500`: Unexpected server error
 
 ## License

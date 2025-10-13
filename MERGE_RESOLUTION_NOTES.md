@@ -11,7 +11,7 @@ Use the table below whenever the README shows conflicts. The "Incoming" column r
 | Top-level heading (`# Mik-Management`) | **Accept Incoming** | Preserves the canonical project name and matches GitHub. |
 | Table of Contents and "Project Structure" | **Accept Incoming** | Keeps links to Ubuntu, Nginx, and Git workflow guidance. |
 | "Prerequisites" and "Installing Node.js and npm on Ubuntu" | **Accept Incoming** | Retains the Node.js setup steps that align with the deployment scripts. |
-| "Getting Started" through "Troubleshooting" | **Accept Incoming** | Ensures the deployment, conflict, and npm error fixes remain available. |
+| "Getting Started" through "Troubleshooting" (including "Updating an Existing Installation") | **Accept Incoming** | Ensures the deployment, update, conflict, and npm error fixes remain available. |
 | Any new blank lines introduced by Git | **Accept Incoming** (or manually delete) | Prevents duplicate spacing when merging. |
 
 There are no sections that require **Accept Both** with the current GitHub upstream. If future upstream changes add content you want to keep, resolve section by section and prefer incoming unless the upstream text introduces new requirements.

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const initialState = {
   firstName: '',
@@ -12,6 +13,7 @@ const Register = () => {
   const [form, setForm] = useState(initialState);
   const [status, setStatus] = useState({ type: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -43,8 +45,9 @@ const Register = () => {
         throw new Error(error.message || 'Registration failed.');
       }
 
-      setStatus({ type: 'success', message: 'Registration successful.' });
+      const email = form.email;
       setForm(initialState);
+      navigate('/login', { replace: true, state: { registered: true, email } });
     } catch (error) {
       setStatus({ type: 'error', message: error.message });
     } finally {
@@ -96,7 +99,6 @@ const Register = () => {
             onChange={handleChange}
             autoComplete="new-password"
             required
-            minLength={8}
           />
         </label>
         <label>
@@ -108,7 +110,6 @@ const Register = () => {
             onChange={handleChange}
             autoComplete="new-password"
             required
-            minLength={8}
           />
         </label>
         <button type="submit" disabled={isSubmitting} className="primary-button">
@@ -116,9 +117,7 @@ const Register = () => {
         </button>
       </form>
       {status.message && (
-        <p className={status.type === 'error' ? 'feedback error' : 'feedback success'}>
-          {status.message}
-        </p>
+        <p className="feedback error">{status.message}</p>
       )}
     </section>
   );

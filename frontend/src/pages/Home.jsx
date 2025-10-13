@@ -34,6 +34,15 @@ const Home = () => {
         <code>/api</code> to <code>http://127.0.0.1:4000</code>.
       </p>
 
+      <h2>Updating Existing Deployments</h2>
+      <ol>
+        <li>SSH into the server and switch to <code>/opt/mik-management</code>.</li>
+        <li>Fetch the latest code: <code>sudo git fetch origin</code> followed by <code>sudo git reset --hard origin/main</code>.</li>
+        <li>Reinstall backend and frontend dependencies with <code>npm install</code> in each folder.</li>
+        <li>Rebuild the frontend using <code>npm run build</code> and restart PM2 with <code>pm2 restart mik-api</code>.</li>
+        <li>Reload Nginx if needed: <code>sudo systemctl reload nginx</code>.</li>
+      </ol>
+
       <h2>Quick Git Tips</h2>
       <ul>
         <li>Check your current status with <code>git status</code>.</li>

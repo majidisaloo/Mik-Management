@@ -9,9 +9,10 @@ const Layout = () => {
         </Link>
         <nav>
           <NavLink to="/" end>
-            Guide
+            Home
           </NavLink>
           <NavLink to="/register">Register</NavLink>
+          <NavLink to="/login">Login</NavLink>
         </nav>
       </header>
       <main className="app-main">
