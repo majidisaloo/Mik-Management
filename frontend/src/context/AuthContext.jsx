@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 const AuthContext = createContext({
   user: null,
@@ -24,6 +24,8 @@ export const AuthProvider = ({ children }) => {
     }
   });
 
+  const refreshedUsersRef = useRef(new Set());
+
   useEffect(() => {
     try {
       if (typeof window === 'undefined') {
@@ -39,6 +41,60 @@ export const AuthProvider = ({ children }) => {
       console.warn('Unable to persist session', error);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    if (refreshedUsersRef.current.has(user.id)) {
+      return;
+    }
+
+    const controller = new AbortController();
+    let isMounted = true;
+
+    const refreshUser = async () => {
+      try {
+        const response = await fetch(`/api/users/${user.id}`, { signal: controller.signal });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = await response.json();
+        if (!payload?.user) {
+          return;
+        }
+
+        if (!isMounted) {
+          return;
+        }
+
+        setUser((current) => {
+          if (!current || current.id !== user.id) {
+            return current;
+          }
+
+          return { ...current, ...payload.user };
+        });
+
+        refreshedUsersRef.current.add(user.id);
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          return;
+        }
+        console.warn('Unable to refresh user record', error);
+      }
+    };
+
+    refreshUser();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [user?.id]);
 
   const value = useMemo(
     () => ({

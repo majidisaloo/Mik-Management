@@ -33,6 +33,8 @@ All files under `backend/` and `frontend/` are new in this branch and do not exi
 
 - The Mik-Groups feature introduces `frontend/src/pages/Groups.jsx`, supporting styles in `frontend/src/styles.css`, and the updated sidebar layout in `frontend/src/components/Layout.jsx`. Accept the incoming versions so the management hierarchy, theme toggle placement, and responsive tweaks remain consistent.
 - The Mikrotiks workspace adds `frontend/src/pages/Mikrotiks.jsx`, new navigation wiring in `frontend/src/App.jsx` and `frontend/src/components/Layout.jsx`, and extended styling rules inside `frontend/src/styles.css`. Accept the incoming versions to retain the device inventory UI, router configuration forms, and responsive behaviour.
+- `frontend/src/components/Layout.jsx` now renders the full management menu with disabled placeholders until permissions load. Keep the incoming file so sidebar links remain visible during upgrades.
+- `frontend/src/context/AuthContext.jsx` refreshes the signed-in operator from `/api/users/:id` to populate new permissions after deployments. Accept incoming to avoid losing that automatic session normalization.
 - The Settings workspace introduces `frontend/src/pages/Settings.jsx`, which keeps the configuration area permission-gated while future controls are staged. Accept the incoming version so the placeholder messaging and routing stay intact.
 - The footer version indicator relies on `backend/src/version.js` and supporting changes inside `backend/src/server.js` and `frontend/src/components/Layout.jsx`. Accept incoming to keep the automatically generated `0.<commit-count>` build label.
 

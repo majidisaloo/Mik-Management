@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import BrandMark from './BrandMark.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -104,6 +104,74 @@ const Layout = () => {
     );
   };
 
+  const navigation = useMemo(
+    () => [
+      {
+        label: null,
+        items: [
+          {
+            to: '/dashboard',
+            label: 'Dashboard',
+            permissionKey: 'dashboard'
+          }
+        ]
+      },
+      {
+        label: 'Management',
+        items: [
+          {
+            to: '/users',
+            label: 'Users',
+            permissionKey: 'users'
+          },
+          {
+            to: '/roles',
+            label: 'Roles',
+            permissionKey: 'roles'
+          },
+          {
+            to: '/groups',
+            label: 'Mik-Groups',
+            permissionKey: 'groups'
+          },
+          {
+            to: '/mikrotiks',
+            label: "Mikrotik's",
+            permissionKey: 'mikrotiks'
+          },
+          {
+            to: '/settings',
+            label: 'Settings',
+            permissionKey: 'settings'
+          }
+        ]
+      }
+    ],
+    []
+  );
+
+  const renderNavEntry = (item) => {
+    const hasAccess = item.permissionKey ? Boolean(user?.permissions?.[item.permissionKey]) : true;
+
+    if (hasAccess) {
+      return (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+        >
+          {item.label}
+        </NavLink>
+      );
+    }
+
+    return (
+      <span key={`${item.to}-disabled`} className="sidebar-link sidebar-link--disabled" role="link" aria-disabled="true">
+        {item.label}
+      </span>
+    );
+  };
+
   return (
     <div className={`app-shell${user ? ' app-shell--authed' : ''}`}>
       <header className="app-header">
@@ -133,17 +201,12 @@ const Layout = () => {
         <div className="app-content">
           <aside className="app-sidebar" aria-label="Primary navigation">
             <nav className="sidebar-nav">
-              <div className="sidebar-group">
-                <NavLink to="/dashboard">Dashboard</NavLink>
-              </div>
-              <div className="sidebar-group">
-                <p className="sidebar-group__label">Management</p>
-                {user.permissions?.users ? <NavLink to="/users">Users</NavLink> : null}
-                {user.permissions?.roles ? <NavLink to="/roles">Roles</NavLink> : null}
-                {user.permissions?.groups ? <NavLink to="/groups">Mik-Groups</NavLink> : null}
-                {user.permissions?.mikrotiks ? <NavLink to="/mikrotiks">Mikrotik's</NavLink> : null}
-                {user.permissions?.settings ? <NavLink to="/settings">Settings</NavLink> : null}
-              </div>
+              {navigation.map((section) => (
+                <div className="sidebar-group" key={section.label ?? 'primary'}>
+                  {section.label ? <p className="sidebar-group__label">{section.label}</p> : null}
+                  {section.items.map((item) => renderNavEntry(item))}
+                </div>
+              ))}
             </nav>
             <div className="sidebar-footer">{renderThemeToggle('sidebar')}</div>
           </aside>

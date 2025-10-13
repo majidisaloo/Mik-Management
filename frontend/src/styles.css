@@ -273,7 +273,8 @@ body {
   margin: 0;
 }
 
-.sidebar-nav a {
+.sidebar-nav .sidebar-link {
+  display: block;
   text-decoration: none;
   color: var(--sidebar-link);
   font-weight: 600;
@@ -282,13 +283,21 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.sidebar-nav a:hover {
+.sidebar-nav .sidebar-link:hover,
+.sidebar-nav .sidebar-link:focus-visible {
   color: var(--sidebar-link-hover);
 }
 
-.sidebar-nav a.active {
+.sidebar-nav .sidebar-link.active {
   color: var(--sidebar-link-active);
   background: var(--chip-active-background);
+}
+
+.sidebar-nav .sidebar-link--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  color: var(--subtle-text);
+  pointer-events: none;
 }
 
 .sidebar-footer {
@@ -1399,7 +1408,7 @@ body {
     padding: 1.5rem 1.25rem;
   }
 
-  .sidebar-nav a {
+  .sidebar-nav .sidebar-link {
     width: 100%;
     text-align: center;
   }

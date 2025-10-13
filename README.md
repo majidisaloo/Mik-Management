@@ -285,8 +285,7 @@ Keep your deployment in sync with GitHub using the following workflow:
    npm run prepare:db
    pm2 restart mik-api
    ```
-   > **Tip:** If the npm registry blocks `npm audit fix --force`, rerun it later or skip the command—the backend has no external
-   > dependencies so the audit normally reports zero issues.
+  > **Tip:** If `npm audit fix --force` fails with `connect ENETUNREACH …`, the server cannot reach the npm registry. Confirm outbound access or temporarily run `npm config set audit false --location=project`, finish the build, and clear the override with `npm config delete audit --location=project` once connectivity is restored. The backend has no third-party dependencies, so skipping the audit during an outage is safe.
    >
   > `npm run prepare:db` is safe to run on every update. It backs up any legacy SQLite file, recreates missing folders, refreshes Mik-Groups and Mikrotik records, and verifies the JSON data store is ready before the API restarts.
 4. Update the frontend dependencies and publish a fresh production build:
