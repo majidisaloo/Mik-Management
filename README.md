@@ -8,6 +8,8 @@ A full-stack registration experience built with React, Vite, and a lightweight N
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
 - [Dashboard Overview](#dashboard-overview)
+- [Users Workspace](#users-workspace)
+- [Roles Workspace](#roles-workspace)
 - [Ubuntu Deployment Quick Start](#ubuntu-deployment-quick-start)
 - [Production Deployment on Ubuntu with Nginx](#production-deployment-on-ubuntu-with-nginx)
 - [Updating an Existing Installation](#updating-an-existing-installation)
@@ -89,16 +91,30 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
    npm run dev
    ```
 8. Visit the site at http://localhost:5173. The **Login** screen loads first—use the **Register** link in the header to create an
-   account, sign in with the credentials you just added, and you will land on the **Dashboard**. The dashboard presents a Users
-   table with your operator record and a form to update your first name, last name, or email address at any time.
+   account, sign in with the credentials you just added, and you will land on the **Dashboard**. After authentication the header
+   condenses to a logout button and the primary navigation shifts to the left sidebar. The dashboard now highlights your roles,
+   effective permissions, and provides a profile form to adjust your first name, last name, or email address at any time.
    - Click the moon icon in the header to enable the new dark mode theme for low-light environments. Click the sun icon to return
      to the bright daytime palette. Your choice is remembered locally for future visits.
 
 ### Dashboard Overview
 
-- **Users card** – Lists the signed-in operator with the ID, email, and creation timestamp for quick verification.
-- **Profile form** – Update the first name, last name, or email address and submit to persist the changes to the secure data file instantly.
+- **Sidebar navigation** – The vertical menu on the left provides quick access to the Dashboard, Users, and Roles workspaces. The Users and Roles links only appear when your assigned roles grant those permissions.
+- **Access summary** – Review the roles attached to your account and the resulting Dashboard, Users, and Roles capabilities in the highlighted chips.
+- **Profile form** – Update your first name, last name, or email address and submit to persist the changes to the secure data file instantly.
 - **Session controls** – Use the header Logout button to clear the session and return to the Login screen.
+
+### Users Workspace
+
+- **Directory table** – The Users screen lists every operator, highlighting the currently selected row and showing each person’s roles.
+- **Select and edit** – Choose an operator from the dropdown to load their details into the form, adjust contact information, optionally set a new password, and assign or remove roles before saving.
+- **Permission aware** – Only operators with the Users permission can access this page. Attempts to reach the screen without the permission redirect back to the Dashboard.
+
+### Roles Workspace
+
+- **Role library** – Review every role, rename them inline, and toggle Dashboard, Users, and Roles permissions before saving.
+- **Create and delete** – Add new roles tailored to teams such as sales or support. Roles that are still assigned to users cannot be deleted until those users are reassigned, preventing accidental loss of access.
+- **Guided feedback** – Success and error alerts surface immediately so you know when actions complete or require additional steps.
 
 ## Ubuntu Deployment Quick Start
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -15,25 +15,8 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', message: '' });
   const [isSaving, setIsSaving] = useState(false);
-
-  const userRow = useMemo(() => {
-    if (!user) {
-      return [];
-    }
-
-    const createdAtLabel = user.createdAt
-      ? new Date(`${user.createdAt}Z`).toLocaleString()
-      : 'Not recorded';
-
-    return [
-      {
-        id: user.id,
-        name: `${user.firstName} ${user.lastName}`.trim(),
-        email: user.email,
-        createdAt: createdAtLabel
-      }
-    ];
-  }, [user]);
+  const [assignedRoles, setAssignedRoles] = useState([]);
+  const [permissions, setPermissions] = useState({ dashboard: false, users: false, roles: false });
 
   useEffect(() => {
     if (!user) {
@@ -65,6 +48,12 @@ const Dashboard = () => {
           firstName: userPayload.firstName ?? '',
           lastName: userPayload.lastName ?? '',
           email: userPayload.email ?? ''
+        });
+        setAssignedRoles(Array.isArray(userPayload.roles) ? userPayload.roles : []);
+        setPermissions({
+          dashboard: Boolean(userPayload.permissions?.dashboard),
+          users: Boolean(userPayload.permissions?.users),
+          roles: Boolean(userPayload.permissions?.roles)
         });
         setStatus({ type: '', message: '' });
       } catch (error) {
@@ -138,6 +127,12 @@ const Dashboard = () => {
           lastName: updatedUser.lastName ?? '',
           email: updatedUser.email ?? ''
         });
+        setAssignedRoles(Array.isArray(updatedUser.roles) ? updatedUser.roles : []);
+        setPermissions({
+          dashboard: Boolean(updatedUser.permissions?.dashboard),
+          users: Boolean(updatedUser.permissions?.users),
+          roles: Boolean(updatedUser.permissions?.roles)
+        });
       }
 
       setStatus({ type: 'success', message: payload?.message ?? 'Profile updated successfully.' });
@@ -157,31 +152,34 @@ const Dashboard = () => {
       <section className="card">
         <h1>Welcome back, {user.firstName || 'operator'}.</h1>
         <p className="card-intro">
-          Manage account details and review the user list below. Changes are saved instantly once you
-          submit the form.
+          Keep your contact details current and review the access you have within MikroManage. Any changes you save here take
+          effect immediately.
         </p>
-        <div className="user-table-wrapper">
-          <h2>Users</h2>
-          <table className="user-table">
-            <thead>
-              <tr>
-                <th scope="col">ID</th>
-                <th scope="col">Name</th>
-                <th scope="col">Email</th>
-                <th scope="col">Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {userRow.map((entry) => (
-                <tr key={entry.id}>
-                  <td>{entry.id}</td>
-                  <td>{entry.name}</td>
-                  <td>{entry.email}</td>
-                  <td>{entry.createdAt}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="role-overview">
+          <div>
+            <h2>Your roles</h2>
+            <div className="role-badges">
+              {assignedRoles.length > 0 ? (
+                assignedRoles.map((role) => (
+                  <span key={role.id} className="role-badge">
+                    {role.name}
+                  </span>
+                ))
+              ) : (
+                <span className="muted">No roles assigned</span>
+              )}
+            </div>
+          </div>
+          <div>
+            <h2>Effective access</h2>
+            <div className="permission-chips">
+              <span className={`permission-chip${permissions.dashboard ? ' permission-chip--active' : ''}`}>
+                Dashboard
+              </span>
+              <span className={`permission-chip${permissions.users ? ' permission-chip--active' : ''}`}>Users</span>
+              <span className={`permission-chip${permissions.roles ? ' permission-chip--active' : ''}`}>Roles</span>
+            </div>
+          </div>
         </div>
         <form className="form-grid" onSubmit={handleSubmit}>
           <h2 className="wide">Update Profile</h2>

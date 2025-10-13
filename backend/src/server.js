@@ -7,6 +7,12 @@ import { ensureDatabaseConfig, getConfigFilePath } from './config.js';
 const normalizeString = (value) => (typeof value === 'string' ? value.trim() : '');
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const basePermissions = {
+  dashboard: false,
+  users: false,
+  roles: false
+};
+
 const pepperPassword = (password, secret) => `${password}${secret}`;
 
 const hashPassword = (password, secret) => {
@@ -41,7 +47,7 @@ const verifyPassword = (password, secret, storedHash) => {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET,POST,PUT,OPTIONS',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type'
 };
 
@@ -91,13 +97,64 @@ const parseJsonBody = (req) =>
     });
   });
 
-const mapUser = (user) => ({
-  id: user.id,
-  firstName: user.firstName,
-  lastName: user.lastName,
-  email: user.email,
-  createdAt: user.createdAt
+const parsePermissions = (permissions = {}) => {
+  const normalized = { ...basePermissions };
+  if (permissions && typeof permissions === 'object') {
+    Object.keys(normalized).forEach((key) => {
+      normalized[key] = Boolean(permissions[key]);
+    });
+  }
+  return normalized;
+};
+
+const normalizeRoleIds = (roleIds, roles) => {
+  if (!Array.isArray(roleIds)) {
+    return [];
+  }
+
+  const availableIds = new Set(roles.map((role) => role.id));
+  return [...new Set(roleIds.map((roleId) => Number.parseInt(roleId, 10)))].filter(
+    (roleId) => Number.isInteger(roleId) && roleId > 0 && availableIds.has(roleId)
+  );
+};
+
+const mapRole = (role) => ({
+  id: role.id,
+  name: role.name,
+  permissions: parsePermissions(role.permissions ?? {}),
+  createdAt: role.createdAt,
+  updatedAt: role.updatedAt
 });
+
+const aggregatePermissions = (roleDetails) => {
+  return roleDetails.reduce((acc, role) => {
+    Object.keys(acc).forEach((key) => {
+      acc[key] = acc[key] || Boolean(role.permissions?.[key]);
+    });
+    return acc;
+  }, { ...basePermissions });
+};
+
+const mapUser = (user, allRoles) => {
+  const roleIds = normalizeRoleIds(user.roles, allRoles);
+  const roleDetails = roleIds
+    .map((roleId) => allRoles.find((role) => role.id === roleId))
+    .filter(Boolean)
+    .map(mapRole);
+
+  const permissions = aggregatePermissions(roleDetails);
+
+  return {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    createdAt: user.createdAt,
+    roleIds,
+    roles: roleDetails,
+    permissions
+  };
+};
 
 const bootstrap = async () => {
   const config = await ensureDatabaseConfig();
@@ -127,7 +184,7 @@ const bootstrap = async () => {
         return '/';
       }
 
-      const collapsed = value.replace(/\/+/g, '/');
+      const collapsed = value.replace(/\\+/g, '/');
       const withoutTrailing = collapsed.replace(/\/+$/, '');
 
       if (!withoutTrailing) {
@@ -204,7 +261,11 @@ const bootstrap = async () => {
           throw new Error('Unable to create user.');
         }
 
-        sendJson(res, 201, { message: 'User registered successfully.' });
+        const roles = await db.listRoles();
+        sendJson(res, 201, {
+          message: 'User registered successfully.',
+          user: mapUser(result.user, roles)
+        });
       } catch (error) {
         console.error('Registration error', error);
         sendJson(res, 500, {
@@ -240,10 +301,21 @@ const bootstrap = async () => {
           return;
         }
 
-        sendJson(res, 200, { message: 'Login successful.', user: mapUser(user) });
+        const roles = await db.listRoles();
+        sendJson(res, 200, { message: 'Login successful.', user: mapUser(user, roles) });
       } catch (error) {
         console.error('Login error', error);
         sendJson(res, 500, { message: 'Unexpected error. Please try again.' });
+      }
+    };
+
+    const handleListUsers = async () => {
+      try {
+        const [users, roles] = await Promise.all([db.listUsers(), db.listRoles()]);
+        sendJson(res, 200, { users: users.map((user) => mapUser(user, roles)) });
+      } catch (error) {
+        console.error('List users error', error);
+        sendJson(res, 500, { message: 'Unable to load users.' });
       }
     };
 
@@ -261,7 +333,8 @@ const bootstrap = async () => {
           return;
         }
 
-        sendJson(res, 200, { user: mapUser(user) });
+        const roles = await db.listRoles();
+        sendJson(res, 200, { user: mapUser(user, roles) });
       } catch (error) {
         console.error('Fetch user error', error);
         sendJson(res, 500, { message: 'Unable to load the requested user.' });
@@ -270,7 +343,7 @@ const bootstrap = async () => {
 
     const handleUpdateUser = async (userId) => {
       const body = await parseJsonBody(req);
-      const { firstName, lastName, email } = body ?? {};
+      const { firstName, lastName, email, password, passwordConfirmation, roles } = body ?? {};
 
       if (!Number.isInteger(userId) || userId <= 0) {
         sendJson(res, 400, { message: 'A valid user id is required.' });
@@ -301,11 +374,53 @@ const bootstrap = async () => {
         return;
       }
 
+      let normalizedRoles;
+      if (roles !== undefined) {
+        if (!Array.isArray(roles)) {
+          sendJson(res, 400, { message: 'Roles must be provided as an array.' });
+          return;
+        }
+
+        const converted = roles.map((roleId) => Number.parseInt(roleId, 10));
+        const invalidRole = converted.some((roleId) => !Number.isInteger(roleId) || roleId <= 0);
+
+        if (invalidRole) {
+          sendJson(res, 400, { message: 'Each role id must be a positive integer.' });
+          return;
+        }
+
+        normalizedRoles = converted;
+      }
+
+      let passwordHash;
+      if (password !== undefined || passwordConfirmation !== undefined) {
+        const normalizedPassword = typeof password === 'string' ? password : '';
+
+        if (!normalizedPassword) {
+          sendJson(res, 400, { message: 'Password cannot be blank when updating the account.' });
+          return;
+        }
+
+        if (normalizedPassword.length < 8) {
+          sendJson(res, 400, { message: 'Password must be at least 8 characters long.' });
+          return;
+        }
+
+        if (passwordConfirmation !== undefined && normalizedPassword !== passwordConfirmation) {
+          sendJson(res, 400, { message: 'Passwords must match.' });
+          return;
+        }
+
+        passwordHash = hashPassword(normalizedPassword, config.databasePassword);
+      }
+
       try {
         const result = await db.updateUser(userId, {
           firstName: normalizedFirstName,
           lastName: normalizedLastName,
-          email: normalizedEmail
+          email: normalizedEmail,
+          passwordHash,
+          roles: normalizedRoles
         });
 
         if (!result.success && result.reason === 'not-found') {
@@ -318,14 +433,148 @@ const bootstrap = async () => {
           return;
         }
 
+        if (!result.success && result.reason === 'invalid-role-format') {
+          sendJson(res, 400, { message: 'Roles must be supplied as an array of numeric identifiers.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-role-reference') {
+          sendJson(res, 400, {
+            message: 'One or more selected roles do not exist. Refresh the page and try again.'
+          });
+          return;
+        }
+
         if (!result.success) {
           throw new Error('Unable to update user.');
         }
 
-        sendJson(res, 200, { message: 'User updated successfully.', user: mapUser(result.user) });
+        const rolesList = await db.listRoles();
+        sendJson(res, 200, {
+          message: 'User updated successfully.',
+          user: mapUser(result.user, rolesList)
+        });
       } catch (error) {
         console.error('Update user error', error);
         sendJson(res, 500, { message: 'Unable to update the user at this time.' });
+      }
+    };
+
+    const handleListRoles = async () => {
+      try {
+        const roles = await db.listRoles();
+        sendJson(res, 200, { roles: roles.map(mapRole) });
+      } catch (error) {
+        console.error('List roles error', error);
+        sendJson(res, 500, { message: 'Unable to load roles.' });
+      }
+    };
+
+    const handleCreateRole = async () => {
+      const body = await parseJsonBody(req);
+      const { name, permissions } = body ?? {};
+
+      const normalizedName = normalizeString(name);
+
+      if (!normalizedName) {
+        sendJson(res, 400, { message: 'Role name is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.createRole({
+          name: normalizedName,
+          permissions: parsePermissions(permissions)
+        });
+
+        if (!result.success && result.reason === 'duplicate-name') {
+          sendJson(res, 409, { message: 'Another role already uses this name.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to create role.');
+        }
+
+        sendJson(res, 201, { message: 'Role created successfully.', role: mapRole(result.role) });
+      } catch (error) {
+        console.error('Create role error', error);
+        sendJson(res, 500, { message: 'Unable to create the role right now.' });
+      }
+    };
+
+    const handleUpdateRole = async (roleId) => {
+      const body = await parseJsonBody(req);
+      const { name, permissions } = body ?? {};
+
+      if (!Number.isInteger(roleId) || roleId <= 0) {
+        sendJson(res, 400, { message: 'A valid role id is required.' });
+        return;
+      }
+
+      const normalizedName = normalizeString(name);
+
+      if (!normalizedName) {
+        sendJson(res, 400, { message: 'Role name is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.updateRole(roleId, {
+          name: normalizedName,
+          permissions: parsePermissions(permissions)
+        });
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Role not found.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'duplicate-name') {
+          sendJson(res, 409, { message: 'Another role already uses this name.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to update role.');
+        }
+
+        sendJson(res, 200, { message: 'Role updated successfully.', role: mapRole(result.role) });
+      } catch (error) {
+        console.error('Update role error', error);
+        sendJson(res, 500, { message: 'Unable to update the role right now.' });
+      }
+    };
+
+    const handleDeleteRole = async (roleId) => {
+      if (!Number.isInteger(roleId) || roleId <= 0) {
+        sendJson(res, 400, { message: 'A valid role id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.deleteRole(roleId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Role not found.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'role-in-use') {
+          sendJson(res, 409, {
+            message: 'This role is assigned to one or more users. Reassign users before deleting it.'
+          });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to delete role.');
+        }
+
+        sendNoContent(res);
+      } catch (error) {
+        console.error('Delete role error', error);
+        sendJson(res, 500, { message: 'Unable to delete the role right now.' });
       }
     };
 
@@ -356,6 +605,11 @@ const bootstrap = async () => {
         return;
       }
 
+      if (method === 'GET' && (canonicalPath === '/api/users' || resourcePath === '/users')) {
+        await handleListUsers();
+        return;
+      }
+
       if (resourceSegments[0] === 'users' && resourceSegments.length === 2) {
         const idSegment = resourceSegments[1];
         const userId = Number.parseInt(idSegment, 10);
@@ -369,6 +623,31 @@ const bootstrap = async () => {
           await handleUpdateUser(userId);
           return;
         }
+      }
+
+      if (method === 'GET' && (canonicalPath === '/api/roles' || resourcePath === '/roles')) {
+        await handleListRoles();
+        return;
+      }
+
+      if (resourceSegments[0] === 'roles' && resourceSegments.length === 2) {
+        const idSegment = resourceSegments[1];
+        const roleId = Number.parseInt(idSegment, 10);
+
+        if (method === 'PUT') {
+          await handleUpdateRole(roleId);
+          return;
+        }
+
+        if (method === 'DELETE') {
+          await handleDeleteRole(roleId);
+          return;
+        }
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/roles' || resourcePath === '/roles')) {
+        await handleCreateRole();
+        return;
       }
 
       sendJson(res, 404, { message: 'Not found.' });
