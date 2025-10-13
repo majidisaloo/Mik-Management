@@ -54,6 +54,7 @@ const Register = () => {
   const [status, setStatus] = useState({ type: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(evaluatePasswordStrength(''));
+  const [registrationOpen, setRegistrationOpen] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -61,6 +62,29 @@ const Register = () => {
       navigate('/dashboard', { replace: true });
     }
   }, [navigate, user]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadMeta = async () => {
+      try {
+        const response = await fetch('/api/meta', { signal: controller.signal });
+
+        if (!response.ok) {
+          throw new Error('Meta request failed');
+        }
+
+        const payload = await response.json();
+        setRegistrationOpen(payload?.registrationOpen !== false);
+      } catch (error) {
+        setRegistrationOpen(true);
+      }
+    };
+
+    loadMeta();
+
+    return () => controller.abort();
+  }, []);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -74,6 +98,11 @@ const Register = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setStatus({ type: '', message: '' });
+
+    if (!registrationOpen) {
+      setStatus({ type: 'error', message: 'Registration is currently disabled. Ask an administrator for access.' });
+      return;
+    }
 
     if (form.password !== form.passwordConfirmation) {
       setStatus({ type: 'error', message: 'Passwords do not match.' });
@@ -132,6 +161,11 @@ const Register = () => {
   return (
     <section className="card">
       <h1>Create an Account</h1>
+      {!registrationOpen ? (
+        <p className="page-status page-status--warning">
+          Registration is limited to the first administrator. Please sign in with an existing account.
+        </p>
+      ) : null}
       <form onSubmit={handleSubmit} className="form-grid">
         <label>
           <span>First Name</span>
@@ -142,6 +176,7 @@ const Register = () => {
             autoComplete="given-name"
             required
             id="firstName"
+            disabled={!registrationOpen || isSubmitting}
           />
         </label>
         <label>
@@ -153,6 +188,7 @@ const Register = () => {
             autoComplete="family-name"
             required
             id="lastName"
+            disabled={!registrationOpen || isSubmitting}
           />
         </label>
         <label className="wide">
@@ -165,6 +201,7 @@ const Register = () => {
             autoComplete="email"
             required
             id="email"
+            disabled={!registrationOpen || isSubmitting}
           />
         </label>
         <label>
@@ -179,6 +216,7 @@ const Register = () => {
             minLength={8}
             id="password"
             aria-describedby="password-strength"
+            disabled={!registrationOpen || isSubmitting}
           />
         </label>
         <label>
@@ -192,6 +230,7 @@ const Register = () => {
             required
             minLength={8}
             id="passwordConfirmation"
+            disabled={!registrationOpen || isSubmitting}
           />
         </label>
         <div
@@ -210,7 +249,7 @@ const Register = () => {
             </span>
           )}
         </div>
-        <button type="submit" disabled={isSubmitting} className="primary-button">
+        <button type="submit" disabled={isSubmitting || !registrationOpen} className="primary-button">
           {isSubmitting ? 'Submitting…' : 'Register'}
         </button>
       </form>

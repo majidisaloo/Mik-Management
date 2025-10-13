@@ -12,6 +12,7 @@ A full-stack registration experience built with React, Vite, and a lightweight N
 - [Roles Workspace](#roles-workspace)
 - [Mik-Groups Workspace](#mik-groups-workspace)
 - [Mikrotik's Workspace](#mikrotiks-workspace)
+- [Tunnels Workspace](#tunnels-workspace)
 - [Settings Workspace](#settings-workspace)
 - [Ubuntu Deployment Quick Start](#ubuntu-deployment-quick-start)
 - [Production Deployment on Ubuntu with Nginx](#production-deployment-on-ubuntu-with-nginx)
@@ -96,32 +97,36 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
 8. Visit the site at http://localhost:5173. The **Login** screen loads first—use the **Register** link in the header to create an
    account, sign in with the credentials you just added, and you will land on the **Dashboard**. After authentication the header
    condenses to a polished logout pill while the primary navigation shifts to the left sidebar. You will see entries for
-   **Dashboard**, **Users**, **Roles**, **Mik-Groups**, **Mikrotik's**, and the new **Settings** workspace (each only appears if your
-   role grants access). The footer now shows the running build as `Version 0.<commit-count>` so you can confirm which commit is
-   deployed at a glance.
+   **Dashboard**, **Users & Roles**, **Mik-Groups**, **Mikrotik's**, **Tunnels**, and the new **Settings** workspace (each only
+   appears if your role grants access). The footer now shows the running build as `Version 0.<commit-count>` so you can confirm
+   which commit is deployed at a glance.
    - Use the theme slider at the bottom of the sidebar to swap between the bright daytime palette (moon icon) and the darker
      night mode (sun icon). Your choice is remembered locally for future visits.
 
 ### Dashboard Overview
 
-- **Sidebar navigation** – The vertical menu on the left now groups links by focus, placing the Dashboard first and the Users, Roles, Mik-Groups, Mikrotik's, and Settings workspaces under a dedicated management heading. Each link only appears when your assigned roles grant the required permission, and the theme slider at the bottom lets you switch between the moon-lit light mode and the sun-lit dark mode at any time.
-- **Access summary** – Review the roles attached to your account and the resulting Dashboard, Users, Roles, Mik-Groups, Mikrotik's, and Settings capabilities in the highlighted chips.
-- **Profile form** – Update your first name, last name, or email address and submit to persist the changes to the secure data file instantly.
-- **Release indicator** – The footer now displays the running build as `Version 0.<commit-count>` so you can confirm which commit is live on every environment.
-- **Session controls** – Use the gradient logout pill in the header to clear the session and return to the Login screen.
+- **Sidebar navigation** – The vertical menu on the left now groups links by focus, placing the Dashboard first and the Users & Roles, Mik-Groups, Mikrotik's, Tunnels, and Settings workspaces under a dedicated management heading. Each link only appears when your assigned roles grant the required permission, the icons mirror their purpose, and the collapse toggle lets you shrink the menu to an icon-only rail when you need more canvas space.
+- **Fleet metrics** – Three Mikrotik cards summarise how many devices are connected, how many already run the target RouterOS release, and how many remain pending or unknown so operators can prioritise upgrades.
+- **Tunnel status** – Companion cards track the total number of tunnels alongside the up, down, and maintenance counts so you immediately know where to focus.
+- **Health leaderboards** – Latency and packet-loss panels sort tunnels from most to least impacted, showing their status chips and live measurements so you can attack the highest pings and worst packet loss first.
+- **Access summary** – Your name, email address, and granted permissions appear beneath the metrics so you can confirm exactly which Dashboard, Users & Roles, Mik-Groups, Mikrotik's, Tunnels, and Settings capabilities are active on your account.
+- **Release indicator** – The footer displays the running build as `Version 0.<commit-count>` so you can confirm which commit is live on every environment.
+- **Session controls** – Use the red logout pill in the header to clear the session and return to the Login screen.
 
 ### Users Workspace
 
-- **Directory table** – The Users screen lists every operator, highlighting the currently selected row and showing each person’s roles.
-- **Select and edit** – Choose an operator from the dropdown to load their details into the form, adjust contact information, optionally set a new password, and assign or remove roles before saving.
-- **Role insights** – Each role badge summarises the Dashboard, Users, Roles, Mik-Groups, Mikrotik's, and Settings permissions it grants so you can confirm coverage at a glance.
-- **Permission aware** – Only operators with the Users permission can access this page. Attempts to reach the screen without the permission redirect back to the Dashboard.
+- **Tabbed management** – Users and Roles now share one workspace. Switch tabs to flip between the user directory and the role catalogue without losing context.
+- **Global filters** – Type in the toolbar search to filter users by name, email, or role membership (or to filter roles by name and granted permissions when the Roles tab is active).
+- **Modal driven edits** – Add, edit, or remove users from inline dialogs. Password resets, role assignments, and personal details live side by side, and the created-at timestamp stays visible for every account.
+- **Permission insights** – Coloured pills list the Dashboard, Users & Roles, Mik-Groups, Mikrotik's, Tunnels, and Settings capabilities a user inherits so you can audit access at a glance.
+- **Permission aware** – Only operators with the Users permission can access the Users tab. Attempts to reach the screen without the permission redirect back to the Dashboard.
 
 ### Roles Workspace
 
-- **Role library** – Review every role, rename them inline, and toggle Dashboard, Users, Roles, Mik-Groups, Mikrotik's, and Settings permissions before saving.
-- **Create and delete** – Add new roles tailored to teams such as sales or support. Roles that are still assigned to users cannot be deleted until those users are reassigned, preventing accidental loss of access.
+- **Inline editing** – Rename roles, toggle Dashboard, Users & Roles, Mik-Groups, Mikrotik's, Tunnels, and Settings permissions, and update descriptions from the dedicated Roles tab.
+- **Create and delete** – Add new permission sets for teams such as sales or support. Roles that are still assigned to users cannot be deleted until those users are reassigned, preventing accidental loss of access.
 - **Guided feedback** – Success and error alerts surface immediately so you know when actions complete or require additional steps.
+- **Permission aware** – Only operators with the Roles permission see this tab. Others are redirected to the Dashboard.
 
 ### Mik-Groups Workspace
 
@@ -131,11 +136,20 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
 
 ### Mikrotik's Workspace
 
-- **Device directory** – Browse every RouterOS endpoint in the environment from the selector on the left. Each entry highlights its display name, host, assigned Mik-Group, active tags, and the most recent update time.
+- **Device directory** – Browse every RouterOS endpoint in the environment from the consolidated list. Each entry highlights its display name, host, assigned Mik-Group, update-status chip, and the created-at timestamp so you know when it joined the fleet.
+- **Dynamic filtering** – Search by name, host, Mik-Group, status, or tag from the toolbar to zero in on the exact device you need to manage.
 - **RouterOS API controls** – Toggle API availability, enable TLS, enforce certificate validation, and opt into legacy cipher support directly from the edit form. Ports, timeouts, retries, usernames, and passwords all live in one pane so you can adjust connection details without digging through configuration files.
 - **Group-aware organisation** – Assign each Mikrotik to any Mik-Group you have defined. The dropdown stays in sync with the hierarchy so network sites, POPs, and customer segments remain tidy.
 - **Notes and tagging** – Capture free-form notes about rack locations or maintenance windows and add comma-separated tags for filtering future inventory views.
 - **Streamlined provisioning** – Use the Add Mikrotik card to register new routers in seconds. New devices immediately appear in the selector and inherit the RouterOS defaults you configured during creation.
+
+### Tunnels Workspace
+
+- **Topology directory** – Review every inter-site tunnel together with its status chip, parent Mik-Group, source and target MikroTik names, and the most recent health metrics.
+- **Powerful filtering** – Search by tunnel name, Mik-Group, endpoint name, or tag to isolate the exact links you need to investigate.
+- **Rich tunnel editor** – Configure connection types (GRE, IPsec, and more), enable or disable RouterOS API usage, add operational notes, and maintain latency/packet-loss samples for future analysis.
+- **Lifecycle controls** – Create, update, or delete tunnels from focused modals. Status toggles let you mark links as up, down, or in maintenance while keeping retry counts and timeouts aligned with your standards.
+- **Permission aware** – Only operators with the Tunnels permission can access the workspace. Everyone else is redirected to the Dashboard.
 
 ### Settings Workspace
 
@@ -393,8 +407,28 @@ The default configuration works without custom variables. For production deploym
 
 `GET /api/meta`
 
-- **Success**: `200 OK` with `{ version }`
-- **Notes**: Surfaces the running build as `0.<commit-count>` so operators can confirm which commit is deployed from the footer.
+- **Success**: `200 OK` with `{ version, registrationOpen, userCount }`
+- **Notes**: Surfaces the running build as `0.<commit-count>`, indicates whether self-registration is still open, and exposes the current user count so operators can plan onboarding.
+
+`GET /api/dashboard/metrics`
+
+- **Success**: `200 OK` with `{ mikrotik: { total, updated, pending, unknown }, tunnels: { total, up, down, maintenance, latencyLeaderboard, packetLossLeaderboard } }`
+- **Errors**:
+  - `500`: Unable to calculate dashboard metrics
+
+`GET /api/users`
+
+- **Success**: `200 OK` with `{ users }`
+- **Notes**: Each user includes `roles`, `permissions`, and `createdAt` fields so the UI can render badges and audit metadata.
+
+`POST /api/users`
+
+- **Body**: `{ firstName, lastName, email, password, passwordConfirmation?, roleIds? }`
+- **Success**: `201 Created`
+- **Errors**:
+  - `400`: Missing names, invalid email, short passwords, or mismatched password confirmation
+  - `409`: Email already registered
+  - `500`: Unable to create the user
 
 `GET /api/users/:id`
 
@@ -406,13 +440,54 @@ The default configuration works without custom variables. For production deploym
 
 `PUT /api/users/:id`
 
-- **Body**: `{ firstName, lastName, email }`
+- **Body**: `{ firstName, lastName, email, password?, roleIds? }`
 - **Success**: `200 OK`
 - **Errors**:
   - `400`: Missing or invalid fields
   - `404`: User not found
   - `409`: Email already used by another account
   - `500`: Unable to update the user
+
+`DELETE /api/users/:id`
+
+- **Success**: `204 No Content`
+- **Errors**:
+  - `400`: Invalid ID parameter
+  - `404`: User not found
+  - `500`: Unable to delete the user
+
+`GET /api/roles`
+
+- **Success**: `200 OK` with `{ roles }`
+- **Notes**: Each role includes its permission map so the UI can populate toggles.
+
+`POST /api/roles`
+
+- **Body**: `{ name, permissions }`
+- **Success**: `201 Created`
+- **Errors**:
+  - `400`: Missing name or invalid permissions map
+  - `409`: Role name already in use
+  - `500`: Unable to create the role
+
+`PUT /api/roles/:id`
+
+- **Body**: `{ name, permissions }`
+- **Success**: `200 OK`
+- **Errors**:
+  - `400`: Missing name or invalid permissions map
+  - `404`: Role not found
+  - `409`: Another role already uses the provided name
+  - `500`: Unable to update the role
+
+`DELETE /api/roles/:id`
+
+- **Success**: `204 No Content`
+- **Errors**:
+  - `400`: Invalid role id
+  - `404`: Role not found
+  - `409`: Role is still assigned to one or more users
+  - `500`: Unable to delete the role
 
 `GET /api/groups`
 
@@ -476,6 +551,36 @@ The default configuration works without custom variables. For production deploym
   - `400`: Invalid identifier
   - `404`: Device not found
   - `500`: Unable to delete the device
+
+`GET /api/tunnels`
+
+- **Success**: `200 OK` with `{ tunnels, groups, mikrotiks }`
+- **Notes**: Returns all tunnels with resolved Mik-Group, source, and target names plus the available dropdown options.
+
+`POST /api/tunnels`
+
+- **Body**: `{ name, sourceId, targetId, groupId?, connectionType?, status?, enabled?, tags?, notes?, latencyMs?, packetLoss?, lastCheckedAt? }`
+- **Success**: `201 Created`
+- **Errors**:
+  - `400`: Missing name, source, or target; invalid status; or non-existent references
+  - `500`: Unable to create the tunnel
+
+`PUT /api/tunnels/:id`
+
+- **Body**: Any subset of `{ name, sourceId, targetId, groupId, connectionType, status, enabled, tags, notes, latencyMs, packetLoss, lastCheckedAt }`
+- **Success**: `200 OK` with the updated tunnel
+- **Errors**:
+  - `400`: Invalid payload or references
+  - `404`: Tunnel not found
+  - `500`: Unable to update the tunnel
+
+`DELETE /api/tunnels/:id`
+
+- **Success**: `204 No Content`
+- **Errors**:
+  - `400`: Invalid identifier
+  - `404`: Tunnel not found
+  - `500`: Unable to delete the tunnel
 
 `GET /api/config-info`
 

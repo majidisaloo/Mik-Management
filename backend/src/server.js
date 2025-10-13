@@ -13,6 +13,7 @@ const basePermissions = {
   users: false,
   roles: false,
   groups: false,
+  tunnels: false,
   mikrotiks: false,
   settings: false
 };
@@ -180,6 +181,15 @@ const buildRouterosPayload = (input = {}) => ({
   preferredApiFirst: normalizeBooleanFlag(input.preferredApiFirst, true)
 });
 
+const buildDeviceStatusPayload = (input = {}) => {
+  const allowed = new Set(['updated', 'pending', 'unknown']);
+  const candidate = typeof input.updateStatus === 'string' ? input.updateStatus.toLowerCase() : undefined;
+  return {
+    updateStatus: candidate && allowed.has(candidate) ? candidate : undefined,
+    lastAuditAt: typeof input.lastAuditAt === 'string' ? input.lastAuditAt : undefined
+  };
+};
+
 const normalizeRoleIds = (roleIds, roles) => {
   if (!Array.isArray(roleIds)) {
     return [];
@@ -267,8 +277,42 @@ const mapMikrotik = (device, groups) => {
       allowInsecureCiphers: normalizeBooleanFlag(routeros.allowInsecureCiphers, false),
       preferredApiFirst: normalizeBooleanFlag(routeros.preferredApiFirst, true)
     },
+    status: {
+      updateStatus:
+        typeof device.status?.updateStatus === 'string' ? device.status.updateStatus : 'unknown',
+      lastAuditAt: device.status?.lastAuditAt ?? null
+    },
     createdAt: device.createdAt,
     updatedAt: device.updatedAt
+  };
+};
+
+const mapTunnel = (tunnel, groups, mikrotiks) => {
+  const group = tunnel.groupId ? groups.find((entry) => entry.id === tunnel.groupId) : null;
+  const source = tunnel.sourceId ? mikrotiks.find((device) => device.id === tunnel.sourceId) : null;
+  const target = tunnel.targetId ? mikrotiks.find((device) => device.id === tunnel.targetId) : null;
+
+  return {
+    id: tunnel.id,
+    name: tunnel.name,
+    groupId: tunnel.groupId ?? null,
+    groupName: group ? group.name : null,
+    sourceId: tunnel.sourceId ?? null,
+    sourceName: source ? source.name : null,
+    targetId: tunnel.targetId ?? null,
+    targetName: target ? target.name : null,
+    connectionType: tunnel.connectionType,
+    status: tunnel.status,
+    enabled: Boolean(tunnel.enabled),
+    tags: Array.isArray(tunnel.tags) ? [...tunnel.tags] : [],
+    notes: typeof tunnel.notes === 'string' ? tunnel.notes : '',
+    metrics: {
+      latencyMs: typeof tunnel.metrics?.latencyMs === 'number' ? tunnel.metrics.latencyMs : null,
+      packetLoss: typeof tunnel.metrics?.packetLoss === 'number' ? tunnel.metrics.packetLoss : null,
+      lastCheckedAt: tunnel.metrics?.lastCheckedAt ?? null
+    },
+    createdAt: tunnel.createdAt,
+    updatedAt: tunnel.updatedAt
   };
 };
 
@@ -370,61 +414,81 @@ const bootstrap = async () => {
     const resourceSegments = pathSegments[0] === 'api' ? pathSegments.slice(1) : pathSegments;
     const resourcePath = resourceSegments.length > 0 ? `/${resourceSegments.join('/')}` : '/';
 
-    const handleRegister = async () => {
-      const body = await parseJsonBody(req);
+    const buildUserCreationPayload = (body) => {
       const { firstName, lastName, email, password, passwordConfirmation } = body ?? {};
 
       const normalizedFirstName = normalizeString(firstName);
-      const normalizedLastName = normalizeString(lastName);
-      const normalizedEmail = normalizeString(email).toLowerCase();
-      const rawPassword = typeof password === 'string' ? password : '';
-
       if (!normalizedFirstName) {
-        sendJson(res, 400, { message: 'First name is required.' });
-        return;
+        return { error: { status: 400, message: 'First name is required.' } };
       }
 
+      const normalizedLastName = normalizeString(lastName);
       if (!normalizedLastName) {
-        sendJson(res, 400, { message: 'Last name is required.' });
-        return;
+        return { error: { status: 400, message: 'Last name is required.' } };
       }
 
+      const normalizedEmail = normalizeString(email).toLowerCase();
       if (!normalizedEmail) {
-        sendJson(res, 400, { message: 'Email is required.' });
-        return;
+        return { error: { status: 400, message: 'Email is required.' } };
       }
 
       if (!emailPattern.test(normalizedEmail)) {
-        sendJson(res, 400, { message: 'Email must follow the format name@example.com.' });
-        return;
+        return { error: { status: 400, message: 'Email must follow the format name@example.com.' } };
       }
 
+      const rawPassword = typeof password === 'string' ? password : '';
       if (!rawPassword) {
-        sendJson(res, 400, { message: 'Password is required.' });
-        return;
+        return { error: { status: 400, message: 'Password is required.' } };
       }
 
       if (rawPassword.length < 8) {
-        sendJson(res, 400, { message: 'Password must be at least 8 characters long.' });
-        return;
+        return { error: { status: 400, message: 'Password must be at least 8 characters long.' } };
       }
 
       if (passwordConfirmation !== undefined && rawPassword !== passwordConfirmation) {
-        sendJson(res, 400, { message: 'Passwords must match.' });
+        return { error: { status: 400, message: 'Passwords must match.' } };
+      }
+
+      return {
+        payload: {
+          firstName: normalizedFirstName,
+          lastName: normalizedLastName,
+          email: normalizedEmail,
+          rawPassword
+        }
+      };
+    };
+
+    const handleRegister = async () => {
+      const body = await parseJsonBody(req);
+      const { error, payload } = buildUserCreationPayload(body);
+
+      if (error) {
+        sendJson(res, error.status, { message: error.message });
         return;
       }
 
       try {
-        const passwordHash = hashPassword(rawPassword, config.databasePassword);
-        const result = await db.createUser({
-          firstName: normalizedFirstName,
-          lastName: normalizedLastName,
-          email: normalizedEmail,
-          passwordHash
-        });
+        const passwordHash = hashPassword(payload.rawPassword, config.databasePassword);
+        const result = await db.createUser(
+          {
+            firstName: payload.firstName,
+            lastName: payload.lastName,
+            email: payload.email,
+            passwordHash
+          },
+          { bypassGuard: false }
+        );
 
         if (!result.success && result.reason === 'duplicate-email') {
           sendJson(res, 409, { message: 'This email is already registered.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'registration-closed') {
+          sendJson(res, 403, {
+            message: 'Registration is disabled. Ask an administrator to create an account for you.'
+          });
           return;
         }
 
@@ -441,6 +505,49 @@ const bootstrap = async () => {
         console.error('Registration error', error);
         sendJson(res, 500, {
           message: 'Registration failed unexpectedly. Please review your input and try again.'
+        });
+      }
+    };
+
+    const handleCreateUser = async () => {
+      const body = await parseJsonBody(req);
+      const { error, payload } = buildUserCreationPayload(body);
+
+      if (error) {
+        sendJson(res, error.status, { message: error.message });
+        return;
+      }
+
+      try {
+        const passwordHash = hashPassword(payload.rawPassword, config.databasePassword);
+        const result = await db.createUser(
+          {
+            firstName: payload.firstName,
+            lastName: payload.lastName,
+            email: payload.email,
+            passwordHash
+          },
+          { bypassGuard: true }
+        );
+
+        if (!result.success && result.reason === 'duplicate-email') {
+          sendJson(res, 409, { message: 'Another account already uses this email address.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to create user via management API.');
+        }
+
+        const roles = await db.listRoles();
+        sendJson(res, 201, {
+          message: 'User created successfully.',
+          user: mapUser(result.user, roles)
+        });
+      } catch (error) {
+        console.error('Admin create user error', error);
+        sendJson(res, 500, {
+          message: 'Unable to create the user right now. Confirm the backend service is reachable and try again.'
         });
       }
     };
@@ -958,7 +1065,7 @@ const bootstrap = async () => {
 
     const handleCreateMikrotik = async () => {
       const body = await parseJsonBody(req);
-      const { name, host, groupId, tags, notes, routeros } = body ?? {};
+      const { name, host, groupId, tags, notes, routeros, status } = body ?? {};
 
       const normalizedName = normalizeString(name);
       const normalizedHost = normalizeString(host);
@@ -980,7 +1087,8 @@ const bootstrap = async () => {
           groupId,
           tags: normalizeTagsInput(tags),
           notes: normalizeNotesInput(notes),
-          routeros: buildRouterosPayload(routeros)
+          routeros: buildRouterosPayload(routeros),
+          status: buildDeviceStatusPayload(status)
         });
 
         if (!result.success && result.reason === 'invalid-group') {
@@ -1020,7 +1128,7 @@ const bootstrap = async () => {
       }
 
       const body = await parseJsonBody(req);
-      const { name, host, groupId, tags, notes, routeros } = body ?? {};
+      const { name, host, groupId, tags, notes, routeros, status } = body ?? {};
 
       const payload = {};
 
@@ -1046,6 +1154,10 @@ const bootstrap = async () => {
 
       if (routeros !== undefined) {
         payload.routeros = buildRouterosPayload(routeros);
+      }
+
+      if (status !== undefined) {
+        payload.status = buildDeviceStatusPayload(status);
       }
 
       try {
@@ -1111,6 +1223,192 @@ const bootstrap = async () => {
       }
     };
 
+    const handleListTunnels = async () => {
+      try {
+        const [tunnels, groups, mikrotiks] = await Promise.all([
+          db.listTunnels(),
+          db.listGroups(),
+          db.listMikrotiks()
+        ]);
+
+        sendJson(res, 200, {
+          tunnels: tunnels.map((tunnel) => mapTunnel(tunnel, groups, mikrotiks)),
+          groups: groups.map(mapGroup),
+          mikrotiks: mikrotiks.map((device) => mapMikrotik(device, groups))
+        });
+      } catch (error) {
+        console.error('List tunnels error', error);
+        sendJson(res, 500, { message: 'Unable to load tunnels.' });
+      }
+    };
+
+    const handleCreateTunnel = async () => {
+      const body = await parseJsonBody(req);
+      const {
+        name,
+        groupId,
+        sourceId,
+        targetId,
+        connectionType,
+        status,
+        enabled,
+        tags,
+        notes,
+        metrics
+      } = body ?? {};
+
+      const normalizedName = normalizeString(name);
+
+      if (!normalizedName) {
+        sendJson(res, 400, { message: 'Tunnel name is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.createTunnel({
+          name: normalizedName,
+          groupId,
+          sourceId,
+          targetId,
+          connectionType,
+          status,
+          enabled,
+          tags,
+          notes,
+          metrics
+        });
+
+        if (!result.success && result.reason === 'invalid-group') {
+          sendJson(res, 400, { message: 'The selected group does not exist.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-source') {
+          sendJson(res, 400, { message: 'A valid source Mikrotik is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-target') {
+          sendJson(res, 400, { message: 'A valid target Mikrotik is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'duplicate-endpoint') {
+          sendJson(res, 400, { message: 'Source and target Mikrotiks must be different.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'name-required') {
+          sendJson(res, 400, { message: 'Tunnel name is required.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to create tunnel.');
+        }
+
+        const [groups, mikrotiks] = await Promise.all([db.listGroups(), db.listMikrotiks()]);
+        sendJson(res, 201, {
+          message: 'Tunnel created successfully.',
+          tunnel: mapTunnel(result.tunnel, groups, mikrotiks)
+        });
+      } catch (error) {
+        console.error('Create tunnel error', error);
+        sendJson(res, 500, { message: 'Unable to create the tunnel right now.' });
+      }
+    };
+
+    const handleUpdateTunnel = async (tunnelId) => {
+      if (!Number.isInteger(tunnelId) || tunnelId <= 0) {
+        sendJson(res, 400, { message: 'A valid tunnel id is required.' });
+        return;
+      }
+
+      const body = await parseJsonBody(req);
+
+      try {
+        const result = await db.updateTunnel(tunnelId, body ?? {});
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Tunnel not found.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-group') {
+          sendJson(res, 400, { message: 'The selected group does not exist.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-source') {
+          sendJson(res, 400, { message: 'A valid source Mikrotik is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-target') {
+          sendJson(res, 400, { message: 'A valid target Mikrotik is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'duplicate-endpoint') {
+          sendJson(res, 400, { message: 'Source and target Mikrotiks must be different.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'name-required') {
+          sendJson(res, 400, { message: 'Tunnel name is required.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to update tunnel.');
+        }
+
+        const [groups, mikrotiks] = await Promise.all([db.listGroups(), db.listMikrotiks()]);
+        sendJson(res, 200, {
+          message: 'Tunnel updated successfully.',
+          tunnel: mapTunnel(result.tunnel, groups, mikrotiks)
+        });
+      } catch (error) {
+        console.error('Update tunnel error', error);
+        sendJson(res, 500, { message: 'Unable to update the tunnel right now.' });
+      }
+    };
+
+    const handleDeleteTunnel = async (tunnelId) => {
+      if (!Number.isInteger(tunnelId) || tunnelId <= 0) {
+        sendJson(res, 400, { message: 'A valid tunnel id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.deleteTunnel(tunnelId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Tunnel not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to delete tunnel.');
+        }
+
+        sendNoContent(res);
+      } catch (error) {
+        console.error('Delete tunnel error', error);
+        sendJson(res, 500, { message: 'Unable to delete the tunnel right now.' });
+      }
+    };
+
+    const handleDashboardMetrics = async () => {
+      try {
+        const snapshot = await db.getDashboardSnapshot();
+        sendJson(res, 200, snapshot);
+      } catch (error) {
+        console.error('Dashboard metrics error', error);
+        sendJson(res, 500, { message: 'Unable to load dashboard metrics.' });
+      }
+    };
+
     try {
       if (method === 'GET' && (canonicalPath === '/health' || resourcePath === '/health')) {
         sendJson(res, 200, { status: 'ok' });
@@ -1118,7 +1416,29 @@ const bootstrap = async () => {
       }
 
       if (method === 'GET' && (canonicalPath === '/api/meta' || resourcePath === '/meta')) {
-        sendJson(res, 200, { version });
+        try {
+          const [userCount, registrationLocked] = await Promise.all([
+            db.countUsers(),
+            db.hasAnyUsers()
+          ]);
+
+          sendJson(res, 200, {
+            version,
+            userCount,
+            registrationOpen: !registrationLocked
+          });
+        } catch (error) {
+          console.error('Meta endpoint error', error);
+          sendJson(res, 200, { version, registrationOpen: true });
+        }
+        return;
+      }
+
+      if (
+        method === 'GET' &&
+        (canonicalPath === '/api/dashboard/metrics' || resourcePath === '/dashboard/metrics')
+      ) {
+        await handleDashboardMetrics();
         return;
       }
 
@@ -1135,6 +1455,11 @@ const bootstrap = async () => {
 
       if (method === 'POST' && (canonicalPath === '/api/register' || resourcePath === '/register')) {
         await handleRegister();
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/users' || resourcePath === '/users')) {
+        await handleCreateUser();
         return;
       }
 
@@ -1240,6 +1565,31 @@ const bootstrap = async () => {
 
       if (method === 'POST' && (canonicalPath === '/api/mikrotiks' || resourcePath === '/mikrotiks')) {
         await handleCreateMikrotik();
+        return;
+      }
+
+      if (method === 'GET' && (canonicalPath === '/api/tunnels' || resourcePath === '/tunnels')) {
+        await handleListTunnels();
+        return;
+      }
+
+      if (resourceSegments[0] === 'tunnels' && resourceSegments.length === 2) {
+        const idSegment = resourceSegments[1];
+        const tunnelId = Number.parseInt(idSegment, 10);
+
+        if (method === 'PUT') {
+          await handleUpdateTunnel(tunnelId);
+          return;
+        }
+
+        if (method === 'DELETE') {
+          await handleDeleteTunnel(tunnelId);
+          return;
+        }
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/tunnels' || resourcePath === '/tunnels')) {
+        await handleCreateTunnel();
         return;
       }
 

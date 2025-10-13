@@ -1,9 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
-const emptyCreateForm = {
+const permissionCatalog = [
+  { key: 'dashboard', label: 'Dashboard' },
+  { key: 'users', label: 'Users' },
+  { key: 'roles', label: 'Roles' },
+  { key: 'groups', label: 'Mik-Groups' },
+  { key: 'mikrotiks', label: 'Mikrotiks' },
+  { key: 'tunnels', label: 'Tunnels' },
+  { key: 'settings', label: 'Settings' }
+];
+
+const emptyCreateUserForm = {
   firstName: '',
   lastName: '',
   email: '',
@@ -11,7 +21,7 @@ const emptyCreateForm = {
   passwordConfirmation: ''
 };
 
-const emptyManageForm = {
+const emptyManageUserForm = {
   firstName: '',
   lastName: '',
   email: '',
@@ -20,39 +30,42 @@ const emptyManageForm = {
   roleIds: []
 };
 
-const formatDateTime = (value) => {
-  if (!value) {
-    return '—';
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return '—';
-  }
-
-  return date.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+const emptyRoleForm = {
+  name: '',
+  permissions: permissionCatalog.reduce((acc, { key }) => ({ ...acc, [key]: false }), {})
 };
 
-const Users = () => {
-  const { user, updateUser, logout } = useAuth();
+const Users = ({ initialTab = 'users' }) => {
+  const location = useLocation();
   const navigate = useNavigate();
+  const { user, updateUser, logout } = useAuth();
+
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', message: '' });
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState(emptyCreateForm);
-  const [createBusy, setCreateBusy] = useState(false);
-  const [manageState, setManageState] = useState({ open: false, userId: null, form: emptyManageForm });
-  const [manageBusy, setManageBusy] = useState(false);
-  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [filters, setFilters] = useState({ users: '', roles: '' });
+
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState(emptyCreateUserForm);
+  const [createUserBusy, setCreateUserBusy] = useState(false);
+
+  const [manageUserState, setManageUserState] = useState({ open: false, userId: null, form: emptyManageUserForm });
+  const [manageUserBusy, setManageUserBusy] = useState(false);
+  const [deleteUserBusy, setDeleteUserBusy] = useState(false);
+
+  const [createRoleOpen, setCreateRoleOpen] = useState(false);
+  const [createRoleForm, setCreateRoleForm] = useState(emptyRoleForm);
+  const [createRoleBusy, setCreateRoleBusy] = useState(false);
+
+  const [manageRoleState, setManageRoleState] = useState({ open: false, roleId: null, form: emptyRoleForm });
+  const [manageRoleBusy, setManageRoleBusy] = useState(false);
+  const [deleteRoleBusy, setDeleteRoleBusy] = useState(false);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   useEffect(() => {
     if (!user) {
@@ -60,14 +73,14 @@ const Users = () => {
       return;
     }
 
-    if (!user.permissions?.users) {
+    if (!user.permissions?.users && !user.permissions?.roles) {
       navigate('/dashboard', { replace: true });
       return;
     }
 
     const controller = new AbortController();
 
-    const load = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
         const [userResponse, roleResponse] = await Promise.all([
@@ -93,95 +106,21 @@ const Users = () => {
         if (error.name === 'AbortError') {
           return;
         }
-
         setStatus({
           type: 'error',
-          message:
-            error.message ||
-            'User management is unavailable right now. Confirm the API is reachable and refresh the page.'
+          message: error.message || 'Directory data is unavailable. Confirm the API is reachable and refresh the page.'
         });
       } finally {
         setLoading(false);
       }
     };
 
-    load();
+    loadData();
 
     return () => controller.abort();
-  }, [navigate, user]);
+  }, [navigate, user, location.pathname]);
 
-  const sortedUsers = useMemo(() => {
-    return [...users].sort((a, b) => {
-      const createdA = new Date(a.createdAt || 0).getTime();
-      const createdB = new Date(b.createdAt || 0).getTime();
-      if (Number.isNaN(createdA) || Number.isNaN(createdB)) {
-        return a.firstName.localeCompare(b.firstName);
-      }
-      return createdA - createdB;
-    });
-  }, [users]);
-
-  const openCreateModal = () => {
-    setCreateForm(emptyCreateForm);
-    setCreateOpen(true);
-    setStatus({ type: '', message: '' });
-  };
-
-  const openManageModal = (userRecord) => {
-    setManageState({
-      open: true,
-      userId: userRecord.id,
-      form: {
-        firstName: userRecord.firstName ?? '',
-        lastName: userRecord.lastName ?? '',
-        email: userRecord.email ?? '',
-        password: '',
-        passwordConfirmation: '',
-        roleIds: Array.isArray(userRecord.roleIds) ? userRecord.roleIds : []
-      }
-    });
-    setStatus({ type: '', message: '' });
-  };
-
-  const closeManageModal = () => {
-    setManageState({ open: false, userId: null, form: emptyManageForm });
-    setManageBusy(false);
-    setDeleteBusy(false);
-  };
-
-  const handleCreateFieldChange = (event) => {
-    const { name, value } = event.target;
-    setCreateForm((current) => ({ ...current, [name]: value }));
-  };
-
-  const handleManageFieldChange = (event) => {
-    const { name, value } = event.target;
-    setManageState((current) => ({
-      ...current,
-      form: {
-        ...current.form,
-        [name]: value
-      }
-    }));
-  };
-
-  const handleRoleToggle = (roleId) => {
-    setManageState((current) => {
-      const existing = new Set(current.form.roleIds ?? []);
-      if (existing.has(roleId)) {
-        existing.delete(roleId);
-      } else {
-        existing.add(roleId);
-      }
-
-      return {
-        ...current,
-        form: { ...current.form, roleIds: [...existing] }
-      };
-    });
-  };
-
-  const refreshUsers = async () => {
+  const refreshUsers = useCallback(async () => {
     try {
       const response = await fetch('/api/users');
       if (!response.ok) {
@@ -190,25 +129,132 @@ const Users = () => {
       const payload = await response.json();
       setUsers(Array.isArray(payload?.users) ? payload.users : []);
     } catch (error) {
-      setStatus({
-        type: 'error',
-        message: error.message || 'Unable to refresh the user directory right now.'
-      });
+      setStatus({ type: 'error', message: error.message || 'Unable to refresh the user directory right now.' });
     }
+  }, []);
+
+  const refreshRoles = useCallback(async () => {
+    try {
+      const response = await fetch('/api/roles');
+      if (!response.ok) {
+        throw new Error('Unable to refresh the role directory.');
+      }
+      const payload = await response.json();
+      setRoles(Array.isArray(payload?.roles) ? payload.roles : []);
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message || 'Unable to refresh the role directory right now.' });
+    }
+  }, []);
+
+  const filteredUsers = useMemo(() => {
+    const query = filters.users.trim().toLowerCase();
+    if (!query) {
+      return users;
+    }
+
+    return users.filter((entry) => {
+      const nameMatch = `${entry.firstName ?? ''} ${entry.lastName ?? ''}`.toLowerCase().includes(query);
+      const emailMatch = (entry.email ?? '').toLowerCase().includes(query);
+      const roleMatch = Array.isArray(entry.roles)
+        ? entry.roles.some((role) => role.name?.toLowerCase().includes(query))
+        : false;
+      return nameMatch || emailMatch || roleMatch;
+    });
+  }, [filters.users, users]);
+
+  const filteredRoles = useMemo(() => {
+    const query = filters.roles.trim().toLowerCase();
+    if (!query) {
+      return roles;
+    }
+
+    return roles.filter((entry) => {
+      const nameMatch = (entry.name ?? '').toLowerCase().includes(query);
+      const permissionMatch = permissionCatalog.some((permission) =>
+        entry.permissions?.[permission.key] && permission.label.toLowerCase().includes(query)
+      );
+      return nameMatch || permissionMatch;
+    });
+  }, [filters.roles, roles]);
+
+  const openCreateUserModal = () => {
+    setCreateUserForm(emptyCreateUserForm);
+    setCreateUserOpen(true);
+    setStatus({ type: '', message: '' });
+  };
+
+  const openManageUserModal = (record) => {
+    setManageUserState({
+      open: true,
+      userId: record.id,
+      form: {
+        firstName: record.firstName ?? '',
+        lastName: record.lastName ?? '',
+        email: record.email ?? '',
+        password: '',
+        passwordConfirmation: '',
+        roleIds: Array.isArray(record.roleIds) ? record.roleIds : []
+      }
+    });
+    setStatus({ type: '', message: '' });
+  };
+
+  const closeManageUserModal = () => {
+    setManageUserState({ open: false, userId: null, form: emptyManageUserForm });
+    setManageUserBusy(false);
+    setDeleteUserBusy(false);
+  };
+
+  const handleCreateUserFieldChange = (event) => {
+    const { name, value } = event.target;
+    setCreateUserForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleManageUserFieldChange = (event) => {
+    const { name, value, type, checked } = event.target;
+    if (name === 'roleIds') {
+      const roleId = Number.parseInt(value, 10);
+      setManageUserState((current) => {
+        const currentRoles = new Set(current.form.roleIds);
+        if (checked) {
+          currentRoles.add(roleId);
+        } else {
+          currentRoles.delete(roleId);
+        }
+        return {
+          ...current,
+          form: { ...current.form, roleIds: Array.from(currentRoles) }
+        };
+      });
+      return;
+    }
+
+    if (type === 'checkbox') {
+      setManageUserState((current) => ({
+        ...current,
+        form: { ...current.form, [name]: checked }
+      }));
+      return;
+    }
+
+    setManageUserState((current) => ({
+      ...current,
+      form: { ...current.form, [name]: value }
+    }));
   };
 
   const handleCreateUser = async (event) => {
     event.preventDefault();
-    setCreateBusy(true);
+    setCreateUserBusy(true);
     setStatus({ type: '', message: '' });
 
     try {
-      const response = await fetch('/api/register', {
+      const response = await fetch('/api/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(createForm)
+        body: JSON.stringify(createUserForm)
       });
 
       const payload = await response.json().catch(() => ({}));
@@ -217,45 +263,50 @@ const Users = () => {
         const message =
           payload?.message ||
           (response.status === 502
-            ? 'Registration is unavailable (502 Bad Gateway). Confirm the API service is online.'
+            ? 'User creation is unavailable (502 Bad Gateway). Confirm the backend is reachable.'
             : 'Unable to create the user.');
         throw new Error(message);
       }
 
+      if (payload?.user) {
+        setUsers((current) => [...current, payload.user]);
+      } else {
+        await refreshUsers();
+      }
+
       setStatus({ type: 'success', message: 'User created successfully.' });
-      setCreateOpen(false);
-      setCreateForm(emptyCreateForm);
-      await refreshUsers();
+      setCreateUserOpen(false);
+      setCreateUserForm(emptyCreateUserForm);
     } catch (error) {
       setStatus({ type: 'error', message: error.message });
     } finally {
-      setCreateBusy(false);
+      setCreateUserBusy(false);
     }
   };
 
   const handleUpdateUser = async (event) => {
     event.preventDefault();
-    if (!manageState.userId) {
+    if (!manageUserState.userId) {
       return;
     }
 
-    setManageBusy(true);
+    setManageUserBusy(true);
     setStatus({ type: '', message: '' });
 
     const payload = {
-      firstName: manageState.form.firstName,
-      lastName: manageState.form.lastName,
-      email: manageState.form.email,
-      roles: manageState.form.roleIds
+      firstName: manageUserState.form.firstName,
+      lastName: manageUserState.form.lastName,
+      email: manageUserState.form.email,
+      roles: manageUserState.form.roleIds
     };
 
-    if (manageState.form.password || manageState.form.passwordConfirmation) {
-      payload.password = manageState.form.password;
-      payload.passwordConfirmation = manageState.form.passwordConfirmation;
+    if (manageUserState.form.password || manageUserState.form.passwordConfirmation) {
+      payload.password = manageUserState.form.password;
+      payload.passwordConfirmation = manageUserState.form.passwordConfirmation;
     }
 
     try {
-      const response = await fetch(`/api/users/${manageState.userId}`, {
+      const response = await fetch(`/api/users/${manageUserState.userId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -287,24 +338,24 @@ const Users = () => {
       }
 
       setStatus({ type: 'success', message: 'User details updated successfully.' });
-      closeManageModal();
+      closeManageUserModal();
     } catch (error) {
       setStatus({ type: 'error', message: error.message });
     } finally {
-      setManageBusy(false);
+      setManageUserBusy(false);
     }
   };
 
   const handleDeleteUser = async () => {
-    if (!manageState.userId) {
+    if (!manageUserState.userId) {
       return;
     }
 
-    setDeleteBusy(true);
+    setDeleteUserBusy(true);
     setStatus({ type: '', message: '' });
 
     try {
-      const response = await fetch(`/api/users/${manageState.userId}`, {
+      const response = await fetch(`/api/users/${manageUserState.userId}`, {
         method: 'DELETE'
       });
 
@@ -315,249 +366,587 @@ const Users = () => {
         throw new Error(message);
       }
 
-      setUsers((current) => current.filter((entry) => entry.id !== manageState.userId));
+      setUsers((current) => current.filter((entry) => entry.id !== manageUserState.userId));
 
-      if (user && manageState.userId === user.id) {
+      if (user && manageUserState.userId === user.id) {
         logout();
       }
 
       setStatus({ type: 'success', message: 'User removed successfully.' });
-      closeManageModal();
+      closeManageUserModal();
     } catch (error) {
       setStatus({ type: 'error', message: error.message });
     } finally {
-      setDeleteBusy(false);
+      setDeleteUserBusy(false);
     }
   };
 
+  const handleCreateRoleFieldChange = (event) => {
+    const { name, value, type, checked } = event.target;
+    if (type === 'checkbox') {
+      setCreateRoleForm((current) => ({
+        ...current,
+        permissions: { ...current.permissions, [name]: checked }
+      }));
+      return;
+    }
+
+    setCreateRoleForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleManageRoleFieldChange = (event) => {
+    const { name, value, type, checked } = event.target;
+
+    if (type === 'checkbox') {
+      setManageRoleState((current) => ({
+        ...current,
+        form: {
+          ...current.form,
+          permissions: { ...current.form.permissions, [name]: checked }
+        }
+      }));
+      return;
+    }
+
+    setManageRoleState((current) => ({
+      ...current,
+      form: { ...current.form, [name]: value }
+    }));
+  };
+
+  const openCreateRoleModal = () => {
+    setCreateRoleForm(emptyRoleForm);
+    setCreateRoleOpen(true);
+    setStatus({ type: '', message: '' });
+  };
+
+  const openManageRoleModal = (roleRecord) => {
+    setManageRoleState({
+      open: true,
+      roleId: roleRecord.id,
+      form: {
+        name: roleRecord.name ?? '',
+        permissions: { ...emptyRoleForm.permissions, ...(roleRecord.permissions ?? {}) }
+      }
+    });
+    setStatus({ type: '', message: '' });
+  };
+
+  const closeManageRoleModal = () => {
+    setManageRoleState({ open: false, roleId: null, form: emptyRoleForm });
+    setManageRoleBusy(false);
+    setDeleteRoleBusy(false);
+  };
+
+  const handleCreateRole = async (event) => {
+    event.preventDefault();
+    setCreateRoleBusy(true);
+    setStatus({ type: '', message: '' });
+
+    try {
+      const response = await fetch('/api/roles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(createRoleForm)
+      });
+
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message = payload?.message || 'Unable to create the role.';
+        throw new Error(message);
+      }
+
+      if (payload?.role) {
+        setRoles((current) => [...current, payload.role]);
+      } else {
+        await refreshRoles();
+      }
+
+      setStatus({ type: 'success', message: 'Role created successfully.' });
+      setCreateRoleOpen(false);
+      setCreateRoleForm(emptyRoleForm);
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message });
+    } finally {
+      setCreateRoleBusy(false);
+    }
+  };
+
+  const handleUpdateRole = async (event) => {
+    event.preventDefault();
+
+    if (!manageRoleState.roleId) {
+      return;
+    }
+
+    setManageRoleBusy(true);
+    setStatus({ type: '', message: '' });
+
+    try {
+      const response = await fetch(`/api/roles/${manageRoleState.roleId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(manageRoleState.form)
+      });
+
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message = payload?.message || 'Unable to update the role.';
+        throw new Error(message);
+      }
+
+      if (payload?.role) {
+        setRoles((current) => current.map((entry) => (entry.id === payload.role.id ? payload.role : entry)));
+        await refreshUsers();
+      } else {
+        await Promise.all([refreshRoles(), refreshUsers()]);
+      }
+
+      setStatus({ type: 'success', message: 'Role updated successfully.' });
+      closeManageRoleModal();
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message });
+    } finally {
+      setManageRoleBusy(false);
+    }
+  };
+
+  const handleDeleteRole = async () => {
+    if (!manageRoleState.roleId) {
+      return;
+    }
+
+    setDeleteRoleBusy(true);
+    setStatus({ type: '', message: '' });
+
+    try {
+      const response = await fetch(`/api/roles/${manageRoleState.roleId}`, {
+        method: 'DELETE'
+      });
+
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message = payload?.message || 'Unable to delete the selected role.';
+        throw new Error(message);
+      }
+
+      setRoles((current) => current.filter((entry) => entry.id !== manageRoleState.roleId));
+      await refreshUsers();
+      setStatus({ type: 'success', message: 'Role removed successfully.' });
+      closeManageRoleModal();
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message });
+    } finally {
+      setDeleteRoleBusy(false);
+    }
+  };
+
+  const renderUserList = () => {
+    if (loading) {
+      return <p>Loading users…</p>;
+    }
+
+    if (filteredUsers.length === 0) {
+      return <p>No users found.</p>;
+    }
+
+    return (
+      <ul className="management-list" aria-live="polite">
+        {filteredUsers.map((entry) => (
+          <li key={entry.id} className="management-list__item">
+            <div className="management-list__summary">
+              <span className="management-list__title">
+                {entry.firstName} {entry.lastName}
+              </span>
+              <div className="management-list__meta">
+                <span>{entry.email}</span>
+                <span>Created {new Date(entry.createdAt).toLocaleString()}</span>
+                <span>
+                  Roles:{' '}
+                  {Array.isArray(entry.roles) && entry.roles.length > 0
+                    ? entry.roles.map((role) => role.name).join(', ')
+                    : '—'}
+                </span>
+              </div>
+            </div>
+            <div className="management-list__actions">
+              <button type="button" className="action-button" onClick={() => openManageUserModal(entry)}>
+                Manage
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
+  const renderRoleList = () => {
+    if (loading) {
+      return <p>Loading roles…</p>;
+    }
+
+    if (filteredRoles.length === 0) {
+      return <p>No roles found.</p>;
+    }
+
+    return (
+      <ul className="management-list" aria-live="polite">
+        {filteredRoles.map((entry) => (
+          <li key={entry.id} className="management-list__item">
+            <div className="management-list__summary">
+              <span className="management-list__title">{entry.name}</span>
+              <div className="management-list__meta">
+                <span>Created {new Date(entry.createdAt).toLocaleString()}</span>
+                <span>
+                  Permissions:{' '}
+                  {permissionCatalog
+                    .filter((permission) => Boolean(entry.permissions?.[permission.key]))
+                    .map((permission) => permission.label)
+                    .join(', ') || '—'}
+                </span>
+              </div>
+            </div>
+            <div className="management-list__actions">
+              <button type="button" className="action-button" onClick={() => openManageRoleModal(entry)}>
+                Manage
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
+  const renderPermissionCheckboxes = (form, onChange) => (
+    <div className="permission-grid">
+      {permissionCatalog.map((permission) => (
+        <label key={permission.key} className="permission-checkbox">
+          <input
+            type="checkbox"
+            name={permission.key}
+            checked={Boolean(form.permissions?.[permission.key])}
+            onChange={onChange}
+          />
+          <span>{permission.label}</span>
+        </label>
+      ))}
+    </div>
+  );
+
   return (
-    <div>
-      <div className="management-toolbar">
-        <h1>User management</h1>
-        <button type="button" className="action-button action-button--primary" onClick={openCreateModal}>
-          Add user
+    <div className="management-page">
+      <div className="management-toolbar management-toolbar--stacked">
+        <div>
+          <h1>User &amp; Role directory</h1>
+          <p className="management-description">
+            Invite operators, reset credentials, and curate role-based permissions from a single workspace.
+          </p>
+        </div>
+        <div className="toolbar-actions">
+          <input
+            type="search"
+            value={activeTab === 'users' ? filters.users : filters.roles}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                [activeTab]: event.target.value
+              }))
+            }
+            placeholder={activeTab === 'users' ? 'Filter by name, email, or role' : 'Filter by role or permission'}
+            className="toolbar-filter"
+          />
+          {activeTab === 'users' ? (
+            <button type="button" className="action-button action-button--primary" onClick={openCreateUserModal}>
+              Add user
+            </button>
+          ) : (
+            <button type="button" className="action-button action-button--primary" onClick={openCreateRoleModal}>
+              Add role
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="tab-strip" role="tablist">
+        <button
+          type="button"
+          className={`tab-strip__tab${activeTab === 'users' ? ' tab-strip__tab--active' : ''}`}
+          role="tab"
+          aria-selected={activeTab === 'users'}
+          onClick={() => setActiveTab('users')}
+        >
+          Users
+        </button>
+        <button
+          type="button"
+          className={`tab-strip__tab${activeTab === 'roles' ? ' tab-strip__tab--active' : ''}`}
+          role="tab"
+          aria-selected={activeTab === 'roles'}
+          onClick={() => setActiveTab('roles')}
+        >
+          Roles
         </button>
       </div>
 
-      {status.message ? <div className={`page-status page-status--${status.type}`}>{status.message}</div> : null}
+      {status.message ? <p className={`page-status page-status--${status.type}`}>{status.message}</p> : null}
 
-      {loading ? (
-        <p>Loading users…</p>
-      ) : sortedUsers.length === 0 ? (
-        <p>No users have been registered yet.</p>
-      ) : (
-        <ul className="management-list" aria-live="polite">
-          {sortedUsers.map((entry) => (
-            <li key={entry.id} className="management-list__item">
-              <div className="management-list__summary">
-                <span className="management-list__title">
-                  {entry.firstName} {entry.lastName}
-                </span>
-                <div className="management-list__meta">
-                  <span>{entry.email}</span>
-                  <span>Created {formatDateTime(entry.createdAt)}</span>
-                  <span>
-                    Roles:
-                    {Array.isArray(entry.roles) && entry.roles.length > 0
-                      ? ` ${entry.roles.map((role) => role.name).join(', ')}`
-                      : ' —'}
-                  </span>
-                </div>
-              </div>
-              <div className="management-list__actions">
-                <button
-                  type="button"
-                  className="action-button action-button--ghost"
-                  onClick={() => openManageModal(entry)}
-                >
-                  Manage
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <section className="tab-panel" role="tabpanel">
+        {activeTab === 'users' ? renderUserList() : renderRoleList()}
+      </section>
 
-      {createOpen ? (
-        <Modal
-          title="Create user"
-          description="Provide contact details and a strong password to add a new operator to MikroManage."
-          onClose={() => {
-            setCreateOpen(false);
-            setCreateBusy(false);
-          }}
-          actions={
-            <>
-              <button type="button" className="action-button" onClick={() => setCreateOpen(false)}>
-                Cancel
-              </button>
-              <button
-                type="submit"
-                form="create-user-form"
-                className="action-button action-button--primary"
-                disabled={createBusy}
-              >
-                {createBusy ? 'Saving…' : 'Create'}
-              </button>
-            </>
+      <Modal
+        title="Add user"
+        open={createUserOpen}
+        onClose={() => setCreateUserOpen(false)}
+        actions={[
+          {
+            label: 'Cancel',
+            variant: 'ghost',
+            onClick: () => setCreateUserOpen(false),
+            disabled: createUserBusy
+          },
+          {
+            label: createUserBusy ? 'Creating…' : 'Create user',
+            variant: 'primary',
+            type: 'submit',
+            form: 'create-user-form',
+            disabled: createUserBusy
           }
-        >
-          <form id="create-user-form" onSubmit={handleCreateUser} className="form-grid">
-            <label>
-              <span>First name</span>
-              <input
-                name="firstName"
-                value={createForm.firstName}
-                onChange={handleCreateFieldChange}
-                required
-              />
-            </label>
-            <label>
-              <span>Last name</span>
-              <input name="lastName" value={createForm.lastName} onChange={handleCreateFieldChange} required />
-            </label>
-            <label>
-              <span>Email</span>
-              <input
-                name="email"
-                type="email"
-                value={createForm.email}
-                onChange={handleCreateFieldChange}
-                required
-              />
-            </label>
-            <label>
-              <span>Password</span>
-              <input
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                value={createForm.password}
-                onChange={handleCreateFieldChange}
-                required
-              />
-            </label>
-            <label>
-              <span>Confirm password</span>
-              <input
-                name="passwordConfirmation"
-                type="password"
-                autoComplete="new-password"
-                value={createForm.passwordConfirmation}
-                onChange={handleCreateFieldChange}
-                required
-              />
-            </label>
-          </form>
-        </Modal>
-      ) : null}
+        ]}
+      >
+        <form id="create-user-form" className="form-grid" onSubmit={handleCreateUser}>
+          <label>
+            <span>First name</span>
+            <input
+              name="firstName"
+              value={createUserForm.firstName}
+              onChange={handleCreateUserFieldChange}
+              autoComplete="given-name"
+              required
+            />
+          </label>
+          <label>
+            <span>Last name</span>
+            <input
+              name="lastName"
+              value={createUserForm.lastName}
+              onChange={handleCreateUserFieldChange}
+              autoComplete="family-name"
+              required
+            />
+          </label>
+          <label className="wide">
+            <span>Email</span>
+            <input
+              type="email"
+              name="email"
+              value={createUserForm.email}
+              onChange={handleCreateUserFieldChange}
+              autoComplete="email"
+              required
+            />
+          </label>
+          <label>
+            <span>Password</span>
+            <input
+              type="password"
+              name="password"
+              value={createUserForm.password}
+              onChange={handleCreateUserFieldChange}
+              autoComplete="new-password"
+              minLength={8}
+              required
+            />
+          </label>
+          <label>
+            <span>Confirm password</span>
+            <input
+              type="password"
+              name="passwordConfirmation"
+              value={createUserForm.passwordConfirmation}
+              onChange={handleCreateUserFieldChange}
+              autoComplete="new-password"
+              minLength={8}
+              required
+            />
+          </label>
+        </form>
+      </Modal>
 
-      {manageState.open ? (
-        <Modal
-          title="Manage user"
-          description="Update profile details, rotate credentials, or assign roles to control access."
-          onClose={closeManageModal}
-          actions={
-            <>
-              <button type="button" className="action-button" onClick={closeManageModal}>
-                Close
-              </button>
-              <button
-                type="button"
-                className="action-button action-button--danger"
-                onClick={handleDeleteUser}
-                disabled={deleteBusy}
-              >
-                {deleteBusy ? 'Removing…' : 'Delete'}
-              </button>
-              <button
-                type="submit"
-                form="manage-user-form"
-                className="action-button action-button--primary"
-                disabled={manageBusy}
-              >
-                {manageBusy ? 'Saving…' : 'Save changes'}
-              </button>
-            </>
+      <Modal
+        title="Manage user"
+        open={manageUserState.open}
+        onClose={closeManageUserModal}
+        actions={[
+          {
+            label: deleteUserBusy ? 'Deleting…' : 'Delete',
+            variant: 'danger',
+            onClick: handleDeleteUser,
+            disabled: manageUserBusy || deleteUserBusy
+          },
+          {
+            label: 'Cancel',
+            variant: 'ghost',
+            onClick: closeManageUserModal,
+            disabled: manageUserBusy
+          },
+          {
+            label: manageUserBusy ? 'Saving…' : 'Save changes',
+            variant: 'primary',
+            type: 'submit',
+            form: 'manage-user-form',
+            disabled: manageUserBusy
           }
-        >
-          <form id="manage-user-form" onSubmit={handleUpdateUser} className="form-grid">
-            <label>
-              <span>First name</span>
-              <input
-                name="firstName"
-                value={manageState.form.firstName}
-                onChange={handleManageFieldChange}
-                required
-              />
-            </label>
-            <label>
-              <span>Last name</span>
-              <input
-                name="lastName"
-                value={manageState.form.lastName}
-                onChange={handleManageFieldChange}
-                required
-              />
-            </label>
-            <label>
-              <span>Email</span>
-              <input
-                name="email"
-                type="email"
-                value={manageState.form.email}
-                onChange={handleManageFieldChange}
-                required
-              />
-            </label>
-            <fieldset className="form-fieldset">
-              <legend>Assign roles</legend>
-              {roles.length === 0 ? (
-                <p>No roles available yet.</p>
-              ) : (
-                roles.map((role) => {
-                  const checked = manageState.form.roleIds?.includes(role.id);
-                  return (
-                    <label key={role.id} className="checkbox-field">
-                      <input
-                        type="checkbox"
-                        value={role.id}
-                        checked={checked}
-                        onChange={() => handleRoleToggle(role.id)}
-                      />
-                      <span>
-                        {role.name}
-                        <small>{role.description}</small>
-                      </span>
-                    </label>
-                  );
-                })
-              )}
-            </fieldset>
-            <label>
-              <span>New password (optional)</span>
-              <input
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                placeholder="Leave blank to keep the current password"
-                value={manageState.form.password}
-                onChange={handleManageFieldChange}
-              />
-            </label>
-            <label>
-              <span>Confirm password</span>
-              <input
-                name="passwordConfirmation"
-                type="password"
-                autoComplete="new-password"
-                value={manageState.form.passwordConfirmation}
-                onChange={handleManageFieldChange}
-              />
-            </label>
-          </form>
-        </Modal>
-      ) : null}
+        ]}
+      >
+        <form id="manage-user-form" className="form-grid" onSubmit={handleUpdateUser}>
+          <label>
+            <span>First name</span>
+            <input
+              name="firstName"
+              value={manageUserState.form.firstName}
+              onChange={handleManageUserFieldChange}
+              required
+            />
+          </label>
+          <label>
+            <span>Last name</span>
+            <input
+              name="lastName"
+              value={manageUserState.form.lastName}
+              onChange={handleManageUserFieldChange}
+              required
+            />
+          </label>
+          <label className="wide">
+            <span>Email</span>
+            <input
+              type="email"
+              name="email"
+              value={manageUserState.form.email}
+              onChange={handleManageUserFieldChange}
+              required
+            />
+          </label>
+          <fieldset className="wide">
+            <legend>Assign roles</legend>
+            <div className="role-checkboxes">
+              {roles.map((role) => (
+                <label key={role.id}>
+                  <input
+                    type="checkbox"
+                    name="roleIds"
+                    value={role.id}
+                    checked={manageUserState.form.roleIds.includes(role.id)}
+                    onChange={handleManageUserFieldChange}
+                  />
+                  <span>{role.name}</span>
+                </label>
+              ))}
+              {roles.length === 0 ? <p className="muted">No roles defined yet.</p> : null}
+            </div>
+          </fieldset>
+          <label>
+            <span>New password</span>
+            <input
+              type="password"
+              name="password"
+              value={manageUserState.form.password}
+              onChange={handleManageUserFieldChange}
+              minLength={8}
+              autoComplete="new-password"
+            />
+          </label>
+          <label>
+            <span>Confirm password</span>
+            <input
+              type="password"
+              name="passwordConfirmation"
+              value={manageUserState.form.passwordConfirmation}
+              onChange={handleManageUserFieldChange}
+              minLength={8}
+              autoComplete="new-password"
+            />
+          </label>
+        </form>
+      </Modal>
+
+      <Modal
+        title="Add role"
+        open={createRoleOpen}
+        onClose={() => setCreateRoleOpen(false)}
+        actions={[
+          {
+            label: 'Cancel',
+            variant: 'ghost',
+            onClick: () => setCreateRoleOpen(false),
+            disabled: createRoleBusy
+          },
+          {
+            label: createRoleBusy ? 'Creating…' : 'Create role',
+            variant: 'primary',
+            type: 'submit',
+            form: 'create-role-form',
+            disabled: createRoleBusy
+          }
+        ]}
+      >
+        <form id="create-role-form" className="form-grid" onSubmit={handleCreateRole}>
+          <label className="wide">
+            <span>Role name</span>
+            <input name="name" value={createRoleForm.name} onChange={handleCreateRoleFieldChange} required />
+          </label>
+          <fieldset className="wide">
+            <legend>Permissions</legend>
+            {renderPermissionCheckboxes(createRoleForm, handleCreateRoleFieldChange)}
+          </fieldset>
+        </form>
+      </Modal>
+
+      <Modal
+        title="Manage role"
+        open={manageRoleState.open}
+        onClose={closeManageRoleModal}
+        actions={[
+          {
+            label: deleteRoleBusy ? 'Deleting…' : 'Delete',
+            variant: 'danger',
+            onClick: handleDeleteRole,
+            disabled: manageRoleBusy || deleteRoleBusy
+          },
+          {
+            label: 'Cancel',
+            variant: 'ghost',
+            onClick: closeManageRoleModal,
+            disabled: manageRoleBusy
+          },
+          {
+            label: manageRoleBusy ? 'Saving…' : 'Save changes',
+            variant: 'primary',
+            type: 'submit',
+            form: 'manage-role-form',
+            disabled: manageRoleBusy
+          }
+        ]}
+      >
+        <form id="manage-role-form" className="form-grid" onSubmit={handleUpdateRole}>
+          <label className="wide">
+            <span>Role name</span>
+            <input name="name" value={manageRoleState.form.name} onChange={handleManageRoleFieldChange} required />
+          </label>
+          <fieldset className="wide">
+            <legend>Permissions</legend>
+            {renderPermissionCheckboxes(manageRoleState.form, handleManageRoleFieldChange)}
+          </fieldset>
+        </form>
+      </Modal>
     </div>
   );
 };

@@ -78,6 +78,7 @@ const Groups = () => {
   const [manageState, setManageState] = useState({ open: false, groupId: null, form: emptyGroupForm });
   const [manageBusy, setManageBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [filter, setFilter] = useState('');
 
   useEffect(() => {
     if (!user) {
@@ -138,6 +139,20 @@ const Groups = () => {
       label: `${'— '.repeat(entry.depth || 0)}${entry.name}`
     }));
   }, [orderedGroups]);
+
+  const filteredOrderedGroups = useMemo(() => {
+    const query = filter.trim().toLowerCase();
+    if (!query) {
+      return orderedGroups;
+    }
+
+    return orderedGroups.filter((entry) => {
+      const nameMatch = entry.name?.toLowerCase().includes(query);
+      const parentName = groups.find((group) => group.id === entry.parentId)?.name ?? '';
+      const parentMatch = parentName.toLowerCase().includes(query);
+      return nameMatch || parentMatch;
+    });
+  }, [filter, orderedGroups, groups]);
 
   const availableParentOptions = (groupId) => {
     if (!groupId) {
@@ -321,22 +336,36 @@ const Groups = () => {
 
   return (
     <div>
-      <div className="management-toolbar">
-        <h1>Mik-Groups</h1>
-        <button type="button" className="action-button action-button--primary" onClick={openCreateModal}>
-          Add group
-        </button>
+      <div className="management-toolbar management-toolbar--stacked">
+        <div>
+          <h1>Mik-Groups</h1>
+          <p className="management-description">
+            Build hierarchical collections to mirror regions, datacenters, or customer environments.
+          </p>
+        </div>
+        <div className="toolbar-actions">
+          <input
+            type="search"
+            value={filter}
+            onChange={(event) => setFilter(event.target.value)}
+            placeholder="Filter by name or parent"
+            className="toolbar-filter"
+          />
+          <button type="button" className="action-button action-button--primary" onClick={openCreateModal}>
+            Add group
+          </button>
+        </div>
       </div>
 
       {status.message ? <div className={`page-status page-status--${status.type}`}>{status.message}</div> : null}
 
       {loading ? (
         <p>Loading groups…</p>
-      ) : orderedGroups.length === 0 ? (
+      ) : filteredOrderedGroups.length === 0 ? (
         <p>No groups available yet.</p>
       ) : (
         <ul className="management-list" aria-live="polite">
-          {orderedGroups.map((entry) => (
+          {filteredOrderedGroups.map((entry) => (
             <li key={entry.id} className="management-list__item">
               <div
                 className="management-list__summary"

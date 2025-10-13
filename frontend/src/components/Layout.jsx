@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import BrandMark from './BrandMark.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
@@ -40,11 +40,22 @@ const LogoutIcon = () => (
   </svg>
 );
 
+const navigationIcons = {
+  dashboard: '📊',
+  users: '👥',
+  groups: '🗂️',
+  mikrotiks: '📡',
+  tunnels: '🔗',
+  settings: '⚙️'
+};
+
 const Layout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, toggleTheme } = useTheme();
-  const [version, setVersion] = useState('0.0');
+  const [meta, setMeta] = useState({ version: '0.0', registrationOpen: true });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -60,12 +71,16 @@ const Layout = () => {
 
         const payload = await response.json();
 
-        if (mounted && payload?.version) {
-          setVersion(payload.version);
+        if (mounted) {
+          setMeta({
+            version: payload?.version ?? '0.0',
+            registrationOpen: payload?.registrationOpen !== false,
+            userCount: payload?.userCount ?? 0
+          });
         }
       } catch (error) {
         if (mounted) {
-          setVersion((current) => current || '0.0');
+          setMeta((current) => ({ ...current, version: current.version || '0.0' }));
         }
       }
     };
@@ -112,7 +127,9 @@ const Layout = () => {
           {
             to: '/dashboard',
             label: 'Dashboard',
-            permissionKey: 'dashboard'
+            iconKey: 'dashboard',
+            permissionKey: 'dashboard',
+            match: ['/dashboard']
           }
         ]
       },
@@ -121,28 +138,38 @@ const Layout = () => {
         items: [
           {
             to: '/users',
-            label: 'Users',
-            permissionKey: 'users'
-          },
-          {
-            to: '/roles',
-            label: 'Roles',
-            permissionKey: 'roles'
+            label: "Users & Roles",
+            iconKey: 'users',
+            permissionsAny: ['users', 'roles'],
+            match: ['/users', '/roles']
           },
           {
             to: '/groups',
             label: 'Mik-Groups',
-            permissionKey: 'groups'
+            iconKey: 'groups',
+            permissionKey: 'groups',
+            match: ['/groups']
           },
           {
             to: '/mikrotiks',
-            label: "Mikrotik's",
-            permissionKey: 'mikrotiks'
+            label: 'Mikrotiks',
+            iconKey: 'mikrotiks',
+            permissionKey: 'mikrotiks',
+            match: ['/mikrotiks']
+          },
+          {
+            to: '/tunnels',
+            label: 'Tunnels',
+            iconKey: 'tunnels',
+            permissionKey: 'tunnels',
+            match: ['/tunnels']
           },
           {
             to: '/settings',
             label: 'Settings',
-            permissionKey: 'settings'
+            iconKey: 'settings',
+            permissionKey: 'settings',
+            match: ['/settings']
           }
         ]
       }
@@ -150,30 +177,61 @@ const Layout = () => {
     []
   );
 
-  const renderNavEntry = (item) => {
-    const hasAccess = item.permissionKey ? Boolean(user?.permissions?.[item.permissionKey]) : true;
+  const hasAccess = (item) => {
+    if (!user) {
+      return false;
+    }
 
-    if (hasAccess) {
+    if (item.permissionsAny) {
+      return item.permissionsAny.some((key) => Boolean(user.permissions?.[key]));
+    }
+
+    return item.permissionKey ? Boolean(user.permissions?.[item.permissionKey]) : true;
+  };
+
+  const renderNavEntry = (item) => {
+    const activeMatch = item.match || [item.to];
+
+    if (hasAccess(item)) {
       return (
         <NavLink
           key={item.to}
           to={item.to}
-          className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+          className={({ isActive }) => {
+            const locationMatch = activeMatch.some((path) => location.pathname.startsWith(path));
+            const active = isActive || locationMatch;
+            return `sidebar-link${active ? ' active' : ''}${sidebarCollapsed ? ' sidebar-link--compact' : ''}`;
+          }}
         >
-          {item.label}
+          <span className="sidebar-link__icon" aria-hidden="true">
+            {navigationIcons[item.iconKey] ?? '•'}
+          </span>
+          <span className="sidebar-link__label">{item.label}</span>
         </NavLink>
       );
     }
 
     return (
-      <span key={`${item.to}-disabled`} className="sidebar-link sidebar-link--disabled" role="link" aria-disabled="true">
-        {item.label}
+      <span
+        key={`${item.to}-disabled`}
+        className={`sidebar-link sidebar-link--disabled${sidebarCollapsed ? ' sidebar-link--compact' : ''}`}
+        role="link"
+        aria-disabled="true"
+      >
+        <span className="sidebar-link__icon" aria-hidden="true">
+          {navigationIcons[item.iconKey] ?? '•'}
+        </span>
+        <span className="sidebar-link__label">{item.label}</span>
       </span>
     );
   };
 
+  const toggleSidebar = () => setSidebarCollapsed((current) => !current);
+
   return (
-    <div className={`app-shell${user ? ' app-shell--authed' : ''}`}>
+    <div
+      className={`app-shell${user ? ' app-shell--authed' : ''}${sidebarCollapsed ? ' app-shell--collapsed' : ''}`}
+    >
       <header className="app-header">
         <Link to="/" className="logo" aria-label="MikroManage home">
           <BrandMark />
@@ -189,7 +247,7 @@ const Layout = () => {
             </button>
           ) : (
             <nav>
-              <NavLink to="/register">Register</NavLink>
+              {meta.registrationOpen ? <NavLink to="/register">Register</NavLink> : null}
               <NavLink to="/" end>
                 Login
               </NavLink>
@@ -200,6 +258,15 @@ const Layout = () => {
       {user ? (
         <div className="app-content">
           <aside className="app-sidebar" aria-label="Primary navigation">
+            <button
+              type="button"
+              className="sidebar-collapse"
+              onClick={toggleSidebar}
+              aria-expanded={!sidebarCollapsed}
+            >
+              {sidebarCollapsed ? '➤' : '◀'}
+              <span className="sidebar-collapse__label">{sidebarCollapsed ? 'Expand menu' : 'Collapse menu'}</span>
+            </button>
             <nav className="sidebar-nav">
               {navigation.map((section) => (
                 <div className="sidebar-group" key={section.label ?? 'primary'}>
@@ -222,7 +289,7 @@ const Layout = () => {
       <footer className="app-footer">
         <p>© {new Date().getFullYear()} MikroManage. All rights reserved.</p>
         <p className="app-footer__version" aria-live="polite">
-          Version {version}
+          Version {meta.version}
         </p>
       </footer>
     </div>

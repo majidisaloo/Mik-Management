@@ -1,9 +1,56 @@
 import { useEffect, useRef } from 'react';
 
-const Modal = ({ title, description, children, actions, onClose }) => {
+const buildActionClassName = (variant = 'ghost') => {
+  return ['modal__action', variant ? `modal__action--${variant}` : ''].filter(Boolean).join(' ');
+};
+
+const renderActions = (actions) => {
+  if (!actions) {
+    return null;
+  }
+
+  if (Array.isArray(actions)) {
+    const entries = actions.filter(Boolean).map((action, index) => {
+      const {
+        label,
+        variant = 'ghost',
+        type = 'button',
+        form,
+        onClick,
+        disabled,
+        autoFocus,
+        key
+      } = action;
+
+      return (
+        <button
+          key={key ?? `${variant}-${label ?? 'action'}-${index}`}
+          type={type}
+          form={form}
+          onClick={onClick}
+          disabled={disabled}
+          autoFocus={autoFocus}
+          className={buildActionClassName(variant)}
+        >
+          {label}
+        </button>
+      );
+    });
+
+    return entries.length ? entries : null;
+  }
+
+  return actions;
+};
+
+const Modal = ({ title, description, children, actions, onClose, open = true }) => {
   const dialogRef = useRef(null);
 
   useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
     const previouslyFocused = document.activeElement;
     const dialog = dialogRef.current;
 
@@ -35,7 +82,7 @@ const Modal = ({ title, description, children, actions, onClose }) => {
         previouslyFocused.focus();
       }
     };
-  }, [onClose]);
+  }, [onClose, open]);
 
   const handleBackdropClick = (event) => {
     if (event.target === event.currentTarget) {
@@ -44,6 +91,12 @@ const Modal = ({ title, description, children, actions, onClose }) => {
   };
 
   const labelId = `${title?.replace(/\s+/g, '-').toLowerCase() || 'modal'}-heading`;
+
+  if (!open) {
+    return null;
+  }
+
+  const renderedActions = renderActions(actions);
 
   return (
     <div className="modal" role="dialog" aria-modal="true" aria-labelledby={labelId} onClick={handleBackdropClick}>
@@ -56,7 +109,7 @@ const Modal = ({ title, description, children, actions, onClose }) => {
         </div>
         {description ? <p className="modal__description">{description}</p> : null}
         <div className="modal__body">{children}</div>
-        {actions ? <div className="modal__actions">{actions}</div> : null}
+        {renderedActions ? <div className="modal__actions">{renderedActions}</div> : null}
       </div>
     </div>
   );

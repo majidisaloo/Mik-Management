@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
+const statusOptions = [
+  { value: 'updated', label: 'Updated' },
+  { value: 'pending', label: 'Pending update' },
+  { value: 'unknown', label: 'Unknown state' }
+];
+
 const defaultRouterForm = () => ({
   apiEnabled: false,
   apiSSL: false,
@@ -22,6 +28,7 @@ const emptyDeviceForm = () => ({
   groupId: '',
   tags: '',
   notes: '',
+  status: 'unknown',
   routeros: defaultRouterForm()
 });
 
@@ -60,6 +67,7 @@ const toFormState = (device) => {
     groupId: device.groupId ? String(device.groupId) : '',
     tags,
     notes: device.notes ?? '',
+    status: device.status?.updateStatus ?? 'unknown',
     routeros: {
       apiEnabled: Boolean(router.apiEnabled),
       apiSSL: sslEnabled,
@@ -94,6 +102,7 @@ const toPayload = (form) => ({
   groupId: form.groupId ? Number.parseInt(form.groupId, 10) : null,
   tags: parseTags(form.tags),
   notes: form.notes,
+  status: { updateStatus: form.status },
   routeros: {
     apiEnabled: Boolean(form.routeros.apiEnabled),
     apiSSL: Boolean(form.routeros.apiSSL),
@@ -115,6 +124,7 @@ const Mikrotiks = () => {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', message: '' });
+  const [filter, setFilter] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState(emptyDeviceForm());
   const [createBusy, setCreateBusy] = useState(false);
@@ -178,9 +188,27 @@ const Mikrotiks = () => {
     return () => controller.abort();
   }, [navigate, user]);
 
+  const filteredDevices = useMemo(() => {
+    const query = filter.trim().toLowerCase();
+    if (!query) {
+      return devices;
+    }
+
+    return devices.filter((device) => {
+      const nameMatch = device.name?.toLowerCase().includes(query);
+      const hostMatch = device.host?.toLowerCase().includes(query);
+      const groupMatch = device.groupName?.toLowerCase().includes(query);
+      const tagMatch = Array.isArray(device.tags)
+        ? device.tags.some((tag) => tag.toLowerCase().includes(query))
+        : false;
+      const statusMatch = device.status?.updateStatus?.toLowerCase().includes(query);
+      return nameMatch || hostMatch || groupMatch || tagMatch || statusMatch;
+    });
+  }, [devices, filter]);
+
   const sortedDevices = useMemo(() => {
-    return [...devices].sort((a, b) => a.name.localeCompare(b.name));
-  }, [devices]);
+    return [...filteredDevices].sort((a, b) => a.name.localeCompare(b.name));
+  }, [filteredDevices]);
 
   const openCreateModal = () => {
     setCreateForm(emptyDeviceForm());
@@ -497,11 +525,25 @@ const Mikrotiks = () => {
 
   return (
     <div>
-      <div className="management-toolbar">
-        <h1>Mikrotik inventory</h1>
-        <button type="button" className="action-button action-button--primary" onClick={openCreateModal}>
-          Add Mikrotik
-        </button>
+      <div className="management-toolbar management-toolbar--stacked">
+        <div>
+          <h1>Mikrotik inventory</h1>
+          <p className="management-description">
+            Track RouterOS devices, API credentials, and firmware status across your MikroTik footprint.
+          </p>
+        </div>
+        <div className="toolbar-actions">
+          <input
+            type="search"
+            value={filter}
+            onChange={(event) => setFilter(event.target.value)}
+            placeholder="Filter by name, host, group, status, or tag"
+            className="toolbar-filter"
+          />
+          <button type="button" className="action-button action-button--primary" onClick={openCreateModal}>
+            Add Mikrotik
+          </button>
+        </div>
       </div>
 
       {status.message ? <div className={`page-status page-status--${status.type}`}>{status.message}</div> : null}
@@ -519,16 +561,15 @@ const Mikrotiks = () => {
                 <div className="management-list__meta">
                   <span>{entry.host}</span>
                   <span>{entry.groupName ? `Group: ${entry.groupName}` : 'No group assigned'}</span>
+                  <span className={`status-pill status-pill--${entry.status?.updateStatus ?? 'unknown'}`}>
+                    {entry.status?.updateStatus ?? 'unknown'}
+                  </span>
                   <span>{entry.routeros?.apiEnabled ? 'API enabled' : 'API disabled'}</span>
                   <span>Created {formatDateTime(entry.createdAt)}</span>
                 </div>
               </div>
               <div className="management-list__actions">
-                <button
-                  type="button"
-                  className="action-button action-button--ghost"
-                  onClick={() => openManageModal(entry)}
-                >
+                <button type="button" className="action-button" onClick={() => openManageModal(entry)}>
                   Manage
                 </button>
               </div>
@@ -577,6 +618,16 @@ const Mikrotiks = () => {
                 {groups.map((group) => (
                   <option key={group.id} value={group.id}>
                     {group.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Update status</span>
+              <select name="status" value={createForm.status} onChange={handleCreateFieldChange}>
+                {statusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -650,6 +701,16 @@ const Mikrotiks = () => {
                 {groups.map((group) => (
                   <option key={group.id} value={group.id}>
                     {group.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Update status</span>
+              <select name="status" value={manageState.form.status} onChange={handleManageFieldChange}>
+                {statusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>

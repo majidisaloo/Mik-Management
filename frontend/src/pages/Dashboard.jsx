@@ -1,29 +1,59 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
-const initialProfile = {
-  firstName: '',
-  lastName: '',
-  email: ''
+const formatNumber = (value) => {
+  if (value === null || value === undefined) {
+    return '0';
+  }
+  return new Intl.NumberFormat().format(value);
+};
+
+const formatLatency = (value) => {
+  if (value === null || value === undefined) {
+    return '—';
+  }
+  return `${value} ms`;
+};
+
+const formatPacketLoss = (value) => {
+  if (value === null || value === undefined) {
+    return '—';
+  }
+  return `${value}%`;
 };
 
 const Dashboard = () => {
-  const { user, updateUser } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [profile, setProfile] = useState(initialProfile);
+  const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', message: '' });
-  const [isSaving, setIsSaving] = useState(false);
-  const [assignedRoles, setAssignedRoles] = useState([]);
-  const [permissions, setPermissions] = useState({
-    dashboard: false,
-    users: false,
-    roles: false,
-    groups: false,
-    mikrotiks: false,
-    settings: false
-  });
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  const loadMetrics = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/dashboard/metrics');
+
+      if (!response.ok) {
+        const message =
+          response.status === 502
+            ? 'Metrics service is unavailable (502 Bad Gateway). Confirm the API is running behind Nginx.'
+            : 'Unable to load dashboard metrics.';
+        throw new Error(message);
+      }
+
+      const payload = await response.json();
+      setMetrics(payload);
+      setLastUpdated(new Date());
+      setStatus({ type: '', message: '' });
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message || 'Unable to load dashboard metrics.' });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -31,221 +61,186 @@ const Dashboard = () => {
       return;
     }
 
-    const controller = new AbortController();
+    loadMetrics();
+  }, [loadMetrics, navigate, user]);
 
-    const loadProfile = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/users/${user.id}`, {
-          signal: controller.signal
-        });
-
-        if (!response.ok) {
-          throw new Error('Unable to load your profile.');
-        }
-
-        const payload = await response.json();
-        const userPayload = payload?.user;
-
-        if (!userPayload) {
-          throw new Error('User details were not returned by the server.');
-        }
-
-        setProfile({
-          firstName: userPayload.firstName ?? '',
-          lastName: userPayload.lastName ?? '',
-          email: userPayload.email ?? ''
-        });
-        setAssignedRoles(Array.isArray(userPayload.roles) ? userPayload.roles : []);
-        setPermissions({
-          dashboard: Boolean(userPayload.permissions?.dashboard),
-          users: Boolean(userPayload.permissions?.users),
-          roles: Boolean(userPayload.permissions?.roles),
-          groups: Boolean(userPayload.permissions?.groups),
-          mikrotiks: Boolean(userPayload.permissions?.mikrotiks),
-          settings: Boolean(userPayload.permissions?.settings)
-        });
-        setStatus({ type: '', message: '' });
-      } catch (error) {
-        if (error.name !== 'AbortError') {
-          setStatus({
-            type: 'error',
-            message: error.message || 'Unable to load your profile.'
-          });
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProfile();
-
-    return () => controller.abort();
-  }, [navigate, user]);
-
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-    setProfile((current) => ({ ...current, [name]: value }));
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-
-    if (!user) {
-      navigate('/login', { replace: true });
-      return;
+  const outdatedMikrotiks = useMemo(() => {
+    if (!metrics?.mikrotik) {
+      return 0;
     }
+    return (metrics.mikrotik.pending ?? 0) + (metrics.mikrotik.unknown ?? 0);
+  }, [metrics]);
 
-    setStatus({ type: '', message: '' });
-    setIsSaving(true);
-
-    try {
-      const response = await fetch(`/api/users/${user.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(profile)
-      });
-
-      if (!response.ok) {
-        const contentType = response.headers.get('content-type') ?? '';
-        let message = 'Profile update failed.';
-
-        if (contentType.includes('application/json')) {
-          const payload = await response.json().catch(() => ({}));
-          if (payload?.message) {
-            message = payload.message;
-          }
-        } else {
-          const fallbackText = await response.text().catch(() => '');
-          if (fallbackText) {
-            message = fallbackText;
-          }
-        }
-
-        throw new Error(message);
-      }
-
-      const payload = await response.json();
-      const updatedUser = payload?.user;
-
-      if (updatedUser) {
-        updateUser(updatedUser);
-        setProfile({
-          firstName: updatedUser.firstName ?? '',
-          lastName: updatedUser.lastName ?? '',
-          email: updatedUser.email ?? ''
-        });
-        setAssignedRoles(Array.isArray(updatedUser.roles) ? updatedUser.roles : []);
-        setPermissions({
-          dashboard: Boolean(updatedUser.permissions?.dashboard),
-          users: Boolean(updatedUser.permissions?.users),
-          roles: Boolean(updatedUser.permissions?.roles),
-          groups: Boolean(updatedUser.permissions?.groups),
-          mikrotiks: Boolean(updatedUser.permissions?.mikrotiks),
-          settings: Boolean(updatedUser.permissions?.settings)
-        });
-      }
-
-      setStatus({ type: 'success', message: payload?.message ?? 'Profile updated successfully.' });
-    } catch (error) {
-      setStatus({ type: 'error', message: error.message || 'Profile update failed.' });
-    } finally {
-      setIsSaving(false);
+  const inactiveTunnels = useMemo(() => {
+    if (!metrics?.tunnels) {
+      return 0;
     }
+    return (metrics.tunnels.down ?? 0) + (metrics.tunnels.maintenance ?? 0);
+  }, [metrics]);
+
+  const handleRefresh = () => {
+    loadMetrics();
   };
 
   if (!user) {
     return null;
   }
 
+  const roles = Array.isArray(user.roles) ? user.roles.map((role) => role.name).join(', ') : '—';
+
   return (
     <div className="dashboard">
-      <section className="card">
-        <h1>Welcome back, {user.firstName || 'operator'}.</h1>
-        <p className="card-intro">
-          Keep your contact details current and review the access you have within MikroManage. Any changes you save here take
-          effect immediately.
-        </p>
-        <div className="role-overview">
-          <div>
-            <h2>Your roles</h2>
-            <div className="role-badges">
-              {assignedRoles.length > 0 ? (
-                assignedRoles.map((role) => (
-                  <span key={role.id} className="role-badge">
-                    {role.name}
-                  </span>
-                ))
-              ) : (
-                <span className="muted">No roles assigned</span>
-              )}
-            </div>
-          </div>
-          <div>
-            <h2>Effective access</h2>
-            <div className="permission-chips">
-              <span className={`permission-chip${permissions.dashboard ? ' permission-chip--active' : ''}`}>
-                Dashboard
-              </span>
-              <span className={`permission-chip${permissions.users ? ' permission-chip--active' : ''}`}>Users</span>
-              <span className={`permission-chip${permissions.roles ? ' permission-chip--active' : ''}`}>Roles</span>
-              <span className={`permission-chip${permissions.groups ? ' permission-chip--active' : ''}`}>
-                Mik-Groups
-              </span>
-              <span className={`permission-chip${permissions.mikrotiks ? ' permission-chip--active' : ''}`}>
-                Mikrotik's
-              </span>
-              <span className={`permission-chip${permissions.settings ? ' permission-chip--active' : ''}`}>
-                Settings
-              </span>
-            </div>
-          </div>
+      <header className="dashboard-header">
+        <div>
+          <h1>Network health overview</h1>
+          <p className="dashboard-subtitle">
+            Keep track of MikroTik devices, inter-site tunnels, and their responsiveness in real time.
+          </p>
         </div>
-        <form className="form-grid" onSubmit={handleSubmit}>
-          <h2 className="wide">Update Profile</h2>
-          <label>
-            <span>First Name</span>
-            <input
-              name="firstName"
-              value={profile.firstName}
-              onChange={handleChange}
-              autoComplete="given-name"
-              required
-            />
-          </label>
-          <label>
-            <span>Last Name</span>
-            <input
-              name="lastName"
-              value={profile.lastName}
-              onChange={handleChange}
-              autoComplete="family-name"
-              required
-            />
-          </label>
-          <label className="wide">
-            <span>Email</span>
-            <input
-              type="email"
-              name="email"
-              value={profile.email}
-              onChange={handleChange}
-              autoComplete="email"
-              required
-            />
-          </label>
-          <div className="wide">
-            <button type="submit" className="primary-button" disabled={isSaving}>
-              {isSaving ? 'Saving…' : 'Save changes'}
-            </button>
-          </div>
-        </form>
-        {loading && <p className="feedback muted">Loading profile…</p>}
-        {status.message && (
-          <p className={`feedback ${status.type === 'error' ? 'error' : 'success'}`}>{status.message}</p>
-        )}
+        <div className="dashboard-actions">
+          <button type="button" className="secondary-button" onClick={handleRefresh} disabled={loading}>
+            {loading ? 'Refreshing…' : 'Refresh metrics'}
+          </button>
+          {lastUpdated ? (
+            <span className="dashboard-updated" aria-live="polite">
+              Updated {lastUpdated.toLocaleTimeString()}
+            </span>
+          ) : null}
+        </div>
+      </header>
+
+      {status.message ? (
+        <p className={`page-status page-status--${status.type}`}>{status.message}</p>
+      ) : null}
+
+      <section className="metric-section">
+        <h2>Mikrotik fleet</h2>
+        <div className="metric-grid">
+          <article className="metric-card metric-card--info">
+            <h3>Total Mikrotiks</h3>
+            <p className="metric-value">{formatNumber(metrics?.mikrotik?.total ?? 0)}</p>
+            <p className="metric-hint">Devices synced with MikroManage</p>
+          </article>
+          <article className="metric-card metric-card--success">
+            <h3>Updated Mikrotiks</h3>
+            <p className="metric-value">{formatNumber(metrics?.mikrotik?.updated ?? 0)}</p>
+            <p className="metric-hint">Running the target RouterOS release</p>
+          </article>
+          <article className="metric-card metric-card--warning">
+            <h3>Out-of-date Mikrotiks</h3>
+            <p className="metric-value">{formatNumber(outdatedMikrotiks)}</p>
+            <p className="metric-hint">
+              {formatNumber(metrics?.mikrotik?.pending ?? 0)} pending ·{' '}
+              {formatNumber(metrics?.mikrotik?.unknown ?? 0)} unknown
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section className="metric-section">
+        <h2>Tunnel summary</h2>
+        <div className="metric-grid">
+          <article className="metric-card metric-card--info">
+            <h3>Total tunnels</h3>
+            <p className="metric-value">{formatNumber(metrics?.tunnels?.total ?? 0)}</p>
+            <p className="metric-hint">Configured Mikrotik interconnects</p>
+          </article>
+          <article className="metric-card metric-card--success">
+            <h3>Active tunnels</h3>
+            <p className="metric-value">{formatNumber(metrics?.tunnels?.up ?? 0)}</p>
+            <p className="metric-hint">Tunnels reporting an UP status</p>
+          </article>
+          <article className="metric-card metric-card--danger">
+            <h3>Inactive tunnels</h3>
+            <p className="metric-value">{formatNumber(inactiveTunnels)}</p>
+            <p className="metric-hint">
+              {formatNumber(metrics?.tunnels?.down ?? 0)} down ·{' '}
+              {formatNumber(metrics?.tunnels?.maintenance ?? 0)} maintenance
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section className="metric-section metric-section--split">
+        <article className="metric-panel">
+          <header>
+            <h2>Highest tunnel latency</h2>
+            <p className="metric-hint">Sorted from highest to lowest average ping</p>
+          </header>
+          {metrics?.tunnels?.latencyLeaderboard?.length ? (
+            <ol className="metric-list">
+              {metrics.tunnels.latencyLeaderboard.map((entry) => (
+                <li key={entry.id}>
+                  <div>
+                    <strong>{entry.name}</strong>
+                    <span className={`status-pill status-pill--${entry.status}`}>{entry.status}</span>
+                  </div>
+                  <span>{formatLatency(entry.latencyMs)}</span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="muted">No latency samples have been recorded yet.</p>
+          )}
+        </article>
+        <article className="metric-panel">
+          <header>
+            <h2>Packet loss leaderboard</h2>
+            <p className="metric-hint">Watch tunnels experiencing the most packet loss</p>
+          </header>
+          {metrics?.tunnels?.packetLossLeaderboard?.length ? (
+            <ol className="metric-list">
+              {metrics.tunnels.packetLossLeaderboard.map((entry) => (
+                <li key={entry.id}>
+                  <div>
+                    <strong>{entry.name}</strong>
+                    <span className={`status-pill status-pill--${entry.status}`}>{entry.status}</span>
+                  </div>
+                  <span>{formatPacketLoss(entry.packetLoss)}</span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="muted">No packet loss reports are available.</p>
+          )}
+        </article>
+      </section>
+
+      <section className="metric-section metric-section--profile">
+        <article className="metric-panel">
+          <header>
+            <h2>Your access</h2>
+            <p className="metric-hint">Signed in as {user.email}</p>
+          </header>
+          <dl className="profile-grid">
+            <div>
+              <dt>Name</dt>
+              <dd>
+                {user.firstName} {user.lastName}
+              </dd>
+            </div>
+            <div>
+              <dt>Roles</dt>
+              <dd>{roles || '—'}</dd>
+            </div>
+            <div className="profile-grid__wide">
+              <dt>Permissions</dt>
+              <dd className="permission-pill-group">
+                {Object.entries(user.permissions || {})
+                  .filter(([, value]) => Boolean(value))
+                  .map(([key]) => (
+                    <span key={key} className="permission-pill">
+                      {key.replace(/-/g, ' ')}
+                    </span>
+                  ))}
+                {!user.permissions ||
+                !Object.values(user.permissions || {}).some((value) => value) ? (
+                  <span className="muted">No permissions assigned</span>
+                ) : null}
+              </dd>
+            </div>
+          </dl>
+        </article>
       </section>
     </div>
   );

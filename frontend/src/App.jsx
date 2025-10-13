@@ -7,6 +7,7 @@ import Users from './pages/Users.jsx';
 import Roles from './pages/Roles.jsx';
 import Groups from './pages/Groups.jsx';
 import Mikrotiks from './pages/Mikrotiks.jsx';
+import Tunnels from './pages/Tunnels.jsx';
 import Settings from './pages/Settings.jsx';
 
 const managementRoutes = [
@@ -15,6 +16,7 @@ const managementRoutes = [
   { path: 'roles', Component: Roles },
   { path: 'groups', Component: Groups },
   { path: 'mikrotiks', Component: Mikrotiks },
+  { path: 'tunnels', Component: Tunnels },
   { path: 'settings', Component: Settings }
 ];
 
