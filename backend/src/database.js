@@ -5,9 +5,20 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const databaseFile = path.resolve(__dirname, '../data/app.db');
 
-const initializeDatabase = async () => {
+const resolveDatabaseFile = (databasePath) => {
+  if (!databasePath) {
+    throw new Error('Database path must be provided.');
+  }
+
+  return path.isAbsolute(databasePath)
+    ? databasePath
+    : path.resolve(__dirname, '..', databasePath);
+};
+
+const initializeDatabase = async (databasePath) => {
+  const databaseFile = resolveDatabaseFile(databasePath);
+
   const db = await open({
     filename: databaseFile,
     driver: sqlite3.Database

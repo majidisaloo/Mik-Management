@@ -143,6 +143,8 @@ sudo nginx -t
 sudo systemctl restart nginx
 ```
 
+The first `pm2 start` run will create `backend/config/database.config.json` with the database location and a randomly generated `databasePassword`. Keep this file on the server—deleting it will prevent future logins because the same secret is required to verify stored password hashes.
+
 Open a browser and navigate to `http://<server-ip>/` to confirm that the React application loads and proxies API requests correctly.
 
 ## Production Deployment on Ubuntu with Nginx
@@ -171,6 +173,7 @@ Follow these steps to deploy the application so it is accessible from the server
    pm2 start src/server.js --name mik-api
    pm2 save
    ```
+   The first launch writes `backend/config/database.config.json` with the SQLite path and a random `databasePassword`. Back up this file and never commit it to Git—it is required to validate user passwords.
 4. **Build the frontend for production**
    ```bash
    cd /opt/mik-management/frontend
@@ -216,6 +219,7 @@ Keep your deployment in sync with GitHub using the following workflow:
    ```bash
    cd /opt/mik-management
    ```
+   > **Important:** Preserve `/opt/mik-management/backend/config/database.config.json`. It contains the random `databasePassword` that peppers user hashes; losing it will invalidate all stored credentials.
 2. Pull the latest changes and update subdirectories:
    ```bash
    sudo git fetch origin
@@ -249,7 +253,13 @@ The default configuration works without custom variables. For production deploym
 
 ## Database
 
-The backend uses SQLite and automatically creates the database file at `backend/data/app.db`. Passwords are hashed with bcrypt before being persisted.
+- Storage engine: SQLite (file-based)
+- Config file: `backend/config/database.config.json`
+  - Generated automatically on the first backend launch.
+  - Contains the relative `databasePath` (defaults to `./data/app.db`) and a random `databasePassword` used as a server-side pepper for hashing credentials.
+  - Treat it like a secret—do not commit it to Git and back it up before redeploying or reinstalling the server.
+- The API exposes `GET /api/config-info` for administrators to verify the resolved database path and config file location without revealing the secret pepper.
+- Passwords are hashed with `bcryptjs` after being combined with the pepper so credentials remain secure even if the SQLite file is copied.
 
 ## Troubleshooting
 
@@ -269,13 +279,15 @@ The backend uses SQLite and automatically creates the database file at `backend/
 - **Browser shows `502 Bad Gateway` from Nginx during registration or login**
   - Ensure the API service is running: `pm2 status mik-api` (or restart with `pm2 restart mik-api`). A stopped upstream will force Nginx to return 502.
   - Validate the backend responds locally: `curl http://127.0.0.1:4000/health` should produce `{"status":"ok"}`. If it fails, inspect `/opt/mik-management/backend` logs with `pm2 logs mik-api`.
+  - Confirm `backend/config/database.config.json` exists and still contains the original `databasePassword`. Recreating or deleting this file prevents logins because stored hashes depend on the original secret.
   - Confirm the proxy block includes `/api/` (see the sample Nginx config above) and reload Nginx after edits: `sudo systemctl reload nginx`.
 
 ## Useful npm Scripts
 
 | Location | Script | Description |
 | --- | --- | --- |
-| `backend` | `npm run dev` | Start the API server. |
+| `backend` | `npm run dev` | Start the API server in watch mode for development. |
+| `backend` | `npm start` | Launch the API server once (useful for PM2/systemd). |
 | `frontend` | `npm run dev` | Start the Vite development server. |
 | `frontend` | `npm run build` | Build the production assets. |
 | `frontend` | `npm run preview` | Preview the production build locally. |
@@ -325,6 +337,11 @@ The backend uses SQLite and automatically creates the database file at `backend/
   - `404`: User not found
   - `409`: Email already used by another account
   - `500`: Unable to update the user
+
+`GET /api/config-info`
+
+- **Success**: `200 OK` with `{ database: { driver, file, configFile } }`
+- **Notes**: Provides operators with the resolved database location without exposing the secret `databasePassword`.
 
 ## License
 

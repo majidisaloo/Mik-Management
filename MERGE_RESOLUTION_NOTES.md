@@ -16,6 +16,10 @@ Use the table below whenever the README shows conflicts. The "Incoming" column r
 
 There are no sections that require **Accept Both** with the current GitHub upstream. If future upstream changes add content you want to keep, resolve section by section and prefer incoming unless the upstream text introduces new requirements.
 
+## .gitignore
+
+- **Accept Incoming** to keep the database and config exclusions (`backend/data/*.db`, `backend/config/database.config.json`). This prevents secrets from being committed accidentally.
+
 ## Newly added files
 All files under `backend/` and `frontend/` are new in this branch and do not exist upstream. Stage them as new files (no conflict markers should appear). If your tool still flags them, mark them as **Accept Incoming**.
 

@@ -5,17 +5,30 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import initializeDatabase from './database.js';
+import { ensureDatabaseConfig, getConfigFilePath } from './config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const dataDirectory = path.resolve(__dirname, '../data');
 
 const normalizeString = (value) => (typeof value === 'string' ? value.trim() : '');
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const resolveDatabaseFile = (databasePath) => {
+  if (path.isAbsolute(databasePath)) {
+    return databasePath;
+  }
+
+  return path.resolve(__dirname, '..', databasePath);
+};
+
+const pepperPassword = (password, secret) => `${password}${secret}`;
+
 const bootstrap = async () => {
-  await fs.mkdir(dataDirectory, { recursive: true });
-  const db = await initializeDatabase();
+  const config = await ensureDatabaseConfig();
+  const databaseFile = resolveDatabaseFile(config.databasePath);
+  await fs.mkdir(path.dirname(databaseFile), { recursive: true });
+
+  const db = await initializeDatabase(databaseFile);
 
   const app = express();
   const port = process.env.PORT || 4000;
@@ -25,6 +38,16 @@ const bootstrap = async () => {
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
+  });
+
+  app.get('/api/config-info', (_req, res) => {
+    res.json({
+      database: {
+        driver: config.driver,
+        file: databaseFile,
+        configFile: getConfigFilePath()
+      }
+    });
   });
 
   app.post('/api/register', async (req, res) => {
@@ -64,7 +87,7 @@ const bootstrap = async () => {
     }
 
     try {
-      const passwordHash = await bcrypt.hash(rawPassword, 12);
+      const passwordHash = await bcrypt.hash(pepperPassword(rawPassword, config.databasePassword), 12);
       await db.run(
         `INSERT INTO users (first_name, last_name, email, password_hash) VALUES (?, ?, ?, ?)`,
         [normalizedFirstName, normalizedLastName, normalizedEmail, passwordHash]
@@ -109,7 +132,10 @@ const bootstrap = async () => {
         return res.status(401).json({ message: 'Invalid credentials.' });
       }
 
-      const passwordIsValid = await bcrypt.compare(rawPassword, user.password_hash);
+      const passwordIsValid = await bcrypt.compare(
+        pepperPassword(rawPassword, config.databasePassword),
+        user.password_hash
+      );
 
       if (!passwordIsValid) {
         return res.status(401).json({ message: 'Invalid credentials.' });
