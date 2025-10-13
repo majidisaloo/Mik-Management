@@ -16,7 +16,14 @@ const Dashboard = () => {
   const [status, setStatus] = useState({ type: '', message: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [assignedRoles, setAssignedRoles] = useState([]);
-  const [permissions, setPermissions] = useState({ dashboard: false, users: false, roles: false, groups: false });
+  const [permissions, setPermissions] = useState({
+    dashboard: false,
+    users: false,
+    roles: false,
+    groups: false,
+    mikrotiks: false,
+    settings: false
+  });
 
   useEffect(() => {
     if (!user) {
@@ -54,7 +61,9 @@ const Dashboard = () => {
           dashboard: Boolean(userPayload.permissions?.dashboard),
           users: Boolean(userPayload.permissions?.users),
           roles: Boolean(userPayload.permissions?.roles),
-          groups: Boolean(userPayload.permissions?.groups)
+          groups: Boolean(userPayload.permissions?.groups),
+          mikrotiks: Boolean(userPayload.permissions?.mikrotiks),
+          settings: Boolean(userPayload.permissions?.settings)
         });
         setStatus({ type: '', message: '' });
       } catch (error) {
@@ -133,7 +142,9 @@ const Dashboard = () => {
           dashboard: Boolean(updatedUser.permissions?.dashboard),
           users: Boolean(updatedUser.permissions?.users),
           roles: Boolean(updatedUser.permissions?.roles),
-          groups: Boolean(updatedUser.permissions?.groups)
+          groups: Boolean(updatedUser.permissions?.groups),
+          mikrotiks: Boolean(updatedUser.permissions?.mikrotiks),
+          settings: Boolean(updatedUser.permissions?.settings)
         });
       }
 
@@ -184,7 +195,10 @@ const Dashboard = () => {
                 Mik-Groups
               </span>
               <span className={`permission-chip${permissions.mikrotiks ? ' permission-chip--active' : ''}`}>
-                Mikrotiks
+                Mikrotik's
+              </span>
+              <span className={`permission-chip${permissions.settings ? ' permission-chip--active' : ''}`}>
+                Settings
               </span>
             </div>
           </div>

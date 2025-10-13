@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import BrandMark from './BrandMark.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -25,10 +26,57 @@ const SunIcon = () => (
   </svg>
 );
 
+const LogoutIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path
+      d="M14.5 5.25a.75.75 0 0 0-1.5 0v2.25h-4a1.75 1.75 0 0 0-1.75 1.75v5.5A1.75 1.75 0 0 0 9 16.5h4v2.25a.75.75 0 1 0 1.5 0V5.25Z"
+      fill="currentColor"
+      opacity="0.65"
+    />
+    <path
+      d="M18.53 12.53a.75.75 0 0 0 0-1.06l-2-2a.75.75 0 1 0-1.06 1.06l.72.72H11a.75.75 0 0 0 0 1.5h5.19l-.72.72a.75.75 0 1 0 1.06 1.06l2-2Z"
+      fill="currentColor"
+    />
+  </svg>
+);
+
 const Layout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const [version, setVersion] = useState('0.0');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let mounted = true;
+
+    const loadMeta = async () => {
+      try {
+        const response = await fetch('/api/meta', { signal: controller.signal });
+
+        if (!response.ok) {
+          throw new Error('Meta request failed');
+        }
+
+        const payload = await response.json();
+
+        if (mounted && payload?.version) {
+          setVersion(payload.version);
+        }
+      } catch (error) {
+        if (mounted) {
+          setVersion((current) => current || '0.0');
+        }
+      }
+    };
+
+    loadMeta();
+
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
+  }, []);
 
   const handleSignOut = () => {
     logout();
@@ -65,8 +113,11 @@ const Layout = () => {
         <div className={`header-actions${user ? ' header-actions--authed' : ''}`}>
           {!user && renderThemeToggle('header')}
           {user ? (
-            <button type="button" onClick={handleSignOut} className="link-button">
-              Logout
+            <button type="button" onClick={handleSignOut} className="logout-button">
+              <span className="logout-button__icon" aria-hidden="true">
+                <LogoutIcon />
+              </span>
+              <span className="logout-button__label">Logout</span>
             </button>
           ) : (
             <nav>
@@ -90,7 +141,8 @@ const Layout = () => {
                 {user.permissions?.users ? <NavLink to="/users">Users</NavLink> : null}
                 {user.permissions?.roles ? <NavLink to="/roles">Roles</NavLink> : null}
                 {user.permissions?.groups ? <NavLink to="/groups">Mik-Groups</NavLink> : null}
-                {user.permissions?.mikrotiks ? <NavLink to="/mikrotiks">Mikrotiks</NavLink> : null}
+                {user.permissions?.mikrotiks ? <NavLink to="/mikrotiks">Mikrotik's</NavLink> : null}
+                {user.permissions?.settings ? <NavLink to="/settings">Settings</NavLink> : null}
               </div>
             </nav>
             <div className="sidebar-footer">{renderThemeToggle('sidebar')}</div>
@@ -106,6 +158,9 @@ const Layout = () => {
       )}
       <footer className="app-footer">
         <p>© {new Date().getFullYear()} MikroManage. All rights reserved.</p>
+        <p className="app-footer__version" aria-live="polite">
+          Version {version}
+        </p>
       </footer>
     </div>
   );

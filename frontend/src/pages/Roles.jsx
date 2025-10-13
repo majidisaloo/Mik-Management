@@ -7,7 +7,8 @@ const blankPermissions = () => ({
   users: false,
   roles: false,
   groups: false,
-  mikrotiks: false
+  mikrotiks: false,
+  settings: false
 });
 
 const Roles = () => {
@@ -55,16 +56,17 @@ const Roles = () => {
           loadedRoles.reduce((acc, role) => {
             acc[role.id] = {
               name: role.name,
-            permissions: {
-              dashboard: Boolean(role.permissions?.dashboard),
-              users: Boolean(role.permissions?.users),
-              roles: Boolean(role.permissions?.roles),
-              groups: Boolean(role.permissions?.groups),
-              mikrotiks: Boolean(role.permissions?.mikrotiks)
-            }
-          };
-          return acc;
-        }, {})
+              permissions: {
+                dashboard: Boolean(role.permissions?.dashboard),
+                users: Boolean(role.permissions?.users),
+                roles: Boolean(role.permissions?.roles),
+                groups: Boolean(role.permissions?.groups),
+                mikrotiks: Boolean(role.permissions?.mikrotiks),
+                settings: Boolean(role.permissions?.settings)
+              }
+            };
+            return acc;
+          }, {})
         );
         setStatus({ type: '', message: '' });
       } catch (error) {
@@ -170,7 +172,8 @@ const Roles = () => {
               users: Boolean(updatedRole.permissions?.users),
               roles: Boolean(updatedRole.permissions?.roles),
               groups: Boolean(updatedRole.permissions?.groups),
-              mikrotiks: Boolean(updatedRole.permissions?.mikrotiks)
+              mikrotiks: Boolean(updatedRole.permissions?.mikrotiks),
+              settings: Boolean(updatedRole.permissions?.settings)
             }
           }
         }));
@@ -309,7 +312,8 @@ const Roles = () => {
               users: Boolean(createdRole.permissions?.users),
               roles: Boolean(createdRole.permissions?.roles),
               groups: Boolean(createdRole.permissions?.groups),
-              mikrotiks: Boolean(createdRole.permissions?.mikrotiks)
+              mikrotiks: Boolean(createdRole.permissions?.mikrotiks),
+              settings: Boolean(createdRole.permissions?.settings)
             }
           }
         }));
@@ -424,7 +428,15 @@ const Roles = () => {
                           checked={Boolean(draft.permissions.mikrotiks)}
                           onChange={() => handleDraftPermissionToggle(role.id, 'mikrotiks')}
                         />
-                        <span>Mikrotiks</span>
+                        <span>Mikrotik's</span>
+                      </label>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(draft.permissions.settings)}
+                          onChange={() => handleDraftPermissionToggle(role.id, 'settings')}
+                        />
+                        <span>Settings</span>
                       </label>
                     </div>
                     <p className="role-summary">
@@ -432,7 +444,8 @@ const Roles = () => {
                       {draft.permissions.users ? ' · Users' : ''}
                       {draft.permissions.roles ? ' · Roles' : ''}
                       {draft.permissions.groups ? ' · Mik-Groups' : ''}
-                      {draft.permissions.mikrotiks ? ' · Mikrotiks' : ''}
+                      {draft.permissions.mikrotiks ? " · Mikrotik's" : ''}
+                      {draft.permissions.settings ? ' · Settings' : ''}
                     </p>
                   </li>
                 );
@@ -491,7 +504,15 @@ const Roles = () => {
                   checked={newRole.permissions.mikrotiks}
                   onChange={() => handleNewRoleToggle('mikrotiks')}
                 />
-                <span>Mikrotiks</span>
+                <span>Mikrotik's</span>
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={newRole.permissions.settings}
+                  onChange={() => handleNewRoleToggle('settings')}
+                />
+                <span>Settings</span>
               </label>
             </fieldset>
             <div className="wide button-row">

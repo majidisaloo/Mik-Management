@@ -7,6 +7,7 @@ import Users from './pages/Users.jsx';
 import Roles from './pages/Roles.jsx';
 import Groups from './pages/Groups.jsx';
 import Mikrotiks from './pages/Mikrotiks.jsx';
+import Settings from './pages/Settings.jsx';
 
 const App = () => {
   return (
@@ -20,6 +21,7 @@ const App = () => {
         <Route path="roles" element={<Roles />} />
         <Route path="groups" element={<Groups />} />
         <Route path="mikrotiks" element={<Mikrotiks />} />
+        <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>
   );

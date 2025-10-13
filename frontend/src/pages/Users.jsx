@@ -389,12 +389,14 @@ const Users = () => {
                         {role.permissions.users ? ' · Users' : ''}
                         {role.permissions.roles ? ' · Roles' : ''}
                         {role.permissions.groups ? ' · Mik-Groups' : ''}
-                        {role.permissions.mikrotiks ? ' · Mikrotiks' : ''}
+                        {role.permissions.mikrotiks ? " · Mikrotik's" : ''}
+                        {role.permissions.settings ? ' · Settings' : ''}
                         {!role.permissions.dashboard &&
                         !role.permissions.users &&
                         !role.permissions.roles &&
                         !role.permissions.groups &&
-                        !role.permissions.mikrotiks
+                        !role.permissions.mikrotiks &&
+                        !role.permissions.settings
                           ? ' None'
                           : ''}
                       </span>

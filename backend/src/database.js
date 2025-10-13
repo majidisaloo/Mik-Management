@@ -10,7 +10,8 @@ const defaultPermissions = () => ({
   users: false,
   roles: false,
   groups: false,
-  mikrotiks: false
+  mikrotiks: false,
+  settings: false
 });
 
 const defaultState = () => ({
@@ -314,7 +315,8 @@ const ensureStateShape = async (databaseFile) => {
           users: true,
           roles: true,
           groups: true,
-          mikrotiks: true
+          mikrotiks: true,
+          settings: true
         },
         createdAt: timestamp,
         updatedAt: timestamp
@@ -340,6 +342,12 @@ const ensureStateShape = async (databaseFile) => {
       if (!Object.prototype.hasOwnProperty.call(originalPermissions, 'mikrotiks')) {
         if (isDefaultAdmin || sanitizedPermissions.groups) {
           sanitizedPermissions.mikrotiks = true;
+        }
+      }
+
+      if (!Object.prototype.hasOwnProperty.call(originalPermissions, 'settings')) {
+        if (isDefaultAdmin || sanitizedPermissions.dashboard) {
+          sanitizedPermissions.settings = true;
         }
       }
 
@@ -636,7 +644,9 @@ const initializeDatabase = async (databasePath) => {
               dashboard: true,
               users: true,
               roles: true,
-              groups: true
+              groups: true,
+              mikrotiks: true,
+              settings: true
             },
             createdAt: timestamp,
             updatedAt: timestamp

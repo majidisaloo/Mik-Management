@@ -11,7 +11,8 @@ A full-stack registration experience built with React, Vite, and a lightweight N
 - [Users Workspace](#users-workspace)
 - [Roles Workspace](#roles-workspace)
 - [Mik-Groups Workspace](#mik-groups-workspace)
-- [Mikrotiks Workspace](#mikrotiks-workspace)
+- [Mikrotik's Workspace](#mikrotiks-workspace)
+- [Settings Workspace](#settings-workspace)
 - [Ubuntu Deployment Quick Start](#ubuntu-deployment-quick-start)
 - [Production Deployment on Ubuntu with Nginx](#production-deployment-on-ubuntu-with-nginx)
 - [Updating an Existing Installation](#updating-an-existing-installation)
@@ -94,28 +95,31 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
    ```
 8. Visit the site at http://localhost:5173. The **Login** screen loads first—use the **Register** link in the header to create an
    account, sign in with the credentials you just added, and you will land on the **Dashboard**. After authentication the header
-   condenses to a logout button and the primary navigation shifts to the left sidebar. The dashboard now highlights your roles,
-   effective permissions, and provides a profile form to adjust your first name, last name, or email address at any time.
-   - Click the moon icon in the header to enable the new dark mode theme for low-light environments. Click the sun icon to return
-     to the bright daytime palette. Your choice is remembered locally for future visits.
+   condenses to a polished logout pill while the primary navigation shifts to the left sidebar. You will see entries for
+   **Dashboard**, **Users**, **Roles**, **Mik-Groups**, **Mikrotik's**, and the new **Settings** workspace (each only appears if your
+   role grants access). The footer now shows the running build as `Version 0.<commit-count>` so you can confirm which commit is
+   deployed at a glance.
+   - Use the theme slider at the bottom of the sidebar to swap between the bright daytime palette (moon icon) and the darker
+     night mode (sun icon). Your choice is remembered locally for future visits.
 
 ### Dashboard Overview
 
-- **Sidebar navigation** – The vertical menu on the left now groups links by focus, placing the Dashboard first and the Users, Roles, Mik-Groups, and Mikrotiks workspaces under a dedicated management heading. Each link only appears when your assigned roles grant the required permission, and the theme toggle sits at the bottom of the menu so you can switch between day and night palettes at any time.
-- **Access summary** – Review the roles attached to your account and the resulting Dashboard, Users, Roles, Mik-Groups, and Mikrotiks capabilities in the highlighted chips.
+- **Sidebar navigation** – The vertical menu on the left now groups links by focus, placing the Dashboard first and the Users, Roles, Mik-Groups, Mikrotik's, and Settings workspaces under a dedicated management heading. Each link only appears when your assigned roles grant the required permission, and the theme slider at the bottom lets you switch between the moon-lit light mode and the sun-lit dark mode at any time.
+- **Access summary** – Review the roles attached to your account and the resulting Dashboard, Users, Roles, Mik-Groups, Mikrotik's, and Settings capabilities in the highlighted chips.
 - **Profile form** – Update your first name, last name, or email address and submit to persist the changes to the secure data file instantly.
-- **Session controls** – Use the header Logout button to clear the session and return to the Login screen.
+- **Release indicator** – The footer now displays the running build as `Version 0.<commit-count>` so you can confirm which commit is live on every environment.
+- **Session controls** – Use the gradient logout pill in the header to clear the session and return to the Login screen.
 
 ### Users Workspace
 
 - **Directory table** – The Users screen lists every operator, highlighting the currently selected row and showing each person’s roles.
 - **Select and edit** – Choose an operator from the dropdown to load their details into the form, adjust contact information, optionally set a new password, and assign or remove roles before saving.
-- **Role insights** – Each role badge summarises the Dashboard, Users, Roles, Mik-Groups, and Mikrotiks permissions it grants so you can confirm coverage at a glance.
+- **Role insights** – Each role badge summarises the Dashboard, Users, Roles, Mik-Groups, Mikrotik's, and Settings permissions it grants so you can confirm coverage at a glance.
 - **Permission aware** – Only operators with the Users permission can access this page. Attempts to reach the screen without the permission redirect back to the Dashboard.
 
 ### Roles Workspace
 
-- **Role library** – Review every role, rename them inline, and toggle Dashboard, Users, Roles, Mik-Groups, and Mikrotiks permissions before saving.
+- **Role library** – Review every role, rename them inline, and toggle Dashboard, Users, Roles, Mik-Groups, Mikrotik's, and Settings permissions before saving.
 - **Create and delete** – Add new roles tailored to teams such as sales or support. Roles that are still assigned to users cannot be deleted until those users are reassigned, preventing accidental loss of access.
 - **Guided feedback** – Success and error alerts surface immediately so you know when actions complete or require additional steps.
 
@@ -125,13 +129,18 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
 - **Parent assignments** – Update a group’s name or parent with confidence. The interface prevents cycles, keeps the root Mik-Group anchored at the top level, and lets you create new nested groups in a couple of clicks.
 - **Safe clean-up** – Delete buttons stay disabled for the root group and for branches that still own child groups, ensuring you never orphan part of the hierarchy by accident.
 
-### Mikrotiks Workspace
+### Mikrotik's Workspace
 
 - **Device directory** – Browse every RouterOS endpoint in the environment from the selector on the left. Each entry highlights its display name, host, assigned Mik-Group, active tags, and the most recent update time.
 - **RouterOS API controls** – Toggle API availability, enable TLS, enforce certificate validation, and opt into legacy cipher support directly from the edit form. Ports, timeouts, retries, usernames, and passwords all live in one pane so you can adjust connection details without digging through configuration files.
 - **Group-aware organisation** – Assign each Mikrotik to any Mik-Group you have defined. The dropdown stays in sync with the hierarchy so network sites, POPs, and customer segments remain tidy.
 - **Notes and tagging** – Capture free-form notes about rack locations or maintenance windows and add comma-separated tags for filtering future inventory views.
 - **Streamlined provisioning** – Use the Add Mikrotik card to register new routers in seconds. New devices immediately appear in the selector and inherit the RouterOS defaults you configured during creation.
+
+### Settings Workspace
+
+- **Future-ready staging** – The Settings screen is now scaffolded and permission protected so administrators know where global preferences, integrations, and automation controls will live. Current builds show a guided placeholder while the configuration tools are prepared.
+- **Permission gated** – Only operators with the Settings permission see this workspace in the sidebar, keeping upcoming controls limited to trusted administrators.
 
 ## Ubuntu Deployment Quick Start
 
@@ -382,6 +391,11 @@ The default configuration works without custom variables. For production deploym
   - `400`: Missing credentials
   - `401`: Invalid email or password
   - `500`: Unexpected server error
+
+`GET /api/meta`
+
+- **Success**: `200 OK` with `{ version }`
+- **Notes**: Surfaces the running build as `0.<commit-count>` so operators can confirm which commit is deployed from the footer.
 
 `GET /api/users/:id`
 

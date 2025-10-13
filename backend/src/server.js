@@ -3,6 +3,7 @@ import { URL } from 'url';
 import crypto from 'crypto';
 import initializeDatabase, { resolveDatabaseFile } from './database.js';
 import { ensureDatabaseConfig, getConfigFilePath } from './config.js';
+import getProjectVersion from './version.js';
 
 const normalizeString = (value) => (typeof value === 'string' ? value.trim() : '');
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -12,7 +13,8 @@ const basePermissions = {
   users: false,
   roles: false,
   groups: false,
-  mikrotiks: false
+  mikrotiks: false,
+  settings: false
 };
 
 const pepperPassword = (password, secret) => `${password}${secret}`;
@@ -303,6 +305,7 @@ const bootstrap = async () => {
   const db = await initializeDatabase(config.databasePath);
 
   const port = Number.parseInt(process.env.PORT ?? '4000', 10) || 4000;
+  const version = getProjectVersion();
 
   const server = http.createServer(async (req, res) => {
     if (!req.url || !req.method) {
@@ -1058,6 +1061,11 @@ const bootstrap = async () => {
     try {
       if (method === 'GET' && (canonicalPath === '/health' || resourcePath === '/health')) {
         sendJson(res, 200, { status: 'ok' });
+        return;
+      }
+
+      if (method === 'GET' && (canonicalPath === '/api/meta' || resourcePath === '/meta')) {
+        sendJson(res, 200, { version });
         return;
       }
 
