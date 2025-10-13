@@ -3,6 +3,28 @@ import BrandMark from './BrandMark.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
 
+const MoonIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path d="M21 14.15A8.5 8.5 0 0 1 11.85 5 6.5 6.5 0 1 0 21 14.15Z" fill="#0f172a" opacity="0.75" />
+  </svg>
+);
+
+const SunIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <circle cx="12" cy="12" r="5.5" fill="#facc15" stroke="#f59e0b" strokeWidth="1.25" />
+    <g stroke="#f59e0b" strokeWidth="1.4" strokeLinecap="round">
+      <line x1="12" y1="2.75" x2="12" y2="5.25" />
+      <line x1="12" y1="18.75" x2="12" y2="21.25" />
+      <line x1="4.22" y1="4.22" x2="6" y2="6" />
+      <line x1="18" y1="18" x2="19.78" y2="19.78" />
+      <line x1="2.75" y1="12" x2="5.25" y2="12" />
+      <line x1="18.75" y1="12" x2="21.25" y2="12" />
+      <line x1="4.22" y1="19.78" x2="6" y2="18" />
+      <line x1="18" y1="6" x2="19.78" y2="4.22" />
+    </g>
+  </svg>
+);
+
 const Layout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -13,35 +35,35 @@ const Layout = () => {
     navigate('/login', { replace: true });
   };
 
+  const renderThemeToggle = (placement) => {
+    const variant = placement === 'sidebar' ? 'sidebar' : 'header';
+    const modeLabel = theme === 'dark' ? 'Dark mode' : 'Light mode';
+
+    return (
+      <button
+        type="button"
+        className={`theme-toggle theme-toggle--${variant} theme-toggle--${theme}`}
+        onClick={toggleTheme}
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        role="switch"
+        aria-checked={theme === 'dark'}
+      >
+        <span className="theme-toggle__track" aria-hidden="true">
+          <span className="theme-toggle__thumb">{theme === 'dark' ? <SunIcon /> : <MoonIcon />}</span>
+        </span>
+        <span className="theme-toggle__caption">{modeLabel}</span>
+      </button>
+    );
+  };
+
   return (
     <div className={`app-shell${user ? ' app-shell--authed' : ''}`}>
       <header className="app-header">
         <Link to="/" className="logo" aria-label="MikroManage home">
           <BrandMark />
         </Link>
-        <div className="header-actions">
-          <button
-            type="button"
-            className="theme-toggle"
-            onClick={toggleTheme}
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {theme === 'dark' ? (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path
-                  d="M12 18a6 6 0 0 0 6-6 6.11 6.11 0 0 0-.35-2 6 6 0 1 1-7.65 7.65 6.11 6.11 0 0 0 2 .35Z"
-                  fill="currentColor"
-                />
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path
-                  d="M12 18a6 6 0 1 1 0-12 6 6 0 0 1 0 12Zm0 2a1 1 0 0 1-1-1v-1.06a7 7 0 0 1-1.94-.8l-.75.75a1 1 0 0 1-1.41-1.41l.75-.75A7 7 0 0 1 7 13H5.94a1 1 0 0 1 0-2H7a7 7 0 0 1 .8-1.94l-.75-.75a1 1 0 0 1 1.41-1.41l.75.75A7 7 0 0 1 11 7V5.94a1 1 0 0 1 2 0V7a7 7 0 0 1 1.94.8l.75-.75a1 1 0 1 1 1.41 1.41l-.75.75A7 7 0 0 1 17 11h1.06a1 1 0 0 1 0 2H17a7 7 0 0 1-.8 1.94l.75.75a1 1 0 1 1-1.41 1.41l-.75-.75A7 7 0 0 1 13 17v1.06a1 1 0 0 1-1 1Z"
-                  fill="currentColor"
-                />
-              </svg>
-            )}
-          </button>
+        <div className={`header-actions${user ? ' header-actions--authed' : ''}`}>
+          {!user && renderThemeToggle('header')}
           {user ? (
             <button type="button" onClick={handleSignOut} className="link-button">
               Logout
@@ -64,6 +86,7 @@ const Layout = () => {
               {user.permissions?.users ? <NavLink to="/users">Users</NavLink> : null}
               {user.permissions?.roles ? <NavLink to="/roles">Roles</NavLink> : null}
             </nav>
+            <div className="sidebar-footer">{renderThemeToggle('sidebar')}</div>
           </aside>
           <main className="app-main">
             <Outlet />

@@ -27,6 +27,25 @@ const Users = () => {
     [users, selectedUserId]
   );
 
+  const formatDateTime = (value) => {
+    if (!value) {
+      return '';
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+
+    return date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   useEffect(() => {
     if (!user) {
       navigate('/login', { replace: true });
@@ -259,6 +278,7 @@ const Users = () => {
                     <th scope="col">ID</th>
                     <th scope="col">Name</th>
                     <th scope="col">Email</th>
+                    <th scope="col">Created</th>
                     <th scope="col">Roles</th>
                   </tr>
                 </thead>
@@ -267,12 +287,14 @@ const Users = () => {
                     const roleNames = Array.isArray(entry.roles)
                       ? entry.roles.map((role) => role.name).join(', ')
                       : '';
+                    const createdDisplay = formatDateTime(entry.createdAt);
 
                     return (
                       <tr key={entry.id} className={entry.id === selectedUserId ? 'active-row' : ''}>
                         <td>{entry.id}</td>
                         <td>{`${entry.firstName} ${entry.lastName}`.trim()}</td>
                         <td>{entry.email}</td>
+                        <td>{createdDisplay || '—'}</td>
                         <td>{roleNames || '—'}</td>
                       </tr>
                     );
@@ -317,6 +339,12 @@ const Users = () => {
             <fieldset className="wide">
               <legend>Password reset (optional)</legend>
               <p className="muted small">Leave blank to keep the current password.</p>
+              {selectedUser?.createdAt ? (
+                <p className="muted small">
+                  Account created{' '}
+                  <time dateTime={selectedUser.createdAt}>{formatDateTime(selectedUser.createdAt)}</time>
+                </p>
+              ) : null}
               <label>
                 <span>New password</span>
                 <input
