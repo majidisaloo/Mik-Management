@@ -1,83 +1,56 @@
 # Mik Management
 
-A full-stack registration experience built with React, Vite, Express, and SQLite. The project ships with a modern onboarding guide, a secure API, and a polished user interface.
-
-## Project Structure
-
-```
-Mik-Management/
-├── backend/   # Express + SQLite API
-└── frontend/  # Vite + React single-page application
-```
+A lightweight Express application that demonstrates a registration form backed by SQLite. The homepage contains setup steps and a short Git primer so teammates can start contributing immediately.
 
 ## Prerequisites
 
 - Node.js 18 or newer
-- npm 9 or newer
+- npm (bundled with Node.js)
 
 ## Getting Started
 
-1. Clone the repository:
+1. Install dependencies:
+
    ```bash
-   git clone https://example.com/mik-management.git
-   cd mik-management
-   ```
-2. Install dependencies for the API:
-   ```bash
-   cd backend
    npm install
    ```
-3. Run the API server (http://localhost:4000):
+
+2. Start the development server:
+
    ```bash
-   npm run dev
+   npm start
    ```
-4. In a separate terminal, install the web client dependencies:
-   ```bash
-   cd ../frontend
-   npm install
-   ```
-5. Launch the development server (http://localhost:5173):
-   ```bash
-   npm run dev
-   ```
-6. Visit the site at http://localhost:5173 and use the **Register** link to create an account.
 
-## Environment Variables
+3. Open your browser to <http://localhost:3000> to view the site.
 
-The default configuration works without custom variables. For production deployments you can override the port with `PORT=5000 npm run dev` in the backend.
+## Registration Flow
 
-## Database
+- Open the **Register** page from the homepage.
+- Complete the fields: first name, last name, email, password, and confirm password.
+- Submit the form to save the user in the local SQLite database (`data.db`).
+- Passwords are hashed with `bcryptjs` before being persisted.
 
-The backend uses SQLite and automatically creates the database file at `backend/data/app.db`. Passwords are hashed with bcrypt before being persisted.
+## Database Location
 
-## Useful npm Scripts
+The SQLite database file (`data.db`) is created automatically in the project root the first time the server runs.
 
-| Location | Script | Description |
-| --- | --- | --- |
-| `backend` | `npm run dev` | Start the API server. |
-| `frontend` | `npm run dev` | Start the Vite development server. |
-| `frontend` | `npm run build` | Build the production assets. |
-| `frontend` | `npm run preview` | Preview the production build locally. |
+## Project Structure
 
-## Quick Git Reference
+```
+├── public
+│   └── styles.css
+├── views
+│   ├── home.ejs
+│   └── register.ejs
+├── server.js
+├── package.json
+└── README.md
+```
 
-- Check your working tree: `git status`
-- Create a feature branch: `git checkout -b feature/your-feature`
-- Stage files: `git add .`
-- Commit changes: `git commit -m "Describe your change"`
-- Push to origin: `git push origin feature/your-feature`
+## Available Scripts
 
-## API Overview
-
-`POST /api/register`
-
-- **Body**: `{ firstName, lastName, email, password, passwordConfirmation }`
-- **Success**: `201 Created`
-- **Errors**:
-  - `400`: Missing fields, mismatched passwords, or weak password
-  - `409`: Email already registered
-  - `500`: Unexpected server error
+- `npm start` – starts the Express server on port 3000.
 
 ## License
 
-This project is distributed for demonstration purposes and does not yet include an explicit license.
+MIT
