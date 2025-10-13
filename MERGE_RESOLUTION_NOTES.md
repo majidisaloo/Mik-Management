@@ -11,17 +11,17 @@ Use the table below whenever the README shows conflicts. The "Incoming" column r
 | Top-level heading (`# Mik-Management`) | **Accept Incoming** | Preserves the canonical project name and matches GitHub. |
 | Table of Contents and "Project Structure" | **Accept Incoming** | Keeps links to Ubuntu, Nginx, and Git workflow guidance. |
 | "Prerequisites" and "Installing Node.js and npm on Ubuntu" | **Accept Incoming** | Retains the Node.js setup steps that align with the deployment scripts. |
-| "Getting Started" through "Troubleshooting" (including "Updating an Existing Installation") | **Accept Incoming** | Ensures the deployment, update, conflict, and npm error fixes remain available. |
+| "Getting Started" through "Troubleshooting" (including "Updating an Existing Installation") | **Accept Incoming** | Ensures the deployment, update, conflict, and data preparation fixes remain available. |
 | Any new blank lines introduced by Git | **Accept Incoming** (or manually delete) | Prevents duplicate spacing when merging. |
 
 There are no sections that require **Accept Both** with the current GitHub upstream. If future upstream changes add content you want to keep, resolve section by section and prefer incoming unless the upstream text introduces new requirements.
 
 ## .gitignore
 
-- **Accept Incoming** to keep the database and config exclusions (`backend/data/*.db`, `backend/config/database.config.json`). This prevents secrets from being committed accidentally.
+- **Accept Incoming** to keep the database and config exclusions (`backend/data/*.db`, `backend/data/*.json`, `backend/config/database.config.json`). This prevents secrets from being committed accidentally.
 
 ## Newly added files
-All files under `backend/` and `frontend/` are new in this branch and do not exist upstream. Stage them as new files (no conflict markers should appear). If your tool still flags them, mark them as **Accept Incoming**. This includes helper utilities such as `backend/src/scripts/prepare.js`, which bootstraps the SQLite database during deployments.
+All files under `backend/` and `frontend/` are new in this branch and do not exist upstream. Stage them as new files (no conflict markers should appear). If your tool still flags them, mark them as **Accept Incoming**. This includes helper utilities such as `backend/src/scripts/prepare.js`, which prepares the file-backed database during deployments.
 
 ## General workflow
 1. Run `git pull --rebase` to bring in the upstream changes.

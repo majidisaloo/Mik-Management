@@ -1,6 +1,6 @@
 # Mik-Management
 
-A full-stack registration experience built with React, Vite, Express, and SQLite. The project ships with a modern onboarding guide, a secure API, and a polished user interface.
+A full-stack registration experience built with React, Vite, and a lightweight Node.js API that stores data in a secure file-backed database. The project ships with a modern onboarding guide, a secure API, and a polished user interface.
 
 ## Table of Contents
 
@@ -23,7 +23,7 @@ A full-stack registration experience built with React, Vite, Express, and SQLite
 
 ```
 Mik-Management/
-├── backend/   # Express + SQLite API
+├── backend/   # Node.js API with file-backed storage
 └── frontend/  # Vite + React single-page application
 ```
 
@@ -66,12 +66,12 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
    git clone https://github.com/majidisaloo/Mik-Management.git
    cd mik-management
    ```
-3. Install dependencies for the API:
+3. Install dependencies for the API (there are no external packages, so this completes instantly):
    ```bash
    cd backend
    npm install
    ```
-4. Generate the SQLite database and configuration secrets (runs once per server):
+4. Generate the database file and configuration secrets (runs once per server):
    ```bash
    npm run prepare:db
    ```
@@ -95,7 +95,7 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
 ### Dashboard Overview
 
 - **Users card** – Lists the signed-in operator with the ID, email, and creation timestamp for quick verification.
-- **Profile form** – Update the first name, last name, or email address and submit to persist the changes in SQLite instantly.
+- **Profile form** – Update the first name, last name, or email address and submit to persist the changes to the secure data file instantly.
 - **Session controls** – Use the header Logout button to clear the session and return to the Login screen.
 
 ## Ubuntu Deployment Quick Start
@@ -179,7 +179,7 @@ Follow these steps to deploy the application so it is accessible from the server
    pm2 start src/server.js --name mik-api
    pm2 save
    ```
-   The `npm run prepare:db` command creates the SQLite file at `backend/data/app.db` and ensures `backend/config/database.config.json` stores the random `databasePassword`. Back up this JSON file and never commit it to Git—it is required to validate user passwords.
+   The `npm run prepare:db` command creates the data file at `backend/data/app.db` (stored as JSON) and ensures `backend/config/database.config.json` keeps the random `databasePassword`. Back up this JSON file and never commit it to Git—it is required to validate user passwords.
 4. **Build the frontend for production**
    ```bash
    cd /opt/mik-management/frontend
@@ -215,7 +215,7 @@ Follow these steps to deploy the application so it is accessible from the server
    sudo nginx -t
    sudo systemctl restart nginx
    ```
-6. **Visit the application** at `http://<server-ip>/`. The React build will load without a port number, and `/api` requests will be proxied to the Express backend.
+6. **Visit the application** at `http://<server-ip>/`. The React build will load without a port number, and `/api` requests will be proxied to the Node.js backend.
 
 ## Updating an Existing Installation
 
@@ -262,23 +262,24 @@ The default configuration works without custom variables. For production deploym
 
 ## Database
 
-- Storage engine: SQLite (file-based)
+- Storage engine: File-backed JSON database managed entirely by Node.js
 - Config file: `backend/config/database.config.json`
   - Generated automatically on the first backend launch.
   - Contains the relative `databasePath` (defaults to `./data/app.db`) and a random `databasePassword` used as a server-side pepper for hashing credentials.
   - Treat it like a secret—do not commit it to Git and back it up before redeploying or reinstalling the server.
 - Database file: `backend/data/app.db`
   - Created by `npm run prepare:db` or automatically when the server first accepts a request.
-  - No separate system package is required—SQLite is bundled as a Node.js dependency.
+  - Stores JSON data for operators and works without installing external database servers.
 - The API exposes `GET /api/config-info` for administrators to verify the resolved database path and config file location without revealing the secret pepper.
-- Passwords are hashed with `bcryptjs` after being combined with the pepper so credentials remain secure even if the SQLite file is copied.
+- Passwords are hashed with PBKDF2 after being combined with the pepper so credentials remain secure even if the data file is copied.
 
 ## Troubleshooting
 
-- **`npm ERR! notarget No matching version found for sqlite@^5.1.6.`**
-  - Pull the latest repository changes: `git pull`.
-  - If the error persists, update the dependency manually: `cd backend && npm install sqlite@^5.2.4`.
-  - Retry `npm install` to ensure all packages resolve correctly.
+- **Backend logs show `Unable to parse the database`**
+  - The previous SQLite database is incompatible with the new file-backed format.
+  - Stop the API service and back up the existing `backend/data/app.db` if you need the records.
+  - Remove the file and recreate it with `npm run prepare:db`.
+  - Relaunch the backend so a fresh JSON data store is generated.
 - **Browser message "The string did not match the expected pattern" on registration**
   - Reload the page with a hard refresh to ensure the latest frontend bundle is loaded.
   - Confirm that both password fields are filled, match exactly, and contain at least eight characters.
@@ -287,13 +288,13 @@ The default configuration works without custom variables. For production deploym
 - **In-app banner shows "Registration failed."**
   - Visit `journalctl -u mik-api` (or check the terminal) for backend logs—validation errors such as duplicate emails or short passwords will be reported with a specific message that is also surfaced in the UI.
   - Confirm the API is running (`curl http://127.0.0.1:4000/health` should return `{"status":"ok"}`).
-  - Verify the SQLite database folder exists (`ls backend/data`) so the server can persist new users. It is created automatically on first launch, but missing directories will prevent registrations.
-  - If the folder is missing, run `npm run prepare:db` from the `backend` directory to recreate the SQLite file before retrying.
+  - Verify the backend data folder exists (`ls backend/data`) so the server can persist new users. It is created automatically on first launch, but missing directories will prevent registrations.
+  - If the folder is missing, run `npm run prepare:db` from the `backend` directory to recreate the data file before retrying.
 - **Browser shows `502 Bad Gateway` from Nginx during registration or login**
   - Ensure the API service is running: `pm2 status mik-api` (or restart with `pm2 restart mik-api`). A stopped upstream will force Nginx to return 502.
   - Validate the backend responds locally: `curl http://127.0.0.1:4000/health` should produce `{"status":"ok"}`. If it fails, inspect `/opt/mik-management/backend` logs with `pm2 logs mik-api`.
   - Confirm `backend/config/database.config.json` exists and still contains the original `databasePassword`. Recreating or deleting this file prevents logins because stored hashes depend on the original secret.
-  - Run `npm run prepare:db` inside `/opt/mik-management/backend` to recreate missing folders or the SQLite database file before restarting the API.
+  - Run `npm run prepare:db` inside `/opt/mik-management/backend` to recreate missing folders or the data file before restarting the API.
   - Confirm the proxy block includes `/api/` (see the sample Nginx config above) and reload Nginx after edits: `sudo systemctl reload nginx`.
 
 ## Useful npm Scripts
@@ -302,7 +303,7 @@ The default configuration works without custom variables. For production deploym
 | --- | --- | --- |
 | `backend` | `npm run dev` | Start the API server in watch mode for development. |
 | `backend` | `npm start` | Launch the API server once (useful for PM2/systemd). |
-| `backend` | `npm run prepare:db` | Generate or repair the SQLite database and config secrets. |
+| `backend` | `npm run prepare:db` | Generate or repair the data file and config secrets. |
 | `frontend` | `npm run dev` | Start the Vite development server. |
 | `frontend` | `npm run build` | Build the production assets. |
 | `frontend` | `npm run preview` | Preview the production build locally. |

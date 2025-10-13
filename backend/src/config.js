@@ -10,7 +10,7 @@ const configDirectory = path.resolve(rootDirectory, 'config');
 const configFile = path.resolve(configDirectory, 'database.config.json');
 
 const createDefaultConfig = () => ({
-  driver: 'sqlite',
+  driver: 'file',
   databasePath: './data/app.db',
   databasePassword: crypto.randomBytes(24).toString('hex')
 });

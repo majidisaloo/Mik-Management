@@ -8,8 +8,8 @@ const run = async () => {
   const db = await initializeDatabase(config.databasePath);
   await db.close();
 
-  console.log('SQLite database is ready.');
-  console.log(`Database file: ${databaseFile}`);
+  console.log('File-backed database is ready.');
+  console.log(`Data file: ${databaseFile}`);
   console.log(`Configuration file: ${getConfigFilePath()}`);
   console.log('Next step: start the API with "npm run start".');
 };
