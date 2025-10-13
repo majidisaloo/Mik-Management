@@ -305,6 +305,11 @@ The default configuration works without custom variables. For production deploym
   - Run `npm run prepare:db` inside `/opt/mik-management/backend` to recreate missing folders or the data file before restarting the API.
   - Confirm the proxy block includes `/api/` (see the sample Nginx config above) and reload Nginx after edits: `sudo systemctl reload nginx`.
   - The interface now reports "API is unavailable (502 Bad Gateway)" when this happens, so you can immediately tell the upstream server needs attention.
+- **API returns `{ "message": "Not found." }` during registration or login**
+  - Confirm Nginx (or any upstream proxy) forwards `/api/register` and `/api/login` to the backend. Both `/api/...` and `/...` paths are now accepted, so the sample configs that map `/api/` to `http://127.0.0.1:4000/api/` and those that strip the prefix (for example, `proxy_pass http://127.0.0.1:4000/;`) will work.
+  - Reload the proxy after configuration changes: `sudo systemctl reload nginx`.
+  - If the backend was restarted manually, re-run `npm run prepare:db` to ensure the data directory exists before starting the service. The command preserves existing records and only creates missing folders or configuration files.
+  - Double-check that `pm2 status mik-api` reports the process as `online`. A crashed process will cause the proxy to serve a stale 404 response.
 
 ## Useful npm Scripts
 

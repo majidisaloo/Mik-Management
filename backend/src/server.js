@@ -122,6 +122,26 @@ const bootstrap = async () => {
     const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`);
     const pathname = url.pathname;
 
+    const normalizePath = (value) => {
+      if (!value) {
+        return '/';
+      }
+
+      const collapsed = value.replace(/\/+/g, '/');
+      const withoutTrailing = collapsed.replace(/\/+$/, '');
+
+      if (!withoutTrailing) {
+        return '/';
+      }
+
+      return withoutTrailing.startsWith('/') ? withoutTrailing : `/${withoutTrailing}`;
+    };
+
+    const canonicalPath = normalizePath(pathname);
+    const pathSegments = canonicalPath.split('/').filter(Boolean);
+    const resourceSegments = pathSegments[0] === 'api' ? pathSegments.slice(1) : pathSegments;
+    const resourcePath = resourceSegments.length > 0 ? `/${resourceSegments.join('/')}` : '/';
+
     const handleRegister = async () => {
       const body = await parseJsonBody(req);
       const { firstName, lastName, email, password, passwordConfirmation } = body ?? {};
@@ -310,12 +330,12 @@ const bootstrap = async () => {
     };
 
     try {
-      if (method === 'GET' && pathname === '/health') {
+      if (method === 'GET' && (canonicalPath === '/health' || resourcePath === '/health')) {
         sendJson(res, 200, { status: 'ok' });
         return;
       }
 
-      if (method === 'GET' && pathname === '/api/config-info') {
+      if (method === 'GET' && (canonicalPath === '/api/config-info' || resourcePath === '/config-info')) {
         sendJson(res, 200, {
           database: {
             driver: config.driver,
@@ -326,18 +346,18 @@ const bootstrap = async () => {
         return;
       }
 
-      if (method === 'POST' && pathname === '/api/register') {
+      if (method === 'POST' && (canonicalPath === '/api/register' || resourcePath === '/register')) {
         await handleRegister();
         return;
       }
 
-      if (method === 'POST' && pathname === '/api/login') {
+      if (method === 'POST' && (canonicalPath === '/api/login' || resourcePath === '/login')) {
         await handleLogin();
         return;
       }
 
-      if (pathname.startsWith('/api/users/')) {
-        const idSegment = pathname.split('/')[3];
+      if (resourceSegments[0] === 'users' && resourceSegments.length === 2) {
+        const idSegment = resourceSegments[1];
         const userId = Number.parseInt(idSegment, 10);
 
         if (method === 'GET') {
