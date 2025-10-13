@@ -10,6 +10,7 @@ A full-stack registration experience built with React, Vite, and a lightweight N
 - [Dashboard Overview](#dashboard-overview)
 - [Users Workspace](#users-workspace)
 - [Roles Workspace](#roles-workspace)
+- [Mik-Groups Workspace](#mik-groups-workspace)
 - [Ubuntu Deployment Quick Start](#ubuntu-deployment-quick-start)
 - [Production Deployment on Ubuntu with Nginx](#production-deployment-on-ubuntu-with-nginx)
 - [Updating an Existing Installation](#updating-an-existing-installation)
@@ -99,8 +100,8 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
 
 ### Dashboard Overview
 
-- **Sidebar navigation** – The vertical menu on the left provides quick access to the Dashboard, Users, and Roles workspaces. The Users and Roles links only appear when your assigned roles grant those permissions.
-- **Access summary** – Review the roles attached to your account and the resulting Dashboard, Users, and Roles capabilities in the highlighted chips.
+- **Sidebar navigation** – The vertical menu on the left now groups links by focus, placing the Dashboard first and the Users, Roles, and Mik-Groups workspaces under a dedicated management heading. Each link only appears when your assigned roles grant the required permission, and the theme toggle sits at the bottom of the menu so you can switch between day and night palettes at any time.
+- **Access summary** – Review the roles attached to your account and the resulting Dashboard, Users, Roles, and Mik-Groups capabilities in the highlighted chips.
 - **Profile form** – Update your first name, last name, or email address and submit to persist the changes to the secure data file instantly.
 - **Session controls** – Use the header Logout button to clear the session and return to the Login screen.
 
@@ -108,13 +109,20 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
 
 - **Directory table** – The Users screen lists every operator, highlighting the currently selected row and showing each person’s roles.
 - **Select and edit** – Choose an operator from the dropdown to load their details into the form, adjust contact information, optionally set a new password, and assign or remove roles before saving.
+- **Role insights** – Each role badge summarises the Dashboard, Users, Roles, and Mik-Groups permissions it grants so you can confirm coverage at a glance.
 - **Permission aware** – Only operators with the Users permission can access this page. Attempts to reach the screen without the permission redirect back to the Dashboard.
 
 ### Roles Workspace
 
-- **Role library** – Review every role, rename them inline, and toggle Dashboard, Users, and Roles permissions before saving.
+- **Role library** – Review every role, rename them inline, and toggle Dashboard, Users, Roles, and Mik-Groups permissions before saving.
 - **Create and delete** – Add new roles tailored to teams such as sales or support. Roles that are still assigned to users cannot be deleted until those users are reassigned, preventing accidental loss of access.
 - **Guided feedback** – Success and error alerts surface immediately so you know when actions complete or require additional steps.
+
+### Mik-Groups Workspace
+
+- **Hierarchy explorer** – Visualise the entire organisation tree in the left column. Selecting a Mik-Group highlights it in the hierarchy and loads its details for editing.
+- **Parent assignments** – Update a group’s name or parent with confidence. The interface prevents cycles, keeps the root Mik-Group anchored at the top level, and lets you create new nested groups in a couple of clicks.
+- **Safe clean-up** – Delete buttons stay disabled for the root group and for branches that still own child groups, ensuring you never orphan part of the hierarchy by accident.
 
 ## Ubuntu Deployment Quick Start
 
@@ -383,6 +391,39 @@ The default configuration works without custom variables. For production deploym
   - `404`: User not found
   - `409`: Email already used by another account
   - `500`: Unable to update the user
+
+`GET /api/groups`
+
+- **Success**: `200 OK` with `{ groups, tree }`
+- **Notes**: Returns both a flat list of all Mik-Groups and a nested tree that reflects parent-child relationships.
+
+`POST /api/groups`
+
+- **Body**: `{ name, parentId? }`
+- **Success**: `201 Created`
+- **Errors**:
+  - `400`: Missing name or invalid parent reference
+  - `409`: A group with the same name already exists
+  - `500`: Unable to create the group
+
+`PUT /api/groups/:id`
+
+- **Body**: `{ name, parentId? }`
+- **Success**: `200 OK`
+- **Errors**:
+  - `400`: Missing name, invalid parent reference, or attempt to nest the root group
+  - `404`: Group not found
+  - `409`: Another group already uses the provided name
+  - `500`: Unable to update the group
+
+`DELETE /api/groups/:id`
+
+- **Success**: `204 No Content`
+- **Errors**:
+  - `400`: Attempt to delete the protected root group
+  - `404`: Group not found
+  - `409`: Group still has child groups; reassign them first
+  - `500`: Unable to delete the group
 
 `GET /api/config-info`
 

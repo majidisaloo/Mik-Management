@@ -16,7 +16,7 @@ const Dashboard = () => {
   const [status, setStatus] = useState({ type: '', message: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [assignedRoles, setAssignedRoles] = useState([]);
-  const [permissions, setPermissions] = useState({ dashboard: false, users: false, roles: false });
+  const [permissions, setPermissions] = useState({ dashboard: false, users: false, roles: false, groups: false });
 
   useEffect(() => {
     if (!user) {
@@ -53,7 +53,8 @@ const Dashboard = () => {
         setPermissions({
           dashboard: Boolean(userPayload.permissions?.dashboard),
           users: Boolean(userPayload.permissions?.users),
-          roles: Boolean(userPayload.permissions?.roles)
+          roles: Boolean(userPayload.permissions?.roles),
+          groups: Boolean(userPayload.permissions?.groups)
         });
         setStatus({ type: '', message: '' });
       } catch (error) {
@@ -131,7 +132,8 @@ const Dashboard = () => {
         setPermissions({
           dashboard: Boolean(updatedUser.permissions?.dashboard),
           users: Boolean(updatedUser.permissions?.users),
-          roles: Boolean(updatedUser.permissions?.roles)
+          roles: Boolean(updatedUser.permissions?.roles),
+          groups: Boolean(updatedUser.permissions?.groups)
         });
       }
 
@@ -178,6 +180,9 @@ const Dashboard = () => {
               </span>
               <span className={`permission-chip${permissions.users ? ' permission-chip--active' : ''}`}>Users</span>
               <span className={`permission-chip${permissions.roles ? ' permission-chip--active' : ''}`}>Roles</span>
+              <span className={`permission-chip${permissions.groups ? ' permission-chip--active' : ''}`}>
+                Mik-Groups
+              </span>
             </div>
           </div>
         </div>

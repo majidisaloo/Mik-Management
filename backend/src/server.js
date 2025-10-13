@@ -10,7 +10,8 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const basePermissions = {
   dashboard: false,
   users: false,
-  roles: false
+  roles: false,
+  groups: false
 };
 
 const pepperPassword = (password, secret) => `${password}${secret}`;
@@ -154,6 +155,41 @@ const mapUser = (user, allRoles) => {
     roles: roleDetails,
     permissions
   };
+};
+
+const mapGroup = (group) => ({
+  id: group.id,
+  name: group.name,
+  parentId: group.parentId ?? null,
+  createdAt: group.createdAt,
+  updatedAt: group.updatedAt
+});
+
+const buildGroupTree = (groups) => {
+  const nodeLookup = new Map();
+
+  groups.forEach((group) => {
+    nodeLookup.set(group.id, { ...mapGroup(group), children: [] });
+  });
+
+  const roots = [];
+
+  nodeLookup.forEach((node) => {
+    if (node.parentId && nodeLookup.has(node.parentId)) {
+      nodeLookup.get(node.parentId).children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  const sortNodes = (entries) => {
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    entries.forEach((child) => sortNodes(child.children));
+  };
+
+  sortNodes(roots);
+
+  return roots;
 };
 
 const bootstrap = async () => {
@@ -578,6 +614,174 @@ const bootstrap = async () => {
       }
     };
 
+    const handleListGroups = async () => {
+      try {
+        const groups = await db.listGroups();
+        const mapped = groups.map(mapGroup);
+        const tree = buildGroupTree(groups);
+        sendJson(res, 200, { groups: mapped, tree });
+      } catch (error) {
+        console.error('List groups error', error);
+        sendJson(res, 500, { message: 'Unable to load groups.' });
+      }
+    };
+
+    const handleCreateGroup = async () => {
+      const body = await parseJsonBody(req);
+      const { name, parentId } = body ?? {};
+
+      const normalizedName = normalizeString(name);
+
+      if (!normalizedName) {
+        sendJson(res, 400, { message: 'Group name is required.' });
+        return;
+      }
+
+      let normalizedParentId = null;
+
+      if (parentId !== undefined && parentId !== null && parentId !== '') {
+        const parsed = Number.parseInt(parentId, 10);
+
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+          sendJson(res, 400, { message: 'Parent group must be a positive integer identifier.' });
+          return;
+        }
+
+        normalizedParentId = parsed;
+      }
+
+      try {
+        const result = await db.createGroup({ name: normalizedName, parentId: normalizedParentId });
+
+        if (!result.success && result.reason === 'duplicate-name') {
+          sendJson(res, 409, { message: 'Another group already uses this name.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-parent') {
+          sendJson(res, 400, { message: 'The selected parent group does not exist.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'cyclic-parent') {
+          sendJson(res, 400, { message: 'A group cannot be nested within itself or its descendants.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to create group.');
+        }
+
+        sendJson(res, 201, { message: 'Group created successfully.', group: mapGroup(result.group) });
+      } catch (error) {
+        console.error('Create group error', error);
+        sendJson(res, 500, { message: 'Unable to create the group right now.' });
+      }
+    };
+
+    const handleUpdateGroup = async (groupId) => {
+      const body = await parseJsonBody(req);
+      const { name, parentId } = body ?? {};
+
+      if (!Number.isInteger(groupId) || groupId <= 0) {
+        sendJson(res, 400, { message: 'A valid group id is required.' });
+        return;
+      }
+
+      const normalizedName = normalizeString(name);
+
+      if (!normalizedName) {
+        sendJson(res, 400, { message: 'Group name is required.' });
+        return;
+      }
+
+      let normalizedParentId = null;
+
+      if (parentId !== undefined && parentId !== null && parentId !== '') {
+        const parsed = Number.parseInt(parentId, 10);
+
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+          sendJson(res, 400, { message: 'Parent group must be a positive integer identifier.' });
+          return;
+        }
+
+        normalizedParentId = parsed;
+      }
+
+      try {
+        const result = await db.updateGroup(groupId, { name: normalizedName, parentId: normalizedParentId });
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Group not found.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'duplicate-name') {
+          sendJson(res, 409, { message: 'Another group already uses this name.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-parent') {
+          sendJson(res, 400, { message: 'The selected parent group does not exist.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'cyclic-parent') {
+          sendJson(res, 400, { message: 'A group cannot be nested within itself or its descendants.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'protected-group') {
+          sendJson(res, 400, { message: 'The root Mik-Group cannot be reassigned to another parent.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to update group.');
+        }
+
+        sendJson(res, 200, { message: 'Group updated successfully.', group: mapGroup(result.group) });
+      } catch (error) {
+        console.error('Update group error', error);
+        sendJson(res, 500, { message: 'Unable to update the group right now.' });
+      }
+    };
+
+    const handleDeleteGroup = async (groupId) => {
+      if (!Number.isInteger(groupId) || groupId <= 0) {
+        sendJson(res, 400, { message: 'A valid group id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.deleteGroup(groupId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Group not found.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'protected-group') {
+          sendJson(res, 400, { message: 'The root Mik-Group cannot be deleted.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'group-in-use') {
+          sendJson(res, 409, { message: 'Remove or reparent child groups before deleting this group.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to delete group.');
+        }
+
+        sendNoContent(res);
+      } catch (error) {
+        console.error('Delete group error', error);
+        sendJson(res, 500, { message: 'Unable to delete the group right now.' });
+      }
+    };
+
     try {
       if (method === 'GET' && (canonicalPath === '/health' || resourcePath === '/health')) {
         sendJson(res, 200, { status: 'ok' });
@@ -647,6 +851,31 @@ const bootstrap = async () => {
 
       if (method === 'POST' && (canonicalPath === '/api/roles' || resourcePath === '/roles')) {
         await handleCreateRole();
+        return;
+      }
+
+      if (method === 'GET' && (canonicalPath === '/api/groups' || resourcePath === '/groups')) {
+        await handleListGroups();
+        return;
+      }
+
+      if (resourceSegments[0] === 'groups' && resourceSegments.length === 2) {
+        const idSegment = resourceSegments[1];
+        const groupId = Number.parseInt(idSegment, 10);
+
+        if (method === 'PUT') {
+          await handleUpdateGroup(groupId);
+          return;
+        }
+
+        if (method === 'DELETE') {
+          await handleDeleteGroup(groupId);
+          return;
+        }
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/groups' || resourcePath === '/groups')) {
+        await handleCreateGroup();
         return;
       }
 

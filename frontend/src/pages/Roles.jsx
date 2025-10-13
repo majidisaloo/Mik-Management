@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext.jsx';
 const blankPermissions = () => ({
   dashboard: true,
   users: false,
-  roles: false
+  roles: false,
+  groups: false
 });
 
 const Roles = () => {
@@ -56,7 +57,8 @@ const Roles = () => {
               permissions: {
                 dashboard: Boolean(role.permissions?.dashboard),
                 users: Boolean(role.permissions?.users),
-                roles: Boolean(role.permissions?.roles)
+                roles: Boolean(role.permissions?.roles),
+                groups: Boolean(role.permissions?.groups)
               }
             };
             return acc;
@@ -164,7 +166,8 @@ const Roles = () => {
             permissions: {
               dashboard: Boolean(updatedRole.permissions?.dashboard),
               users: Boolean(updatedRole.permissions?.users),
-              roles: Boolean(updatedRole.permissions?.roles)
+              roles: Boolean(updatedRole.permissions?.roles),
+              groups: Boolean(updatedRole.permissions?.groups)
             }
           }
         }));
@@ -301,7 +304,8 @@ const Roles = () => {
             permissions: {
               dashboard: Boolean(createdRole.permissions?.dashboard),
               users: Boolean(createdRole.permissions?.users),
-              roles: Boolean(createdRole.permissions?.roles)
+              roles: Boolean(createdRole.permissions?.roles),
+              groups: Boolean(createdRole.permissions?.groups)
             }
           }
         }));
@@ -402,11 +406,20 @@ const Roles = () => {
                         />
                         <span>Roles</span>
                       </label>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(draft.permissions.groups)}
+                          onChange={() => handleDraftPermissionToggle(role.id, 'groups')}
+                        />
+                        <span>Mik-Groups</span>
+                      </label>
                     </div>
                     <p className="role-summary">
                       Effective access: {draft.permissions.dashboard ? 'Dashboard' : 'No dashboard'}
                       {draft.permissions.users ? ' · Users' : ''}
                       {draft.permissions.roles ? ' · Roles' : ''}
+                      {draft.permissions.groups ? ' · Mik-Groups' : ''}
                     </p>
                   </li>
                 );
@@ -450,6 +463,14 @@ const Roles = () => {
                   onChange={() => handleNewRoleToggle('roles')}
                 />
                 <span>Roles</span>
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={newRole.permissions.groups}
+                  onChange={() => handleNewRoleToggle('groups')}
+                />
+                <span>Mik-Groups</span>
               </label>
             </fieldset>
             <div className="wide button-row">

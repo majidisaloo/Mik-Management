@@ -388,7 +388,13 @@ const Users = () => {
                         {role.permissions.dashboard ? ' Dashboard' : ''}
                         {role.permissions.users ? ' · Users' : ''}
                         {role.permissions.roles ? ' · Roles' : ''}
-                        {!role.permissions.dashboard && !role.permissions.users && !role.permissions.roles ? ' None' : ''}
+                        {role.permissions.groups ? ' · Mik-Groups' : ''}
+                        {!role.permissions.dashboard &&
+                        !role.permissions.users &&
+                        !role.permissions.roles &&
+                        !role.permissions.groups
+                          ? ' None'
+                          : ''}
                       </span>
                     </label>
                   ))

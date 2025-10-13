@@ -82,9 +82,15 @@ const Layout = () => {
         <div className="app-content">
           <aside className="app-sidebar" aria-label="Primary navigation">
             <nav className="sidebar-nav">
-              <NavLink to="/dashboard">Dashboard</NavLink>
-              {user.permissions?.users ? <NavLink to="/users">Users</NavLink> : null}
-              {user.permissions?.roles ? <NavLink to="/roles">Roles</NavLink> : null}
+              <div className="sidebar-group">
+                <NavLink to="/dashboard">Dashboard</NavLink>
+              </div>
+              <div className="sidebar-group">
+                <p className="sidebar-group__label">Management</p>
+                {user.permissions?.users ? <NavLink to="/users">Users</NavLink> : null}
+                {user.permissions?.roles ? <NavLink to="/roles">Roles</NavLink> : null}
+                {user.permissions?.groups ? <NavLink to="/groups">Mik-Groups</NavLink> : null}
+              </div>
             </nav>
             <div className="sidebar-footer">{renderThemeToggle('sidebar')}</div>
           </aside>

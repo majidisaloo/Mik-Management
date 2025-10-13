@@ -8,15 +8,75 @@ const __dirname = path.dirname(__filename);
 const defaultPermissions = () => ({
   dashboard: false,
   users: false,
-  roles: false
+  roles: false,
+  groups: false
 });
 
 const defaultState = () => ({
   lastUserId: 0,
   lastRoleId: 0,
+  lastGroupId: 0,
   users: [],
-  roles: []
+  roles: [],
+  groups: []
 });
+
+const normalizeGroupName = (name, fallback) => {
+  if (typeof name !== 'string') {
+    return fallback;
+  }
+
+  const trimmed = name.trim();
+  return trimmed || fallback;
+};
+
+const buildParentLookup = (groups) => {
+  const lookup = new Map();
+  groups.forEach((group) => {
+    lookup.set(group.id, group.parentId ?? null);
+  });
+  return lookup;
+};
+
+const createsCycle = (groups, groupId, candidateParentId) => {
+  if (!candidateParentId || !Number.isInteger(candidateParentId)) {
+    return false;
+  }
+
+  if (candidateParentId === groupId) {
+    return true;
+  }
+
+  const lookup = buildParentLookup(groups);
+  let current = candidateParentId;
+
+  while (current) {
+    if (current === groupId) {
+      return true;
+    }
+
+    const next = lookup.get(current);
+
+    if (!next || next === current) {
+      return false;
+    }
+
+    current = next;
+  }
+
+  return false;
+};
+
+const findCanonicalRootId = (groups) => {
+  return groups
+    .filter((group) => group.parentId === null)
+    .reduce((rootId, group) => {
+      if (rootId === null || group.id < rootId) {
+        return group.id;
+      }
+      return rootId;
+    }, null);
+};
 
 export const resolveDatabaseFile = (databasePath = './data/app.db') => {
   if (!databasePath) {
@@ -125,7 +185,8 @@ const ensureStateShape = async (databaseFile) => {
         permissions: {
           dashboard: true,
           users: true,
-          roles: true
+          roles: true,
+          groups: true
         },
         createdAt: timestamp,
         updatedAt: timestamp
@@ -139,6 +200,139 @@ const ensureStateShape = async (databaseFile) => {
       permissions: sanitizePermissions(role.permissions)
     }));
   }
+
+  if (!Array.isArray(normalized.groups)) {
+    normalized.groups = [];
+    mutated = true;
+  }
+
+  if (!Number.isInteger(normalized.lastGroupId)) {
+    normalized.lastGroupId = normalized.groups.reduce(
+      (max, group) => Math.max(max, Number.parseInt(group.id, 10) || 0),
+      0
+    );
+    mutated = true;
+  }
+
+  let nextGroupIdSeed = Math.max(
+    Number.isInteger(normalized.lastGroupId) ? normalized.lastGroupId : 0,
+    normalized.groups.reduce((max, group) => Math.max(max, Number.parseInt(group.id, 10) || 0), 0)
+  );
+
+  const nowTimestamp = new Date().toISOString();
+  const usedGroupIds = new Set();
+
+  const sanitizedGroups = normalized.groups.map((group) => {
+    let identifier = Number.parseInt(group.id, 10);
+
+    if (!Number.isInteger(identifier) || identifier <= 0 || usedGroupIds.has(identifier)) {
+      nextGroupIdSeed += 1;
+      identifier = nextGroupIdSeed;
+      mutated = true;
+    }
+
+    usedGroupIds.add(identifier);
+
+    const createdAt = group.createdAt ?? nowTimestamp;
+    const updatedAt = group.updatedAt ?? createdAt;
+    const parentCandidate = Number.parseInt(group.parentId, 10);
+    const parentId = Number.isInteger(parentCandidate) && parentCandidate > 0 ? parentCandidate : null;
+    const name = normalizeGroupName(group.name, `Group ${identifier}`);
+
+    if (group.name !== name || group.parentId !== parentId || group.createdAt !== createdAt || group.updatedAt !== updatedAt) {
+      mutated = true;
+    }
+
+    return {
+      id: identifier,
+      name,
+      parentId,
+      createdAt,
+      updatedAt
+    };
+  });
+
+  let updatedGroups = sanitizedGroups;
+
+  if (updatedGroups.length === 0) {
+    const timestamp = new Date().toISOString();
+    updatedGroups = [
+      {
+        id: 1,
+        name: 'Mik-Group Root',
+        parentId: null,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      }
+    ];
+    nextGroupIdSeed = Math.max(nextGroupIdSeed, 1);
+    mutated = true;
+  }
+
+  const snapshot = updatedGroups.map((group) => ({ ...group }));
+
+  updatedGroups = snapshot.map((group) => {
+    let parentId = group.parentId;
+
+    if (parentId && !snapshot.some((candidate) => candidate.id === parentId)) {
+      parentId = null;
+      mutated = true;
+    }
+
+    if (parentId && createsCycle(snapshot, group.id, parentId)) {
+      parentId = null;
+      mutated = true;
+    }
+
+    return {
+      ...group,
+      parentId
+    };
+  });
+
+  let canonicalRootId = findCanonicalRootId(updatedGroups);
+
+  if (canonicalRootId === null) {
+    const timestamp = new Date().toISOString();
+    const nextId = nextGroupIdSeed + 1;
+    updatedGroups.push({
+      id: nextId,
+      name: 'Mik-Group Root',
+      parentId: null,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    });
+    canonicalRootId = nextId;
+    nextGroupIdSeed = nextId;
+    mutated = true;
+  }
+
+  const rootIndex = updatedGroups.findIndex((group) => group.id === canonicalRootId);
+
+  if (rootIndex !== -1) {
+    const rootGroup = updatedGroups[rootIndex];
+    const desiredName = normalizeGroupName(rootGroup.name, 'Mik-Group Root');
+    if (rootGroup.name !== desiredName || rootGroup.parentId !== null) {
+      updatedGroups[rootIndex] = {
+        ...rootGroup,
+        name: desiredName,
+        parentId: null
+      };
+      mutated = true;
+    }
+  }
+
+  const highestGroupId = updatedGroups.reduce((max, group) => Math.max(max, group.id), 0);
+
+  if (highestGroupId !== normalized.lastGroupId) {
+    normalized.lastGroupId = Math.max(nextGroupIdSeed, highestGroupId);
+    mutated = true;
+  } else if (nextGroupIdSeed > normalized.lastGroupId) {
+    normalized.lastGroupId = nextGroupIdSeed;
+    mutated = true;
+  }
+
+  normalized.groups = updatedGroups;
 
   const validRoleIds = new Set(normalized.roles.map((role) => role.id));
 
@@ -386,6 +580,141 @@ const initializeDatabase = async (databasePath) => {
       }
 
       state.roles.splice(index, 1);
+      await persist(state);
+
+      return { success: true };
+    },
+
+    async listGroups() {
+      const state = await load();
+      return state.groups.map((group) => ({ ...group }));
+    },
+
+    async createGroup({ name, parentId }) {
+      const state = await load();
+      const normalizedName = name.trim();
+      const duplicate = state.groups.find((group) => group.name.toLowerCase() === normalizedName.toLowerCase());
+
+      if (duplicate) {
+        return { success: false, reason: 'duplicate-name' };
+      }
+
+      let normalizedParentId = null;
+
+      if (parentId !== null && parentId !== undefined) {
+        if (!Number.isInteger(parentId) || parentId <= 0) {
+          return { success: false, reason: 'invalid-parent' };
+        }
+
+        const parentExists = state.groups.some((group) => group.id === parentId);
+
+        if (!parentExists) {
+          return { success: false, reason: 'invalid-parent' };
+        }
+
+        normalizedParentId = parentId;
+      }
+
+      const nextId = (Number.isInteger(state.lastGroupId) ? state.lastGroupId : 0) + 1;
+      const timestamp = new Date().toISOString();
+
+      const group = {
+        id: nextId,
+        name: normalizedName,
+        parentId: normalizedParentId,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      };
+
+      state.groups.push(group);
+      state.lastGroupId = nextId;
+      await persist(state);
+
+      return { success: true, group };
+    },
+
+    async updateGroup(id, { name, parentId }) {
+      const state = await load();
+      const index = state.groups.findIndex((group) => group.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      const canonicalRootId = findCanonicalRootId(state.groups);
+
+      const normalizedName = name.trim();
+      const duplicate = state.groups.find(
+        (group, position) => position !== index && group.name.toLowerCase() === normalizedName.toLowerCase()
+      );
+
+      if (duplicate) {
+        return { success: false, reason: 'duplicate-name' };
+      }
+
+      const existing = state.groups[index];
+      let normalizedParentId = existing.parentId ?? null;
+
+      if (parentId !== undefined) {
+        if (parentId === null || parentId === '') {
+          normalizedParentId = null;
+        } else {
+          const parsed = Number.parseInt(parentId, 10);
+
+          if (!Number.isInteger(parsed) || parsed <= 0) {
+            return { success: false, reason: 'invalid-parent' };
+          }
+
+          if (!state.groups.some((group) => group.id === parsed)) {
+            return { success: false, reason: 'invalid-parent' };
+          }
+
+          if (createsCycle(state.groups, id, parsed)) {
+            return { success: false, reason: 'cyclic-parent' };
+          }
+
+          normalizedParentId = parsed;
+        }
+      }
+
+      if (canonicalRootId === id && normalizedParentId !== null) {
+        return { success: false, reason: 'protected-group' };
+      }
+
+      const updatedGroup = {
+        ...existing,
+        name: normalizedName,
+        parentId: normalizedParentId,
+        updatedAt: new Date().toISOString()
+      };
+
+      state.groups[index] = updatedGroup;
+      await persist(state);
+
+      return { success: true, group: updatedGroup };
+    },
+
+    async deleteGroup(id) {
+      const state = await load();
+      const index = state.groups.findIndex((group) => group.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      const canonicalRootId = findCanonicalRootId(state.groups);
+
+      if (canonicalRootId === id) {
+        return { success: false, reason: 'protected-group' };
+      }
+
+      const childExists = state.groups.some((group) => group.parentId === id);
+
+      if (childExists) {
+        return { success: false, reason: 'group-in-use' };
+      }
+
+      state.groups.splice(index, 1);
       await persist(state);
 
       return { success: true };
