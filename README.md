@@ -215,10 +215,12 @@ Keep your deployment in sync with GitHub using the following workflow:
    ```
    If you maintain local commits, replace the reset with `git pull --rebase` and resolve any conflicts using the guidance in
    `MERGE_RESOLUTION_NOTES.md`.
-3. Reinstall dependencies when package manifests change:
+3. Reinstall dependencies when package manifests change and immediately address npm audit findings so installs succeed cleanly:
    ```bash
    cd backend && npm install
+   npm audit fix --force
    cd ../frontend && npm install
+   npm audit fix --force
    ```
 4. Rebuild the frontend and restart the API:
    ```bash
@@ -252,6 +254,10 @@ The backend uses SQLite and automatically creates the database file at `backend/
   - Confirm that both password fields are filled, match exactly, and contain at least eight characters.
   - Ensure the email address follows the format `name@example.com`.
   - If the warning persists, rebuild and redeploy the frontend (`npm run build`) so browsers receive the updated form validation and backend validation rules.
+- **In-app banner shows "Registration failed."**
+  - Visit `journalctl -u mik-api` (or check the terminal) for backend logs—validation errors such as duplicate emails or short passwords will be reported with a specific message that is also surfaced in the UI.
+  - Confirm the API is running (`curl http://127.0.0.1:4000/health` should return `{"status":"ok"}`).
+  - Verify the SQLite database folder exists (`ls backend/data`) so the server can persist new users. It is created automatically on first launch, but missing directories will prevent registrations.
 
 ## Useful npm Scripts
 

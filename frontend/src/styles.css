@@ -3,7 +3,7 @@
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   line-height: 1.6;
   font-weight: 400;
-  background-color: #eef4ff;
+  background-color: #f4f8ff;
   color: #0f172a;
 }
 
@@ -14,7 +14,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(circle at 20% 20%, #e0f2ff 0%, #f8fbff 55%, #dde9ff 100%);
+  background: radial-gradient(circle at 15% 15%, #e8f4ff 0%, #f5f9ff 55%, #edf5ff 100%);
 }
 
 .app-shell {
@@ -38,6 +38,44 @@ body {
   font-weight: 700;
   text-decoration: none;
   font-size: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0.25rem;
+  border-radius: 0.85rem;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.3), rgba(99, 102, 241, 0.25));
+  box-shadow: inset 0 1px 4px rgba(255, 255, 255, 0.55);
+}
+
+.brand-copy {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.brand-title {
+  font-size: 1.35rem;
+  letter-spacing: 0.04em;
+}
+
+.brand-subtitle {
+  font-size: 0.75rem;
+  color: #3b82f6;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
 }
 
 nav a {
@@ -154,6 +192,59 @@ nav a.active {
 .primary-button:not(:disabled):hover {
   transform: translateY(-2px);
   box-shadow: 0 12px 30px rgba(96, 165, 250, 0.4);
+}
+
+.password-strength {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.5rem;
+  margin-top: -0.5rem;
+}
+
+.password-strength-track {
+  width: 100%;
+  height: 0.65rem;
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.password-strength-bar {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  transition: width 0.25s ease, background 0.25s ease;
+}
+
+.password-strength[data-score='1'] .password-strength-bar {
+  width: 25%;
+  background: linear-gradient(135deg, #f87171, #ef4444);
+}
+
+.password-strength[data-score='2'] .password-strength-bar {
+  width: 50%;
+  background: linear-gradient(135deg, #fb923c, #f97316);
+}
+
+.password-strength[data-score='3'] .password-strength-bar {
+  width: 75%;
+  background: linear-gradient(135deg, #facc15, #eab308);
+}
+
+.password-strength[data-score='4'] .password-strength-bar {
+  width: 100%;
+  background: linear-gradient(135deg, #34d399, #22c55e);
+}
+
+.password-strength-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+.password-strength-hint {
+  font-size: 0.8rem;
+  color: #475569;
 }
 
 .feedback {

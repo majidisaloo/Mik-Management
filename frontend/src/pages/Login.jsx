@@ -40,14 +40,28 @@ const Login = () => {
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Login failed.' }));
-        throw new Error(error.message || 'Login failed.');
+        const contentType = response.headers.get('content-type') ?? '';
+        let message = 'Login failed.';
+
+        if (contentType.includes('application/json')) {
+          const errorPayload = await response.json().catch(() => ({}));
+          if (errorPayload?.message) {
+            message = errorPayload.message;
+          }
+        } else {
+          const fallbackText = await response.text().catch(() => '');
+          if (fallbackText) {
+            message = fallbackText;
+          }
+        }
+
+        throw new Error(message);
       }
 
       setStatus({ type: 'success', message: 'Login successful.' });
       setForm({ email: form.email, password: '' });
     } catch (error) {
-      setStatus({ type: 'error', message: error.message });
+      setStatus({ type: 'error', message: error.message || 'Login failed.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -66,6 +80,7 @@ const Login = () => {
             onChange={handleChange}
             autoComplete="email"
             required
+            id="loginEmail"
           />
         </label>
         <label className="wide">
@@ -77,6 +92,7 @@ const Login = () => {
             onChange={handleChange}
             autoComplete="current-password"
             required
+            id="loginPassword"
           />
         </label>
         <button type="submit" disabled={isSubmitting} className="primary-button">
