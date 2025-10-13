@@ -418,6 +418,110 @@ const bootstrap = async () => {
       }
     };
 
+    const handleAdminCreateUser = async () => {
+      const body = await parseJsonBody(req);
+      const { firstName, lastName, email, password, passwordConfirmation, roles } = body ?? {};
+
+      const normalizedFirstName = normalizeString(firstName);
+      const normalizedLastName = normalizeString(lastName);
+      const normalizedEmail = normalizeString(email).toLowerCase();
+      const rawPassword = typeof password === 'string' ? password : '';
+
+      if (!normalizedFirstName) {
+        sendJson(res, 400, { message: 'First name is required.' });
+        return;
+      }
+
+      if (!normalizedLastName) {
+        sendJson(res, 400, { message: 'Last name is required.' });
+        return;
+      }
+
+      if (!normalizedEmail) {
+        sendJson(res, 400, { message: 'Email is required.' });
+        return;
+      }
+
+      if (!emailPattern.test(normalizedEmail)) {
+        sendJson(res, 400, { message: 'Email must follow the format name@example.com.' });
+        return;
+      }
+
+      if (!rawPassword) {
+        sendJson(res, 400, { message: 'Password is required.' });
+        return;
+      }
+
+      if (rawPassword.length < 8) {
+        sendJson(res, 400, { message: 'Password must be at least 8 characters long.' });
+        return;
+      }
+
+      if (passwordConfirmation !== undefined && rawPassword !== passwordConfirmation) {
+        sendJson(res, 400, { message: 'Passwords must match.' });
+        return;
+      }
+
+      let normalizedRoles;
+      if (roles !== undefined) {
+        if (!Array.isArray(roles)) {
+          sendJson(res, 400, { message: 'Roles must be provided as an array.' });
+          return;
+        }
+
+        const converted = roles.map((roleId) => Number.parseInt(roleId, 10));
+        const invalidRole = converted.some((roleId) => !Number.isInteger(roleId) || roleId <= 0);
+
+        if (invalidRole) {
+          sendJson(res, 400, { message: 'Each role id must be a positive integer.' });
+          return;
+        }
+
+        normalizedRoles = converted;
+      }
+
+      try {
+        const passwordHash = hashPassword(rawPassword, config.databasePassword);
+        const result = await db.createUser({
+          firstName: normalizedFirstName,
+          lastName: normalizedLastName,
+          email: normalizedEmail,
+          passwordHash,
+          roleIds: normalizedRoles
+        });
+
+        if (!result.success && result.reason === 'duplicate-email') {
+          sendJson(res, 409, { message: 'This email is already registered.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-role-format') {
+          sendJson(res, 400, { message: 'Roles must be supplied as an array of numeric identifiers.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-role-reference') {
+          sendJson(res, 400, {
+            message: 'One or more selected roles do not exist. Refresh the page and try again.'
+          });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to create user.');
+        }
+
+        const rolesList = await db.listRoles();
+        sendJson(res, 201, {
+          message: 'User created successfully.',
+          user: mapUser(result.user, rolesList)
+        });
+      } catch (error) {
+        console.error('Create user error', error);
+        sendJson(res, 500, { message: 'Unable to create the user right now.' });
+      }
+    };
+
     const handleLogin = async () => {
       const body = await parseJsonBody(req);
       const { email, password } = body ?? {};
@@ -460,6 +564,31 @@ const bootstrap = async () => {
       } catch (error) {
         console.error('List users error', error);
         sendJson(res, 500, { message: 'Unable to load users.' });
+      }
+    };
+
+    const handleDeleteUser = async (userId) => {
+      if (!Number.isInteger(userId) || userId <= 0) {
+        sendJson(res, 400, { message: 'A valid user id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.deleteUser(userId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'User not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to delete user.');
+        }
+
+        sendNoContent(res);
+      } catch (error) {
+        console.error('Delete user error', error);
+        sendJson(res, 500, { message: 'Unable to delete the user right now.' });
       }
     };
 
@@ -1095,6 +1224,11 @@ const bootstrap = async () => {
         return;
       }
 
+      if (method === 'POST' && (canonicalPath === '/api/users' || resourcePath === '/users')) {
+        await handleAdminCreateUser();
+        return;
+      }
+
       if (resourceSegments[0] === 'users' && resourceSegments.length === 2) {
         const idSegment = resourceSegments[1];
         const userId = Number.parseInt(idSegment, 10);
@@ -1106,6 +1240,11 @@ const bootstrap = async () => {
 
         if (method === 'PUT') {
           await handleUpdateUser(userId);
+          return;
+        }
+
+        if (method === 'DELETE') {
+          await handleDeleteUser(userId);
           return;
         }
       }

@@ -1,52 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
-const emptyEditForm = {
+const emptyForm = {
   name: '',
   parentId: ''
-};
-
-const emptyCreateForm = {
-  name: '',
-  parentId: ''
-};
-
-const findNodeById = (nodes, targetId) => {
-  for (const node of nodes) {
-    if (node.id === targetId) {
-      return node;
-    }
-
-    if (Array.isArray(node.children) && node.children.length > 0) {
-      const match = findNodeById(node.children, targetId);
-      if (match) {
-        return match;
-      }
-    }
-  }
-
-  return null;
-};
-
-const collectDescendantIds = (node) => {
-  if (!node || !Array.isArray(node.children)) {
-    return new Set();
-  }
-
-  const ids = new Set();
-  const stack = [...node.children];
-
-  while (stack.length > 0) {
-    const current = stack.pop();
-    ids.add(current.id);
-
-    if (Array.isArray(current.children) && current.children.length > 0) {
-      stack.push(...current.children);
-    }
-  }
-
-  return ids;
 };
 
 const formatDateTime = (value) => {
@@ -68,19 +27,26 @@ const formatDateTime = (value) => {
   });
 };
 
+const flattenTree = (nodes, depth = 0, acc = []) => {
+  nodes.forEach((node) => {
+    acc.push({ ...node, depth });
+    if (Array.isArray(node.children) && node.children.length > 0) {
+      flattenTree(node.children, depth + 1, acc);
+    }
+  });
+  return acc;
+};
+
 const Groups = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [groups, setGroups] = useState([]);
   const [tree, setTree] = useState([]);
-  const [selectedGroupId, setSelectedGroupId] = useState(null);
-  const [editForm, setEditForm] = useState(emptyEditForm);
-  const [createForm, setCreateForm] = useState(emptyCreateForm);
+  const [status, setStatus] = useState({ type: '', message: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [status, setStatus] = useState({ type: '', message: '' });
+  const [modal, setModal] = useState({ mode: null, targetId: null });
+  const [form, setForm] = useState(emptyForm);
 
   const canManageGroups = Boolean(user?.permissions?.groups);
 
@@ -97,7 +63,7 @@ const Groups = () => {
 
     const controller = new AbortController();
 
-    const loadGroups = async () => {
+    const load = async () => {
       try {
         setLoading(true);
         const response = await fetch('/api/groups', { signal: controller.signal });
@@ -112,19 +78,6 @@ const Groups = () => {
 
         setGroups(loadedGroups);
         setTree(loadedTree);
-
-        setSelectedGroupId((current) => {
-          if (current && loadedGroups.some((group) => group.id === current)) {
-            return current;
-          }
-
-          if (loadedTree.length > 0) {
-            return loadedTree[0].id;
-          }
-
-          return null;
-        });
-
         setStatus({ type: '', message: '' });
       } catch (error) {
         if (error.name !== 'AbortError') {
@@ -140,178 +93,100 @@ const Groups = () => {
       }
     };
 
-    loadGroups();
+    load();
 
     return () => controller.abort();
   }, [canManageGroups, navigate, user]);
 
-  const selectedGroup = useMemo(
-    () => groups.find((group) => group.id === selectedGroupId) ?? null,
-    [groups, selectedGroupId]
-  );
+  const flattenedGroups = useMemo(() => flattenTree(tree.slice()), [tree]);
 
-  const selectedNode = useMemo(() => findNodeById(tree, selectedGroupId), [tree, selectedGroupId]);
-
-  const descendantIds = useMemo(() => collectDescendantIds(selectedNode), [selectedNode]);
-
-  const parentOptions = useMemo(() => {
-    return groups
-      .filter((group) => group.id !== selectedGroupId && !descendantIds.has(group.id))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [descendantIds, groups, selectedGroupId]);
-
-  const selectableParentsForCreate = useMemo(
-    () => groups.slice().sort((a, b) => a.name.localeCompare(b.name)),
-    [groups]
-  );
-
-  useEffect(() => {
-    if (!selectedGroup) {
-      setEditForm(emptyEditForm);
-      return;
-    }
-
-    setEditForm({
-      name: selectedGroup.name ?? '',
-      parentId: selectedGroup.parentId ? String(selectedGroup.parentId) : ''
-    });
-  }, [selectedGroup]);
-
-  const handleSelectGroup = (groupId) => {
-    setSelectedGroupId(groupId);
-    setStatus({ type: '', message: '' });
+  const closeModal = () => {
+    setModal({ mode: null, targetId: null });
+    setForm(emptyForm);
+    setSaving(false);
   };
 
-  const handleEditFieldChange = (event) => {
-    const { name, value } = event.target;
-    setEditForm((current) => ({ ...current, [name]: value }));
-  };
-
-  const handleCreateFieldChange = (event) => {
-    const { name, value } = event.target;
-    setCreateForm((current) => ({ ...current, [name]: value }));
-  };
-
-  const reloadGroups = async (preserveSelection = false) => {
+  const refreshGroups = async () => {
     try {
       const response = await fetch('/api/groups');
-
       if (!response.ok) {
-        throw new Error('Unable to refresh the current Mik-Groups.');
+        throw new Error('Unable to refresh groups.');
       }
-
       const payload = await response.json();
-      const loadedGroups = Array.isArray(payload?.groups) ? payload.groups : [];
-      const loadedTree = Array.isArray(payload?.tree) ? payload.tree : [];
-
-      setGroups(loadedGroups);
-      setTree(loadedTree);
-
-      setSelectedGroupId((current) => {
-        if (preserveSelection && current && loadedGroups.some((group) => group.id === current)) {
-          return current;
-        }
-
-        if (loadedTree.length > 0) {
-          return loadedTree[0].id;
-        }
-
-        return null;
-      });
+      setGroups(Array.isArray(payload?.groups) ? payload.groups : []);
+      setTree(Array.isArray(payload?.tree) ? payload.tree : []);
     } catch (error) {
-      setStatus({
-        type: 'error',
-        message: error.message || 'Unable to refresh the current Mik-Groups.'
-      });
+      setStatus({ type: 'error', message: error.message || 'Unable to refresh groups.' });
     }
   };
 
-  const handleEditSubmit = async (event) => {
-    event.preventDefault();
+  const buildErrorMessage = async (response, fallback) => {
+    const statusCode = response.status;
+    const contentType = response.headers.get('content-type') ?? '';
+    let message = fallback;
 
-    if (!selectedGroupId) {
-      setStatus({ type: 'error', message: 'Select a group before saving changes.' });
+    if (statusCode === 502) {
+      message = 'The API returned 502 Bad Gateway. Confirm the backend service is online.';
+    } else if (statusCode >= 500 && statusCode !== 502) {
+      message = `The server returned an unexpected error (${statusCode}).`;
+    }
+
+    if (contentType.includes('application/json')) {
+      const payload = await response.json().catch(() => ({}));
+      if (payload?.message) {
+        message = payload.message;
+      }
+    } else {
+      const text = await response.text().catch(() => '');
+      if (text) {
+        message = text;
+      }
+    }
+
+    return message;
+  };
+
+  const openCreate = (parentId = '') => {
+    setForm({ name: '', parentId: parentId ? String(parentId) : '' });
+    setModal({ mode: 'create', targetId: parentId || null });
+  };
+
+  const openView = (groupId) => {
+    setModal({ mode: 'view', targetId: groupId });
+  };
+
+  const openEdit = (groupId) => {
+    const selected = groups.find((group) => group.id === groupId);
+    if (!selected) {
+      setStatus({ type: 'error', message: 'Unable to load the selected group.' });
       return;
     }
 
-    const trimmedName = editForm.name.trim();
+    setForm({
+      name: selected.name ?? '',
+      parentId: selected.parentId ? String(selected.parentId) : ''
+    });
+    setModal({ mode: 'edit', targetId: groupId });
+  };
 
-    if (!trimmedName) {
-      setStatus({ type: 'error', message: 'Enter a name for the Mik-Group before saving.' });
+  const openDelete = (groupId) => {
+    setModal({ mode: 'delete', targetId: groupId });
+  };
+
+  const handleFieldChange = (event) => {
+    const { name, value } = event.target;
+    setForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const submitCreate = async (event) => {
+    event.preventDefault();
+
+    if (!form.name.trim()) {
+      setStatus({ type: 'error', message: 'Group name is required.' });
       return;
     }
 
     setSaving(true);
-    setStatus({ type: '', message: '' });
-
-    const payload = {
-      name: trimmedName,
-      parentId: editForm.parentId === '' ? null : Number.parseInt(editForm.parentId, 10)
-    };
-
-    try {
-      const response = await fetch(`/api/groups/${selectedGroupId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const contentType = response.headers.get('content-type') ?? '';
-        let message = 'Group update failed.';
-
-        if (response.status === 502) {
-          message = 'Mik-Group updates are unavailable (502 Bad Gateway). Confirm the backend service is online.';
-        }
-
-        if (response.status >= 500 && response.status !== 502) {
-          message = `The server returned an error (${response.status}). Please retry.`;
-        }
-
-        if (contentType.includes('application/json')) {
-          const errorPayload = await response.json().catch(() => ({}));
-          if (errorPayload?.message) {
-            message = errorPayload.message;
-          }
-        } else {
-          const fallbackText = await response.text().catch(() => '');
-          if (fallbackText) {
-            message = fallbackText;
-          }
-        }
-
-        throw new Error(message);
-      }
-
-      const responsePayload = await response.json();
-      await reloadGroups(true);
-      setStatus({ type: 'success', message: responsePayload?.message ?? 'Group updated successfully.' });
-    } catch (error) {
-      setStatus({ type: 'error', message: error.message || 'Group update failed.' });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleCreateSubmit = async (event) => {
-    event.preventDefault();
-
-    const trimmedName = createForm.name.trim();
-
-    if (!trimmedName) {
-      setStatus({ type: 'error', message: 'Enter a name for the new Mik-Group.' });
-      return;
-    }
-
-    setCreating(true);
-    setStatus({ type: '', message: '' });
-
-    const payload = {
-      name: trimmedName,
-      parentId: createForm.parentId === '' ? null : Number.parseInt(createForm.parentId, 10)
-    };
 
     try {
       const response = await fetch('/api/groups', {
@@ -319,249 +194,364 @@ const Groups = () => {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          name: form.name,
+          parentId: form.parentId ? Number.parseInt(form.parentId, 10) : null
+        })
       });
 
       if (!response.ok) {
-        const contentType = response.headers.get('content-type') ?? '';
-        let message = 'Group creation failed.';
-
-        if (response.status === 502) {
-          message = 'Mik-Group creation is unavailable (502 Bad Gateway). Confirm the backend service is online.';
-        }
-
-        if (response.status >= 500 && response.status !== 502) {
-          message = `The server returned an error (${response.status}). Please retry.`;
-        }
-
-        if (contentType.includes('application/json')) {
-          const errorPayload = await response.json().catch(() => ({}));
-          if (errorPayload?.message) {
-            message = errorPayload.message;
-          }
-        } else {
-          const fallbackText = await response.text().catch(() => '');
-          if (fallbackText) {
-            message = fallbackText;
-          }
-        }
-
+        const message = await buildErrorMessage(response, 'Group creation failed.');
         throw new Error(message);
       }
 
-      const responsePayload = await response.json();
-      await reloadGroups(true);
-      setCreateForm(emptyCreateForm);
-      setStatus({ type: 'success', message: responsePayload?.message ?? 'Group created successfully.' });
+      const payload = await response.json();
+      if (payload?.group) {
+        await refreshGroups();
+      }
+
+      setStatus({ type: 'success', message: payload?.message ?? 'Group created successfully.' });
+      closeModal();
     } catch (error) {
       setStatus({ type: 'error', message: error.message || 'Group creation failed.' });
-    } finally {
-      setCreating(false);
+      setSaving(false);
     }
   };
 
-  const handleDeleteGroup = async () => {
-    if (!selectedGroupId) {
+  const submitEdit = async (event) => {
+    event.preventDefault();
+
+    if (!modal.targetId) {
+      setStatus({ type: 'error', message: 'Select a group before saving changes.' });
       return;
     }
 
-    setDeleting(true);
-    setStatus({ type: '', message: '' });
+    if (!form.name.trim()) {
+      setStatus({ type: 'error', message: 'Group name is required.' });
+      return;
+    }
+
+    setSaving(true);
 
     try {
-      const response = await fetch(`/api/groups/${selectedGroupId}`, {
+      const response = await fetch(`/api/groups/${modal.targetId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: form.name,
+          parentId: form.parentId ? Number.parseInt(form.parentId, 10) : ''
+        })
+      });
+
+      if (!response.ok) {
+        const message = await buildErrorMessage(response, 'Group update failed.');
+        throw new Error(message);
+      }
+
+      const payload = await response.json();
+      if (payload?.group) {
+        await refreshGroups();
+      }
+
+      setStatus({ type: 'success', message: payload?.message ?? 'Group updated successfully.' });
+      closeModal();
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message || 'Group update failed.' });
+      setSaving(false);
+    }
+  };
+
+  const submitDelete = async () => {
+    if (!modal.targetId) {
+      setStatus({ type: 'error', message: 'Select a group before deleting it.' });
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const response = await fetch(`/api/groups/${modal.targetId}`, {
         method: 'DELETE'
       });
 
-      if (response.status === 204) {
-        await reloadGroups(false);
-        setStatus({ type: 'success', message: 'Group deleted successfully.' });
-        return;
+      if (response.status !== 204) {
+        const message = await buildErrorMessage(response, 'Group deletion failed.');
+        throw new Error(message);
       }
 
-      const contentType = response.headers.get('content-type') ?? '';
-      let message = 'Group deletion failed.';
-
-      if (response.status === 409) {
-        message = 'Reassign or remove child groups before deleting this Mik-Group.';
-      }
-
-      if (contentType.includes('application/json')) {
-        const payload = await response.json().catch(() => ({}));
-        if (payload?.message) {
-          message = payload.message;
-        }
-      } else {
-        const fallbackText = await response.text().catch(() => '');
-        if (fallbackText) {
-          message = fallbackText;
-        }
-      }
-
-      throw new Error(message);
+      await refreshGroups();
+      setStatus({ type: 'success', message: 'Group deleted successfully.' });
+      closeModal();
     } catch (error) {
       setStatus({ type: 'error', message: error.message || 'Group deletion failed.' });
-    } finally {
-      setDeleting(false);
+      setSaving(false);
     }
   };
 
-  const renderTree = (nodes) => {
-    if (!Array.isArray(nodes) || nodes.length === 0) {
-      return <p className="muted small">No Mik-Groups have been configured.</p>;
-    }
-
-    return (
-      <ul className="group-tree__list">
-        {nodes.map((node) => (
-          <li key={node.id}>
-            <button
-              type="button"
-              className={`group-tree__item${node.id === selectedGroupId ? ' group-tree__item--active' : ''}`}
-              onClick={() => handleSelectGroup(node.id)}
-            >
-              <span>{node.name}</span>
-              {Array.isArray(node.children) && node.children.length > 0 ? (
-                <span className="group-tree__count">{node.children.length}</span>
-              ) : null}
-            </button>
-            {Array.isArray(node.children) && node.children.length > 0 ? renderTree(node.children) : null}
-          </li>
-        ))}
-      </ul>
-    );
-  };
-
-  if (!user || !canManageGroups) {
+  if (!user) {
     return null;
   }
 
-  const isRootGroup = selectedGroup?.parentId === null;
-  const hasChildGroups = Boolean(selectedNode?.children && selectedNode.children.length > 0);
-  const canDeleteSelected = Boolean(selectedGroupId) && !isRootGroup && !hasChildGroups;
+  if (!canManageGroups) {
+    return (
+      <section className="card">
+        <h1>Mik-Groups</h1>
+        <p className="muted">You do not have permission to manage Mik-Groups.</p>
+      </section>
+    );
+  }
+
+  const parentOptions = useMemo(() => {
+    return groups
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((group) => ({ value: String(group.id), label: group.name }));
+  }, [groups]);
+
+  const renderModal = () => {
+    if (!modal.mode) {
+      return null;
+    }
+
+    if (modal.mode === 'view') {
+      const selected = groups.find((group) => group.id === modal.targetId);
+      if (!selected) {
+        return null;
+      }
+
+      const parentName = selected.parentId
+        ? groups.find((group) => group.id === selected.parentId)?.name || '—'
+        : '—';
+
+      return (
+        <Modal title="Group details" onClose={closeModal}>
+          <dl className="detail-list">
+            <div>
+              <dt>Name</dt>
+              <dd>{selected.name}</dd>
+            </div>
+            <div>
+              <dt>Parent</dt>
+              <dd>{parentName}</dd>
+            </div>
+            <div>
+              <dt>Created</dt>
+              <dd>{formatDateTime(selected.createdAt) || '—'}</dd>
+            </div>
+            <div>
+              <dt>Updated</dt>
+              <dd>{formatDateTime(selected.updatedAt) || '—'}</dd>
+            </div>
+          </dl>
+        </Modal>
+      );
+    }
+
+    if (modal.mode === 'create') {
+      const parentName = modal.targetId
+        ? groups.find((group) => group.id === modal.targetId)?.name || 'Mik-Group Root'
+        : 'Mik-Group Root';
+
+      return (
+        <Modal
+          title="Create group"
+          description={`Nest a new Mik-Group under ${parentName}. Use groups to organise routers by site or business unit.`}
+          onClose={closeModal}
+        >
+          <form className="management-form" onSubmit={submitCreate}>
+            <label>
+              <span>Group name</span>
+              <input name="name" value={form.name} onChange={handleFieldChange} required />
+            </label>
+            <label>
+              <span>Parent group</span>
+              <select name="parentId" value={form.parentId} onChange={handleFieldChange}>
+                <option value="">No parent (top-level)</option>
+                {parentOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="management-form__actions">
+              <button type="button" className="ghost-button" onClick={closeModal} disabled={saving}>
+                Cancel
+              </button>
+              <button type="submit" className="primary-button" disabled={saving}>
+                {saving ? 'Creating…' : 'Create group'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      );
+    }
+
+    if (modal.mode === 'edit') {
+      const target = groups.find((group) => group.id === modal.targetId);
+      const isRoot = target ? !target.parentId : false;
+
+      return (
+        <Modal
+          title="Edit group"
+          description="Rename the Mik-Group or move it beneath a different parent to keep your hierarchy tidy."
+          onClose={closeModal}
+        >
+          <form className="management-form" onSubmit={submitEdit}>
+            <label>
+              <span>Group name</span>
+              <input name="name" value={form.name} onChange={handleFieldChange} required />
+            </label>
+            <label>
+              <span>Parent group</span>
+              <select name="parentId" value={form.parentId} onChange={handleFieldChange} disabled={isRoot}>
+                <option value="">No parent (top-level)</option>
+                {parentOptions
+                  .filter((option) => Number.parseInt(option.value, 10) !== modal.targetId)
+                  .map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            {isRoot ? <p className="muted">The root Mik-Group cannot be reassigned.</p> : null}
+            <div className="management-form__actions">
+              <button type="button" className="ghost-button" onClick={closeModal} disabled={saving}>
+                Cancel
+              </button>
+              <button type="submit" className="primary-button" disabled={saving}>
+                {saving ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      );
+    }
+
+    if (modal.mode === 'delete') {
+      const target = groups.find((group) => group.id === modal.targetId);
+      const isRoot = target ? !target.parentId : false;
+      const hasChildren = target ? groups.some((entry) => entry.parentId === target.id) : false;
+
+      return (
+        <Modal title="Delete group" onClose={closeModal}>
+          {isRoot ? (
+            <p>The root Mik-Group cannot be deleted.</p>
+          ) : (
+            <>
+              <p>
+                Are you sure you want to delete <strong>{target?.name ?? 'this group'}</strong>? Any nested groups must be
+                removed or reassigned first.
+              </p>
+              {hasChildren ? (
+                <p className="muted">
+                  This group currently has child entries. Move them before deleting to avoid data loss.
+                </p>
+              ) : null}
+              <div className="modal-footer">
+                <button type="button" className="ghost-button" onClick={closeModal} disabled={saving}>
+                  Cancel
+                </button>
+                <button type="button" className="danger-button" onClick={submitDelete} disabled={saving || hasChildren}>
+                  {saving ? 'Removing…' : 'Delete group'}
+                </button>
+              </div>
+            </>
+          )}
+        </Modal>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <div className="dashboard">
-      <section className="card">
-        <header className="card-header">
-          <div>
-            <h1>Mik-Group directory</h1>
-            <p className="card-intro">
-              Model your organisation with nested Mik-Groups. Place departments inside parent groups to reflect reporting
-              structure and simplify user access management.
-            </p>
-          </div>
-        </header>
-        <div className="group-management">
-          <aside className="group-tree" aria-label="Mik-Group hierarchy">
-            <h2>Hierarchy</h2>
-            {renderTree(tree)}
-          </aside>
-          <div className="group-editor">
-            <form className="group-editor__form" onSubmit={handleEditSubmit}>
-              <h2>Update group</h2>
-              {!selectedGroup ? (
-                <p className="muted">Select a Mik-Group from the hierarchy to edit its details.</p>
-              ) : (
-                <>
-                  <label className="wide">
-                    <span>Group name</span>
-                    <input
-                      name="name"
-                      value={editForm.name}
-                      onChange={handleEditFieldChange}
-                      required
-                    />
-                  </label>
-                  <label className="wide">
-                    <span>Parent group</span>
-                    <select
-                      name="parentId"
-                      value={editForm.parentId}
-                      onChange={handleEditFieldChange}
-                      disabled={isRootGroup}
-                    >
-                      <option value="">No parent (top-level)</option>
-                      {parentOptions.map((group) => (
-                        <option key={group.id} value={group.id}>
-                          {group.name}
-                        </option>
-                      ))}
-                    </select>
-                    {isRootGroup ? (
-                      <span className="muted small">The root Mik-Group cannot be nested inside another group.</span>
-                    ) : null}
-                  </label>
-                  <div className="group-metadata">
-                    <p>
-                      Created
-                      <br />
-                      <time dateTime={selectedGroup.createdAt}>{formatDateTime(selectedGroup.createdAt)}</time>
-                    </p>
-                    <p>
-                      Last updated
-                      <br />
-                      <time dateTime={selectedGroup.updatedAt}>{formatDateTime(selectedGroup.updatedAt)}</time>
-                    </p>
-                  </div>
-                  <div className="button-row">
-                    <button type="submit" className="primary-button" disabled={saving}>
-                      {saving ? 'Saving…' : 'Save changes'}
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost-button"
-                      onClick={handleDeleteGroup}
-                      disabled={!canDeleteSelected || deleting}
-                    >
-                      {deleting ? 'Removing…' : 'Delete group'}
-                    </button>
-                  </div>
-                  {!canDeleteSelected && !isRootGroup && hasChildGroups ? (
-                    <p className="muted small">Detach child groups before deleting this entry.</p>
-                  ) : null}
-                  {isRootGroup ? (
-                    <p className="muted small">Rename the root as needed, but it will always remain the top-level group.</p>
-                  ) : null}
-                </>
-              )}
-            </form>
-            <form className="group-editor__form" onSubmit={handleCreateSubmit}>
-              <h2>Create new group</h2>
-              <label className="wide">
-                <span>Group name</span>
-                <input
-                  name="name"
-                  value={createForm.name}
-                  onChange={handleCreateFieldChange}
-                  placeholder="e.g. Sales Team"
-                  required
-                />
-              </label>
-              <label className="wide">
-                <span>Parent group</span>
-                <select name="parentId" value={createForm.parentId} onChange={handleCreateFieldChange}>
-                  <option value="">No parent (top-level)</option>
-                  {selectableParentsForCreate.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="button-row">
-                <button type="submit" className="secondary-button" disabled={creating}>
-                  {creating ? 'Creating…' : 'Create group'}
-                </button>
-              </div>
-            </form>
-          </div>
+      <div className="management-toolbar">
+        <div className="management-toolbar__title">
+          <h1>Mik-Groups</h1>
+          <p>Design a clean hierarchy for sites and teams so Mikrotik inventory is effortless to navigate.</p>
         </div>
-        {loading && <p className="feedback muted">Loading Mik-Groups…</p>}
-        {status.message && (
-          <p className={`feedback ${status.type === 'error' ? 'error' : 'success'}`}>{status.message}</p>
-        )}
-      </section>
+        <div className="management-toolbar__actions">
+          <button type="button" className="primary-button" onClick={() => openCreate()} disabled={loading}>
+            Add group
+          </button>
+        </div>
+      </div>
+
+      {status.message ? (
+        <div className={`alert ${status.type === 'error' ? 'alert-error' : 'alert-success'}`}>{status.message}</div>
+      ) : null}
+
+      {flattenedGroups.length === 0 ? (
+        <div className="management-empty">No Mik-Groups exist yet. Start by creating the root categories you need.</div>
+      ) : (
+        <div className="management-list">
+          {flattenedGroups.map((group) => {
+            const parentName = group.parentId
+              ? groups.find((entry) => entry.id === group.parentId)?.name || '—'
+              : 'Mik-Group Root';
+            const disableDelete = !group.parentId;
+
+            return (
+              <article
+                key={group.id}
+                className="management-item"
+                style={{ '--depth': `${group.depth ?? 0}` }}
+              >
+                <header className="management-item__header">
+                  <h2 className="management-item__title">{group.name}</h2>
+                  <div className="management-item__meta">
+                    <span>
+                      <strong>ID:</strong> {group.id}
+                    </span>
+                    <span>
+                      <strong>Parent:</strong> {parentName}
+                    </span>
+                    <span>
+                      <strong>Created:</strong> {formatDateTime(group.createdAt) || '—'}
+                    </span>
+                  </div>
+                </header>
+                <div className="management-item__body">
+                  <div className="group-tree" style={{ '--depth': `${group.depth ?? 0}` }}>
+                    <div className="group-tree__node" style={{ '--depth': `${group.depth ?? 0}` }}>
+                      <span className="group-tree__label">{group.name}</span>
+                      <span className="group-tree__meta">
+                        Depth {group.depth} · {group.children?.length ?? 0} direct children
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="management-item__actions">
+                  <button type="button" className="ghost-button" onClick={() => openView(group.id)}>
+                    View
+                  </button>
+                  <button type="button" className="secondary-button" onClick={() => openEdit(group.id)}>
+                    Edit
+                  </button>
+                  <button type="button" className="secondary-button" onClick={() => openCreate(group.id)}>
+                    Add child
+                  </button>
+                  <button
+                    type="button"
+                    className="danger-button"
+                    onClick={() => openDelete(group.id)}
+                    disabled={disableDelete}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      {renderModal()}
     </div>
   );
 };

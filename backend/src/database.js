@@ -631,7 +631,7 @@ const initializeDatabase = async (databasePath) => {
   const persist = (state) => writeDatabase(databaseFile, state);
 
   return {
-    async createUser({ firstName, lastName, email, passwordHash }) {
+    async createUser({ firstName, lastName, email, passwordHash, roleIds }) {
       const state = await load();
 
       if (!Array.isArray(state.roles) || state.roles.length === 0) {
@@ -661,6 +661,29 @@ const initializeDatabase = async (databasePath) => {
         return { success: false, reason: 'duplicate-email' };
       }
 
+      let assignedRoles = [state.roles[0].id];
+
+      if (Array.isArray(roleIds)) {
+        const uniqueRoles = [...new Set(roleIds.map((roleId) => Number.parseInt(roleId, 10)))].filter(
+          (roleId) => Number.isInteger(roleId) && roleId > 0
+        );
+
+        if (roleIds.length > 0 && uniqueRoles.length === 0) {
+          return { success: false, reason: 'invalid-role-format' };
+        }
+
+        const availableRoleIds = new Set(state.roles.map((role) => role.id));
+        const missingRoles = uniqueRoles.filter((roleId) => !availableRoleIds.has(roleId));
+
+        if (missingRoles.length > 0) {
+          return { success: false, reason: 'invalid-role-reference', missing: missingRoles };
+        }
+
+        if (uniqueRoles.length > 0) {
+          assignedRoles = uniqueRoles;
+        }
+      }
+
       const nextId = (Number.isInteger(state.lastUserId) ? state.lastUserId : 0) + 1;
       const createdAt = new Date().toISOString();
       const user = {
@@ -670,7 +693,7 @@ const initializeDatabase = async (databasePath) => {
         email,
         passwordHash,
         createdAt,
-        roles: [state.roles[0].id]
+        roles: assignedRoles
       };
 
       state.users.push(user);
@@ -751,6 +774,20 @@ const initializeDatabase = async (databasePath) => {
       await persist(state);
 
       return { success: true, user: updatedUser };
+    },
+
+    async deleteUser(id) {
+      const state = await load();
+      const index = state.users.findIndex((user) => user.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      state.users.splice(index, 1);
+      await persist(state);
+
+      return { success: true };
     },
 
     async listRoles() {

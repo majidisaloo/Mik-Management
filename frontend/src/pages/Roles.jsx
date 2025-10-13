@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const blankPermissions = () => ({
@@ -11,20 +12,29 @@ const blankPermissions = () => ({
   settings: false
 });
 
+const permissionLabels = {
+  dashboard: 'Dashboard',
+  users: 'Users',
+  roles: 'Roles',
+  groups: 'Mik-Groups',
+  mikrotiks: "Mikrotik's",
+  settings: 'Settings'
+};
+
 const Roles = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [roles, setRoles] = useState([]);
-  const [drafts, setDrafts] = useState({});
   const [status, setStatus] = useState({ type: '', message: '' });
   const [loading, setLoading] = useState(true);
-  const [savingRoleId, setSavingRoleId] = useState(null);
-  const [creating, setCreating] = useState(false);
-  const [newRole, setNewRole] = useState({ name: '', permissions: blankPermissions() });
+  const [saving, setSaving] = useState(false);
+  const [modal, setModal] = useState({ mode: null, targetId: null });
+  const [draft, setDraft] = useState({ name: '', permissions: blankPermissions() });
 
-  const canManageRoles = Boolean(user?.permissions?.roles);
-
-  const sortedRoles = useMemo(() => roles.slice().sort((a, b) => a.name.localeCompare(b.name)), [roles]);
+  const sortedRoles = useMemo(
+    () => roles.slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [roles]
+  );
 
   useEffect(() => {
     if (!user) {
@@ -32,7 +42,7 @@ const Roles = () => {
       return;
     }
 
-    if (!canManageRoles) {
+    if (!user.permissions?.roles) {
       navigate('/dashboard', { replace: true });
       return;
     }
@@ -49,25 +59,7 @@ const Roles = () => {
         }
 
         const payload = await response.json();
-        const loadedRoles = Array.isArray(payload?.roles) ? payload.roles : [];
-
-        setRoles(loadedRoles);
-        setDrafts(
-          loadedRoles.reduce((acc, role) => {
-            acc[role.id] = {
-              name: role.name,
-              permissions: {
-                dashboard: Boolean(role.permissions?.dashboard),
-                users: Boolean(role.permissions?.users),
-                roles: Boolean(role.permissions?.roles),
-                groups: Boolean(role.permissions?.groups),
-                mikrotiks: Boolean(role.permissions?.mikrotiks),
-                settings: Boolean(role.permissions?.settings)
-              }
-            };
-            return acc;
-          }, {})
-        );
+        setRoles(Array.isArray(payload?.roles) ? payload.roles : []);
         setStatus({ type: '', message: '' });
       } catch (error) {
         if (error.name !== 'AbortError') {
@@ -86,44 +78,144 @@ const Roles = () => {
     load();
 
     return () => controller.abort();
-  }, [canManageRoles, navigate, user]);
+  }, [navigate, user]);
 
-  const handleDraftNameChange = (roleId, value) => {
-    setDrafts((current) => ({
-      ...current,
-      [roleId]: {
-        ...current[roleId],
-        name: value
-      }
-    }));
+  const closeModal = () => {
+    setModal({ mode: null, targetId: null });
+    setDraft({ name: '', permissions: blankPermissions() });
+    setSaving(false);
   };
 
-  const handleDraftPermissionToggle = (roleId, permission) => {
-    setDrafts((current) => ({
-      ...current,
-      [roleId]: {
-        ...current[roleId],
-        permissions: {
-          ...current[roleId]?.permissions,
-          [permission]: !current[roleId]?.permissions?.[permission]
-        }
+  const buildErrorMessage = async (response, fallback) => {
+    const statusCode = response.status;
+    const contentType = response.headers.get('content-type') ?? '';
+    let message = fallback;
+
+    if (statusCode === 502) {
+      message = 'The API returned 502 Bad Gateway. Confirm the backend service is online.';
+    } else if (statusCode >= 500 && statusCode !== 502) {
+      message = `The server returned an unexpected error (${statusCode}).`;
+    }
+
+    if (contentType.includes('application/json')) {
+      const payload = await response.json().catch(() => ({}));
+      if (payload?.message) {
+        message = payload.message;
       }
-    }));
+    } else {
+      const text = await response.text().catch(() => '');
+      if (text) {
+        message = text;
+      }
+    }
+
+    return message;
   };
 
-  const handleSaveRole = async (roleId) => {
-    const draft = drafts[roleId];
+  const openCreate = () => {
+    setStatus({ type: '', message: '' });
+    setDraft({ name: '', permissions: blankPermissions() });
+    setModal({ mode: 'create', targetId: null });
+  };
 
-    if (!draft?.name) {
-      setStatus({ type: 'error', message: 'Role name is required before saving.' });
+  const openView = (targetId) => {
+    setModal({ mode: 'view', targetId });
+  };
+
+  const openEdit = (targetId) => {
+    const target = roles.find((entry) => entry.id === targetId);
+    if (!target) {
+      setStatus({ type: 'error', message: 'Unable to load the selected role.' });
       return;
     }
 
-    setSavingRoleId(roleId);
-    setStatus({ type: '', message: '' });
+    setDraft({
+      name: target.name ?? '',
+      permissions: {
+        dashboard: Boolean(target.permissions?.dashboard),
+        users: Boolean(target.permissions?.users),
+        roles: Boolean(target.permissions?.roles),
+        groups: Boolean(target.permissions?.groups),
+        mikrotiks: Boolean(target.permissions?.mikrotiks),
+        settings: Boolean(target.permissions?.settings)
+      }
+    });
+    setModal({ mode: 'edit', targetId });
+  };
+
+  const openDelete = (targetId) => {
+    setModal({ mode: 'delete', targetId });
+  };
+
+  const handleDraftNameChange = (event) => {
+    setDraft((current) => ({ ...current, name: event.target.value }));
+  };
+
+  const handleDraftPermissionToggle = (event) => {
+    const key = event.target.value;
+    setDraft((current) => ({
+      ...current,
+      permissions: {
+        ...current.permissions,
+        [key]: !current.permissions[key]
+      }
+    }));
+  };
+
+  const submitCreate = async (event) => {
+    event.preventDefault();
+
+    if (!draft.name.trim()) {
+      setStatus({ type: 'error', message: 'Role name is required.' });
+      return;
+    }
+
+    setSaving(true);
 
     try {
-      const response = await fetch(`/api/roles/${roleId}`, {
+      const response = await fetch('/api/roles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: draft.name, permissions: draft.permissions })
+      });
+
+      if (!response.ok) {
+        const message = await buildErrorMessage(response, 'Role creation failed.');
+        throw new Error(message);
+      }
+
+      const payload = await response.json();
+      if (payload?.role) {
+        setRoles((current) => [...current, payload.role]);
+      }
+
+      setStatus({ type: 'success', message: payload?.message ?? 'Role created successfully.' });
+      closeModal();
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message || 'Role creation failed.' });
+      setSaving(false);
+    }
+  };
+
+  const submitEdit = async (event) => {
+    event.preventDefault();
+
+    if (!modal.targetId) {
+      setStatus({ type: 'error', message: 'A role must be selected before saving changes.' });
+      return;
+    }
+
+    if (!draft.name.trim()) {
+      setStatus({ type: 'error', message: 'Role name is required.' });
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const response = await fetch(`/api/roles/${modal.targetId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -132,199 +224,49 @@ const Roles = () => {
       });
 
       if (!response.ok) {
-        const contentType = response.headers.get('content-type') ?? '';
-        let message = 'Role update failed.';
-
-        if (response.status === 502) {
-          message = 'Role updates are unavailable (502 Bad Gateway). Confirm the backend service is online.';
-        }
-
-        if (response.status >= 500 && response.status !== 502) {
-          message = `The server returned an error (${response.status}). Please retry.`;
-        }
-
-        if (contentType.includes('application/json')) {
-          const payload = await response.json().catch(() => ({}));
-          if (payload?.message) {
-            message = payload.message;
-          }
-        } else {
-          const fallbackText = await response.text().catch(() => '');
-          if (fallbackText) {
-            message = fallbackText;
-          }
-        }
-
+        const message = await buildErrorMessage(response, 'Role update failed.');
         throw new Error(message);
       }
 
       const payload = await response.json();
-      const updatedRole = payload?.role;
+      const updated = payload?.role;
 
-      if (updatedRole) {
-        setRoles((current) => current.map((role) => (role.id === updatedRole.id ? updatedRole : role)));
-        setDrafts((current) => ({
-          ...current,
-          [roleId]: {
-            name: updatedRole.name,
-            permissions: {
-              dashboard: Boolean(updatedRole.permissions?.dashboard),
-              users: Boolean(updatedRole.permissions?.users),
-              roles: Boolean(updatedRole.permissions?.roles),
-              groups: Boolean(updatedRole.permissions?.groups),
-              mikrotiks: Boolean(updatedRole.permissions?.mikrotiks),
-              settings: Boolean(updatedRole.permissions?.settings)
-            }
-          }
-        }));
+      if (updated) {
+        setRoles((current) => current.map((role) => (role.id === updated.id ? updated : role)));
       }
 
       setStatus({ type: 'success', message: payload?.message ?? 'Role updated successfully.' });
+      closeModal();
     } catch (error) {
       setStatus({ type: 'error', message: error.message || 'Role update failed.' });
-    } finally {
-      setSavingRoleId(null);
+      setSaving(false);
     }
   };
 
-  const handleDeleteRole = async (roleId) => {
-    setSavingRoleId(roleId);
-    setStatus({ type: '', message: '' });
-
-    try {
-      const response = await fetch(`/api/roles/${roleId}`, {
-        method: 'DELETE'
-      });
-
-      if (response.status === 204) {
-        setRoles((current) => current.filter((role) => role.id !== roleId));
-        setDrafts((current) => {
-          const next = { ...current };
-          delete next[roleId];
-          return next;
-        });
-        setStatus({ type: 'success', message: 'Role deleted successfully.' });
-        return;
-      }
-
-      const contentType = response.headers.get('content-type') ?? '';
-      let message = 'Role deletion failed.';
-
-      if (response.status === 409) {
-        message =
-          'This role is still assigned to one or more users. Update the users before removing the role.';
-      }
-
-      if (contentType.includes('application/json')) {
-        const payload = await response.json().catch(() => ({}));
-        if (payload?.message) {
-          message = payload.message;
-        }
-      } else {
-        const fallbackText = await response.text().catch(() => '');
-        if (fallbackText) {
-          message = fallbackText;
-        }
-      }
-
-      throw new Error(message);
-    } catch (error) {
-      setStatus({ type: 'error', message: error.message || 'Role deletion failed.' });
-    } finally {
-      setSavingRoleId(null);
-    }
-  };
-
-  const handleNewRoleFieldChange = (event) => {
-    const { name, value } = event.target;
-    setNewRole((current) => ({ ...current, [name]: value }));
-  };
-
-  const handleNewRoleToggle = (permission) => {
-    setNewRole((current) => ({
-      ...current,
-      permissions: {
-        ...current.permissions,
-        [permission]: !current.permissions[permission]
-      }
-    }));
-  };
-
-  const handleCreateRole = async (event) => {
-    event.preventDefault();
-
-    const trimmedName = newRole.name.trim();
-    if (!trimmedName) {
-      setStatus({ type: 'error', message: 'Enter a name before creating the role.' });
+  const submitDelete = async () => {
+    if (!modal.targetId) {
+      setStatus({ type: 'error', message: 'A role must be selected before deletion.' });
       return;
     }
 
-    setCreating(true);
-    setStatus({ type: '', message: '' });
+    setSaving(true);
 
     try {
-      const response = await fetch('/api/roles', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ name: trimmedName, permissions: newRole.permissions })
+      const response = await fetch(`/api/roles/${modal.targetId}`, {
+        method: 'DELETE'
       });
 
-      if (!response.ok) {
-        const contentType = response.headers.get('content-type') ?? '';
-        let message = 'Role creation failed.';
-
-        if (response.status === 502) {
-          message = 'Role creation is unavailable (502 Bad Gateway). Confirm the backend service is online.';
-        }
-
-        if (response.status >= 500 && response.status !== 502) {
-          message = `The server returned an error (${response.status}). Please retry.`;
-        }
-
-        if (contentType.includes('application/json')) {
-          const payload = await response.json().catch(() => ({}));
-          if (payload?.message) {
-            message = payload.message;
-          }
-        } else {
-          const fallbackText = await response.text().catch(() => '');
-          if (fallbackText) {
-            message = fallbackText;
-          }
-        }
-
+      if (response.status !== 204) {
+        const message = await buildErrorMessage(response, 'Role deletion failed.');
         throw new Error(message);
       }
 
-      const payload = await response.json();
-      const createdRole = payload?.role;
-
-      if (createdRole) {
-        setRoles((current) => [...current, createdRole]);
-        setDrafts((current) => ({
-          ...current,
-          [createdRole.id]: {
-            name: createdRole.name,
-            permissions: {
-              dashboard: Boolean(createdRole.permissions?.dashboard),
-              users: Boolean(createdRole.permissions?.users),
-              roles: Boolean(createdRole.permissions?.roles),
-              groups: Boolean(createdRole.permissions?.groups),
-              mikrotiks: Boolean(createdRole.permissions?.mikrotiks),
-              settings: Boolean(createdRole.permissions?.settings)
-            }
-          }
-        }));
-      }
-
-      setNewRole({ name: '', permissions: blankPermissions() });
-      setStatus({ type: 'success', message: payload?.message ?? 'Role created successfully.' });
+      setRoles((current) => current.filter((role) => role.id !== modal.targetId));
+      setStatus({ type: 'success', message: 'Role deleted successfully.' });
+      closeModal();
     } catch (error) {
-      setStatus({ type: 'error', message: error.message || 'Role creation failed.' });
-    } finally {
-      setCreating(false);
+      setStatus({ type: 'error', message: error.message || 'Role deletion failed.' });
+      setSaving(false);
     }
   };
 
@@ -332,201 +274,211 @@ const Roles = () => {
     return null;
   }
 
-  if (!canManageRoles) {
+  if (!user.permissions?.roles) {
     return (
       <section className="card">
         <h1>Role management</h1>
-        <p className="muted">You do not have permission to manage roles.</p>
+        <p className="muted">You do not have permission to view role definitions.</p>
       </section>
     );
   }
 
-  return (
-    <div className="dashboard">
-      <section className="card">
-        <header className="card-header">
-          <div>
-            <h1>Role management</h1>
-            <p className="card-intro">
-              Define reusable permission sets, assign them to users, and control which areas of MikroManage are visible to each
-              team.
-            </p>
-          </div>
-        </header>
-        <div className="role-management">
-          <div className="existing-roles">
-            <h2>Existing roles</h2>
-            {sortedRoles.length === 0 && <p className="muted">No roles have been configured yet.</p>}
-            <ul className="role-list">
-              {sortedRoles.map((role) => {
-                const draft = drafts[role.id] ?? { name: role.name, permissions: blankPermissions() };
+  const renderPermissionGrid = (permissions) => (
+    <ul className="chip-grid">
+      {Object.entries(permissionLabels).map(([key, label]) => (
+        <li key={key} className={permissions[key] ? 'chip chip--active' : 'chip'}>
+          {label}
+        </li>
+      ))}
+    </ul>
+  );
 
-                return (
-                  <li key={role.id} className="role-card">
-                    <div className="role-card-header">
-                      <input
-                        type="text"
-                        value={draft.name}
-                        onChange={(event) => handleDraftNameChange(role.id, event.target.value)}
-                        aria-label={`Role name for ${role.name}`}
-                      />
-                      <div className="role-actions">
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          onClick={() => handleSaveRole(role.id)}
-                          disabled={savingRoleId === role.id}
-                        >
-                          {savingRoleId === role.id ? 'Saving…' : 'Save'}
-                        </button>
-                        <button
-                          type="button"
-                          className="ghost-button"
-                          onClick={() => handleDeleteRole(role.id)}
-                          disabled={savingRoleId === role.id}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                    <div className="role-permissions">
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(draft.permissions.dashboard)}
-                          onChange={() => handleDraftPermissionToggle(role.id, 'dashboard')}
-                        />
-                        <span>Dashboard</span>
-                      </label>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(draft.permissions.users)}
-                          onChange={() => handleDraftPermissionToggle(role.id, 'users')}
-                        />
-                        <span>Users</span>
-                      </label>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(draft.permissions.roles)}
-                          onChange={() => handleDraftPermissionToggle(role.id, 'roles')}
-                        />
-                        <span>Roles</span>
-                      </label>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(draft.permissions.groups)}
-                          onChange={() => handleDraftPermissionToggle(role.id, 'groups')}
-                        />
-                        <span>Mik-Groups</span>
-                      </label>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(draft.permissions.mikrotiks)}
-                          onChange={() => handleDraftPermissionToggle(role.id, 'mikrotiks')}
-                        />
-                        <span>Mikrotik's</span>
-                      </label>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(draft.permissions.settings)}
-                          onChange={() => handleDraftPermissionToggle(role.id, 'settings')}
-                        />
-                        <span>Settings</span>
-                      </label>
-                    </div>
-                    <p className="role-summary">
-                      Effective access: {draft.permissions.dashboard ? 'Dashboard' : 'No dashboard'}
-                      {draft.permissions.users ? ' · Users' : ''}
-                      {draft.permissions.roles ? ' · Roles' : ''}
-                      {draft.permissions.groups ? ' · Mik-Groups' : ''}
-                      {draft.permissions.mikrotiks ? " · Mikrotik's" : ''}
-                      {draft.permissions.settings ? ' · Settings' : ''}
-                    </p>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-          <form className="new-role" onSubmit={handleCreateRole}>
-            <h2>Create a new role</h2>
-            <label className="wide">
+  const renderPermissionChoices = () => (
+    <div className="permission-grid">
+      {Object.entries(permissionLabels).map(([key, label]) => (
+        <label key={key} className="checkbox">
+          <input type="checkbox" value={key} checked={draft.permissions[key]} onChange={handleDraftPermissionToggle} />
+          <span>{label}</span>
+        </label>
+      ))}
+    </div>
+  );
+
+  const renderModal = () => {
+    if (!modal.mode) {
+      return null;
+    }
+
+    if (modal.mode === 'view') {
+      const selected = roles.find((entry) => entry.id === modal.targetId);
+      if (!selected) {
+        return null;
+      }
+
+      return (
+        <Modal title="Role details" onClose={closeModal}>
+          <dl className="detail-list">
+            <div>
+              <dt>Name</dt>
+              <dd>{selected.name}</dd>
+            </div>
+            <div>
+              <dt>Created</dt>
+              <dd>{selected.createdAt ? new Date(selected.createdAt).toLocaleString() : '—'}</dd>
+            </div>
+            <div>
+              <dt>Updated</dt>
+              <dd>{selected.updatedAt ? new Date(selected.updatedAt).toLocaleString() : '—'}</dd>
+            </div>
+          </dl>
+          <h3>Permissions</h3>
+          {renderPermissionGrid(selected.permissions || {})}
+        </Modal>
+      );
+    }
+
+    if (modal.mode === 'create') {
+      return (
+        <Modal
+          title="Create role"
+          description="Bundle access scopes so you can assign consistent permissions across multiple operators."
+          onClose={closeModal}
+        >
+          <form className="management-form" onSubmit={submitCreate}>
+            <label>
               <span>Role name</span>
-              <input
-                name="name"
-                value={newRole.name}
-                onChange={handleNewRoleFieldChange}
-                placeholder="e.g. Sales"
-                required
-              />
+              <input value={draft.name} onChange={handleDraftNameChange} required />
             </label>
-            <fieldset className="wide">
+            <fieldset>
               <legend>Permissions</legend>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={newRole.permissions.dashboard}
-                  onChange={() => handleNewRoleToggle('dashboard')}
-                />
-                <span>Dashboard</span>
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={newRole.permissions.users}
-                  onChange={() => handleNewRoleToggle('users')}
-                />
-                <span>Users</span>
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={newRole.permissions.roles}
-                  onChange={() => handleNewRoleToggle('roles')}
-                />
-                <span>Roles</span>
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={newRole.permissions.groups}
-                  onChange={() => handleNewRoleToggle('groups')}
-                />
-                <span>Mik-Groups</span>
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={newRole.permissions.mikrotiks}
-                  onChange={() => handleNewRoleToggle('mikrotiks')}
-                />
-                <span>Mikrotik's</span>
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={newRole.permissions.settings}
-                  onChange={() => handleNewRoleToggle('settings')}
-                />
-                <span>Settings</span>
-              </label>
+              {renderPermissionChoices()}
             </fieldset>
-            <div className="wide button-row">
-              <button type="submit" className="primary-button" disabled={creating}>
-                {creating ? 'Creating…' : 'Create role'}
+            <div className="management-form__actions">
+              <button type="button" className="ghost-button" onClick={closeModal} disabled={saving}>
+                Cancel
+              </button>
+              <button type="submit" className="primary-button" disabled={saving}>
+                {saving ? 'Creating…' : 'Create role'}
               </button>
             </div>
           </form>
+        </Modal>
+      );
+    }
+
+    if (modal.mode === 'edit') {
+      return (
+        <Modal
+          title="Edit role"
+          description="Adjust the permissions this role grants. Changes apply to every user assigned to the role."
+          onClose={closeModal}
+        >
+          <form className="management-form" onSubmit={submitEdit}>
+            <label>
+              <span>Role name</span>
+              <input value={draft.name} onChange={handleDraftNameChange} required />
+            </label>
+            <fieldset>
+              <legend>Permissions</legend>
+              {renderPermissionChoices()}
+            </fieldset>
+            <div className="management-form__actions">
+              <button type="button" className="ghost-button" onClick={closeModal} disabled={saving}>
+                Cancel
+              </button>
+              <button type="submit" className="primary-button" disabled={saving}>
+                {saving ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      );
+    }
+
+    if (modal.mode === 'delete') {
+      const selected = roles.find((entry) => entry.id === modal.targetId);
+      const displayName = selected ? selected.name : 'this role';
+
+      return (
+        <Modal title="Delete role" onClose={closeModal}>
+          <p>
+            Are you sure you want to delete <strong>{displayName}</strong>? Any users assigned to this role will lose the
+            associated permissions.
+          </p>
+          <div className="modal-footer">
+            <button type="button" className="ghost-button" onClick={closeModal} disabled={saving}>
+              Cancel
+            </button>
+            <button type="button" className="danger-button" onClick={submitDelete} disabled={saving}>
+              {saving ? 'Removing…' : 'Delete role'}
+            </button>
+          </div>
+        </Modal>
+      );
+    }
+
+    return null;
+  };
+
+  return (
+    <div className="dashboard">
+      <div className="management-toolbar">
+        <div className="management-toolbar__title">
+          <h1>Role management</h1>
+          <p>Model least-privilege access by grouping permissions and applying them consistently across the team.</p>
         </div>
-        {loading && <p className="feedback muted">Loading roles…</p>}
-        {status.message && (
-          <p className={`feedback ${status.type === 'error' ? 'error' : 'success'}`}>{status.message}</p>
-        )}
-      </section>
+        <div className="management-toolbar__actions">
+          <button type="button" className="primary-button" onClick={openCreate} disabled={loading}>
+            Add role
+          </button>
+        </div>
+      </div>
+
+      {status.message ? (
+        <div className={`alert ${status.type === 'error' ? 'alert-error' : 'alert-success'}`}>{status.message}</div>
+      ) : null}
+
+      {sortedRoles.length === 0 ? (
+        <div className="management-empty">No roles exist yet. Use the Add role button to define your first permission set.</div>
+      ) : (
+        <div className="management-list">
+          {sortedRoles.map((role) => (
+            <article key={role.id} className="management-item">
+              <header className="management-item__header">
+                <h2 className="management-item__title">{role.name}</h2>
+                <div className="management-item__meta">
+                  <span>
+                    <strong>ID:</strong> {role.id}
+                  </span>
+                  <span>
+                    <strong>Created:</strong> {role.createdAt ? new Date(role.createdAt).toLocaleString() : '—'}
+                  </span>
+                  <span>
+                    <strong>Updated:</strong> {role.updatedAt ? new Date(role.updatedAt).toLocaleString() : '—'}
+                  </span>
+                </div>
+              </header>
+              <div className="management-item__body">
+                <h3>Effective access</h3>
+                {renderPermissionGrid(role.permissions || {})}
+              </div>
+              <div className="management-item__actions">
+                <button type="button" className="ghost-button" onClick={() => openView(role.id)}>
+                  View
+                </button>
+                <button type="button" className="secondary-button" onClick={() => openEdit(role.id)}>
+                  Edit
+                </button>
+                <button type="button" className="danger-button" onClick={() => openDelete(role.id)}>
+                  Delete
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {renderModal()}
     </div>
   );
 };

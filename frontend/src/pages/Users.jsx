@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const emptyForm = {
@@ -11,40 +12,45 @@ const emptyForm = {
   roleIds: []
 };
 
+const formatDateTime = (value) => {
+  if (!value) {
+    return '';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
 const Users = () => {
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
-  const [selectedUserId, setSelectedUserId] = useState(null);
-  const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState({ type: '', message: '' });
+  const [saving, setSaving] = useState(false);
+  const [modal, setModal] = useState({ mode: null, targetId: null });
+  const [form, setForm] = useState(emptyForm);
 
-  const selectedUser = useMemo(
-    () => users.find((entry) => entry.id === selectedUserId) ?? null,
-    [users, selectedUserId]
-  );
-
-  const formatDateTime = (value) => {
-    if (!value) {
-      return '';
-    }
-
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return '';
-    }
-
-    return date.toLocaleString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const sortedUsers = useMemo(() => {
+    return users
+      .slice()
+      .sort((a, b) => {
+        const aName = `${a.firstName} ${a.lastName}`.trim().toLowerCase();
+        const bName = `${b.firstName} ${b.lastName}`.trim().toLowerCase();
+        return aName.localeCompare(bName);
+      });
+  }, [users]);
 
   useEffect(() => {
     if (!user) {
@@ -78,18 +84,8 @@ const Users = () => {
         const usersPayload = await usersResponse.json();
         const rolesPayload = await rolesResponse.json();
 
-        const loadedUsers = Array.isArray(usersPayload?.users) ? usersPayload.users : [];
-        const loadedRoles = Array.isArray(rolesPayload?.roles) ? rolesPayload.roles : [];
-
-        setUsers(loadedUsers);
-        setRoles(loadedRoles);
-
-        if (loadedUsers.length > 0) {
-          setSelectedUserId(loadedUsers[0].id);
-        } else {
-          setSelectedUserId(null);
-        }
-
+        setUsers(Array.isArray(usersPayload?.users) ? usersPayload.users : []);
+        setRoles(Array.isArray(rolesPayload?.roles) ? rolesPayload.roles : []);
         setStatus({ type: '', message: '' });
       } catch (error) {
         if (error.name !== 'AbortError') {
@@ -110,31 +106,47 @@ const Users = () => {
     return () => controller.abort();
   }, [navigate, user]);
 
-  useEffect(() => {
-    if (!selectedUser) {
-      setForm(emptyForm);
+  const closeModal = () => {
+    setModal({ mode: null, targetId: null });
+    setForm(emptyForm);
+    setSaving(false);
+  };
+
+  const handleAdd = () => {
+    setStatus({ type: '', message: '' });
+    setForm(emptyForm);
+    setModal({ mode: 'create', targetId: null });
+  };
+
+  const handleView = (targetId) => {
+    setModal({ mode: 'view', targetId });
+  };
+
+  const handleEdit = (targetId) => {
+    const selected = users.find((entry) => entry.id === targetId);
+    if (!selected) {
+      setStatus({ type: 'error', message: 'Unable to load the requested user.' });
       return;
     }
 
     setForm({
-      firstName: selectedUser.firstName ?? '',
-      lastName: selectedUser.lastName ?? '',
-      email: selectedUser.email ?? '',
+      firstName: selected.firstName ?? '',
+      lastName: selected.lastName ?? '',
+      email: selected.email ?? '',
       password: '',
       passwordConfirmation: '',
-      roleIds: Array.isArray(selectedUser.roleIds) ? selectedUser.roleIds : []
+      roleIds: Array.isArray(selected.roleIds) ? selected.roleIds : []
     });
-  }, [selectedUser]);
-
-  const handleFieldChange = (event) => {
-    const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
+    setModal({ mode: 'edit', targetId });
   };
 
-  const handleUserChange = (event) => {
-    const nextId = Number.parseInt(event.target.value, 10);
-    setSelectedUserId(Number.isInteger(nextId) ? nextId : null);
-    setStatus({ type: '', message: '' });
+  const handleDeletePrompt = (targetId) => {
+    setModal({ mode: 'delete', targetId });
+  };
+
+  const handleFormChange = (event) => {
+    const { name, value } = event.target;
+    setForm((current) => ({ ...current, [name]: value }));
   };
 
   const handleRoleToggle = (event) => {
@@ -146,23 +158,91 @@ const Users = () => {
 
     setForm((current) => {
       const hasRole = current.roleIds.includes(roleId);
-      const nextRoles = hasRole
-        ? current.roleIds.filter((value) => value !== roleId)
-        : [...current.roleIds, roleId];
-      return { ...current, roleIds: nextRoles };
+      return {
+        ...current,
+        roleIds: hasRole
+          ? current.roleIds.filter((value) => value !== roleId)
+          : [...current.roleIds, roleId]
+      };
     });
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const buildErrorMessage = async (response, fallback) => {
+    const statusCode = response.status;
+    const contentType = response.headers.get('content-type') ?? '';
+    let message = fallback;
 
-    if (!selectedUserId) {
-      setStatus({ type: 'error', message: 'Select a user to update before saving changes.' });
+    if (statusCode === 502) {
+      message = 'The API returned 502 Bad Gateway. Confirm the backend service is online.';
+    } else if (statusCode >= 500 && statusCode !== 502) {
+      message = `The server returned an unexpected error (${statusCode}).`;
+    }
+
+    if (contentType.includes('application/json')) {
+      const payload = await response.json().catch(() => ({}));
+      if (payload?.message) {
+        message = payload.message;
+      }
+    } else {
+      const text = await response.text().catch(() => '');
+      if (text) {
+        message = text;
+      }
+    }
+
+    return message;
+  };
+
+  const submitCreate = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+
+    const payload = {
+      firstName: form.firstName,
+      lastName: form.lastName,
+      email: form.email,
+      password: form.password,
+      passwordConfirmation: form.passwordConfirmation,
+      roles: form.roleIds
+    };
+
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const message = await buildErrorMessage(response, 'User creation failed.');
+        throw new Error(message);
+      }
+
+      const payloadBody = await response.json();
+      const created = payloadBody?.user;
+
+      if (created) {
+        setUsers((current) => [...current, created]);
+      }
+
+      setStatus({ type: 'success', message: payloadBody?.message ?? 'User created successfully.' });
+      closeModal();
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message || 'User creation failed.' });
+      setSaving(false);
+    }
+  };
+
+  const submitEdit = async (event) => {
+    event.preventDefault();
+    if (!modal.targetId) {
+      setStatus({ type: 'error', message: 'A valid user must be selected before updating.' });
       return;
     }
 
     setSaving(true);
-    setStatus({ type: '', message: '' });
 
     const payload = {
       firstName: form.firstName,
@@ -177,7 +257,7 @@ const Users = () => {
     }
 
     try {
-      const response = await fetch(`/api/users/${selectedUserId}`, {
+      const response = await fetch(`/api/users/${modal.targetId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -186,49 +266,51 @@ const Users = () => {
       });
 
       if (!response.ok) {
-        const statusCode = response.status;
-        const contentType = response.headers.get('content-type') ?? '';
-        let message = 'User update failed.';
-
-        if (statusCode === 502) {
-          message = 'Updates are unavailable (502 Bad Gateway). Confirm the backend service is online.';
-        }
-
-        if (statusCode >= 500 && statusCode !== 502) {
-          message = `The server returned an error (${statusCode}). Please retry.`;
-        }
-
-        if (contentType.includes('application/json')) {
-          const payloadBody = await response.json().catch(() => ({}));
-          if (payloadBody?.message) {
-            message = payloadBody.message;
-          }
-        } else {
-          const fallbackText = await response.text().catch(() => '');
-          if (fallbackText) {
-            message = fallbackText;
-          }
-        }
-
+        const message = await buildErrorMessage(response, 'User update failed.');
         throw new Error(message);
       }
 
       const payloadBody = await response.json();
-      const updatedUser = payloadBody?.user;
+      const updated = payloadBody?.user;
 
-      if (updatedUser) {
-        setUsers((current) => current.map((entry) => (entry.id === updatedUser.id ? updatedUser : entry)));
-
-        if (user && updatedUser.id === user.id) {
-          updateUser(updatedUser);
+      if (updated) {
+        setUsers((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
+        if (user && updated.id === user.id) {
+          updateUser(updated);
         }
       }
 
-      setForm((current) => ({ ...current, password: '', passwordConfirmation: '' }));
       setStatus({ type: 'success', message: payloadBody?.message ?? 'User updated successfully.' });
+      closeModal();
     } catch (error) {
       setStatus({ type: 'error', message: error.message || 'User update failed.' });
-    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitDelete = async () => {
+    if (!modal.targetId) {
+      setStatus({ type: 'error', message: 'A valid user is required for deletion.' });
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const response = await fetch(`/api/users/${modal.targetId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const message = await buildErrorMessage(response, 'User deletion failed.');
+        throw new Error(message);
+      }
+
+      setUsers((current) => current.filter((entry) => entry.id !== modal.targetId));
+      setStatus({ type: 'success', message: 'User deleted successfully.' });
+      closeModal();
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message || 'User deletion failed.' });
       setSaving(false);
     }
   };
@@ -246,177 +328,310 @@ const Users = () => {
     );
   }
 
-  return (
-    <div className="dashboard">
-      <section className="card">
-        <header className="card-header">
-          <div>
-            <h1>User management</h1>
-            <p className="card-intro">
-              Review every account, update contact details, rotate passwords, and assign roles so each operator only sees the
-              areas they need.
-            </p>
-          </div>
-        </header>
-        <div className="management-grid">
-          <div className="management-list">
-            <label className="wide">
-              <span>Select user</span>
-              <select value={selectedUserId ?? ''} onChange={handleUserChange} disabled={loading}>
-                {users.length === 0 && <option value="">No users available</option>}
-                {users.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.firstName} {entry.lastName} ({entry.email})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="user-table-wrapper">
-              <table className="user-table">
-                <thead>
-                  <tr>
-                    <th scope="col">ID</th>
-                    <th scope="col">Name</th>
-                    <th scope="col">Email</th>
-                    <th scope="col">Created</th>
-                    <th scope="col">Roles</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((entry) => {
-                    const roleNames = Array.isArray(entry.roles)
-                      ? entry.roles.map((role) => role.name).join(', ')
-                      : '';
-                    const createdDisplay = formatDateTime(entry.createdAt);
+  const renderRoleChecklist = () => (
+    <div className="role-checklist">
+      {roles.map((role) => (
+        <label key={role.id} className="checkbox">
+          <input
+            type="checkbox"
+            value={role.id}
+            checked={form.roleIds.includes(role.id)}
+            onChange={handleRoleToggle}
+          />
+          <span>{role.name}</span>
+        </label>
+      ))}
+    </div>
+  );
 
-                    return (
-                      <tr key={entry.id} className={entry.id === selectedUserId ? 'active-row' : ''}>
-                        <td>{entry.id}</td>
-                        <td>{`${entry.firstName} ${entry.lastName}`.trim()}</td>
-                        <td>{entry.email}</td>
-                        <td>{createdDisplay || '—'}</td>
-                        <td>{roleNames || '—'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+  const renderModal = () => {
+    if (!modal.mode) {
+      return null;
+    }
+
+    if (modal.mode === 'view') {
+      const selected = users.find((entry) => entry.id === modal.targetId);
+      if (!selected) {
+        return null;
+      }
+
+      const roleNames = Array.isArray(selected.roles)
+        ? selected.roles.map((role) => role.name).join(', ')
+        : '';
+
+      return (
+        <Modal title="User details" onClose={closeModal}>
+          <dl className="detail-list">
+            <div>
+              <dt>Name</dt>
+              <dd>{`${selected.firstName} ${selected.lastName}`.trim()}</dd>
             </div>
-          </div>
-          <form className="form-grid management-form" onSubmit={handleSubmit}>
-            <h2 className="wide">Update details</h2>
-            <label>
-              <span>First name</span>
-              <input
-                name="firstName"
-                value={form.firstName}
-                onChange={handleFieldChange}
-                autoComplete="given-name"
-                required
-              />
-            </label>
-            <label>
-              <span>Last name</span>
-              <input
-                name="lastName"
-                value={form.lastName}
-                onChange={handleFieldChange}
-                autoComplete="family-name"
-                required
-              />
-            </label>
-            <label className="wide">
-              <span>Email</span>
-              <input
-                type="email"
-                name="email"
-                value={form.email}
-                onChange={handleFieldChange}
-                autoComplete="email"
-                required
-              />
-            </label>
-            <fieldset className="wide">
-              <legend>Password reset (optional)</legend>
-              <p className="muted small">Leave blank to keep the current password.</p>
-              {selectedUser?.createdAt ? (
-                <p className="muted small">
-                  Account created{' '}
-                  <time dateTime={selectedUser.createdAt}>{formatDateTime(selectedUser.createdAt)}</time>
-                </p>
-              ) : null}
+            <div>
+              <dt>Email</dt>
+              <dd>{selected.email}</dd>
+            </div>
+            <div>
+              <dt>Created</dt>
+              <dd>{formatDateTime(selected.createdAt) || '—'}</dd>
+            </div>
+            <div>
+              <dt>Roles</dt>
+              <dd>{roleNames || '—'}</dd>
+            </div>
+          </dl>
+        </Modal>
+      );
+    }
+
+    if (modal.mode === 'create') {
+      return (
+        <Modal
+          title="Create user"
+          description="Register a new operator and assign their starting roles. Passwords must be at least eight characters."
+          onClose={closeModal}
+        >
+          <form className="management-form" onSubmit={submitCreate}>
+            <div className="management-form__grid">
               <label>
-                <span>New password</span>
+                <span>First name</span>
                 <input
-                  type="password"
+                  name="firstName"
+                  value={form.firstName}
+                  onChange={handleFormChange}
+                  autoComplete="given-name"
+                  required
+                />
+              </label>
+              <label>
+                <span>Last name</span>
+                <input
+                  name="lastName"
+                  value={form.lastName}
+                  onChange={handleFormChange}
+                  autoComplete="family-name"
+                  required
+                />
+              </label>
+              <label>
+                <span>Email</span>
+                <input
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  onChange={handleFormChange}
+                  autoComplete="email"
+                  required
+                />
+              </label>
+              <label>
+                <span>Password</span>
+                <input
                   name="password"
+                  type="password"
                   value={form.password}
-                  onChange={handleFieldChange}
+                  onChange={handleFormChange}
                   autoComplete="new-password"
-                  placeholder="••••••••"
+                  required
                 />
               </label>
               <label>
                 <span>Confirm password</span>
                 <input
-                  type="password"
                   name="passwordConfirmation"
+                  type="password"
                   value={form.passwordConfirmation}
-                  onChange={handleFieldChange}
+                  onChange={handleFormChange}
                   autoComplete="new-password"
-                  placeholder="••••••••"
+                  required
                 />
               </label>
-            </fieldset>
-            <fieldset className="wide">
+            </div>
+            <fieldset>
               <legend>Roles</legend>
-              <div className="role-grid">
-                {roles.length === 0 ? (
-                  <p className="muted small">Create roles from the Roles workspace to assign access levels.</p>
-                ) : (
-                  roles.map((role) => (
-                    <label key={role.id} className="role-option">
-                      <input
-                        type="checkbox"
-                        value={role.id}
-                        checked={form.roleIds.includes(role.id)}
-                        onChange={handleRoleToggle}
-                      />
-                      <span className="role-name">{role.name}</span>
-                      <span className="role-detail">
-                        Access:
-                        {role.permissions.dashboard ? ' Dashboard' : ''}
-                        {role.permissions.users ? ' · Users' : ''}
-                        {role.permissions.roles ? ' · Roles' : ''}
-                        {role.permissions.groups ? ' · Mik-Groups' : ''}
-                        {role.permissions.mikrotiks ? " · Mikrotik's" : ''}
-                        {role.permissions.settings ? ' · Settings' : ''}
-                        {!role.permissions.dashboard &&
-                        !role.permissions.users &&
-                        !role.permissions.roles &&
-                        !role.permissions.groups &&
-                        !role.permissions.mikrotiks &&
-                        !role.permissions.settings
-                          ? ' None'
-                          : ''}
-                      </span>
-                    </label>
-                  ))
-                )}
-              </div>
+              {roles.length > 0 ? renderRoleChecklist() : <p className="muted">No roles are available yet.</p>}
             </fieldset>
-            <div className="wide button-row">
+            <div className="management-form__actions">
+              <button type="button" className="ghost-button" onClick={closeModal} disabled={saving}>
+                Cancel
+              </button>
+              <button type="submit" className="primary-button" disabled={saving}>
+                {saving ? 'Creating…' : 'Create user'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      );
+    }
+
+    if (modal.mode === 'edit') {
+      return (
+        <Modal
+          title="Edit user"
+          description="Update profile details, reset the password, or adjust role assignments for this operator."
+          onClose={closeModal}
+        >
+          <form className="management-form" onSubmit={submitEdit}>
+            <div className="management-form__grid">
+              <label>
+                <span>First name</span>
+                <input
+                  name="firstName"
+                  value={form.firstName}
+                  onChange={handleFormChange}
+                  autoComplete="given-name"
+                  required
+                />
+              </label>
+              <label>
+                <span>Last name</span>
+                <input
+                  name="lastName"
+                  value={form.lastName}
+                  onChange={handleFormChange}
+                  autoComplete="family-name"
+                  required
+                />
+              </label>
+              <label>
+                <span>Email</span>
+                <input
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  onChange={handleFormChange}
+                  autoComplete="email"
+                  required
+                />
+              </label>
+              <label>
+                <span>New password</span>
+                <input
+                  name="password"
+                  type="password"
+                  value={form.password}
+                  onChange={handleFormChange}
+                  autoComplete="new-password"
+                  placeholder="Leave blank to keep the current password"
+                />
+              </label>
+              <label>
+                <span>Confirm password</span>
+                <input
+                  name="passwordConfirmation"
+                  type="password"
+                  value={form.passwordConfirmation}
+                  onChange={handleFormChange}
+                  autoComplete="new-password"
+                  placeholder="Repeat the new password"
+                />
+              </label>
+            </div>
+            <fieldset>
+              <legend>Roles</legend>
+              {roles.length > 0 ? renderRoleChecklist() : <p className="muted">No roles are available yet.</p>}
+            </fieldset>
+            <div className="management-form__actions">
+              <button type="button" className="ghost-button" onClick={closeModal} disabled={saving}>
+                Cancel
+              </button>
               <button type="submit" className="primary-button" disabled={saving}>
                 {saving ? 'Saving…' : 'Save changes'}
               </button>
             </div>
           </form>
+        </Modal>
+      );
+    }
+
+    if (modal.mode === 'delete') {
+      const selected = users.find((entry) => entry.id === modal.targetId);
+      const displayName = selected ? `${selected.firstName} ${selected.lastName}`.trim() : 'this user';
+
+      return (
+        <Modal title="Delete user" onClose={closeModal}>
+          <p>
+            Are you sure you want to delete <strong>{displayName}</strong>? This action permanently removes the account and
+            cannot be undone.
+          </p>
+          <div className="modal-footer">
+            <button type="button" className="ghost-button" onClick={closeModal} disabled={saving}>
+              Cancel
+            </button>
+            <button type="button" className="danger-button" onClick={submitDelete} disabled={saving}>
+              {saving ? 'Removing…' : 'Delete user'}
+            </button>
+          </div>
+        </Modal>
+      );
+    }
+
+    return null;
+  };
+
+  return (
+    <div className="dashboard">
+      <div className="management-toolbar">
+        <div className="management-toolbar__title">
+          <h1>User management</h1>
+          <p>Audit every operator, reset credentials, and align permissions with the correct responsibilities.</p>
         </div>
-        {loading && <p className="feedback muted">Loading users…</p>}
-        {status.message && (
-          <p className={`feedback ${status.type === 'error' ? 'error' : 'success'}`}>{status.message}</p>
-        )}
-      </section>
+        <div className="management-toolbar__actions">
+          <button type="button" className="primary-button" onClick={handleAdd} disabled={loading}>
+            Add user
+          </button>
+        </div>
+      </div>
+
+      {status.message ? (
+        <div className={`alert ${status.type === 'error' ? 'alert-error' : 'alert-success'}`}>{status.message}</div>
+      ) : null}
+
+      {sortedUsers.length === 0 ? (
+        <div className="management-empty">No users are registered yet. Use the Add user button to get started.</div>
+      ) : (
+        <div className="management-list">
+          {sortedUsers.map((entry) => {
+            const roleNames = Array.isArray(entry.roles)
+              ? entry.roles.map((role) => role.name).join(', ')
+              : '';
+
+            return (
+              <article key={entry.id} className="management-item">
+                <header className="management-item__header">
+                  <h2 className="management-item__title">{`${entry.firstName} ${entry.lastName}`.trim()}</h2>
+                  <div className="management-item__meta">
+                    <span>
+                      <strong>ID:</strong> {entry.id}
+                    </span>
+                    <span>
+                      <strong>Email:</strong> {entry.email}
+                    </span>
+                    <span>
+                      <strong>Created:</strong> {formatDateTime(entry.createdAt) || '—'}
+                    </span>
+                  </div>
+                </header>
+                <div className="management-item__body">
+                  <p>{roleNames ? `Roles: ${roleNames}` : 'No roles assigned yet.'}</p>
+                </div>
+                <div className="management-item__actions">
+                  <button type="button" className="ghost-button" onClick={() => handleView(entry.id)}>
+                    View
+                  </button>
+                  <button type="button" className="secondary-button" onClick={() => handleEdit(entry.id)}>
+                    Edit
+                  </button>
+                  <button type="button" className="danger-button" onClick={() => handleDeletePrompt(entry.id)}>
+                    Delete
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      {renderModal()}
     </div>
   );
 };

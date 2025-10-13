@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const defaultRouterForm = () => ({
@@ -104,14 +105,11 @@ const Mikrotiks = () => {
   const navigate = useNavigate();
   const [mikrotiks, setMikrotiks] = useState([]);
   const [groups, setGroups] = useState([]);
-  const [selectedId, setSelectedId] = useState(null);
-  const [form, setForm] = useState(emptyDeviceForm());
-  const [createForm, setCreateForm] = useState(emptyDeviceForm());
   const [status, setStatus] = useState({ type: '', message: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [modal, setModal] = useState({ mode: null, targetId: null });
+  const [form, setForm] = useState(emptyDeviceForm());
 
   const canManageMikrotiks = Boolean(user?.permissions?.mikrotiks);
 
@@ -134,7 +132,7 @@ const Mikrotiks = () => {
         const response = await fetch('/api/mikrotiks', { signal: controller.signal });
 
         if (!response.ok) {
-          throw new Error('Unable to load Mikrotik devices from the server.');
+          throw new Error('Unable to load Mikrotik inventory from the server.');
         }
 
         const payload = await response.json();
@@ -143,17 +141,6 @@ const Mikrotiks = () => {
 
         setMikrotiks(loadedDevices);
         setGroups(loadedGroups);
-        setSelectedId((current) => {
-          if (current && loadedDevices.some((device) => device.id === current)) {
-            return current;
-          }
-
-          if (loadedDevices.length > 0) {
-            return loadedDevices[0].id;
-          }
-
-          return null;
-        });
         setStatus({ type: '', message: '' });
       } catch (error) {
         if (error.name !== 'AbortError') {
@@ -174,147 +161,109 @@ const Mikrotiks = () => {
     return () => controller.abort();
   }, [canManageMikrotiks, navigate, user]);
 
-  const selectedDevice = useMemo(
-    () => mikrotiks.find((entry) => entry.id === selectedId) ?? null,
-    [mikrotiks, selectedId]
+  const sortedDevices = useMemo(
+    () =>
+      mikrotiks
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name) || a.host.localeCompare(b.host)),
+    [mikrotiks]
   );
 
-  useEffect(() => {
-    setForm(toFormState(selectedDevice));
-  }, [selectedDevice]);
-
-  const handleSelectDevice = (event) => {
-    const nextId = Number.parseInt(event.target.value, 10);
-    setSelectedId(Number.isInteger(nextId) ? nextId : null);
-    setStatus({ type: '', message: '' });
+  const closeModal = () => {
+    setModal({ mode: null, targetId: null });
+    setForm(emptyDeviceForm());
+    setSaving(false);
   };
 
-  const handleFormFieldChange = (event) => {
-    const { name, value } = event.target;
-    setForm((current) => ({
-      ...current,
-      [name]: value
-    }));
-  };
+  const buildErrorMessage = async (response, fallback) => {
+    const statusCode = response.status;
+    const contentType = response.headers.get('content-type') ?? '';
+    let message = fallback;
 
-  const handleCreateFieldChange = (event) => {
-    const { name, value } = event.target;
-    setCreateForm((current) => ({
-      ...current,
-      [name]: value
-    }));
-  };
+    if (statusCode === 502) {
+      message = 'The API returned 502 Bad Gateway. Confirm the backend service is online.';
+    } else if (statusCode >= 500 && statusCode !== 502) {
+      message = `The server returned an unexpected error (${statusCode}).`;
+    }
 
-  const handleRouterToggle = (formUpdater, field) => {
-    formUpdater((current) => {
-      const nextValue = !current.routeros[field];
-      const nextRouter = { ...current.routeros, [field]: nextValue };
-
-      if (field === 'apiSSL') {
-        if (nextValue && (!current.routeros.apiPort || current.routeros.apiPort === '8728')) {
-          nextRouter.apiPort = '8729';
-        }
-        if (!nextValue && current.routeros.apiPort === '8729') {
-          nextRouter.apiPort = '8728';
-        }
+    if (contentType.includes('application/json')) {
+      const payload = await response.json().catch(() => ({}));
+      if (payload?.message) {
+        message = payload.message;
       }
+    } else {
+      const text = await response.text().catch(() => '');
+      if (text) {
+        message = text;
+      }
+    }
 
-      return {
-        ...current,
-        routeros: nextRouter
-      };
-    });
+    return message;
   };
 
-  const handleRouterFieldChange = (formUpdater, field) => (event) => {
-    const { value } = event.target;
-    formUpdater((current) => ({
+  const refreshDevices = async () => {
+    try {
+      const response = await fetch('/api/mikrotiks');
+      if (!response.ok) {
+        throw new Error('Unable to refresh Mikrotik devices.');
+      }
+      const payload = await response.json();
+      setMikrotiks(Array.isArray(payload?.mikrotiks) ? payload.mikrotiks : []);
+      setGroups(Array.isArray(payload?.groups) ? payload.groups : []);
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message || 'Unable to refresh Mikrotik devices.' });
+    }
+  };
+
+  const openCreate = () => {
+    setForm(emptyDeviceForm());
+    setModal({ mode: 'create', targetId: null });
+  };
+
+  const openView = (targetId) => {
+    setModal({ mode: 'view', targetId });
+  };
+
+  const openEdit = (targetId) => {
+    const target = mikrotiks.find((entry) => entry.id === targetId);
+    if (!target) {
+      setStatus({ type: 'error', message: 'Unable to load the selected Mikrotik.' });
+      return;
+    }
+
+    setForm(toFormState(target));
+    setModal({ mode: 'edit', targetId });
+  };
+
+  const openDelete = (targetId) => {
+    setModal({ mode: 'delete', targetId });
+  };
+
+  const handleFieldChange = (event) => {
+    const { name, value } = event.target;
+    setForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleRouterFieldChange = (event) => {
+    const { name, value, type, checked } = event.target;
+    setForm((current) => ({
       ...current,
       routeros: {
         ...current.routeros,
-        [field]: value
+        [name]: type === 'checkbox' ? checked : value
       }
     }));
   };
 
-  const buildPayload = (sourceForm) => {
-    const payload = {
-      name: sourceForm.name,
-      host: sourceForm.host,
-      groupId: sourceForm.groupId ? Number.parseInt(sourceForm.groupId, 10) : null,
-      tags: parseTags(sourceForm.tags),
-      notes: sourceForm.notes,
-      routeros: buildRouterPayload(sourceForm.routeros)
-    };
-
-    if (!payload.groupId) {
-      payload.groupId = null;
-    }
-
-    return payload;
-  };
-
-  const handleSubmit = async (event) => {
+  const submitCreate = async (event) => {
     event.preventDefault();
 
-    if (!selectedId) {
-      setStatus({ type: 'error', message: 'Select a Mikrotik device before saving changes.' });
+    if (!form.name.trim() || !form.host.trim()) {
+      setStatus({ type: 'error', message: 'Name and host/IP are required.' });
       return;
     }
 
     setSaving(true);
-    setStatus({ type: '', message: '' });
-
-    try {
-      const response = await fetch(`/api/mikrotiks/${selectedId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(buildPayload(form))
-      });
-
-      if (!response.ok) {
-        const statusCode = response.status;
-        let message = 'Unable to update the Mikrotik device.';
-
-        if (statusCode === 404) {
-          message = 'The selected Mikrotik device no longer exists. Refresh and try again.';
-        } else if (statusCode === 400) {
-          const payload = await response.json().catch(() => ({}));
-          message = payload?.message || message;
-        } else if (statusCode === 502) {
-          message = 'Updates are unavailable (502 Bad Gateway). Confirm the backend service is online.';
-        } else if (statusCode >= 500) {
-          message = `The server returned an error (${statusCode}). Please retry.`;
-        }
-
-        throw new Error(message);
-      }
-
-      const payload = await response.json();
-      const updated = payload?.mikrotik;
-
-      if (updated) {
-        setMikrotiks((current) =>
-          current.map((entry) => (entry.id === updated.id ? updated : entry))
-        );
-        setStatus({ type: 'success', message: 'Mikrotik device updated successfully.' });
-      } else {
-        setStatus({ type: 'success', message: 'Mikrotik device updated.' });
-      }
-    } catch (error) {
-      setStatus({ type: 'error', message: error.message || 'Unable to update the Mikrotik device.' });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleCreate = async (event) => {
-    event.preventDefault();
-
-    setCreating(true);
-    setStatus({ type: '', message: '' });
 
     try {
       const response = await fetch('/api/mikrotiks', {
@@ -322,502 +271,467 @@ const Mikrotiks = () => {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(buildPayload(createForm))
+        body: JSON.stringify({
+          name: form.name,
+          host: form.host,
+          groupId: form.groupId ? Number.parseInt(form.groupId, 10) : null,
+          tags: parseTags(form.tags),
+          notes: form.notes,
+          routeros: buildRouterPayload(form.routeros)
+        })
       });
 
       if (!response.ok) {
-        const statusCode = response.status;
-        let message = 'Unable to add the Mikrotik device.';
-
-        if (statusCode === 400 || statusCode === 409) {
-          const payload = await response.json().catch(() => ({}));
-          message = payload?.message || message;
-        } else if (statusCode === 502) {
-          message = 'Creation is unavailable (502 Bad Gateway). Confirm the backend service is online.';
-        } else if (statusCode >= 500) {
-          message = `The server returned an error (${statusCode}). Please retry.`;
-        }
-
+        const message = await buildErrorMessage(response, 'Device creation failed.');
         throw new Error(message);
       }
 
       const payload = await response.json();
-      const created = payload?.mikrotik;
-
-      if (created) {
-        setMikrotiks((current) => [created, ...current]);
-        setCreateForm(emptyDeviceForm());
-        setSelectedId(created.id);
-        setStatus({ type: 'success', message: 'Mikrotik device added successfully.' });
-      } else {
-        setStatus({ type: 'success', message: 'Mikrotik device added.' });
+      if (payload?.mikrotik) {
+        await refreshDevices();
       }
 
-      const refreshed = await fetch('/api/mikrotiks');
-      if (refreshed.ok) {
-        const payload = await refreshed.json();
-        const loadedDevices = Array.isArray(payload?.mikrotiks) ? payload.mikrotiks : [];
-        setMikrotiks(loadedDevices);
-        if (!created && loadedDevices.length > 0) {
-          setSelectedId(loadedDevices[0].id);
-        }
-      }
+      setStatus({ type: 'success', message: payload?.message ?? 'Device created successfully.' });
+      closeModal();
     } catch (error) {
-      setStatus({ type: 'error', message: error.message || 'Unable to add the Mikrotik device.' });
-    } finally {
-      setCreating(false);
+      setStatus({ type: 'error', message: error.message || 'Device creation failed.' });
+      setSaving(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!selectedId) {
-      setStatus({ type: 'error', message: 'Select a Mikrotik device before deleting.' });
+  const submitEdit = async (event) => {
+    event.preventDefault();
+
+    if (!modal.targetId) {
+      setStatus({ type: 'error', message: 'Select a device before saving changes.' });
       return;
     }
 
-    if (!window.confirm('Delete this Mikrotik device? This action cannot be undone.')) {
+    if (!form.name.trim() || !form.host.trim()) {
+      setStatus({ type: 'error', message: 'Name and host/IP are required.' });
       return;
     }
 
-    setDeleting(true);
-    setStatus({ type: '', message: '' });
+    setSaving(true);
 
     try {
-      const response = await fetch(`/api/mikrotiks/${selectedId}`, {
-        method: 'DELETE'
+      const response = await fetch(`/api/mikrotiks/${modal.targetId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: form.name,
+          host: form.host,
+          groupId: form.groupId === '' ? null : Number.parseInt(form.groupId, 10),
+          tags: parseTags(form.tags),
+          notes: form.notes,
+          routeros: buildRouterPayload(form.routeros)
+        })
       });
 
-      if (!response.ok && response.status !== 204) {
-        const statusCode = response.status;
-        let message = 'Unable to delete the Mikrotik device.';
-
-        if (statusCode === 404) {
-          message = 'The selected Mikrotik device no longer exists.';
-        } else if (statusCode === 502) {
-          message = 'Deletion is unavailable (502 Bad Gateway). Confirm the backend service is online.';
-        } else if (statusCode >= 500) {
-          message = `The server returned an error (${statusCode}). Please retry.`;
-        }
-
+      if (!response.ok) {
+        const message = await buildErrorMessage(response, 'Device update failed.');
         throw new Error(message);
       }
 
-      setMikrotiks((current) => {
-        const remaining = current.filter((entry) => entry.id !== selectedId);
-        setSelectedId(remaining.length > 0 ? remaining[0].id : null);
-        return remaining;
-      });
-      setStatus({ type: 'success', message: 'Mikrotik device removed.' });
+      const payload = await response.json();
+      if (payload?.mikrotik) {
+        await refreshDevices();
+      }
+
+      setStatus({ type: 'success', message: payload?.message ?? 'Device updated successfully.' });
+      closeModal();
     } catch (error) {
-      setStatus({ type: 'error', message: error.message || 'Unable to delete the Mikrotik device.' });
-    } finally {
-      setDeleting(false);
+      setStatus({ type: 'error', message: error.message || 'Device update failed.' });
+      setSaving(false);
     }
   };
 
-  return (
-    <div className="page">
-      <header className="page-header">
-        <div>
-          <h1>Mikrotiks</h1>
-          <p className="muted">
-            Catalogue RouterOS endpoints, manage connection defaults, and organise devices by Mik-Groups.
-          </p>
-        </div>
-        <div className="header-actions-single">
-          <button type="button" className="danger-button" onClick={handleDelete} disabled={!selectedId || deleting}>
-            {deleting ? 'Removing…' : 'Delete device'}
-          </button>
-        </div>
-      </header>
+  const submitDelete = async () => {
+    if (!modal.targetId) {
+      setStatus({ type: 'error', message: 'Select a device before deleting it.' });
+      return;
+    }
 
-      <section className="mikrotik-management">
-        <div className="mikrotik-list">
-          <label htmlFor="mikrotik-select">
-            <span>Select device</span>
-            <select id="mikrotik-select" value={selectedId ?? ''} onChange={handleSelectDevice}>
-              {mikrotiks.length === 0 ? (
-                <option value="">No Mikrotik devices available</option>
-              ) : (
-                mikrotiks.map((device) => (
-                  <option key={device.id} value={device.id}>
-                    {device.name} · {device.host}
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
-          <div className="mikrotik-summary">
-            {selectedDevice ? (
-              <ul>
-                <li>
-                  <strong>Display name:</strong> {selectedDevice.name}
-                </li>
-                <li>
-                  <strong>Host / IP:</strong> {selectedDevice.host}
-                </li>
-                <li>
-                  <strong>Group:</strong> {selectedDevice.groupName || 'Unassigned'}
-                </li>
-                <li>
-                  <strong>Tags:</strong> {selectedDevice.tags?.length ? selectedDevice.tags.join(', ') : '—'}
-                </li>
-                <li>
-                  <strong>Updated:</strong> {formatDateTime(selectedDevice.updatedAt) || '—'}
-                </li>
-              </ul>
-            ) : (
-              <p className="muted">Select a Mikrotik device to review details.</p>
-            )}
-          </div>
-        </div>
+    setSaving(true);
 
-        <div className="mikrotik-editor">
-          <form className="card" onSubmit={handleSubmit}>
-            <h2>Edit Mikrotik</h2>
-            <div className="form-grid two-column">
-              <label htmlFor="device-name">
+    try {
+      const response = await fetch(`/api/mikrotiks/${modal.targetId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.status !== 204) {
+        const message = await buildErrorMessage(response, 'Device deletion failed.');
+        throw new Error(message);
+      }
+
+      await refreshDevices();
+      setStatus({ type: 'success', message: 'Device deleted successfully.' });
+      closeModal();
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message || 'Device deletion failed.' });
+      setSaving(false);
+    }
+  };
+
+  if (!user) {
+    return null;
+  }
+
+  if (!canManageMikrotiks) {
+    return (
+      <section className="card">
+        <h1>Mikrotik management</h1>
+        <p className="muted">You do not have permission to manage Mikrotik inventory.</p>
+      </section>
+    );
+  }
+
+  const groupOptions = useMemo(
+    () =>
+      groups
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((group) => ({ value: String(group.id), label: group.name })),
+    [groups]
+  );
+
+  const renderRouterSettings = () => (
+    <fieldset>
+      <legend>RouterOS API</legend>
+      <div className="management-form__grid">
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            name="apiEnabled"
+            checked={form.routeros.apiEnabled}
+            onChange={handleRouterFieldChange}
+          />
+          <span>API enabled</span>
+        </label>
+        <label className="checkbox">
+          <input type="checkbox" name="apiSSL" checked={form.routeros.apiSSL} onChange={handleRouterFieldChange} />
+          <span>Use SSL (8729)</span>
+        </label>
+        <label>
+          <span>API port</span>
+          <input name="apiPort" value={form.routeros.apiPort} onChange={handleRouterFieldChange} />
+        </label>
+        <label>
+          <span>Username</span>
+          <input name="apiUsername" value={form.routeros.apiUsername} onChange={handleRouterFieldChange} />
+        </label>
+        <label>
+          <span>Password</span>
+          <input
+            name="apiPassword"
+            type="password"
+            value={form.routeros.apiPassword}
+            onChange={handleRouterFieldChange}
+          />
+        </label>
+        <label className="checkbox">
+          <input type="checkbox" name="verifyTLS" checked={form.routeros.verifyTLS} onChange={handleRouterFieldChange} />
+          <span>Verify TLS certificates</span>
+        </label>
+        <label>
+          <span>Timeout (ms)</span>
+          <input name="apiTimeout" value={form.routeros.apiTimeout} onChange={handleRouterFieldChange} />
+        </label>
+        <label>
+          <span>Retries</span>
+          <input name="apiRetries" value={form.routeros.apiRetries} onChange={handleRouterFieldChange} />
+        </label>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            name="allowInsecureCiphers"
+            checked={form.routeros.allowInsecureCiphers}
+            onChange={handleRouterFieldChange}
+          />
+          <span>Allow insecure ciphers</span>
+        </label>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            name="preferredApiFirst"
+            checked={form.routeros.preferredApiFirst}
+            onChange={handleRouterFieldChange}
+          />
+          <span>Prefer API before SSH fallback</span>
+        </label>
+      </div>
+    </fieldset>
+  );
+
+  const renderModal = () => {
+    if (!modal.mode) {
+      return null;
+    }
+
+    if (modal.mode === 'view') {
+      const device = mikrotiks.find((entry) => entry.id === modal.targetId);
+      if (!device) {
+        return null;
+      }
+
+      return (
+        <Modal title="Mikrotik details" size="lg" onClose={closeModal}>
+          <dl className="detail-list">
+            <div>
+              <dt>Name</dt>
+              <dd>{device.name}</dd>
+            </div>
+            <div>
+              <dt>Host / IP</dt>
+              <dd>{device.host}</dd>
+            </div>
+            <div>
+              <dt>Group</dt>
+              <dd>{device.groupName || '—'}</dd>
+            </div>
+            <div>
+              <dt>Tags</dt>
+              <dd>{Array.isArray(device.tags) && device.tags.length > 0 ? device.tags.join(', ') : '—'}</dd>
+            </div>
+            <div>
+              <dt>Created</dt>
+              <dd>{formatDateTime(device.createdAt) || '—'}</dd>
+            </div>
+            <div>
+              <dt>Updated</dt>
+              <dd>{formatDateTime(device.updatedAt) || '—'}</dd>
+            </div>
+          </dl>
+          <h3>RouterOS API</h3>
+          <ul className="chip-grid">
+            <li className={device.routeros?.apiEnabled ? 'chip chip--active' : 'chip'}>API enabled</li>
+            <li className={device.routeros?.apiSSL ? 'chip chip--active' : 'chip'}>SSL</li>
+            <li className="chip">Port {device.routeros?.apiPort ?? '8728'}</li>
+            <li className={device.routeros?.verifyTLS ? 'chip chip--active' : 'chip'}>Verify TLS</li>
+            <li className="chip">Timeout {device.routeros?.apiTimeout ?? 5000} ms</li>
+          </ul>
+          {device.notes ? (
+            <>
+              <h3>Notes</h3>
+              <p>{device.notes}</p>
+            </>
+          ) : null}
+        </Modal>
+      );
+    }
+
+    if (modal.mode === 'create') {
+      return (
+        <Modal
+          title="Add Mikrotik"
+          size="lg"
+          description="Register a router with connection preferences so you can automate backups and monitoring."
+          onClose={closeModal}
+        >
+          <form className="management-form" onSubmit={submitCreate}>
+            <div className="management-form__grid">
+              <label>
                 <span>Display name</span>
-                <input
-                  id="device-name"
-                  name="name"
-                  value={form.name}
-                  onChange={handleFormFieldChange}
-                  placeholder="Edge Router"
-                  required
-                />
+                <input name="name" value={form.name} onChange={handleFieldChange} required />
               </label>
-              <label htmlFor="device-host">
+              <label>
                 <span>Host / IP</span>
-                <input
-                  id="device-host"
-                  name="host"
-                  value={form.host}
-                  onChange={handleFormFieldChange}
-                  placeholder="192.0.2.10 or core.example.com"
-                  required
-                />
+                <input name="host" value={form.host} onChange={handleFieldChange} required />
               </label>
-              <label htmlFor="device-group">
-                <span>Site / Group</span>
-                <select
-                  id="device-group"
-                  name="groupId"
-                  value={form.groupId}
-                  onChange={handleFormFieldChange}
-                >
+              <label>
+                <span>Group</span>
+                <select name="groupId" value={form.groupId} onChange={handleFieldChange}>
                   <option value="">Unassigned</option>
-                  {groups.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
+                  {groupOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
               </label>
-              <label htmlFor="device-tags">
+              <label>
                 <span>Tags</span>
                 <input
-                  id="device-tags"
                   name="tags"
                   value={form.tags}
-                  onChange={handleFormFieldChange}
-                  placeholder="core, production"
+                  onChange={handleFieldChange}
+                  placeholder="Edge, core, datacenter"
+                />
+              </label>
+              <label>
+                <span>Notes</span>
+                <textarea
+                  name="notes"
+                  value={form.notes}
+                  onChange={handleFieldChange}
+                  rows={3}
+                  placeholder="Document context such as rack location or maintenance windows."
                 />
               </label>
             </div>
-            <label htmlFor="device-notes" className="wide">
-              <span>Notes</span>
-              <textarea
-                id="device-notes"
-                name="notes"
-                rows="3"
-                value={form.notes}
-                onChange={handleFormFieldChange}
-                placeholder="Link, rack, or maintenance notes"
-              />
-            </label>
+            {renderRouterSettings()}
+            <div className="management-form__actions">
+              <button type="button" className="ghost-button" onClick={closeModal} disabled={saving}>
+                Cancel
+              </button>
+              <button type="submit" className="primary-button" disabled={saving}>
+                {saving ? 'Creating…' : 'Add Mikrotik'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      );
+    }
 
-            <fieldset className="routeros-panel">
-              <legend>RouterOS API</legend>
-              <div className="toggle-grid">
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={form.routeros.apiEnabled}
-                    onChange={() => handleRouterToggle(setForm, 'apiEnabled')}
-                  />
-                  <span>API enabled</span>
-                </label>
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={form.routeros.apiSSL}
-                    onChange={() => handleRouterToggle(setForm, 'apiSSL')}
-                  />
-                  <span>Use API over TLS</span>
-                </label>
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={form.routeros.verifyTLS}
-                    onChange={() => handleRouterToggle(setForm, 'verifyTLS')}
-                    disabled={!form.routeros.apiSSL}
-                  />
-                  <span>Verify TLS certificates</span>
-                </label>
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={form.routeros.allowInsecureCiphers}
-                    onChange={() => handleRouterToggle(setForm, 'allowInsecureCiphers')}
-                  />
-                  <span>Allow insecure ciphers</span>
-                </label>
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={form.routeros.preferredApiFirst}
-                    onChange={() => handleRouterToggle(setForm, 'preferredApiFirst')}
-                  />
-                  <span>Prefer API before SSH fallback</span>
-                </label>
-              </div>
-              <div className="form-grid two-column">
-                <label htmlFor="device-api-port">
-                  <span>API port</span>
-                  <input
-                    id="device-api-port"
-                    value={form.routeros.apiPort}
-                    onChange={handleRouterFieldChange(setForm, 'apiPort')}
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                  />
-                </label>
-                <label htmlFor="device-api-timeout">
-                  <span>API timeout (ms)</span>
-                  <input
-                    id="device-api-timeout"
-                    value={form.routeros.apiTimeout}
-                    onChange={handleRouterFieldChange(setForm, 'apiTimeout')}
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                  />
-                </label>
-                <label htmlFor="device-api-retries">
-                  <span>API retries</span>
-                  <input
-                    id="device-api-retries"
-                    value={form.routeros.apiRetries}
-                    onChange={handleRouterFieldChange(setForm, 'apiRetries')}
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                  />
-                </label>
-                <label htmlFor="device-api-username">
-                  <span>API username</span>
-                  <input
-                    id="device-api-username"
-                    value={form.routeros.apiUsername}
-                    onChange={handleRouterFieldChange(setForm, 'apiUsername')}
-                    autoComplete="username"
-                    placeholder="automation"
-                  />
-                </label>
-                <label htmlFor="device-api-password">
-                  <span>API password</span>
-                  <input
-                    id="device-api-password"
-                    type="password"
-                    value={form.routeros.apiPassword}
-                    onChange={handleRouterFieldChange(setForm, 'apiPassword')}
-                    autoComplete="new-password"
-                    placeholder="Use a strong secret"
-                  />
-                </label>
-              </div>
-            </fieldset>
-
-            <div className="button-row">
-              <button type="submit" className="primary-button" disabled={saving || !selectedId}>
+    if (modal.mode === 'edit') {
+      return (
+        <Modal
+          title="Edit Mikrotik"
+          size="lg"
+          description="Update device ownership, adjust API credentials, or add context notes for operators."
+          onClose={closeModal}
+        >
+          <form className="management-form" onSubmit={submitEdit}>
+            <div className="management-form__grid">
+              <label>
+                <span>Display name</span>
+                <input name="name" value={form.name} onChange={handleFieldChange} required />
+              </label>
+              <label>
+                <span>Host / IP</span>
+                <input name="host" value={form.host} onChange={handleFieldChange} required />
+              </label>
+              <label>
+                <span>Group</span>
+                <select name="groupId" value={form.groupId} onChange={handleFieldChange}>
+                  <option value="">Unassigned</option>
+                  {groupOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Tags</span>
+                <input name="tags" value={form.tags} onChange={handleFieldChange} />
+              </label>
+              <label>
+                <span>Notes</span>
+                <textarea name="notes" value={form.notes} onChange={handleFieldChange} rows={3} />
+              </label>
+            </div>
+            {renderRouterSettings()}
+            <div className="management-form__actions">
+              <button type="button" className="ghost-button" onClick={closeModal} disabled={saving}>
+                Cancel
+              </button>
+              <button type="submit" className="primary-button" disabled={saving}>
                 {saving ? 'Saving…' : 'Save changes'}
               </button>
             </div>
           </form>
+        </Modal>
+      );
+    }
 
-          <form className="card" onSubmit={handleCreate}>
-            <h2>Add Mikrotik</h2>
-            <div className="form-grid two-column">
-              <label htmlFor="new-device-name">
-                <span>Display name</span>
-                <input
-                  id="new-device-name"
-                  name="name"
-                  value={createForm.name}
-                  onChange={handleCreateFieldChange}
-                  placeholder="New edge router"
-                  required
-                />
-              </label>
-              <label htmlFor="new-device-host">
-                <span>Host / IP</span>
-                <input
-                  id="new-device-host"
-                  name="host"
-                  value={createForm.host}
-                  onChange={handleCreateFieldChange}
-                  placeholder="203.0.113.5"
-                  required
-                />
-              </label>
-              <label htmlFor="new-device-group">
-                <span>Site / Group</span>
-                <select
-                  id="new-device-group"
-                  name="groupId"
-                  value={createForm.groupId}
-                  onChange={handleCreateFieldChange}
-                >
-                  <option value="">Unassigned</option>
-                  {groups.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label htmlFor="new-device-tags">
-                <span>Tags</span>
-                <input
-                  id="new-device-tags"
-                  name="tags"
-                  value={createForm.tags}
-                  onChange={handleCreateFieldChange}
-                  placeholder="branch, backup"
-                />
-              </label>
-            </div>
-            <label htmlFor="new-device-notes" className="wide">
-              <span>Notes</span>
-              <textarea
-                id="new-device-notes"
-                name="notes"
-                rows="3"
-                value={createForm.notes}
-                onChange={handleCreateFieldChange}
-              />
-            </label>
+    if (modal.mode === 'delete') {
+      const device = mikrotiks.find((entry) => entry.id === modal.targetId);
+      const displayName = device ? device.name : 'this Mikrotik';
 
-            <fieldset className="routeros-panel">
-              <legend>RouterOS API defaults</legend>
-              <div className="toggle-grid">
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={createForm.routeros.apiEnabled}
-                    onChange={() => handleRouterToggle(setCreateForm, 'apiEnabled')}
-                  />
-                  <span>API enabled</span>
-                </label>
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={createForm.routeros.apiSSL}
-                    onChange={() => handleRouterToggle(setCreateForm, 'apiSSL')}
-                  />
-                  <span>Use API over TLS</span>
-                </label>
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={createForm.routeros.verifyTLS}
-                    onChange={() => handleRouterToggle(setCreateForm, 'verifyTLS')}
-                    disabled={!createForm.routeros.apiSSL}
-                  />
-                  <span>Verify TLS certificates</span>
-                </label>
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={createForm.routeros.allowInsecureCiphers}
-                    onChange={() => handleRouterToggle(setCreateForm, 'allowInsecureCiphers')}
-                  />
-                  <span>Allow insecure ciphers</span>
-                </label>
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={createForm.routeros.preferredApiFirst}
-                    onChange={() => handleRouterToggle(setCreateForm, 'preferredApiFirst')}
-                  />
-                  <span>Prefer API before SSH fallback</span>
-                </label>
-              </div>
-              <div className="form-grid two-column">
-                <label htmlFor="new-device-api-port">
-                  <span>API port</span>
-                  <input
-                    id="new-device-api-port"
-                    value={createForm.routeros.apiPort}
-                    onChange={handleRouterFieldChange(setCreateForm, 'apiPort')}
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                  />
-                </label>
-                <label htmlFor="new-device-api-timeout">
-                  <span>API timeout (ms)</span>
-                  <input
-                    id="new-device-api-timeout"
-                    value={createForm.routeros.apiTimeout}
-                    onChange={handleRouterFieldChange(setCreateForm, 'apiTimeout')}
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                  />
-                </label>
-                <label htmlFor="new-device-api-retries">
-                  <span>API retries</span>
-                  <input
-                    id="new-device-api-retries"
-                    value={createForm.routeros.apiRetries}
-                    onChange={handleRouterFieldChange(setCreateForm, 'apiRetries')}
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                  />
-                </label>
-                <label htmlFor="new-device-api-username">
-                  <span>API username</span>
-                  <input
-                    id="new-device-api-username"
-                    value={createForm.routeros.apiUsername}
-                    onChange={handleRouterFieldChange(setCreateForm, 'apiUsername')}
-                    autoComplete="username"
-                  />
-                </label>
-                <label htmlFor="new-device-api-password">
-                  <span>API password</span>
-                  <input
-                    id="new-device-api-password"
-                    type="password"
-                    value={createForm.routeros.apiPassword}
-                    onChange={handleRouterFieldChange(setCreateForm, 'apiPassword')}
-                    autoComplete="new-password"
-                  />
-                </label>
-              </div>
-            </fieldset>
+      return (
+        <Modal title="Delete Mikrotik" onClose={closeModal}>
+          <p>
+            Are you sure you want to delete <strong>{displayName}</strong>? Remove the device only when it is fully
+            decommissioned.
+          </p>
+          <div className="modal-footer">
+            <button type="button" className="ghost-button" onClick={closeModal} disabled={saving}>
+              Cancel
+            </button>
+            <button type="button" className="danger-button" onClick={submitDelete} disabled={saving}>
+              {saving ? 'Removing…' : 'Delete device'}
+            </button>
+          </div>
+        </Modal>
+      );
+    }
 
-            <div className="button-row">
-              <button type="submit" className="primary-button" disabled={creating}>
-                {creating ? 'Adding…' : 'Add Mikrotik'}
-              </button>
-            </div>
-          </form>
+    return null;
+  };
+
+  return (
+    <div className="dashboard">
+      <div className="management-toolbar">
+        <div className="management-toolbar__title">
+          <h1>Mikrotik management</h1>
+          <p>Track every RouterOS endpoint, standardise API settings, and annotate context for the field engineers.</p>
         </div>
-      </section>
+        <div className="management-toolbar__actions">
+          <button type="button" className="primary-button" onClick={openCreate} disabled={loading}>
+            Add Mikrotik
+          </button>
+        </div>
+      </div>
 
-      {loading && <p className="feedback muted">Loading Mikrotik devices…</p>}
-      {status.message && (
-        <p className={`feedback ${status.type === 'error' ? 'error' : 'success'}`}>{status.message}</p>
+      {status.message ? (
+        <div className={`alert ${status.type === 'error' ? 'alert-error' : 'alert-success'}`}>{status.message}</div>
+      ) : null}
+
+      {sortedDevices.length === 0 ? (
+        <div className="management-empty">No Mikrotik devices are registered yet. Use the Add button to onboard routers.</div>
+      ) : (
+        <div className="management-list">
+          {sortedDevices.map((device) => (
+            <article key={device.id} className="management-item">
+              <header className="management-item__header">
+                <h2 className="management-item__title">{device.name}</h2>
+                <div className="management-item__meta">
+                  <span>
+                    <strong>ID:</strong> {device.id}
+                  </span>
+                  <span>
+                    <strong>Host/IP:</strong> {device.host}
+                  </span>
+                  <span>
+                    <strong>Group:</strong> {device.groupName || 'Unassigned'}
+                  </span>
+                  <span>
+                    <strong>Updated:</strong> {formatDateTime(device.updatedAt) || '—'}
+                  </span>
+                </div>
+              </header>
+              <div className="management-item__body">
+                <p>
+                  RouterOS API:{' '}
+                  {device.routeros?.apiEnabled ? 'Enabled' : 'Disabled'} · Port {device.routeros?.apiPort ?? 8728}{' '}
+                  {device.routeros?.apiSSL ? '(SSL)' : ''}
+                </p>
+                {Array.isArray(device.tags) && device.tags.length > 0 ? (
+                  <p>Tags: {device.tags.join(', ')}</p>
+                ) : (
+                  <p>No tags assigned.</p>
+                )}
+              </div>
+              <div className="management-item__actions">
+                <button type="button" className="ghost-button" onClick={() => openView(device.id)}>
+                  View
+                </button>
+                <button type="button" className="secondary-button" onClick={() => openEdit(device.id)}>
+                  Edit
+                </button>
+                <button type="button" className="danger-button" onClick={() => openDelete(device.id)}>
+                  Delete
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
       )}
+
+      {renderModal()}
     </div>
   );
 };
