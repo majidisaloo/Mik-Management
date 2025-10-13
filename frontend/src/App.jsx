@@ -1,0 +1,42 @@
+import { Route, Routes } from 'react-router-dom';
+import Layout from './components/Layout.jsx';
+import Login from './pages/Login.jsx';
+import Register from './pages/Register.jsx';
+import Dashboard from './pages/Dashboard.jsx';
+import Users from './pages/Users.jsx';
+import Roles from './pages/Roles.jsx';
+import Groups from './pages/Groups.jsx';
+import Mikrotiks from './pages/Mikrotiks.jsx';
+import Settings from './pages/Settings.jsx';
+
+const managementRoutes = [
+  { path: 'dashboard', Component: Dashboard },
+  { path: 'users', Component: Users },
+  { path: 'roles', Component: Roles },
+  { path: 'groups', Component: Groups },
+  { path: 'mikrotiks', Component: Mikrotiks },
+  { path: 'settings', Component: Settings }
+];
+
+const buildRouteVariants = ({ path, Component }) => {
+  const capitalizedPath = path.charAt(0).toUpperCase() + path.slice(1);
+  return [
+    <Route key={path} path={path} element={<Component />} />,
+    <Route key={`${path}-alias`} path={capitalizedPath} element={<Component />} />
+  ];
+};
+
+const App = () => {
+  return (
+    <Routes>
+      <Route path="/" element={<Layout />}>
+        <Route index element={<Login />} />
+        <Route path="register" element={<Register />} />
+        <Route path="login" element={<Login />} />
+        {managementRoutes.flatMap((route) => buildRouteVariants(route))}
+      </Route>
+    </Routes>
+  );
+};
+
+export default App;
