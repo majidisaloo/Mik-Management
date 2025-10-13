@@ -18,7 +18,11 @@ There are no sections that require **Accept Both** with the current GitHub upstr
 
 ## .gitignore
 
-- **Accept Incoming** to keep the database and config exclusions (`backend/data/*.db`, `backend/data/*.json`, `backend/config/database.config.json`). This prevents secrets from being committed accidentally.
+- **Accept Incoming** to keep the database/config exclusions (`backend/data/*.db`, `backend/data/*.json`, `backend/config/database.config.json`) and the `frontend/dist` build output. This prevents secrets and compiled artifacts from being committed accidentally.
+
+## backend/src/database.js
+
+- **Accept Both** and manually merge if upstream alters the file. Preserve the file-backed helpers (`resolveDatabaseFile`, `createUser`, `updateUser`) and the legacy backup logic that renames SQLite databases to `app.db.legacy-<timestamp>`.
 
 ## Newly added files
 All files under `backend/` and `frontend/` are new in this branch and do not exist upstream. Stage them as new files (no conflict markers should appear). If your tool still flags them, mark them as **Accept Incoming**. This includes helper utilities such as `backend/src/scripts/prepare.js`, which prepares the file-backed database during deployments.

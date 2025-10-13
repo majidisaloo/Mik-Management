@@ -25,6 +25,18 @@ const ensureDirectory = async (databaseFile) => {
   await fs.mkdir(directory, { recursive: true });
 };
 
+const backupLegacyDatabase = async (databaseFile) => {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupFile = `${databaseFile}.legacy-${timestamp}`;
+
+  await fs.rename(databaseFile, backupFile);
+
+  const initialState = defaultState();
+  await fs.writeFile(databaseFile, JSON.stringify(initialState, null, 2), 'utf-8');
+
+  return { initialState, backupFile };
+};
+
 const readDatabase = async (databaseFile) => {
   try {
     const raw = await fs.readFile(databaseFile, 'utf-8');
@@ -47,9 +59,11 @@ const readDatabase = async (databaseFile) => {
     }
 
     if (error instanceof SyntaxError) {
-      throw new Error(
-        `Unable to parse the database at ${databaseFile}. Remove the file and rerun \"npm run prepare:db\" to re-initialize it.`
+      const { initialState, backupFile } = await backupLegacyDatabase(databaseFile);
+      console.warn(
+        `Detected a legacy database at ${databaseFile}. The original file was moved to ${backupFile} and a fresh JSON store was created.`
       );
+      return initialState;
     }
 
     throw error;

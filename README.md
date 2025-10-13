@@ -241,6 +241,8 @@ Keep your deployment in sync with GitHub using the following workflow:
    npm run prepare:db
    pm2 restart mik-api
    ```
+   > **Tip:** If the npm registry blocks `npm audit fix --force`, rerun it later or skip the command—the backend has no external
+   > dependencies so the audit normally reports zero issues.
 4. Update the frontend dependencies and publish a fresh production build:
    ```bash
    cd ../frontend
@@ -275,11 +277,11 @@ The default configuration works without custom variables. For production deploym
 
 ## Troubleshooting
 
-- **Backend logs show `Unable to parse the database`**
-  - The previous SQLite database is incompatible with the new file-backed format.
-  - Stop the API service and back up the existing `backend/data/app.db` if you need the records.
-  - Remove the file and recreate it with `npm run prepare:db`.
-  - Relaunch the backend so a fresh JSON data store is generated.
+- **Backend logs previously showed `Unable to parse the database`**
+  - Deployments upgraded from the SQLite era now migrate automatically.
+  - When the backend encounters the legacy binary file it renames it to `backend/data/app.db.legacy-<timestamp>` and generates a
+    new JSON data store.
+  - Review the backup if you need historical records, then confirm registrations succeed with the fresh database.
 - **Browser message "The string did not match the expected pattern" on registration**
   - Reload the page with a hard refresh to ensure the latest frontend bundle is loaded.
   - Confirm that both password fields are filled, match exactly, and contain at least eight characters.
