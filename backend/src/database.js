@@ -195,10 +195,25 @@ const ensureStateShape = async (databaseFile) => {
     normalized.lastRoleId = 1;
     mutated = true;
   } else {
-    normalized.roles = normalized.roles.map((role) => ({
-      ...role,
-      permissions: sanitizePermissions(role.permissions)
-    }));
+    normalized.roles = normalized.roles.map((role) => {
+      const sanitizedPermissions = sanitizePermissions(role.permissions);
+      const originalPermissions = role.permissions ?? {};
+
+      if (!Object.prototype.hasOwnProperty.call(originalPermissions, 'groups')) {
+        const isDefaultAdmin =
+          (typeof role.id === 'number' && role.id === 1) ||
+          (typeof role.name === 'string' && role.name.toLowerCase() === 'administrator');
+
+        if (isDefaultAdmin || (sanitizedPermissions.dashboard && sanitizedPermissions.users && sanitizedPermissions.roles)) {
+          sanitizedPermissions.groups = true;
+        }
+      }
+
+      return {
+        ...role,
+        permissions: sanitizedPermissions
+      };
+    });
   }
 
   if (!Array.isArray(normalized.groups)) {
@@ -395,7 +410,8 @@ const initializeDatabase = async (databasePath) => {
             permissions: {
               dashboard: true,
               users: true,
-              roles: true
+              roles: true,
+              groups: true
             },
             createdAt: timestamp,
             updatedAt: timestamp
