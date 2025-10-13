@@ -47,8 +47,16 @@ const Login = () => {
       });
 
       if (!response.ok) {
+        const statusCode = response.status;
         const contentType = response.headers.get('content-type') ?? '';
         let message = 'Login failed.';
+
+        if (statusCode === 502) {
+          message =
+            'Login failed because the API is unavailable (502 Bad Gateway). Please verify the backend process is running.';
+        } else if (statusCode >= 500) {
+          message = `Login failed due to a server error (${statusCode}). Please retry after confirming the API is online.`;
+        }
 
         if (contentType.includes('application/json')) {
           const errorPayload = await response.json().catch(() => ({}));
@@ -57,7 +65,7 @@ const Login = () => {
           }
         } else {
           const fallbackText = await response.text().catch(() => '');
-          if (fallbackText) {
+          if (fallbackText && message === 'Login failed.') {
             message = fallbackText;
           }
         }

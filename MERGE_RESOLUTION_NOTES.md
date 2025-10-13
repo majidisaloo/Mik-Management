@@ -25,7 +25,7 @@ There are no sections that require **Accept Both** with the current GitHub upstr
 - **Accept Both** and manually merge if upstream alters the file. Preserve the file-backed helpers (`resolveDatabaseFile`, `createUser`, `updateUser`) and the legacy backup logic that renames SQLite databases to `app.db.legacy-<timestamp>`.
 
 ## Newly added files
-All files under `backend/` and `frontend/` are new in this branch and do not exist upstream. Stage them as new files (no conflict markers should appear). If your tool still flags them, mark them as **Accept Incoming**. This includes helper utilities such as `backend/src/scripts/prepare.js`, which prepares the file-backed database during deployments.
+All files under `backend/` and `frontend/` are new in this branch and do not exist upstream. Stage them as new files (no conflict markers should appear). If your tool still flags them, mark them as **Accept Incoming**. This includes helper utilities such as `backend/src/scripts/prepare.js`, which prepares the file-backed database during deployments, and UI state such as `frontend/src/context/ThemeContext.jsx` for the light/dark mode toggle.
 
 ## General workflow
 1. Run `git pull --rebase` to bring in the upstream changes.

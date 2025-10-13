@@ -92,8 +92,16 @@ const Register = () => {
       });
 
       if (!response.ok) {
+        const statusCode = response.status;
         const contentType = response.headers.get('content-type') ?? '';
         let message = 'Registration failed.';
+
+        if (statusCode === 502) {
+          message =
+            'Registration failed because the API is unavailable (502 Bad Gateway). Please make sure the backend service is running behind Nginx.';
+        } else if (statusCode >= 500) {
+          message = `Registration failed due to a server error (${statusCode}). Please retry after confirming the API is online.`;
+        }
 
         if (contentType.includes('application/json')) {
           const errorPayload = await response.json().catch(() => ({}));
@@ -102,7 +110,7 @@ const Register = () => {
           }
         } else {
           const fallbackText = await response.text().catch(() => '');
-          if (fallbackText) {
+          if (fallbackText && message === 'Registration failed.') {
             message = fallbackText;
           }
         }

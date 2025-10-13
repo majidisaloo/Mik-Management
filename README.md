@@ -91,6 +91,8 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
 8. Visit the site at http://localhost:5173. The **Login** screen loads first—use the **Register** link in the header to create an
    account, sign in with the credentials you just added, and you will land on the **Dashboard**. The dashboard presents a Users
    table with your operator record and a form to update your first name, last name, or email address at any time.
+   - Click the moon icon in the header to enable the new dark mode theme for low-light environments. Click the sun icon to return
+     to the bright daytime palette. Your choice is remembered locally for future visits.
 
 ### Dashboard Overview
 
@@ -243,6 +245,8 @@ Keep your deployment in sync with GitHub using the following workflow:
    ```
    > **Tip:** If the npm registry blocks `npm audit fix --force`, rerun it later or skip the command—the backend has no external
    > dependencies so the audit normally reports zero issues.
+   >
+   > `npm run prepare:db` is safe to run on every update. It backs up any legacy SQLite file, recreates missing folders, and verifies the JSON data store is ready before the API restarts.
 4. Update the frontend dependencies and publish a fresh production build:
    ```bash
    cd ../frontend
@@ -272,6 +276,8 @@ The default configuration works without custom variables. For production deploym
 - Database file: `backend/data/app.db`
   - Created by `npm run prepare:db` or automatically when the server first accepts a request.
   - Stores JSON data for operators and works without installing external database servers.
+  - Immediately after running `npm run prepare:db` the file contains an empty structure (`{"lastUserId":0,"users":[]}`). After
+    registering accounts, rerun `cat backend/data/app.db` (or `jq . backend/data/app.db`) to confirm the records are written.
 - The API exposes `GET /api/config-info` for administrators to verify the resolved database path and config file location without revealing the secret pepper.
 - Passwords are hashed with PBKDF2 after being combined with the pepper so credentials remain secure even if the data file is copied.
 
@@ -298,6 +304,7 @@ The default configuration works without custom variables. For production deploym
   - Confirm `backend/config/database.config.json` exists and still contains the original `databasePassword`. Recreating or deleting this file prevents logins because stored hashes depend on the original secret.
   - Run `npm run prepare:db` inside `/opt/mik-management/backend` to recreate missing folders or the data file before restarting the API.
   - Confirm the proxy block includes `/api/` (see the sample Nginx config above) and reload Nginx after edits: `sudo systemctl reload nginx`.
+  - The interface now reports "API is unavailable (502 Bad Gateway)" when this happens, so you can immediately tell the upstream server needs attention.
 
 ## Useful npm Scripts
 
