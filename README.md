@@ -31,6 +31,25 @@ Mik-Management/
 - npm 9 or newer
 - rpm toolchain (installable with `sudo apt update && sudo apt install rpm -y`)
 
+### Installing Node.js and npm on Ubuntu
+
+Use the NodeSource repositories to install an up-to-date Node.js release together with npm:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt update
+sudo apt install nodejs -y
+```
+
+Verify the installation:
+
+```bash
+node -v
+npm -v
+```
+
+The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
+
 ## Getting Started
 
 1. Prepare the installation directory on Ubuntu:
@@ -185,6 +204,13 @@ The default configuration works without custom variables. For production deploym
 ## Database
 
 The backend uses SQLite and automatically creates the database file at `backend/data/app.db`. Passwords are hashed with bcrypt before being persisted.
+
+## Troubleshooting
+
+- **`npm ERR! notarget No matching version found for sqlite@^5.1.6.`**
+  - Pull the latest repository changes: `git pull`.
+  - If the error persists, update the dependency manually: `cd backend && npm install sqlite@^5.2.4`.
+  - Retry `npm install` to ensure all packages resolve correctly.
 
 ## Useful npm Scripts
 
