@@ -1,34 +1,18 @@
 import cors from 'cors';
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import initializeDatabase from './database.js';
+import initializeDatabase, { resolveDatabaseFile } from './database.js';
 import { ensureDatabaseConfig, getConfigFilePath } from './config.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const normalizeString = (value) => (typeof value === 'string' ? value.trim() : '');
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const resolveDatabaseFile = (databasePath) => {
-  if (path.isAbsolute(databasePath)) {
-    return databasePath;
-  }
-
-  return path.resolve(__dirname, '..', databasePath);
-};
 
 const pepperPassword = (password, secret) => `${password}${secret}`;
 
 const bootstrap = async () => {
   const config = await ensureDatabaseConfig();
   const databaseFile = resolveDatabaseFile(config.databasePath);
-  await fs.mkdir(path.dirname(databaseFile), { recursive: true });
-
-  const db = await initializeDatabase(databaseFile);
+  const db = await initializeDatabase(config.databasePath);
 
   const app = express();
   const port = process.env.PORT || 4000;

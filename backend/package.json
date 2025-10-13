@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "node src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "prepare:db": "node src/scripts/prepare.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -21,7 +21,7 @@ There are no sections that require **Accept Both** with the current GitHub upstr
 - **Accept Incoming** to keep the database and config exclusions (`backend/data/*.db`, `backend/config/database.config.json`). This prevents secrets from being committed accidentally.
 
 ## Newly added files
-All files under `backend/` and `frontend/` are new in this branch and do not exist upstream. Stage them as new files (no conflict markers should appear). If your tool still flags them, mark them as **Accept Incoming**.
+All files under `backend/` and `frontend/` are new in this branch and do not exist upstream. Stage them as new files (no conflict markers should appear). If your tool still flags them, mark them as **Accept Incoming**. This includes helper utilities such as `backend/src/scripts/prepare.js`, which bootstraps the SQLite database during deployments.
 
 ## General workflow
 1. Run `git pull --rebase` to bring in the upstream changes.

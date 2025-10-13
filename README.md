@@ -71,20 +71,24 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
    cd backend
    npm install
    ```
-4. Run the API server (http://localhost:4000):
+4. Generate the SQLite database and configuration secrets (runs once per server):
+   ```bash
+   npm run prepare:db
+   ```
+5. Run the API server (http://localhost:4000):
    ```bash
    npm run dev
    ```
-5. In a separate terminal, install the web client dependencies:
+6. In a separate terminal, install the web client dependencies:
    ```bash
    cd ../frontend
    npm install
    ```
-6. Launch the development server (http://localhost:5173):
+7. Launch the development server (http://localhost:5173):
    ```bash
    npm run dev
    ```
-7. Visit the site at http://localhost:5173. The **Login** screen loads first—use the **Register** link in the header to create an
+8. Visit the site at http://localhost:5173. The **Login** screen loads first—use the **Register** link in the header to create an
    account, sign in with the credentials you just added, and you will land on the **Dashboard**. The dashboard presents a Users
    table with your operator record and a form to update your first name, last name, or email address at any time.
 
@@ -107,6 +111,7 @@ sudo git clone https://github.com/majidisaloo/Mik-Management.git /opt/mik-manage
 
 cd /opt/mik-management/backend
 npm install
+npm run prepare:db
 npm install -g pm2
 pm2 start src/server.js --name mik-api
 pm2 save
@@ -166,6 +171,7 @@ Follow these steps to deploy the application so it is accessible from the server
    ```bash
    cd /opt/mik-management/backend
    npm install
+   npm run prepare:db
    ```
    Start the API with a process manager (for example, PM2) or a systemd service listening on port 4000:
    ```bash
@@ -173,7 +179,7 @@ Follow these steps to deploy the application so it is accessible from the server
    pm2 start src/server.js --name mik-api
    pm2 save
    ```
-   The first launch writes `backend/config/database.config.json` with the SQLite path and a random `databasePassword`. Back up this file and never commit it to Git—it is required to validate user passwords.
+   The `npm run prepare:db` command creates the SQLite file at `backend/data/app.db` and ensures `backend/config/database.config.json` stores the random `databasePassword`. Back up this JSON file and never commit it to Git—it is required to validate user passwords.
 4. **Build the frontend for production**
    ```bash
    cd /opt/mik-management/frontend
@@ -227,17 +233,20 @@ Keep your deployment in sync with GitHub using the following workflow:
    ```
    If you maintain local commits, replace the reset with `git pull --rebase` and resolve any conflicts using the guidance in
    `MERGE_RESOLUTION_NOTES.md`.
-3. Reinstall dependencies when package manifests change and immediately address npm audit findings so installs succeed cleanly:
+3. Refresh the backend dependencies, run the audit fix, and make sure the database stays in sync:
    ```bash
-   cd backend && npm install
+   cd backend
+   npm install
    npm audit fix --force
-   cd ../frontend && npm install
-   npm audit fix --force
-   ```
-4. Rebuild the frontend and restart the API:
-   ```bash
-   npm run build
+   npm run prepare:db
    pm2 restart mik-api
+   ```
+4. Update the frontend dependencies and publish a fresh production build:
+   ```bash
+   cd ../frontend
+   npm install
+   npm audit fix --force
+   npm run build
    ```
 5. Reload Nginx if its configuration changed:
    ```bash
@@ -258,6 +267,9 @@ The default configuration works without custom variables. For production deploym
   - Generated automatically on the first backend launch.
   - Contains the relative `databasePath` (defaults to `./data/app.db`) and a random `databasePassword` used as a server-side pepper for hashing credentials.
   - Treat it like a secret—do not commit it to Git and back it up before redeploying or reinstalling the server.
+- Database file: `backend/data/app.db`
+  - Created by `npm run prepare:db` or automatically when the server first accepts a request.
+  - No separate system package is required—SQLite is bundled as a Node.js dependency.
 - The API exposes `GET /api/config-info` for administrators to verify the resolved database path and config file location without revealing the secret pepper.
 - Passwords are hashed with `bcryptjs` after being combined with the pepper so credentials remain secure even if the SQLite file is copied.
 
@@ -276,10 +288,12 @@ The default configuration works without custom variables. For production deploym
   - Visit `journalctl -u mik-api` (or check the terminal) for backend logs—validation errors such as duplicate emails or short passwords will be reported with a specific message that is also surfaced in the UI.
   - Confirm the API is running (`curl http://127.0.0.1:4000/health` should return `{"status":"ok"}`).
   - Verify the SQLite database folder exists (`ls backend/data`) so the server can persist new users. It is created automatically on first launch, but missing directories will prevent registrations.
+  - If the folder is missing, run `npm run prepare:db` from the `backend` directory to recreate the SQLite file before retrying.
 - **Browser shows `502 Bad Gateway` from Nginx during registration or login**
   - Ensure the API service is running: `pm2 status mik-api` (or restart with `pm2 restart mik-api`). A stopped upstream will force Nginx to return 502.
   - Validate the backend responds locally: `curl http://127.0.0.1:4000/health` should produce `{"status":"ok"}`. If it fails, inspect `/opt/mik-management/backend` logs with `pm2 logs mik-api`.
   - Confirm `backend/config/database.config.json` exists and still contains the original `databasePassword`. Recreating or deleting this file prevents logins because stored hashes depend on the original secret.
+  - Run `npm run prepare:db` inside `/opt/mik-management/backend` to recreate missing folders or the SQLite database file before restarting the API.
   - Confirm the proxy block includes `/api/` (see the sample Nginx config above) and reload Nginx after edits: `sudo systemctl reload nginx`.
 
 ## Useful npm Scripts
@@ -288,6 +302,7 @@ The default configuration works without custom variables. For production deploym
 | --- | --- | --- |
 | `backend` | `npm run dev` | Start the API server in watch mode for development. |
 | `backend` | `npm start` | Launch the API server once (useful for PM2/systemd). |
+| `backend` | `npm run prepare:db` | Generate or repair the SQLite database and config secrets. |
 | `frontend` | `npm run dev` | Start the Vite development server. |
 | `frontend` | `npm run build` | Build the production assets. |
 | `frontend` | `npm run preview` | Preview the production build locally. |

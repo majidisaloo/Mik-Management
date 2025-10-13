@@ -1,3 +1,4 @@
+import fs from 'fs/promises';
 import { open } from 'sqlite';
 import sqlite3 from 'sqlite3';
 import path from 'path';
@@ -6,7 +7,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const resolveDatabaseFile = (databasePath) => {
+export const resolveDatabaseFile = (databasePath = './data/app.db') => {
   if (!databasePath) {
     throw new Error('Database path must be provided.');
   }
@@ -16,8 +17,15 @@ const resolveDatabaseFile = (databasePath) => {
     : path.resolve(__dirname, '..', databasePath);
 };
 
+const ensureDirectory = async (databaseFile) => {
+  const directory = path.dirname(databaseFile);
+  await fs.mkdir(directory, { recursive: true });
+};
+
 const initializeDatabase = async (databasePath) => {
   const databaseFile = resolveDatabaseFile(databasePath);
+
+  await ensureDirectory(databaseFile);
 
   const db = await open({
     filename: databaseFile,
