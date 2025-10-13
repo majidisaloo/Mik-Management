@@ -11,7 +11,8 @@ const basePermissions = {
   dashboard: false,
   users: false,
   roles: false,
-  groups: false
+  groups: false,
+  mikrotiks: false
 };
 
 const pepperPassword = (password, secret) => `${password}${secret}`;
@@ -108,6 +109,75 @@ const parsePermissions = (permissions = {}) => {
   return normalized;
 };
 
+const normalizeBooleanFlag = (value, fallback = false) => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const lowered = value.toLowerCase();
+    if (lowered === 'true' || lowered === '1' || lowered === 'yes' || lowered === 'on') {
+      return true;
+    }
+    if (lowered === 'false' || lowered === '0' || lowered === 'no' || lowered === 'off') {
+      return false;
+    }
+  }
+
+  if (typeof value === 'number') {
+    if (value === 1) {
+      return true;
+    }
+    if (value === 0) {
+      return false;
+    }
+  }
+
+  return fallback;
+};
+
+const parseInteger = (value) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) ? parsed : null;
+};
+
+const normalizeTagsInput = (value) => {
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return [...new Set(value.map((entry) => normalizeString(entry)).filter(Boolean))];
+  }
+
+  if (typeof value === 'string') {
+    return [...new Set(value.split(',').map((entry) => entry.trim()).filter(Boolean))];
+  }
+
+  return [];
+};
+
+const normalizeNotesInput = (value) => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  return value.trim();
+};
+
+const buildRouterosPayload = (input = {}) => ({
+  apiEnabled: normalizeBooleanFlag(input.apiEnabled, false),
+  apiPort: parseInteger(input.apiPort),
+  apiSSL: normalizeBooleanFlag(input.apiSSL, false),
+  apiUsername: normalizeString(input.apiUsername),
+  apiPassword: typeof input.apiPassword === 'string' ? input.apiPassword.trim() : '',
+  verifyTLS: normalizeBooleanFlag(input.verifyTLS, true),
+  apiTimeout: parseInteger(input.apiTimeout),
+  apiRetries: parseInteger(input.apiRetries),
+  allowInsecureCiphers: normalizeBooleanFlag(input.allowInsecureCiphers, false),
+  preferredApiFirst: normalizeBooleanFlag(input.preferredApiFirst, true)
+});
+
 const normalizeRoleIds = (roleIds, roles) => {
   if (!Array.isArray(roleIds)) {
     return [];
@@ -117,6 +187,11 @@ const normalizeRoleIds = (roleIds, roles) => {
   return [...new Set(roleIds.map((roleId) => Number.parseInt(roleId, 10)))].filter(
     (roleId) => Number.isInteger(roleId) && roleId > 0 && availableIds.has(roleId)
   );
+};
+
+const ensureNumber = (value, fallback) => {
+  const parsed = parseInteger(value);
+  return parsed ?? fallback;
 };
 
 const mapRole = (role) => ({
@@ -164,6 +239,36 @@ const mapGroup = (group) => ({
   createdAt: group.createdAt,
   updatedAt: group.updatedAt
 });
+
+const mapMikrotik = (device, groups) => {
+  const group = device.groupId ? groups.find((entry) => entry.id === device.groupId) : null;
+  const routeros = device.routeros ?? {};
+  const sslEnabled = Boolean(routeros.apiSSL);
+
+  return {
+    id: device.id,
+    name: device.name,
+    host: device.host,
+    groupId: device.groupId ?? null,
+    groupName: group ? group.name : null,
+    tags: Array.isArray(device.tags) ? [...device.tags] : [],
+    notes: typeof device.notes === 'string' ? device.notes : '',
+    routeros: {
+      apiEnabled: Boolean(routeros.apiEnabled),
+      apiPort: ensureNumber(routeros.apiPort, sslEnabled ? 8729 : 8728),
+      apiSSL: sslEnabled,
+      apiUsername: typeof routeros.apiUsername === 'string' ? routeros.apiUsername : '',
+      apiPassword: typeof routeros.apiPassword === 'string' ? routeros.apiPassword : '',
+      verifyTLS: normalizeBooleanFlag(routeros.verifyTLS, true),
+      apiTimeout: ensureNumber(routeros.apiTimeout, 5000),
+      apiRetries: ensureNumber(routeros.apiRetries, 1),
+      allowInsecureCiphers: normalizeBooleanFlag(routeros.allowInsecureCiphers, false),
+      preferredApiFirst: normalizeBooleanFlag(routeros.preferredApiFirst, true)
+    },
+    createdAt: device.createdAt,
+    updatedAt: device.updatedAt
+  };
+};
 
 const buildGroupTree = (groups) => {
   const nodeLookup = new Map();
@@ -782,6 +887,174 @@ const bootstrap = async () => {
       }
     };
 
+    const handleListMikrotiks = async () => {
+      try {
+        const [devices, groups] = await Promise.all([db.listMikrotiks(), db.listGroups()]);
+        sendJson(res, 200, {
+          mikrotiks: devices.map((device) => mapMikrotik(device, groups)),
+          groups: groups.map(mapGroup)
+        });
+      } catch (error) {
+        console.error('List Mikrotiks error', error);
+        sendJson(res, 500, { message: 'Unable to load Mikrotik devices.' });
+      }
+    };
+
+    const handleCreateMikrotik = async () => {
+      const body = await parseJsonBody(req);
+      const { name, host, groupId, tags, notes, routeros } = body ?? {};
+
+      const normalizedName = normalizeString(name);
+      const normalizedHost = normalizeString(host);
+
+      if (!normalizedName) {
+        sendJson(res, 400, { message: 'Device name is required.' });
+        return;
+      }
+
+      if (!normalizedHost) {
+        sendJson(res, 400, { message: 'Host or IP is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.createMikrotik({
+          name: normalizedName,
+          host: normalizedHost,
+          groupId,
+          tags: normalizeTagsInput(tags),
+          notes: normalizeNotesInput(notes),
+          routeros: buildRouterosPayload(routeros)
+        });
+
+        if (!result.success && result.reason === 'invalid-group') {
+          sendJson(res, 400, { message: 'The selected group does not exist.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'name-required') {
+          sendJson(res, 400, { message: 'Device name is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'host-required') {
+          sendJson(res, 400, { message: 'Host or IP is required.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to create Mikrotik.');
+        }
+
+        const groups = await db.listGroups();
+        sendJson(res, 201, {
+          message: 'Mikrotik device added successfully.',
+          mikrotik: mapMikrotik(result.mikrotik, groups)
+        });
+      } catch (error) {
+        console.error('Create Mikrotik error', error);
+        sendJson(res, 500, { message: 'Unable to add the Mikrotik device right now.' });
+      }
+    };
+
+    const handleUpdateMikrotik = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      const body = await parseJsonBody(req);
+      const { name, host, groupId, tags, notes, routeros } = body ?? {};
+
+      const payload = {};
+
+      if (name !== undefined) {
+        payload.name = normalizeString(name);
+      }
+
+      if (host !== undefined) {
+        payload.host = normalizeString(host);
+      }
+
+      if (groupId !== undefined) {
+        payload.groupId = groupId;
+      }
+
+      if (tags !== undefined) {
+        payload.tags = normalizeTagsInput(tags);
+      }
+
+      if (notes !== undefined) {
+        payload.notes = normalizeNotesInput(notes);
+      }
+
+      if (routeros !== undefined) {
+        payload.routeros = buildRouterosPayload(routeros);
+      }
+
+      try {
+        const result = await db.updateMikrotik(deviceId, payload);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'name-required') {
+          sendJson(res, 400, { message: 'Device name is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'host-required') {
+          sendJson(res, 400, { message: 'Host or IP is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-group') {
+          sendJson(res, 400, { message: 'The selected group does not exist.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to update Mikrotik.');
+        }
+
+        const groups = await db.listGroups();
+        sendJson(res, 200, {
+          message: 'Mikrotik device updated successfully.',
+          mikrotik: mapMikrotik(result.mikrotik, groups)
+        });
+      } catch (error) {
+        console.error('Update Mikrotik error', error);
+        sendJson(res, 500, { message: 'Unable to update the Mikrotik device right now.' });
+      }
+    };
+
+    const handleDeleteMikrotik = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.deleteMikrotik(deviceId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to delete Mikrotik.');
+        }
+
+        sendNoContent(res);
+      } catch (error) {
+        console.error('Delete Mikrotik error', error);
+        sendJson(res, 500, { message: 'Unable to delete the Mikrotik device right now.' });
+      }
+    };
+
     try {
       if (method === 'GET' && (canonicalPath === '/health' || resourcePath === '/health')) {
         sendJson(res, 200, { status: 'ok' });
@@ -876,6 +1149,31 @@ const bootstrap = async () => {
 
       if (method === 'POST' && (canonicalPath === '/api/groups' || resourcePath === '/groups')) {
         await handleCreateGroup();
+        return;
+      }
+
+      if (method === 'GET' && (canonicalPath === '/api/mikrotiks' || resourcePath === '/mikrotiks')) {
+        await handleListMikrotiks();
+        return;
+      }
+
+      if (resourceSegments[0] === 'mikrotiks' && resourceSegments.length === 2) {
+        const idSegment = resourceSegments[1];
+        const deviceId = Number.parseInt(idSegment, 10);
+
+        if (method === 'PUT') {
+          await handleUpdateMikrotik(deviceId);
+          return;
+        }
+
+        if (method === 'DELETE') {
+          await handleDeleteMikrotik(deviceId);
+          return;
+        }
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/mikrotiks' || resourcePath === '/mikrotiks')) {
+        await handleCreateMikrotik();
         return;
       }
 

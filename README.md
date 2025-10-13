@@ -11,6 +11,7 @@ A full-stack registration experience built with React, Vite, and a lightweight N
 - [Users Workspace](#users-workspace)
 - [Roles Workspace](#roles-workspace)
 - [Mik-Groups Workspace](#mik-groups-workspace)
+- [Mikrotiks Workspace](#mikrotiks-workspace)
 - [Ubuntu Deployment Quick Start](#ubuntu-deployment-quick-start)
 - [Production Deployment on Ubuntu with Nginx](#production-deployment-on-ubuntu-with-nginx)
 - [Updating an Existing Installation](#updating-an-existing-installation)
@@ -100,8 +101,8 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
 
 ### Dashboard Overview
 
-- **Sidebar navigation** – The vertical menu on the left now groups links by focus, placing the Dashboard first and the Users, Roles, and Mik-Groups workspaces under a dedicated management heading. Each link only appears when your assigned roles grant the required permission, and the theme toggle sits at the bottom of the menu so you can switch between day and night palettes at any time.
-- **Access summary** – Review the roles attached to your account and the resulting Dashboard, Users, Roles, and Mik-Groups capabilities in the highlighted chips.
+- **Sidebar navigation** – The vertical menu on the left now groups links by focus, placing the Dashboard first and the Users, Roles, Mik-Groups, and Mikrotiks workspaces under a dedicated management heading. Each link only appears when your assigned roles grant the required permission, and the theme toggle sits at the bottom of the menu so you can switch between day and night palettes at any time.
+- **Access summary** – Review the roles attached to your account and the resulting Dashboard, Users, Roles, Mik-Groups, and Mikrotiks capabilities in the highlighted chips.
 - **Profile form** – Update your first name, last name, or email address and submit to persist the changes to the secure data file instantly.
 - **Session controls** – Use the header Logout button to clear the session and return to the Login screen.
 
@@ -109,12 +110,12 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
 
 - **Directory table** – The Users screen lists every operator, highlighting the currently selected row and showing each person’s roles.
 - **Select and edit** – Choose an operator from the dropdown to load their details into the form, adjust contact information, optionally set a new password, and assign or remove roles before saving.
-- **Role insights** – Each role badge summarises the Dashboard, Users, Roles, and Mik-Groups permissions it grants so you can confirm coverage at a glance.
+- **Role insights** – Each role badge summarises the Dashboard, Users, Roles, Mik-Groups, and Mikrotiks permissions it grants so you can confirm coverage at a glance.
 - **Permission aware** – Only operators with the Users permission can access this page. Attempts to reach the screen without the permission redirect back to the Dashboard.
 
 ### Roles Workspace
 
-- **Role library** – Review every role, rename them inline, and toggle Dashboard, Users, Roles, and Mik-Groups permissions before saving.
+- **Role library** – Review every role, rename them inline, and toggle Dashboard, Users, Roles, Mik-Groups, and Mikrotiks permissions before saving.
 - **Create and delete** – Add new roles tailored to teams such as sales or support. Roles that are still assigned to users cannot be deleted until those users are reassigned, preventing accidental loss of access.
 - **Guided feedback** – Success and error alerts surface immediately so you know when actions complete or require additional steps.
 
@@ -123,6 +124,14 @@ The commands should report Node.js 20.x (or newer) and npm 10.x (or newer).
 - **Hierarchy explorer** – Visualise the entire organisation tree in the left column. Selecting a Mik-Group highlights it in the hierarchy and loads its details for editing.
 - **Parent assignments** – Update a group’s name or parent with confidence. The interface prevents cycles, keeps the root Mik-Group anchored at the top level, and lets you create new nested groups in a couple of clicks.
 - **Safe clean-up** – Delete buttons stay disabled for the root group and for branches that still own child groups, ensuring you never orphan part of the hierarchy by accident.
+
+### Mikrotiks Workspace
+
+- **Device directory** – Browse every RouterOS endpoint in the environment from the selector on the left. Each entry highlights its display name, host, assigned Mik-Group, active tags, and the most recent update time.
+- **RouterOS API controls** – Toggle API availability, enable TLS, enforce certificate validation, and opt into legacy cipher support directly from the edit form. Ports, timeouts, retries, usernames, and passwords all live in one pane so you can adjust connection details without digging through configuration files.
+- **Group-aware organisation** – Assign each Mikrotik to any Mik-Group you have defined. The dropdown stays in sync with the hierarchy so network sites, POPs, and customer segments remain tidy.
+- **Notes and tagging** – Capture free-form notes about rack locations or maintenance windows and add comma-separated tags for filtering future inventory views.
+- **Streamlined provisioning** – Use the Add Mikrotik card to register new routers in seconds. New devices immediately appear in the selector and inherit the RouterOS defaults you configured during creation.
 
 ## Ubuntu Deployment Quick Start
 
@@ -270,7 +279,7 @@ Keep your deployment in sync with GitHub using the following workflow:
    > **Tip:** If the npm registry blocks `npm audit fix --force`, rerun it later or skip the command—the backend has no external
    > dependencies so the audit normally reports zero issues.
    >
-   > `npm run prepare:db` is safe to run on every update. It backs up any legacy SQLite file, recreates missing folders, and verifies the JSON data store is ready before the API restarts.
+  > `npm run prepare:db` is safe to run on every update. It backs up any legacy SQLite file, recreates missing folders, refreshes Mik-Groups and Mikrotik records, and verifies the JSON data store is ready before the API restarts.
 4. Update the frontend dependencies and publish a fresh production build:
    ```bash
    cd ../frontend
@@ -424,6 +433,36 @@ The default configuration works without custom variables. For production deploym
   - `404`: Group not found
   - `409`: Group still has child groups; reassign them first
   - `500`: Unable to delete the group
+
+`GET /api/mikrotiks`
+
+- **Success**: `200 OK` with `{ mikrotiks, groups }`
+- **Notes**: Returns every Mikrotik device alongside the available Mik-Groups so the UI can render selectors without extra round trips.
+
+`POST /api/mikrotiks`
+
+- **Body**: `{ name, host, groupId?, tags?, notes?, routeros? }`
+- **Success**: `201 Created`
+- **Errors**:
+  - `400`: Missing display name or host, or an invalid group reference
+  - `500`: Unable to create the device
+
+`PUT /api/mikrotiks/:id`
+
+- **Body**: Any subset of `{ name, host, groupId, tags, notes, routeros }`
+- **Success**: `200 OK` with the updated device
+- **Errors**:
+  - `400`: Name or host cleared, or group reference does not exist
+  - `404`: Device not found
+  - `500`: Unable to update the device
+
+`DELETE /api/mikrotiks/:id`
+
+- **Success**: `204 No Content`
+- **Errors**:
+  - `400`: Invalid identifier
+  - `404`: Device not found
+  - `500`: Unable to delete the device
 
 `GET /api/config-info`
 

@@ -90,6 +90,7 @@ const Layout = () => {
                 {user.permissions?.users ? <NavLink to="/users">Users</NavLink> : null}
                 {user.permissions?.roles ? <NavLink to="/roles">Roles</NavLink> : null}
                 {user.permissions?.groups ? <NavLink to="/groups">Mik-Groups</NavLink> : null}
+                {user.permissions?.mikrotiks ? <NavLink to="/mikrotiks">Mikrotiks</NavLink> : null}
               </div>
             </nav>
             <div className="sidebar-footer">{renderThemeToggle('sidebar')}</div>

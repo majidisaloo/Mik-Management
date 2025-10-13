@@ -26,12 +26,13 @@ There are no sections that require **Accept Both** with the current GitHub upstr
 
 ## backend/src/server.js
 
-- **Accept Incoming** to keep the dependency-free API and the new Mik-Groups routes. The incoming version adds `/api/groups` handlers alongside the existing auth and role endpoints so the sidebar management views stay in sync with the JSON datastore.
+- **Accept Incoming** to keep the dependency-free API together with the Mik-Groups and Mikrotiks routes. The incoming version adds `/api/groups` and `/api/mikrotiks` handlers alongside the existing auth and role endpoints so the sidebar management views stay in sync with the JSON datastore.
 
 ## Newly added files
 All files under `backend/` and `frontend/` are new in this branch and do not exist upstream. Stage them as new files (no conflict markers should appear). If your tool still flags them, mark them as **Accept Incoming**. This includes helper utilities such as `backend/src/scripts/prepare.js`, which prepares the file-backed database during deployments, and UI state such as `frontend/src/context/ThemeContext.jsx` for the light/dark mode toggle.
 
 - The Mik-Groups feature introduces `frontend/src/pages/Groups.jsx`, supporting styles in `frontend/src/styles.css`, and the updated sidebar layout in `frontend/src/components/Layout.jsx`. Accept the incoming versions so the management hierarchy, theme toggle placement, and responsive tweaks remain consistent.
+- The Mikrotiks workspace adds `frontend/src/pages/Mikrotiks.jsx`, new navigation wiring in `frontend/src/App.jsx` and `frontend/src/components/Layout.jsx`, and extended styling rules inside `frontend/src/styles.css`. Accept the incoming versions to retain the device inventory UI, router configuration forms, and responsive behaviour.
 
 ## General workflow
 1. Run `git pull --rebase` to bring in the upstream changes.

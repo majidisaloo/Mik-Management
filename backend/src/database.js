@@ -9,16 +9,19 @@ const defaultPermissions = () => ({
   dashboard: false,
   users: false,
   roles: false,
-  groups: false
+  groups: false,
+  mikrotiks: false
 });
 
 const defaultState = () => ({
   lastUserId: 0,
   lastRoleId: 0,
   lastGroupId: 0,
+  lastMikrotikId: 0,
   users: [],
   roles: [],
-  groups: []
+  groups: [],
+  mikrotiks: []
 });
 
 const normalizeGroupName = (name, fallback) => {
@@ -76,6 +79,130 @@ const findCanonicalRootId = (groups) => {
       }
       return rootId;
     }, null);
+};
+
+const defaultRouterosOptions = () => ({
+  apiEnabled: false,
+  apiPort: 8728,
+  apiSSL: false,
+  apiUsername: '',
+  apiPassword: '',
+  verifyTLS: true,
+  apiTimeout: 5000,
+  apiRetries: 1,
+  allowInsecureCiphers: false,
+  preferredApiFirst: true
+});
+
+const normalizeText = (value, fallback = '') => {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+  return trimmed || fallback;
+};
+
+const normalizeOptionalText = (value) => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  return value.trim();
+};
+
+const normalizeBoolean = (value, fallback = false) => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (value === 'true' || value === '1') {
+    return true;
+  }
+
+  if (value === 'false' || value === '0') {
+    return false;
+  }
+
+  return fallback;
+};
+
+const clampNumber = (value, { min, max, fallback }) => {
+  const parsed = Number.parseInt(value, 10);
+
+  if (Number.isInteger(parsed)) {
+    if (Number.isInteger(min) && parsed < min) {
+      return min;
+    }
+
+    if (Number.isInteger(max) && parsed > max) {
+      return max;
+    }
+
+    return parsed;
+  }
+
+  return fallback;
+};
+
+const normalizeTags = (value) => {
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return [...new Set(value.map((entry) => normalizeText(entry)).filter(Boolean))];
+  }
+
+  if (typeof value === 'string') {
+    return [...new Set(value.split(',').map((entry) => entry.trim()).filter(Boolean))];
+  }
+
+  return [];
+};
+
+const sanitizeRouteros = (options = {}, baseline = defaultRouterosOptions()) => {
+  const normalized = { ...baseline };
+
+  normalized.apiEnabled = normalizeBoolean(options.apiEnabled, baseline.apiEnabled);
+  normalized.apiSSL = normalizeBoolean(options.apiSSL, baseline.apiSSL);
+
+  const defaultPort = normalized.apiSSL ? 8729 : 8728;
+  const desiredPort = options.apiPort ?? baseline.apiPort ?? defaultPort;
+  normalized.apiPort = clampNumber(desiredPort, { min: 1, max: 65535, fallback: defaultPort });
+
+  normalized.apiUsername = normalizeOptionalText(options.apiUsername ?? baseline.apiUsername ?? '');
+  normalized.apiPassword = normalizeOptionalText(options.apiPassword ?? baseline.apiPassword ?? '');
+  normalized.verifyTLS = normalizeBoolean(options.verifyTLS, baseline.verifyTLS);
+
+  const timeoutFallback = clampNumber(baseline.apiTimeout, { min: 500, max: 60000, fallback: 5000 });
+  normalized.apiTimeout = clampNumber(options.apiTimeout, {
+    min: 500,
+    max: 60000,
+    fallback: timeoutFallback
+  });
+
+  const retriesFallback = clampNumber(baseline.apiRetries, { min: 0, max: 10, fallback: 1 });
+  normalized.apiRetries = clampNumber(options.apiRetries, { min: 0, max: 10, fallback: retriesFallback });
+
+  normalized.allowInsecureCiphers = normalizeBoolean(
+    options.allowInsecureCiphers,
+    baseline.allowInsecureCiphers
+  );
+  normalized.preferredApiFirst = normalizeBoolean(
+    options.preferredApiFirst,
+    baseline.preferredApiFirst
+  );
+
+  if (normalized.apiSSL && !options.apiPort && !baseline.apiPort) {
+    normalized.apiPort = 8729;
+  }
+
+  if (!normalized.apiSSL && !options.apiPort && !baseline.apiPort) {
+    normalized.apiPort = 8728;
+  }
+
+  return normalized;
 };
 
 export const resolveDatabaseFile = (databasePath = './data/app.db') => {
@@ -186,7 +313,8 @@ const ensureStateShape = async (databaseFile) => {
           dashboard: true,
           users: true,
           roles: true,
-          groups: true
+          groups: true,
+          mikrotiks: true
         },
         createdAt: timestamp,
         updatedAt: timestamp
@@ -199,13 +327,19 @@ const ensureStateShape = async (databaseFile) => {
       const sanitizedPermissions = sanitizePermissions(role.permissions);
       const originalPermissions = role.permissions ?? {};
 
-      if (!Object.prototype.hasOwnProperty.call(originalPermissions, 'groups')) {
-        const isDefaultAdmin =
-          (typeof role.id === 'number' && role.id === 1) ||
-          (typeof role.name === 'string' && role.name.toLowerCase() === 'administrator');
+      const isDefaultAdmin =
+        (typeof role.id === 'number' && role.id === 1) ||
+        (typeof role.name === 'string' && role.name.toLowerCase() === 'administrator');
 
+      if (!Object.prototype.hasOwnProperty.call(originalPermissions, 'groups')) {
         if (isDefaultAdmin || (sanitizedPermissions.dashboard && sanitizedPermissions.users && sanitizedPermissions.roles)) {
           sanitizedPermissions.groups = true;
+        }
+      }
+
+      if (!Object.prototype.hasOwnProperty.call(originalPermissions, 'mikrotiks')) {
+        if (isDefaultAdmin || sanitizedPermissions.groups) {
+          sanitizedPermissions.mikrotiks = true;
         }
       }
 
@@ -348,6 +482,97 @@ const ensureStateShape = async (databaseFile) => {
   }
 
   normalized.groups = updatedGroups;
+
+  if (!Array.isArray(normalized.mikrotiks)) {
+    normalized.mikrotiks = [];
+    mutated = true;
+  }
+
+  if (!Number.isInteger(normalized.lastMikrotikId)) {
+    normalized.lastMikrotikId = normalized.mikrotiks.reduce(
+      (max, device) => Math.max(max, Number.parseInt(device.id, 10) || 0),
+      0
+    );
+    mutated = true;
+  }
+
+  let nextMikrotikIdSeed = Math.max(
+    Number.isInteger(normalized.lastMikrotikId) ? normalized.lastMikrotikId : 0,
+    normalized.mikrotiks.reduce((max, device) => Math.max(max, Number.parseInt(device.id, 10) || 0), 0)
+  );
+
+  const availableGroupIds = new Set(normalized.groups.map((group) => group.id));
+  const usedDeviceIds = new Set();
+
+  const sanitizedDevices = normalized.mikrotiks.map((device) => {
+    let identifier = Number.parseInt(device.id, 10);
+
+    if (!Number.isInteger(identifier) || identifier <= 0 || usedDeviceIds.has(identifier)) {
+      nextMikrotikIdSeed += 1;
+      identifier = nextMikrotikIdSeed;
+      mutated = true;
+    }
+
+    usedDeviceIds.add(identifier);
+
+    const createdAt = device.createdAt ?? new Date().toISOString();
+    const updatedAt = device.updatedAt ?? createdAt;
+    const name = normalizeText(device.name, `Device ${identifier}`);
+    const host = normalizeText(device.host, `host-${identifier}`);
+
+    const groupCandidate = Number.parseInt(device.groupId, 10);
+    const groupId = availableGroupIds.has(groupCandidate) ? groupCandidate : null;
+
+    if (
+      device.name !== name ||
+      device.host !== host ||
+      (device.groupId ?? null) !== groupId ||
+      device.createdAt !== createdAt ||
+      device.updatedAt !== updatedAt
+    ) {
+      mutated = true;
+    }
+
+    const tags = normalizeTags(device.tags);
+    const notes = normalizeOptionalText(device.notes ?? '');
+    const routeros = sanitizeRouteros(device.routeros, defaultRouterosOptions());
+
+    if (
+      JSON.stringify(tags) !== JSON.stringify(device.tags ?? []) ||
+      notes !== (device.notes ?? '') ||
+      JSON.stringify(routeros) !== JSON.stringify(device.routeros ?? {})
+    ) {
+      mutated = true;
+    }
+
+    return {
+      id: identifier,
+      name,
+      host,
+      groupId,
+      tags,
+      notes,
+      routeros,
+      createdAt,
+      updatedAt
+    };
+  });
+
+  if (sanitizedDevices.length !== normalized.mikrotiks.length) {
+    mutated = true;
+  }
+
+  const highestDeviceId = sanitizedDevices.reduce((max, device) => Math.max(max, device.id), 0);
+
+  if (highestDeviceId !== normalized.lastMikrotikId) {
+    normalized.lastMikrotikId = Math.max(nextMikrotikIdSeed, highestDeviceId);
+    mutated = true;
+  } else if (nextMikrotikIdSeed > normalized.lastMikrotikId) {
+    normalized.lastMikrotikId = nextMikrotikIdSeed;
+    mutated = true;
+  }
+
+  normalized.mikrotiks = sanitizedDevices;
 
   const validRoleIds = new Set(normalized.roles.map((role) => role.id));
 
@@ -731,6 +956,153 @@ const initializeDatabase = async (databasePath) => {
       }
 
       state.groups.splice(index, 1);
+      await persist(state);
+
+      return { success: true };
+    },
+
+    async listMikrotiks() {
+      const state = await load();
+      return state.mikrotiks.map((device) => ({
+        ...device,
+        tags: Array.isArray(device.tags) ? [...device.tags] : []
+      }));
+    },
+
+    async createMikrotik({ name, host, groupId, tags, notes, routeros }) {
+      const state = await load();
+
+      const normalizedName = normalizeText(name);
+      const normalizedHost = normalizeText(host);
+
+      if (!normalizedName) {
+        return { success: false, reason: 'name-required' };
+      }
+
+      if (!normalizedHost) {
+        return { success: false, reason: 'host-required' };
+      }
+
+      let normalizedGroupId = null;
+      if (groupId !== undefined && groupId !== null && groupId !== '') {
+        const parsed = Number.parseInt(groupId, 10);
+
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+          return { success: false, reason: 'invalid-group' };
+        }
+
+        const exists = state.groups.some((group) => group.id === parsed);
+
+        if (!exists) {
+          return { success: false, reason: 'invalid-group' };
+        }
+
+        normalizedGroupId = parsed;
+      }
+
+      const normalizedTags = normalizeTags(tags);
+      const normalizedNotes = normalizeOptionalText(notes ?? '');
+      const routerosBaseline = sanitizeRouteros(routeros, defaultRouterosOptions());
+
+      const nextId = (Number.isInteger(state.lastMikrotikId) ? state.lastMikrotikId : 0) + 1;
+      const timestamp = new Date().toISOString();
+
+      const record = {
+        id: nextId,
+        name: normalizedName,
+        host: normalizedHost,
+        groupId: normalizedGroupId,
+        tags: normalizedTags,
+        notes: normalizedNotes,
+        routeros: routerosBaseline,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      };
+
+      state.mikrotiks.push(record);
+      state.lastMikrotikId = nextId;
+      await persist(state);
+
+      return { success: true, mikrotik: record };
+    },
+
+    async updateMikrotik(id, { name, host, groupId, tags, notes, routeros }) {
+      const state = await load();
+      const index = state.mikrotiks.findIndex((device) => device.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      const existing = state.mikrotiks[index];
+
+      const normalizedName = name !== undefined ? normalizeText(name) : existing.name;
+      const normalizedHost = host !== undefined ? normalizeText(host) : existing.host;
+
+      if (!normalizedName) {
+        return { success: false, reason: 'name-required' };
+      }
+
+      if (!normalizedHost) {
+        return { success: false, reason: 'host-required' };
+      }
+
+      let normalizedGroupId = existing.groupId ?? null;
+      if (groupId !== undefined) {
+        if (groupId === null || groupId === '') {
+          normalizedGroupId = null;
+        } else {
+          const parsed = Number.parseInt(groupId, 10);
+
+          if (!Number.isInteger(parsed) || parsed <= 0) {
+            return { success: false, reason: 'invalid-group' };
+          }
+
+          const exists = state.groups.some((group) => group.id === parsed);
+
+          if (!exists) {
+            return { success: false, reason: 'invalid-group' };
+          }
+
+          normalizedGroupId = parsed;
+        }
+      }
+
+      const sanitizedExistingRouteros = sanitizeRouteros(existing.routeros, defaultRouterosOptions());
+      const normalizedRouteros = routeros
+        ? sanitizeRouteros(routeros, sanitizedExistingRouteros)
+        : sanitizedExistingRouteros;
+
+      const nextTags =
+        tags !== undefined ? normalizeTags(tags) : Array.isArray(existing.tags) ? [...existing.tags] : [];
+      const nextNotes = notes !== undefined ? normalizeOptionalText(notes) : existing.notes ?? '';
+
+      const record = {
+        ...existing,
+        name: normalizedName,
+        host: normalizedHost,
+        groupId: normalizedGroupId,
+        tags: nextTags,
+        notes: nextNotes,
+        routeros: normalizedRouteros,
+        updatedAt: new Date().toISOString()
+      };
+
+      state.mikrotiks[index] = record;
+      await persist(state);
+
+      return { success: true, mikrotik: record };
+    },
+
+    async deleteMikrotik(id) {
+      const state = await load();
+      const index = state.mikrotiks.findIndex((device) => device.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      state.mikrotiks.splice(index, 1);
       await persist(state);
 
       return { success: true };

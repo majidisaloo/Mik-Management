@@ -183,6 +183,9 @@ const Dashboard = () => {
               <span className={`permission-chip${permissions.groups ? ' permission-chip--active' : ''}`}>
                 Mik-Groups
               </span>
+              <span className={`permission-chip${permissions.mikrotiks ? ' permission-chip--active' : ''}`}>
+                Mikrotiks
+              </span>
             </div>
           </div>
         </div>

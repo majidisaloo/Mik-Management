@@ -6,7 +6,8 @@ const blankPermissions = () => ({
   dashboard: true,
   users: false,
   roles: false,
-  groups: false
+  groups: false,
+  mikrotiks: false
 });
 
 const Roles = () => {
@@ -54,15 +55,16 @@ const Roles = () => {
           loadedRoles.reduce((acc, role) => {
             acc[role.id] = {
               name: role.name,
-              permissions: {
-                dashboard: Boolean(role.permissions?.dashboard),
-                users: Boolean(role.permissions?.users),
-                roles: Boolean(role.permissions?.roles),
-                groups: Boolean(role.permissions?.groups)
-              }
-            };
-            return acc;
-          }, {})
+            permissions: {
+              dashboard: Boolean(role.permissions?.dashboard),
+              users: Boolean(role.permissions?.users),
+              roles: Boolean(role.permissions?.roles),
+              groups: Boolean(role.permissions?.groups),
+              mikrotiks: Boolean(role.permissions?.mikrotiks)
+            }
+          };
+          return acc;
+        }, {})
         );
         setStatus({ type: '', message: '' });
       } catch (error) {
@@ -167,7 +169,8 @@ const Roles = () => {
               dashboard: Boolean(updatedRole.permissions?.dashboard),
               users: Boolean(updatedRole.permissions?.users),
               roles: Boolean(updatedRole.permissions?.roles),
-              groups: Boolean(updatedRole.permissions?.groups)
+              groups: Boolean(updatedRole.permissions?.groups),
+              mikrotiks: Boolean(updatedRole.permissions?.mikrotiks)
             }
           }
         }));
@@ -305,7 +308,8 @@ const Roles = () => {
               dashboard: Boolean(createdRole.permissions?.dashboard),
               users: Boolean(createdRole.permissions?.users),
               roles: Boolean(createdRole.permissions?.roles),
-              groups: Boolean(createdRole.permissions?.groups)
+              groups: Boolean(createdRole.permissions?.groups),
+              mikrotiks: Boolean(createdRole.permissions?.mikrotiks)
             }
           }
         }));
@@ -414,12 +418,21 @@ const Roles = () => {
                         />
                         <span>Mik-Groups</span>
                       </label>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(draft.permissions.mikrotiks)}
+                          onChange={() => handleDraftPermissionToggle(role.id, 'mikrotiks')}
+                        />
+                        <span>Mikrotiks</span>
+                      </label>
                     </div>
                     <p className="role-summary">
                       Effective access: {draft.permissions.dashboard ? 'Dashboard' : 'No dashboard'}
                       {draft.permissions.users ? ' · Users' : ''}
                       {draft.permissions.roles ? ' · Roles' : ''}
                       {draft.permissions.groups ? ' · Mik-Groups' : ''}
+                      {draft.permissions.mikrotiks ? ' · Mikrotiks' : ''}
                     </p>
                   </li>
                 );
@@ -471,6 +484,14 @@ const Roles = () => {
                   onChange={() => handleNewRoleToggle('groups')}
                 />
                 <span>Mik-Groups</span>
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={newRole.permissions.mikrotiks}
+                  onChange={() => handleNewRoleToggle('mikrotiks')}
+                />
+                <span>Mikrotiks</span>
               </label>
             </fieldset>
             <div className="wide button-row">
