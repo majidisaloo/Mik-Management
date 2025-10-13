@@ -128,7 +128,7 @@ const Mikrotiks = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState(emptyDeviceForm());
   const [createBusy, setCreateBusy] = useState(false);
-  const [manageState, setManageState] = useState({ open: false, deviceId: null, form: emptyDeviceForm() });
+  const [manageState, setManageState] = useState({ open: false, deviceId: null, form: emptyDeviceForm(), record: null });
   const [manageBusy, setManageBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
@@ -217,12 +217,12 @@ const Mikrotiks = () => {
   };
 
   const openManageModal = (device) => {
-    setManageState({ open: true, deviceId: device.id, form: toFormState(device) });
+    setManageState({ open: true, deviceId: device.id, form: toFormState(device), record: device });
     setStatus({ type: '', message: '' });
   };
 
   const closeManageModal = () => {
-    setManageState({ open: false, deviceId: null, form: emptyDeviceForm() });
+    setManageState({ open: false, deviceId: null, form: emptyDeviceForm(), record: null });
     setManageBusy(false);
     setDeleteBusy(false);
   };
@@ -437,91 +437,143 @@ const Mikrotiks = () => {
     }
   };
 
-  const renderRouterFields = (formState, onToggle, onFieldChange) => (
-    <fieldset>
-      <legend>RouterOS API</legend>
-      <label className="checkbox-field">
-        <input
-          type="checkbox"
-          checked={formState.routeros.apiEnabled}
-          onChange={() => onToggle('apiEnabled')}
-        />
-        <span>API enabled</span>
-      </label>
-      <label className="checkbox-field">
-        <input type="checkbox" checked={formState.routeros.apiSSL} onChange={() => onToggle('apiSSL')} />
-        <span>Use API over TLS (port 8729)</span>
-      </label>
-      <div className="form-grid">
-        <label>
-          <span>API port</span>
-          <input
-            name="apiPort"
-            type="number"
-            min="1"
-            value={formState.routeros.apiPort}
-            onChange={onFieldChange}
-          />
-        </label>
-        <label>
-          <span>Username</span>
-          <input name="apiUsername" value={formState.routeros.apiUsername} onChange={onFieldChange} />
-        </label>
-        <label>
-          <span>Password / token</span>
-          <input
-            name="apiPassword"
-            type="password"
-            autoComplete="off"
-            value={formState.routeros.apiPassword}
-            onChange={onFieldChange}
-          />
-        </label>
-        <label className="checkbox-field">
-          <input type="checkbox" checked={formState.routeros.verifyTLS} onChange={() => onToggle('verifyTLS')} />
-          <span>Verify TLS certificates</span>
-        </label>
-        <label className="checkbox-field">
-          <input
-            type="checkbox"
-            checked={formState.routeros.allowInsecureCiphers}
-            onChange={() => onToggle('allowInsecureCiphers')}
-          />
-          <span>Allow insecure ciphers</span>
-        </label>
-        <label className="checkbox-field">
-          <input
-            type="checkbox"
-            checked={formState.routeros.preferredApiFirst}
-            onChange={() => onToggle('preferredApiFirst')}
-          />
-          <span>Prefer API before SSH fallback</span>
-        </label>
-        <label>
-          <span>Timeout (ms)</span>
-          <input
-            name="apiTimeout"
-            type="number"
-            min="100"
-            step="100"
-            value={formState.routeros.apiTimeout}
-            onChange={onFieldChange}
-          />
-        </label>
-        <label>
-          <span>Retries</span>
-          <input
-            name="apiRetries"
-            type="number"
-            min="0"
-            max="5"
-            value={formState.routeros.apiRetries}
-            onChange={onFieldChange}
-          />
-        </label>
-      </div>
-    </fieldset>
-  );
+  const renderRouterSections = (formState, onToggle, onFieldChange, disabled = false) => {
+    const apiEnabled = Boolean(formState.routeros.apiEnabled);
+    const apiSSL = Boolean(formState.routeros.apiSSL);
+
+    return (
+      <>
+        <div className="form-section">
+          <p className="form-section__title">RouterOS API</p>
+          <p className="field-hint">
+            {apiEnabled
+              ? 'Configure the RouterOS API endpoint, credentials, and timeouts used for automation.'
+              : 'Enable the RouterOS API to manage this device remotely without SSH.'}
+          </p>
+          <label className="form-switch-row">
+            <input
+              type="checkbox"
+              checked={apiEnabled}
+              onChange={() => onToggle('apiEnabled')}
+              disabled={disabled}
+            />
+            <span>Enable RouterOS API</span>
+          </label>
+          {apiEnabled ? (
+            <>
+              <div className="form-section__grid form-section__grid--compact">
+                <label>
+                  <span>API port</span>
+                  <input
+                    name="apiPort"
+                    type="number"
+                    min="1"
+                    value={formState.routeros.apiPort}
+                    onChange={onFieldChange}
+                    disabled={disabled}
+                  />
+                </label>
+                <label>
+                  <span>Username</span>
+                  <input
+                    name="apiUsername"
+                    value={formState.routeros.apiUsername}
+                    onChange={onFieldChange}
+                    disabled={disabled}
+                  />
+                </label>
+                <label>
+                  <span>Password / token</span>
+                  <input
+                    name="apiPassword"
+                    type="password"
+                    autoComplete="off"
+                    value={formState.routeros.apiPassword}
+                    onChange={onFieldChange}
+                    disabled={disabled}
+                  />
+                </label>
+                <label>
+                  <span>Timeout (ms)</span>
+                  <input
+                    name="apiTimeout"
+                    type="number"
+                    min="100"
+                    step="100"
+                    value={formState.routeros.apiTimeout}
+                    onChange={onFieldChange}
+                    disabled={disabled}
+                  />
+                </label>
+                <label>
+                  <span>Retries</span>
+                  <input
+                    name="apiRetries"
+                    type="number"
+                    min="0"
+                    max="5"
+                    value={formState.routeros.apiRetries}
+                    onChange={onFieldChange}
+                    disabled={disabled}
+                  />
+                </label>
+              </div>
+              <div className="form-toggle-stack">
+                <label className="form-switch-row">
+                  <input
+                    type="checkbox"
+                    checked={apiSSL}
+                    onChange={() => onToggle('apiSSL')}
+                    disabled={disabled}
+                  />
+                  <span>Use TLS (port 8729)</span>
+                </label>
+                {apiSSL ? (
+                  <label className="form-switch-row">
+                    <input
+                      type="checkbox"
+                      checked={formState.routeros.verifyTLS}
+                      onChange={() => onToggle('verifyTLS')}
+                      disabled={disabled}
+                    />
+                    <span>Verify certificates</span>
+                  </label>
+                ) : null}
+                <label className="form-switch-row">
+                  <input
+                    type="checkbox"
+                    checked={formState.routeros.allowInsecureCiphers}
+                    onChange={() => onToggle('allowInsecureCiphers')}
+                    disabled={disabled}
+                  />
+                  <span>Allow legacy ciphers</span>
+                </label>
+              </div>
+            </>
+          ) : (
+            <p className="management-list__subtitle">
+              Enable the RouterOS API to manage this device remotely and store its credentials securely.
+            </p>
+          )}
+        </div>
+        <div className="form-section">
+          <p className="form-section__title">Connection preferences</p>
+          <p className="field-hint">Tune how MikroManage connects when both API and SSH are available.</p>
+          <div className="form-toggle-stack">
+            <label className="form-switch-row">
+              <input
+                type="checkbox"
+                checked={formState.routeros.preferredApiFirst}
+                onChange={() => onToggle('preferredApiFirst')}
+                disabled={disabled}
+              />
+              <span>Prefer API before SSH fallback</span>
+            </label>
+          </div>
+        </div>
+      </>
+    );
+  };
 
   return (
     <div>
@@ -553,29 +605,66 @@ const Mikrotiks = () => {
       ) : sortedDevices.length === 0 ? (
         <p>No Mikrotik devices have been added yet.</p>
       ) : (
-        <ul className="management-list" aria-live="polite">
-          {sortedDevices.map((entry) => (
-            <li key={entry.id} className="management-list__item">
-              <div className="management-list__summary">
-                <span className="management-list__title">{entry.name}</span>
-                <div className="management-list__meta">
-                  <span>{entry.host}</span>
-                  <span>{entry.groupName ? `Group: ${entry.groupName}` : 'No group assigned'}</span>
-                  <span className={`status-pill status-pill--${entry.status?.updateStatus ?? 'unknown'}`}>
-                    {entry.status?.updateStatus ?? 'unknown'}
-                  </span>
-                  <span>{entry.routeros?.apiEnabled ? 'API enabled' : 'API disabled'}</span>
-                  <span>Created {formatDateTime(entry.createdAt)}</span>
-                </div>
-              </div>
-              <div className="management-list__actions">
-                <button type="button" className="action-button" onClick={() => openManageModal(entry)}>
-                  Manage
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <div className="directory-grid" role="list" aria-live="polite">
+          {sortedDevices.map((entry) => {
+            const tags = Array.isArray(entry.tags) ? entry.tags : [];
+            const statusKey = (entry.status?.updateStatus ?? 'unknown').toLowerCase();
+            const statusLabel = statusKey.replace(/_/g, ' ');
+            const statusTitle = statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1);
+
+            return (
+              <article key={entry.id} className="directory-card" role="listitem">
+                <header className="directory-card__header">
+                  <div>
+                    <h3 className="directory-card__title">{entry.name}</h3>
+                    <p className="directory-card__subtitle">{entry.host}</p>
+                  </div>
+                  <div className="directory-card__header-meta">
+                    <span className="directory-card__badge">ID {entry.id}</span>
+                    <span className={`status-pill status-pill--${statusKey}`}>{statusTitle}</span>
+                  </div>
+                </header>
+                <dl className="directory-card__meta">
+                  <div>
+                    <dt>Group</dt>
+                    <dd>{entry.groupName ?? 'Unassigned'}</dd>
+                  </div>
+                  <div>
+                    <dt>API</dt>
+                    <dd>
+                      {entry.routeros?.apiEnabled
+                        ? entry.routeros?.apiSSL
+                          ? 'Enabled (TLS)'
+                          : 'Enabled'
+                        : 'Disabled'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Added</dt>
+                    <dd>{formatDateTime(entry.createdAt)}</dd>
+                  </div>
+                </dl>
+                {tags.length > 0 ? (
+                  <ul className="directory-card__chips">
+                    {tags.map((tag) => (
+                      <li key={`${entry.id}-${tag}`}>{tag}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                {entry.notes ? <p className="field-hint">{entry.notes}</p> : null}
+                <footer className="directory-card__actions">
+                  <button
+                    type="button"
+                    className="action-chip action-chip--primary"
+                    onClick={() => openManageModal(entry)}
+                  >
+                    Manage
+                  </button>
+                </footer>
+              </article>
+            );
+          })}
+        </div>
       )}
 
       {createOpen ? (
@@ -602,56 +691,61 @@ const Mikrotiks = () => {
             </>
           }
         >
-          <form id="create-device-form" onSubmit={handleCreateDevice} className="form-grid">
-            <label>
-              <span>Display name</span>
-              <input name="name" value={createForm.name} onChange={handleCreateFieldChange} required />
-            </label>
-            <label>
-              <span>Host / IP</span>
-              <input name="host" value={createForm.host} onChange={handleCreateFieldChange} required />
-            </label>
-            <label>
-              <span>Group</span>
-              <select name="groupId" value={createForm.groupId} onChange={handleCreateFieldChange}>
-                <option value="">No group</option>
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Update status</span>
-              <select name="status" value={createForm.status} onChange={handleCreateFieldChange}>
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Tags</span>
-              <input
-                name="tags"
-                value={createForm.tags}
-                onChange={handleCreateFieldChange}
-                placeholder="Comma separated"
-              />
-            </label>
-            <label className="wide">
-              <span>Notes</span>
-              <textarea
-                name="notes"
-                rows="3"
-                value={createForm.notes}
-                onChange={handleCreateFieldChange}
-                placeholder="Deployment notes, on-call hints, or maintenance reminders"
-              />
-            </label>
-            {renderRouterFields(createForm, handleCreateRouterToggle, handleCreateRouterField)}
+          <form id="create-device-form" onSubmit={handleCreateDevice} className="form-sections">
+            <div className="form-section">
+              <p className="form-section__title">Device details</p>
+              <div className="form-section__grid">
+                <label>
+                  <span>Display name</span>
+                  <input name="name" value={createForm.name} onChange={handleCreateFieldChange} required />
+                </label>
+                <label>
+                  <span>Host / IP</span>
+                  <input name="host" value={createForm.host} onChange={handleCreateFieldChange} required />
+                </label>
+                <label>
+                  <span>Group</span>
+                  <select name="groupId" value={createForm.groupId} onChange={handleCreateFieldChange}>
+                    <option value="">No group</option>
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Update status</span>
+                  <select name="status" value={createForm.status} onChange={handleCreateFieldChange}>
+                    {statusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Tags</span>
+                  <input
+                    name="tags"
+                    value={createForm.tags}
+                    onChange={handleCreateFieldChange}
+                    placeholder="Comma separated"
+                  />
+                </label>
+              </div>
+              <label>
+                <span>Notes</span>
+                <textarea
+                  name="notes"
+                  rows="3"
+                  value={createForm.notes}
+                  onChange={handleCreateFieldChange}
+                  placeholder="Deployment notes, on-call hints, or maintenance reminders"
+                />
+              </label>
+            </div>
+            {renderRouterSections(createForm, handleCreateRouterToggle, handleCreateRouterField, createBusy)}
           </form>
         </Modal>
       ) : null}
@@ -685,57 +779,67 @@ const Mikrotiks = () => {
             </>
           }
         >
-          <form id="manage-device-form" onSubmit={handleUpdateDevice} className="form-grid">
-            <label>
-              <span>Display name</span>
-              <input name="name" value={manageState.form.name} onChange={handleManageFieldChange} required />
-            </label>
-            <label>
-              <span>Host / IP</span>
-              <input name="host" value={manageState.form.host} onChange={handleManageFieldChange} required />
-            </label>
-            <label>
-              <span>Group</span>
-              <select name="groupId" value={manageState.form.groupId} onChange={handleManageFieldChange}>
-                <option value="">No group</option>
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Update status</span>
-              <select name="status" value={manageState.form.status} onChange={handleManageFieldChange}>
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Tags</span>
-              <input
-                name="tags"
-                value={manageState.form.tags}
-                onChange={handleManageFieldChange}
-                placeholder="Comma separated"
-              />
-            </label>
-            <label className="wide">
-              <span>Notes</span>
-              <textarea
-                name="notes"
-                rows="3"
-                value={manageState.form.notes}
-                onChange={handleManageFieldChange}
-                placeholder="Deployment notes, on-call hints, or maintenance reminders"
-              />
-            </label>
-            {renderRouterFields(manageState.form, handleManageRouterToggle, handleManageRouterField)}
-            <p className="field-hint">Created {formatDateTime(devices.find((d) => d.id === manageState.deviceId)?.createdAt)}</p>
+          <form id="manage-device-form" onSubmit={handleUpdateDevice} className="form-sections">
+            <div className="management-list__meta">
+              <span>ID: {manageState.deviceId ?? '—'}</span>
+              <span>
+                Created: {formatDateTime(devices.find((device) => device.id === manageState.deviceId)?.createdAt)}
+              </span>
+            </div>
+            <div className="form-section">
+              <p className="form-section__title">Device details</p>
+              <div className="form-section__grid">
+                <label>
+                  <span>Display name</span>
+                  <input name="name" value={manageState.form.name} onChange={handleManageFieldChange} required />
+                </label>
+                <label>
+                  <span>Host / IP</span>
+                  <input name="host" value={manageState.form.host} onChange={handleManageFieldChange} required />
+                </label>
+                <label>
+                  <span>Group</span>
+                  <select name="groupId" value={manageState.form.groupId} onChange={handleManageFieldChange}>
+                    <option value="">No group</option>
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Update status</span>
+                  <select name="status" value={manageState.form.status} onChange={handleManageFieldChange}>
+                    {statusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Tags</span>
+                  <input
+                    name="tags"
+                    value={manageState.form.tags}
+                    onChange={handleManageFieldChange}
+                    placeholder="Comma separated"
+                  />
+                </label>
+              </div>
+              <label>
+                <span>Notes</span>
+                <textarea
+                  name="notes"
+                  rows="3"
+                  value={manageState.form.notes}
+                  onChange={handleManageFieldChange}
+                  placeholder="Deployment notes, on-call hints, or maintenance reminders"
+                />
+              </label>
+            </div>
+            {renderRouterSections(manageState.form, handleManageRouterToggle, handleManageRouterField, manageBusy)}
           </form>
         </Modal>
       ) : null}

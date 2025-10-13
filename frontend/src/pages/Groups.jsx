@@ -64,6 +64,61 @@ const collectDescendantIds = (node) => {
   return ids;
 };
 
+const collectTreeIds = (nodes) => {
+  const ids = new Set();
+  const stack = Array.isArray(nodes) ? [...nodes] : [];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current || typeof current.id !== 'number') {
+      continue;
+    }
+
+    ids.add(current.id);
+
+    if (Array.isArray(current.children) && current.children.length > 0) {
+      stack.push(...current.children);
+    }
+  }
+
+  return ids;
+};
+
+const filterTreeByQuery = (nodes, query, groups) => {
+  if (!query) {
+    return nodes;
+  }
+
+  const lowerQuery = query.toLowerCase();
+  const groupLookup = new Map(groups.map((group) => [group.id, group]));
+
+  const visit = (node) => {
+    if (!node) {
+      return null;
+    }
+
+    const name = (node.name ?? '').toLowerCase();
+    const parentName = groupLookup.get(node.parentId)?.name?.toLowerCase() ?? '';
+    const childMatches = Array.isArray(node.children)
+      ? node.children.map(visit).filter(Boolean)
+      : [];
+
+    if (name.includes(lowerQuery) || parentName.includes(lowerQuery)) {
+      return { ...node, children: childMatches };
+    }
+
+    if (childMatches.length > 0) {
+      return { ...node, children: childMatches };
+    }
+
+    return null;
+  };
+
+  return nodes
+    .map((node) => visit(node))
+    .filter(Boolean);
+};
+
 const Groups = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -79,6 +134,7 @@ const Groups = () => {
   const [manageBusy, setManageBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [filter, setFilter] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState(() => new Set());
 
   useEffect(() => {
     if (!user) {
@@ -140,19 +196,13 @@ const Groups = () => {
     }));
   }, [orderedGroups]);
 
-  const filteredOrderedGroups = useMemo(() => {
-    const query = filter.trim().toLowerCase();
-    if (!query) {
-      return orderedGroups;
-    }
+  const query = filter.trim().toLowerCase();
+  const filteredTree = useMemo(
+    () => filterTreeByQuery(tree, query, groups),
+    [tree, query, groups]
+  );
 
-    return orderedGroups.filter((entry) => {
-      const nameMatch = entry.name?.toLowerCase().includes(query);
-      const parentName = groups.find((group) => group.id === entry.parentId)?.name ?? '';
-      const parentMatch = parentName.toLowerCase().includes(query);
-      return nameMatch || parentMatch;
-    });
-  }, [filter, orderedGroups, groups]);
+  const visibleCount = useMemo(() => collectTreeIds(filteredTree).size, [filteredTree]);
 
   const availableParentOptions = (groupId) => {
     if (!groupId) {
@@ -164,6 +214,132 @@ const Groups = () => {
     const disallowed = new Set([...descendants, groupId]);
 
     return parentOptions.filter((option) => !disallowed.has(option.value));
+  };
+
+  useEffect(() => {
+    if (tree.length === 0) {
+      return;
+    }
+
+    setExpandedGroups((current) => {
+      if (current.size > 0) {
+        return current;
+      }
+
+      const next = new Set();
+      if (rootGroupId) {
+        next.add(rootGroupId);
+      }
+      return next;
+    });
+  }, [tree, rootGroupId]);
+
+  useEffect(() => {
+    if (!query) {
+      return;
+    }
+
+    setExpandedGroups(collectTreeIds(filteredTree));
+  }, [query, filteredTree]);
+
+  const toggleGroupExpansion = (groupId) => {
+    setExpandedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(groupId)) {
+        if (groupId === rootGroupId) {
+          return next;
+        }
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  };
+
+  const expandAllGroups = () => {
+    setExpandedGroups(collectTreeIds(tree));
+  };
+
+  const collapseAllGroups = () => {
+    const next = new Set();
+    if (rootGroupId) {
+      next.add(rootGroupId);
+    }
+    setExpandedGroups(next);
+  };
+
+  const renderTree = (nodes, depth = 0) => {
+    if (!Array.isArray(nodes) || nodes.length === 0) {
+      return null;
+    }
+
+    return (
+      <ul className="management-tree" role={depth === 0 ? 'tree' : 'group'}>
+        {nodes.map((node) => {
+          const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+          const expanded = expandedGroups.has(node.id) || (query && hasChildren);
+          const nodeClasses = ['management-tree__node'];
+
+          if (depth === 0) {
+            nodeClasses.push('management-tree__node--root');
+          }
+
+          return (
+            <li
+              key={node.id}
+              className={nodeClasses.join(' ')}
+              role="treeitem"
+              aria-expanded={hasChildren ? expanded : undefined}
+              aria-level={depth + 1}
+              style={{ '--tree-depth': depth }}
+            >
+              <div className="management-tree__row">
+                {hasChildren ? (
+                  <button
+                    type="button"
+                    className="management-tree__toggle"
+                    onClick={() => toggleGroupExpansion(node.id)}
+                    aria-expanded={expanded}
+                    aria-label={expanded ? `Collapse ${node.name}` : `Expand ${node.name}`}
+                  >
+                    {expanded ? '−' : '+'}
+                  </button>
+                ) : (
+                  <span className="management-tree__toggle management-tree__toggle--static" aria-hidden="true">
+                    ·
+                  </span>
+                )}
+                <div className="management-tree__info">
+                  <span className="management-tree__name">{node.name}</span>
+                  <div className="management-tree__meta">
+                    <span>
+                      Parent:{' '}
+                      {node.parentId
+                        ? groups.find((group) => group.id === node.parentId)?.name || '—'
+                        : 'Top-level'}
+                    </span>
+                    <span>Created: {formatDateTime(node.createdAt)}</span>
+                  </div>
+                </div>
+                <div className="management-list__actions">
+                  <button
+                    type="button"
+                    className="action-button action-button--primary"
+                    onClick={() => openManageModal(node)}
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+              {hasChildren && expanded ? (
+                <div className="management-tree__children">{renderTree(node.children, depth + 1)}</div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    );
   };
 
   const openCreateModal = () => {
@@ -361,40 +537,22 @@ const Groups = () => {
 
       {loading ? (
         <p>Loading groups…</p>
-      ) : filteredOrderedGroups.length === 0 ? (
-        <p>No groups available yet.</p>
+      ) : visibleCount === 0 ? (
+        <p>No groups match the current filters.</p>
       ) : (
-        <ul className="management-list" aria-live="polite">
-          {filteredOrderedGroups.map((entry) => (
-            <li key={entry.id} className="management-list__item">
-              <div
-                className="management-list__summary"
-                data-depth={entry.depth ?? 0}
-                style={{ '--depth': String(entry.depth ?? 0) }}
-              >
-                <span className="management-list__title">{entry.name}</span>
-                <div className="management-list__meta">
-                  <span>
-                    Parent:{' '}
-                    {entry.parentId
-                      ? groups.find((group) => group.id === entry.parentId)?.name || '—'
-                      : 'Top-level'}
-                  </span>
-                  <span>Created {formatDateTime(entry.createdAt)}</span>
-                </div>
-              </div>
-              <div className="management-list__actions">
-                <button
-                  type="button"
-                  className="action-button action-button--ghost"
-                  onClick={() => openManageModal(entry)}
-                >
-                  Manage
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <div>
+          <div className="management-tree-controls">
+            <div className="toolbar-actions__group">
+              <button type="button" className="action-button action-button--ghost" onClick={expandAllGroups}>
+                Expand all
+              </button>
+              <button type="button" className="action-button action-button--ghost" onClick={collapseAllGroups}>
+                Collapse all
+              </button>
+            </div>
+          </div>
+          {renderTree(filteredTree)}
+        </div>
       )}
 
       {createOpen ? (
