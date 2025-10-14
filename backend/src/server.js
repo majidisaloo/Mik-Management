@@ -19,6 +19,8 @@ const basePermissions = {
   settings: false
 };
 
+const TARGET_ROUTEROS_VERSION = '7.14.0';
+
 const pepperPassword = (password, secret) => `${password}${secret}`;
 
 const hashPassword = (password, secret) => {
@@ -102,6 +104,312 @@ const parseJsonBody = (req) =>
       reject(error);
     });
   });
+
+const DEFAULT_PHPIPAM_TIMEOUT_MS = 7000;
+
+const normalisePhpIpamBaseUrl = (baseUrl) => {
+  if (typeof baseUrl !== 'string') {
+    return '';
+  }
+
+  const trimmed = baseUrl.trim();
+
+  if (!trimmed) {
+    return '';
+  }
+
+  return trimmed.replace(/\s+/g, '').replace(/\/+$/, '');
+};
+
+const resolvePhpIpamId = (record, fallbackKeys = []) => {
+  if (!record || typeof record !== 'object') {
+    return null;
+  }
+
+  const candidates = [
+    'id',
+    'ID',
+    'sectionId',
+    'sectionID',
+    'sectionid',
+    'subnetId',
+    'subnetID',
+    'subnetid',
+    'locationId',
+    'locationID',
+    'locationid',
+    ...fallbackKeys
+  ];
+
+  for (const key of candidates) {
+    if (record[key] !== undefined && record[key] !== null && record[key] !== '') {
+      return record[key];
+    }
+  }
+
+  return null;
+};
+
+const normalisePhpIpamList = (data) => {
+  if (!data) {
+    return [];
+  }
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (typeof data === 'object') {
+    return Object.values(data);
+  }
+
+  return [];
+};
+
+const intToIpv4 = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  const unsigned = numeric >>> 0;
+  return [unsigned >>> 24, (unsigned >>> 16) & 255, (unsigned >>> 8) & 255, unsigned & 255].join('.');
+};
+
+const formatPhpIpamSubnet = (value) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    if (value.includes(':') || value.includes('.')) {
+      return value;
+    }
+
+    const numeric = Number(value);
+
+    if (!Number.isNaN(numeric)) {
+      return intToIpv4(numeric) ?? value;
+    }
+
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    return intToIpv4(value);
+  }
+
+  return `${value}`;
+};
+
+const phpIpamFetch = async (ipam, endpoint, options = {}) => {
+  const baseUrl = normalisePhpIpamBaseUrl(ipam.baseUrl);
+
+  if (!baseUrl) {
+    throw new Error('Missing base URL');
+  }
+
+  const appId = ipam.appId ? encodeURIComponent(ipam.appId) : null;
+
+  if (!appId) {
+    throw new Error('Missing App ID');
+  }
+
+  const trimmedEndpoint = `${endpoint || ''}`.replace(/^\/+/, '');
+  const url = `${baseUrl}/${appId}/${trimmedEndpoint}`;
+
+  const allowNotFound = Boolean(options.allowNotFound);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeout ?? DEFAULT_PHPIPAM_TIMEOUT_MS);
+
+  let response;
+
+  try {
+    response = await fetch(url, {
+      method: options.method || 'GET',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mik-Management/1.0',
+        'phpipam-token': ipam.appCode ?? '',
+        ...(options.headers || {})
+      },
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('phpIPAM request timed out');
+    }
+    throw new Error(error.message || 'Failed to reach phpIPAM');
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  let payload;
+  const contentType = response.headers.get('content-type') || '';
+
+  try {
+    if (contentType.includes('application/json')) {
+      payload = await response.json();
+    } else {
+      const text = await response.text();
+      payload = text ? JSON.parse(text) : {};
+    }
+  } catch (error) {
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    throw new Error('Unexpected response from phpIPAM');
+  }
+
+  if (!response.ok) {
+    if (response.status === 404 && allowNotFound) {
+      return [];
+    }
+
+    const message = payload && typeof payload === 'object' && payload.message ? payload.message : `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+
+  if (payload && typeof payload === 'object' && payload.success === false) {
+    if (allowNotFound && /not\s+found/i.test(payload.message || '')) {
+      return [];
+    }
+
+    throw new Error(payload.message || 'phpIPAM request failed');
+  }
+
+  if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {
+    if (payload.data === null && allowNotFound) {
+      return [];
+    }
+
+    return payload.data;
+  }
+
+  return payload;
+};
+
+const testPhpIpamConnection = async (ipam) => {
+  try {
+    const response = await phpIpamFetch(ipam, 'user/');
+
+    if (response && typeof response === 'object') {
+      const username = response.username || response.data?.username;
+      return {
+        status: 'connected',
+        message: username ? `Authenticated as ${username}` : 'phpIPAM connection succeeded'
+      };
+    }
+
+    return { status: 'connected', message: 'phpIPAM connection succeeded' };
+  } catch (error) {
+    return { status: 'failed', message: error.message || 'Unable to reach phpIPAM' };
+  }
+};
+
+const syncPhpIpamStructure = async (ipam) => {
+  const sectionsPayload = normalisePhpIpamList(await phpIpamFetch(ipam, 'sections/'));
+  const sections = sectionsPayload.map((section) => {
+    const identifier = resolvePhpIpamId(section, ['section']);
+    const sectionId = Number.parseInt(identifier, 10);
+    const metadata = {};
+
+    if (section.section !== undefined) {
+      metadata.slug = section.section;
+    }
+
+    if (section.order !== undefined) {
+      metadata.order = section.order;
+    }
+
+    return {
+      id: Number.isInteger(sectionId) ? sectionId : identifier,
+      name: section.name || section.section || `Section ${identifier ?? ''}`,
+      description: section.description || '',
+      metadata
+    };
+  });
+
+  let datacentersPayload = [];
+
+  try {
+    datacentersPayload = normalisePhpIpamList(await phpIpamFetch(ipam, 'tools/locations/', { allowNotFound: true }));
+  } catch (error) {
+    if (!/not\s+found/i.test(error.message || '')) {
+      throw error;
+    }
+  }
+
+  if (!datacentersPayload.length) {
+    datacentersPayload = normalisePhpIpamList(await phpIpamFetch(ipam, 'tools/sites/', { allowNotFound: true }));
+  }
+
+  const datacenters = datacentersPayload.map((entry) => {
+    const identifier = resolvePhpIpamId(entry, ['code']);
+    const dcId = Number.parseInt(identifier, 10);
+    const metadata = {};
+
+    if (entry.code) {
+      metadata.code = entry.code;
+    }
+
+    if (entry.address) {
+      metadata.address = entry.address;
+    }
+
+    return {
+      id: Number.isInteger(dcId) ? dcId : identifier,
+      name: entry.name || entry.code || `Datacenter ${identifier ?? ''}`,
+      description: entry.description || entry.address || '',
+      metadata
+    };
+  });
+
+  const ranges = [];
+
+  for (const section of sections) {
+    const sectionId = section.id ?? resolvePhpIpamId(section, ['sectionId']);
+
+    if (!sectionId) {
+      continue;
+    }
+
+    const rawRanges = normalisePhpIpamList(
+      await phpIpamFetch(ipam, `sections/${sectionId}/subnets/`, { allowNotFound: true })
+    );
+
+    for (const entry of rawRanges) {
+      const identifier = resolvePhpIpamId(entry, ['subnetId', 'subnet']);
+      const rangeId = Number.parseInt(identifier, 10);
+
+      const subnet = formatPhpIpamSubnet(entry.subnet ?? entry.network ?? identifier);
+      const mask = entry.mask ?? entry.cidr ?? entry.bit ?? entry.netmask;
+      const parsedMask = Number.parseInt(mask, 10);
+      const cidr = subnet && Number.isInteger(parsedMask) ? `${subnet}/${parsedMask}` : subnet || identifier;
+
+      const metadata = {
+        cidr: cidr || '',
+        sectionId,
+        vlanId: entry.vlanId ?? entry.vlanid ?? entry.vlan ?? null
+      };
+
+      Object.keys(metadata).forEach((key) => {
+        if (metadata[key] === null || metadata[key] === undefined || metadata[key] === '') {
+          delete metadata[key];
+        }
+      });
+
+      ranges.push({
+        id: Number.isInteger(rangeId) ? rangeId : identifier,
+        name: entry.description || entry.hostname || cidr || `Range ${identifier ?? ''}`,
+        description: entry.description || '',
+        metadata
+      });
+    }
+  }
+
+  return { sections, datacenters, ranges };
+};
 
 const parsePermissions = (permissions = {}) => {
   const normalized = { ...basePermissions };
@@ -238,7 +546,16 @@ const buildRouterosPayload = (input = {}) => ({
   apiTimeout: parseInteger(input.apiTimeout),
   apiRetries: parseInteger(input.apiRetries),
   allowInsecureCiphers: normalizeBooleanFlag(input.allowInsecureCiphers, false),
-  preferredApiFirst: normalizeBooleanFlag(input.preferredApiFirst, true)
+  preferredApiFirst: normalizeBooleanFlag(input.preferredApiFirst, true),
+  firmwareVersion: normalizeString(input.firmwareVersion),
+  sshEnabled: normalizeBooleanFlag(input.sshEnabled, false),
+  sshPort: parseInteger(input.sshPort),
+  sshUsername: normalizeString(input.sshUsername),
+  sshPassword: typeof input.sshPassword === 'string' ? input.sshPassword.trim() : '',
+  sshAcceptNewHostKeys: normalizeBooleanFlag(
+    input.sshAcceptNewHostKeys !== undefined ? input.sshAcceptNewHostKeys : input.sshAcceptUnknownHost,
+    true
+  )
 });
 
 const buildDeviceStatusPayload = (input = {}) => {
@@ -492,15 +809,92 @@ const mapMikrotik = (device, groups) => {
       apiTimeout: ensureNumber(routeros.apiTimeout, 5000),
       apiRetries: ensureNumber(routeros.apiRetries, 1),
       allowInsecureCiphers: normalizeBooleanFlag(routeros.allowInsecureCiphers, false),
-      preferredApiFirst: normalizeBooleanFlag(routeros.preferredApiFirst, true)
+      preferredApiFirst: normalizeBooleanFlag(routeros.preferredApiFirst, true),
+      firmwareVersion: typeof routeros.firmwareVersion === 'string' ? routeros.firmwareVersion : '',
+      sshEnabled: Boolean(routeros.sshEnabled),
+      sshPort: ensureNumber(routeros.sshPort, 22),
+      sshUsername: typeof routeros.sshUsername === 'string' ? routeros.sshUsername : '',
+      sshPassword: typeof routeros.sshPassword === 'string' ? routeros.sshPassword : '',
+      sshAcceptNewHostKeys: normalizeBooleanFlag(routeros.sshAcceptNewHostKeys, true)
     },
     status: {
       updateStatus:
         typeof device.status?.updateStatus === 'string' ? device.status.updateStatus : 'unknown',
-      lastAuditAt: device.status?.lastAuditAt ?? null
+      lastAuditAt: device.status?.lastAuditAt ?? null,
+      targetVersion: TARGET_ROUTEROS_VERSION
+    },
+    connectivity: {
+      api: {
+        status: typeof device.connectivity?.api?.status === 'string' ? device.connectivity.api.status : 'unknown',
+        lastCheckedAt: device.connectivity?.api?.lastCheckedAt ?? null,
+        lastError: device.connectivity?.api?.lastError ?? null
+      },
+      ssh: {
+        status: typeof device.connectivity?.ssh?.status === 'string' ? device.connectivity.ssh.status : 'unknown',
+        lastCheckedAt: device.connectivity?.ssh?.lastCheckedAt ?? null,
+        fingerprint: device.connectivity?.ssh?.fingerprint ?? null,
+        lastError: device.connectivity?.ssh?.lastError ?? null
+      }
     },
     createdAt: device.createdAt,
     updatedAt: device.updatedAt
+  };
+};
+
+const mapAddressList = (entry, groups, mikrotiks) => {
+  const referenceType = entry.referenceType ?? 'mikrotik';
+  let referenceName = null;
+
+  if (referenceType === 'mikrotik' && entry.referenceId) {
+    const device = mikrotiks.find((candidate) => candidate.id === entry.referenceId);
+    referenceName = device ? device.name : null;
+  }
+
+  if (referenceType === 'group' && entry.referenceId) {
+    const group = groups.find((candidate) => candidate.id === entry.referenceId);
+    referenceName = group ? group.name : null;
+  }
+
+  return {
+    id: entry.id,
+    name: entry.name,
+    referenceType,
+    referenceId: entry.referenceId ?? null,
+    referenceName,
+    address: entry.address ?? '',
+    comment: entry.comment ?? '',
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt
+  };
+};
+
+const mapFirewallFilter = (filter, groups, addressLists) => {
+  const group = filter.groupId ? groups.find((entry) => entry.id === filter.groupId) : null;
+  const sourceList = filter.sourceAddressListId
+    ? addressLists.find((entry) => entry.id === filter.sourceAddressListId)
+    : null;
+  const destinationList = filter.destinationAddressListId
+    ? addressLists.find((entry) => entry.id === filter.destinationAddressListId)
+    : null;
+
+  return {
+    id: filter.id,
+    name: filter.name,
+    groupId: filter.groupId ?? null,
+    groupName: group ? group.name : null,
+    chain: filter.chain,
+    sourceAddressListId: filter.sourceAddressListId ?? null,
+    sourceAddressListName: sourceList ? sourceList.name : null,
+    destinationAddressListId: filter.destinationAddressListId ?? null,
+    destinationAddressListName: destinationList ? destinationList.name : null,
+    sourcePort: filter.sourcePort ?? '',
+    destinationPort: filter.destinationPort ?? '',
+    states: Array.isArray(filter.states) ? [...filter.states] : [],
+    action: filter.action,
+    enabled: Boolean(filter.enabled),
+    comment: filter.comment ?? '',
+    createdAt: filter.createdAt,
+    updatedAt: filter.updatedAt
   };
 };
 
@@ -1276,7 +1670,8 @@ const bootstrap = async () => {
         const [devices, groups] = await Promise.all([db.listMikrotiks(), db.listGroups()]);
         sendJson(res, 200, {
           mikrotiks: devices.map((device) => mapMikrotik(device, groups)),
-          groups: groups.map(mapGroup)
+          groups: groups.map(mapGroup),
+          targetRouterOs: TARGET_ROUTEROS_VERSION
         });
       } catch (error) {
         console.error('List Mikrotiks error', error);
@@ -1334,7 +1729,8 @@ const bootstrap = async () => {
         const groups = await db.listGroups();
         sendJson(res, 201, {
           message: 'Mikrotik device added successfully.',
-          mikrotik: mapMikrotik(result.mikrotik, groups)
+          mikrotik: mapMikrotik(result.mikrotik, groups),
+          targetRouterOs: TARGET_ROUTEROS_VERSION
         });
       } catch (error) {
         console.error('Create Mikrotik error', error);
@@ -1411,11 +1807,348 @@ const bootstrap = async () => {
         const groups = await db.listGroups();
         sendJson(res, 200, {
           message: 'Mikrotik device updated successfully.',
-          mikrotik: mapMikrotik(result.mikrotik, groups)
+          mikrotik: mapMikrotik(result.mikrotik, groups),
+          targetRouterOs: TARGET_ROUTEROS_VERSION
         });
       } catch (error) {
         console.error('Update Mikrotik error', error);
         sendJson(res, 500, { message: 'Unable to update the Mikrotik device right now.' });
+      }
+    };
+
+    const handleTestMikrotikConnectivity = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.testMikrotikConnectivity(deviceId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to refresh connectivity.');
+        }
+
+        const groups = await db.listGroups();
+        sendJson(res, 200, {
+          message: 'Connectivity refreshed successfully.',
+          mikrotik: mapMikrotik(result.mikrotik, groups),
+          targetRouterOs: TARGET_ROUTEROS_VERSION
+        });
+      } catch (error) {
+        console.error('Test Mikrotik connectivity error', error);
+        sendJson(res, 500, { message: 'Unable to verify device connectivity right now.' });
+      }
+    };
+
+    const handleListFirewallInventory = async () => {
+      try {
+        const [addressLists, filters, groups, mikrotiks] = await Promise.all([
+          db.listAddressLists(),
+          db.listFirewallFilters(),
+          db.listGroups(),
+          db.listMikrotiks()
+        ]);
+
+        const mappedAddressLists = addressLists.map((entry) => mapAddressList(entry, groups, mikrotiks));
+        const mappedFilters = filters.map((filter) => mapFirewallFilter(filter, groups, addressLists));
+
+        sendJson(res, 200, {
+          addressLists: mappedAddressLists,
+          filters: mappedFilters,
+          groups: groups.map(mapGroup),
+          mikrotiks: mikrotiks.map((device) => mapMikrotik(device, groups)),
+          targetRouterOs: TARGET_ROUTEROS_VERSION
+        });
+      } catch (error) {
+        console.error('List firewall inventory error', error);
+        sendJson(res, 500, { message: 'Unable to load firewall inventory.' });
+      }
+    };
+
+    const handleCreateAddressList = async () => {
+      const body = await parseJsonBody(req);
+      const { name, referenceType, referenceId, address, comment } = body ?? {};
+
+      try {
+        const result = await db.createAddressList({ name, referenceType, referenceId, address, comment });
+
+        if (!result.success && result.reason === 'name-required') {
+          sendJson(res, 400, { message: 'List name is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'type-required') {
+          sendJson(res, 400, { message: 'A valid reference type is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-reference') {
+          sendJson(res, 400, { message: 'The selected reference is invalid.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to create address list.');
+        }
+
+        const [groups, mikrotiks] = await Promise.all([db.listGroups(), db.listMikrotiks()]);
+        sendJson(res, 201, {
+          message: 'Address list entry created successfully.',
+          addressList: mapAddressList(result.addressList, groups, mikrotiks)
+        });
+      } catch (error) {
+        console.error('Create address list error', error);
+        sendJson(res, 500, { message: 'Unable to create the address list entry right now.' });
+      }
+    };
+
+    const handleUpdateAddressList = async (listId) => {
+      if (!Number.isInteger(listId) || listId <= 0) {
+        sendJson(res, 400, { message: 'A valid address list id is required.' });
+        return;
+      }
+
+      const body = await parseJsonBody(req);
+      const { name, referenceType, referenceId, address, comment } = body ?? {};
+
+      try {
+        const result = await db.updateAddressList(listId, { name, referenceType, referenceId, address, comment });
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Address list entry not found.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'type-required') {
+          sendJson(res, 400, { message: 'A valid reference type is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-reference') {
+          sendJson(res, 400, { message: 'The selected reference is invalid.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to update address list entry.');
+        }
+
+        const [groups, mikrotiks] = await Promise.all([db.listGroups(), db.listMikrotiks()]);
+        sendJson(res, 200, {
+          message: 'Address list entry updated successfully.',
+          addressList: mapAddressList(result.addressList, groups, mikrotiks)
+        });
+      } catch (error) {
+        console.error('Update address list error', error);
+        sendJson(res, 500, { message: 'Unable to update the address list entry right now.' });
+      }
+    };
+
+    const handleDeleteAddressList = async (listId) => {
+      if (!Number.isInteger(listId) || listId <= 0) {
+        sendJson(res, 400, { message: 'A valid address list id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.deleteAddressList(listId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Address list entry not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to delete address list entry.');
+        }
+
+        sendNoContent(res);
+      } catch (error) {
+        console.error('Delete address list error', error);
+        sendJson(res, 500, { message: 'Unable to delete the address list entry right now.' });
+      }
+    };
+
+    const handleCreateFirewallFilter = async () => {
+      const body = await parseJsonBody(req);
+      const {
+        name,
+        groupId,
+        chain,
+        sourceAddressListId,
+        destinationAddressListId,
+        sourcePort,
+        destinationPort,
+        states,
+        action,
+        enabled,
+        comment
+      } = body ?? {};
+
+      try {
+        const result = await db.createFirewallFilter({
+          name,
+          groupId,
+          chain,
+          sourceAddressListId,
+          destinationAddressListId,
+          sourcePort,
+          destinationPort,
+          states,
+          action,
+          enabled,
+          comment
+        });
+
+        if (!result.success && result.reason === 'invalid-group') {
+          sendJson(res, 400, { message: 'The selected group does not exist.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-chain') {
+          sendJson(res, 400, { message: 'A valid firewall chain is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-source-address-list') {
+          sendJson(res, 400, { message: 'Select a valid source address list.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-destination-address-list') {
+          sendJson(res, 400, { message: 'Select a valid destination address list.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-action') {
+          sendJson(res, 400, { message: 'A valid action (accept or drop) is required.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to create firewall filter.');
+        }
+
+        const [addressLists, groups] = await Promise.all([db.listAddressLists(), db.listGroups()]);
+        sendJson(res, 201, {
+          message: 'Firewall filter created successfully.',
+          filter: mapFirewallFilter(result.firewallFilter, groups, addressLists)
+        });
+      } catch (error) {
+        console.error('Create firewall filter error', error);
+        sendJson(res, 500, { message: 'Unable to create the firewall filter right now.' });
+      }
+    };
+
+    const handleUpdateFirewallFilter = async (filterId) => {
+      if (!Number.isInteger(filterId) || filterId <= 0) {
+        sendJson(res, 400, { message: 'A valid firewall rule id is required.' });
+        return;
+      }
+
+      const body = await parseJsonBody(req);
+      const {
+        name,
+        groupId,
+        chain,
+        sourceAddressListId,
+        destinationAddressListId,
+        sourcePort,
+        destinationPort,
+        states,
+        action,
+        enabled,
+        comment
+      } = body ?? {};
+
+      try {
+        const result = await db.updateFirewallFilter(filterId, {
+          name,
+          groupId,
+          chain,
+          sourceAddressListId,
+          destinationAddressListId,
+          sourcePort,
+          destinationPort,
+          states,
+          action,
+          enabled,
+          comment
+        });
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Firewall rule not found.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-group') {
+          sendJson(res, 400, { message: 'The selected group does not exist.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-chain') {
+          sendJson(res, 400, { message: 'A valid firewall chain is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-source-address-list') {
+          sendJson(res, 400, { message: 'Select a valid source address list.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-destination-address-list') {
+          sendJson(res, 400, { message: 'Select a valid destination address list.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-action') {
+          sendJson(res, 400, { message: 'A valid action (accept or drop) is required.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to update firewall filter.');
+        }
+
+        const [addressLists, groups] = await Promise.all([db.listAddressLists(), db.listGroups()]);
+        sendJson(res, 200, {
+          message: 'Firewall filter updated successfully.',
+          filter: mapFirewallFilter(result.firewallFilter, groups, addressLists)
+        });
+      } catch (error) {
+        console.error('Update firewall filter error', error);
+        sendJson(res, 500, { message: 'Unable to update the firewall filter right now.' });
+      }
+    };
+
+    const handleDeleteFirewallFilter = async (filterId) => {
+      if (!Number.isInteger(filterId) || filterId <= 0) {
+        sendJson(res, 400, { message: 'A valid firewall rule id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.deleteFirewallFilter(filterId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Firewall rule not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to delete firewall filter.');
+        }
+
+        sendNoContent(res);
+      } catch (error) {
+        console.error('Delete firewall filter error', error);
+        sendJson(res, 500, { message: 'Unable to delete the firewall filter right now.' });
       }
     };
 
@@ -1446,6 +2179,8 @@ const bootstrap = async () => {
 
     const handleListTunnels = async () => {
       try {
+        await db.discoverTunnelsFromInventory();
+
         const [tunnels, groups, mikrotiks] = await Promise.all([
           db.listTunnels(),
           db.listGroups(),
@@ -1795,6 +2530,161 @@ const bootstrap = async () => {
       }
     };
 
+    const handleListIpams = async () => {
+      try {
+        const ipams = await db.listIpams();
+        sendJson(res, 200, { ipams });
+      } catch (error) {
+        console.error('List IPAMs error', error);
+        sendJson(res, 500, { message: 'Unable to load phpIPAM integrations.' });
+      }
+    };
+
+    const handleCreateIpam = async () => {
+      const body = await parseJsonBody(req);
+      const { name, baseUrl, appId, appCode, appPermissions, appSecurity } = body ?? {};
+
+      try {
+        const result = await db.createIpam({ name, baseUrl, appId, appCode, appPermissions, appSecurity });
+
+        if (!result.success) {
+          if (result.reason === 'duplicate-integration') {
+            sendJson(res, 409, {
+              message: 'An integration with this base URL and App ID already exists.'
+            });
+            return;
+          }
+
+          if (
+            result.reason === 'name-required' ||
+            result.reason === 'base-url-required' ||
+            result.reason === 'app-id-required' ||
+            result.reason === 'app-code-required'
+          ) {
+            sendJson(res, 400, { message: 'Name, base URL, App ID, and App Code are required.' });
+            return;
+          }
+
+          throw new Error('Unable to create IPAM integration');
+        }
+
+        let ipam = result.ipam;
+        let testResult = null;
+
+        try {
+          testResult = await testPhpIpamConnection(ipam);
+          const timestamp = new Date().toISOString();
+          await db.updateIpamStatus(ipam.id, { status: testResult.status, checkedAt: timestamp });
+          const refreshed = await db.getIpamById(ipam.id);
+          if (refreshed) {
+            ipam = refreshed;
+          }
+        } catch (error) {
+          console.warn('Initial phpIPAM test failed', error);
+        }
+
+        sendJson(res, 201, { ipam, test: testResult });
+      } catch (error) {
+        console.error('Create IPAM error', error);
+        sendJson(res, 500, { message: 'Unable to add the phpIPAM integration.' });
+      }
+    };
+
+    const handleDeleteIpam = async (ipamId) => {
+      if (!Number.isInteger(ipamId) || ipamId <= 0) {
+        sendJson(res, 400, { message: 'A valid IPAM id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.deleteIpam(ipamId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'IPAM integration not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to delete IPAM integration');
+        }
+
+        sendNoContent(res);
+      } catch (error) {
+        console.error('Delete IPAM error', error);
+        sendJson(res, 500, { message: 'Unable to delete the phpIPAM integration.' });
+      }
+    };
+
+    const handleTestIpam = async (ipamId) => {
+      if (!Number.isInteger(ipamId) || ipamId <= 0) {
+        sendJson(res, 400, { message: 'A valid IPAM id is required.' });
+        return;
+      }
+
+      try {
+        const ipam = await db.getIpamById(ipamId);
+
+        if (!ipam) {
+          sendJson(res, 404, { message: 'IPAM integration not found.' });
+          return;
+        }
+
+        const result = await testPhpIpamConnection(ipam);
+        const timestamp = new Date().toISOString();
+        await db.updateIpamStatus(ipamId, { status: result.status, checkedAt: timestamp });
+
+        sendJson(res, 200, {
+          ok: result.status === 'connected',
+          status: result.status,
+          message: result.message
+        });
+      } catch (error) {
+        console.error('Test IPAM error', error);
+        sendJson(res, 500, { message: 'Unable to verify phpIPAM connectivity.' });
+      }
+    };
+
+    const handleSyncIpam = async (ipamId) => {
+      if (!Number.isInteger(ipamId) || ipamId <= 0) {
+        sendJson(res, 400, { message: 'A valid IPAM id is required.' });
+        return;
+      }
+
+      try {
+        const ipam = await db.getIpamById(ipamId);
+
+        if (!ipam) {
+          sendJson(res, 404, { message: 'IPAM integration not found.' });
+          return;
+        }
+
+        const collections = await syncPhpIpamStructure(ipam);
+        await db.replaceIpamCollections(ipamId, collections);
+        const timestamp = new Date().toISOString();
+        await db.updateIpamStatus(ipamId, { status: 'connected', checkedAt: timestamp });
+
+        sendJson(res, 200, {
+          sections: collections.sections.length,
+          datacenters: collections.datacenters.length,
+          ranges: collections.ranges.length
+        });
+      } catch (error) {
+        console.error('Sync IPAM error', error);
+
+        if (Number.isInteger(ipamId) && ipamId > 0) {
+          try {
+            await db.updateIpamStatus(ipamId, { status: 'failed', checkedAt: new Date().toISOString() });
+          } catch (updateError) {
+            console.error('Failed to record IPAM failure status', updateError);
+          }
+        }
+
+        sendJson(res, 502, {
+          message: error.message || 'Unable to synchronise phpIPAM structure.'
+        });
+      }
+    };
+
     try {
       if (method === 'GET' && (canonicalPath === '/health' || resourcePath === '/health')) {
         sendJson(res, 200, { status: 'ok' });
@@ -1826,6 +2716,42 @@ const bootstrap = async () => {
       ) {
         await handleDashboardMetrics();
         return;
+      }
+
+      if (method === 'GET' && (canonicalPath === '/api/ipams' || resourcePath === '/ipams')) {
+        await handleListIpams();
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/ipams' || resourcePath === '/ipams')) {
+        await handleCreateIpam();
+        return;
+      }
+
+      if (resourceSegments[0] === 'ipams' && resourceSegments.length >= 2) {
+        const idSegment = resourceSegments[1];
+        const ipamId = Number.parseInt(idSegment, 10);
+
+        if (resourceSegments.length === 2) {
+          if (method === 'DELETE') {
+            await handleDeleteIpam(ipamId);
+            return;
+          }
+        }
+
+        if (resourceSegments.length === 3 && method === 'POST') {
+          const action = resourceSegments[2];
+
+          if (action === 'test') {
+            await handleTestIpam(ipamId);
+            return;
+          }
+
+          if (action === 'sync') {
+            await handleSyncIpam(ipamId);
+            return;
+          }
+        }
       }
 
       if (method === 'GET' && (canonicalPath === '/api/config-info' || resourcePath === '/config-info')) {
@@ -1949,9 +2875,65 @@ const bootstrap = async () => {
         }
       }
 
+      if (resourceSegments[0] === 'mikrotiks' && resourceSegments.length === 3) {
+        const deviceId = Number.parseInt(resourceSegments[1], 10);
+        const action = resourceSegments[2];
+
+        if (method === 'POST' && action === 'test-connectivity') {
+          await handleTestMikrotikConnectivity(deviceId);
+          return;
+        }
+      }
+
       if (method === 'POST' && (canonicalPath === '/api/mikrotiks' || resourcePath === '/mikrotiks')) {
         await handleCreateMikrotik();
         return;
+      }
+
+      if (method === 'GET' && (canonicalPath === '/api/firewall' || resourcePath === '/firewall')) {
+        await handleListFirewallInventory();
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/address-lists' || resourcePath === '/address-lists')) {
+        await handleCreateAddressList();
+        return;
+      }
+
+      if (resourceSegments[0] === 'address-lists' && resourceSegments.length === 2) {
+        const listId = Number.parseInt(resourceSegments[1], 10);
+
+        if (method === 'PUT') {
+          await handleUpdateAddressList(listId);
+          return;
+        }
+
+        if (method === 'DELETE') {
+          await handleDeleteAddressList(listId);
+          return;
+        }
+      }
+
+      if (
+        method === 'POST' &&
+        (canonicalPath === '/api/firewall/filters' || resourcePath === '/firewall/filters')
+      ) {
+        await handleCreateFirewallFilter();
+        return;
+      }
+
+      if (resourceSegments[0] === 'firewall' && resourceSegments[1] === 'filters' && resourceSegments.length === 3) {
+        const filterId = Number.parseInt(resourceSegments[2], 10);
+
+        if (method === 'PUT') {
+          await handleUpdateFirewallFilter(filterId);
+          return;
+        }
+
+        if (method === 'DELETE') {
+          await handleDeleteFirewallFilter(filterId);
+          return;
+        }
       }
 
       if (method === 'GET' && (canonicalPath === '/api/tunnels' || resourcePath === '/tunnels')) {

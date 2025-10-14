@@ -3,12 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
-const statusOptions = [
-  { value: 'updated', label: 'Updated' },
-  { value: 'pending', label: 'Pending update' },
-  { value: 'unknown', label: 'Unknown state' }
-];
-
 const defaultRouterForm = () => ({
   apiEnabled: false,
   apiSSL: false,
@@ -33,7 +27,6 @@ const emptyDeviceForm = () => ({
   groupId: '',
   tags: '',
   notes: '',
-  status: 'unknown',
   routeros: defaultRouterForm()
 });
 
@@ -133,7 +126,6 @@ const toFormState = (device) => {
     groupId: device.groupId ? String(device.groupId) : '',
     tags,
     notes: device.notes ?? '',
-    status: device.status?.updateStatus ?? 'unknown',
     routeros: {
       apiEnabled: Boolean(router.apiEnabled),
       apiSSL: sslEnabled,
@@ -174,7 +166,6 @@ const toPayload = (form) => ({
   groupId: form.groupId ? Number.parseInt(form.groupId, 10) : null,
   tags: parseTags(form.tags),
   notes: form.notes,
-  status: { updateStatus: form.status },
   routeros: {
     apiEnabled: Boolean(form.routeros.apiEnabled),
     apiSSL: Boolean(form.routeros.apiSSL),
@@ -202,10 +193,16 @@ const Mikrotiks = () => {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', message: '' });
   const [filter, setFilter] = useState('');
+  const [targetVersion, setTargetVersion] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState(emptyDeviceForm());
   const [createBusy, setCreateBusy] = useState(false);
-  const [manageState, setManageState] = useState({ open: false, deviceId: null, form: emptyDeviceForm() });
+  const [manageState, setManageState] = useState({
+    open: false,
+    deviceId: null,
+    form: emptyDeviceForm(),
+    details: null
+  });
   const [manageBusy, setManageBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const managedDevice = useMemo(
@@ -247,6 +244,9 @@ const Mikrotiks = () => {
 
         setDevices(Array.isArray(devicePayload?.mikrotiks) ? devicePayload.mikrotiks : []);
         setGroups(Array.isArray(groupPayload?.groups) ? groupPayload.groups : []);
+        setTargetVersion(
+          typeof devicePayload?.targetRouterOs === 'string' ? devicePayload.targetRouterOs : ''
+        );
         setStatus({ type: '', message: '' });
       } catch (error) {
         if (error.name === 'AbortError') {
@@ -298,14 +298,15 @@ const Mikrotiks = () => {
   };
 
   const openManageModal = (device) => {
-    setManageState({ open: true, deviceId: device.id, form: toFormState(device) });
+    setManageState({ open: true, deviceId: device.id, form: toFormState(device), details: device });
     setStatus({ type: '', message: '' });
   };
 
   const closeManageModal = () => {
-    setManageState({ open: false, deviceId: null, form: emptyDeviceForm() });
+    setManageState({ open: false, deviceId: null, form: emptyDeviceForm(), details: null });
     setManageBusy(false);
     setDeleteBusy(false);
+    setTestBusy(false);
   };
 
   const refreshDevices = async () => {
@@ -317,6 +318,17 @@ const Mikrotiks = () => {
 
       const payload = await response.json();
       setDevices(Array.isArray(payload?.mikrotiks) ? payload.mikrotiks : []);
+      setTargetVersion(typeof payload?.targetRouterOs === 'string' ? payload.targetRouterOs : '');
+      if (manageState.open && manageState.deviceId && Array.isArray(payload?.mikrotiks)) {
+        const updated = payload.mikrotiks.find((item) => item.id === manageState.deviceId);
+        if (updated) {
+          setManageState((current) => ({
+            ...current,
+            form: toFormState(updated),
+            details: updated
+          }));
+        }
+      }
     } catch (error) {
       setStatus({ type: 'error', message: error.message || 'Unable to refresh the Mikrotik inventory.' });
     }
@@ -518,6 +530,43 @@ const Mikrotiks = () => {
     }
   };
 
+  const handleTestConnectivity = async () => {
+    if (!manageState.deviceId) {
+      return;
+    }
+
+    setTestBusy(true);
+    setStatus({ type: '', message: '' });
+
+    try {
+      const response = await fetch(`/api/mikrotiks/${manageState.deviceId}/test-connectivity`, {
+        method: 'POST'
+      });
+
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message = payload?.message || 'Unable to verify connectivity.';
+        throw new Error(message);
+      }
+
+      if (payload?.mikrotik) {
+        setManageState((current) => ({
+          ...current,
+          form: toFormState(payload.mikrotik),
+          details: payload.mikrotik
+        }));
+      }
+
+      setStatus({ type: 'success', message: payload?.message || 'Connectivity refreshed.' });
+      await refreshDevices();
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message });
+    } finally {
+      setTestBusy(false);
+    }
+  };
+
   const renderRouterFields = (formState, onToggle, onFieldChange) => {
     const apiActive = formState.routeros.apiEnabled;
     const tlsActive = apiActive && formState.routeros.apiSSL;
@@ -548,6 +597,22 @@ const Mikrotiks = () => {
               onChange={() => onToggle('preferredApiFirst')}
             />
             <span>Prefer API before SSH</span>
+          </label>
+          <label className={`toggle-chip${sshActive ? ' toggle-chip--active' : ''}`}>
+            <input type="checkbox" checked={sshActive} onChange={() => onToggle('sshEnabled')} />
+            <span>SSH access</span>
+          </label>
+          <label
+            className={`toggle-chip${formState.routeros.sshAcceptNewHostKeys ? ' toggle-chip--active' : ''}`}
+            aria-disabled={!sshActive}
+          >
+            <input
+              type="checkbox"
+              checked={formState.routeros.sshAcceptNewHostKeys}
+              onChange={() => onToggle('sshAcceptNewHostKeys')}
+              disabled={!sshActive}
+            />
+            <span>Auto-accept fingerprints</span>
           </label>
         </div>
 
@@ -807,7 +872,24 @@ const Mikrotiks = () => {
                   <span className={`status-pill status-pill--${entry.status?.updateStatus ?? 'unknown'}`}>
                     {entry.status?.updateStatus ?? 'unknown'}
                   </span>
-                  <span>{entry.routeros?.apiEnabled ? 'API enabled' : 'API disabled'}</span>
+                  <span
+                    className={`status-pill status-pill--${connectivityStatusClass(
+                      entry.connectivity?.api?.status
+                    )}`}
+                  >
+                    API {formatConnectivityLabel(entry.connectivity?.api?.status)}
+                  </span>
+                  <span
+                    className={`status-pill status-pill--${connectivityStatusClass(
+                      entry.connectivity?.ssh?.status
+                    )}`}
+                  >
+                    SSH {formatConnectivityLabel(entry.connectivity?.ssh?.status)}
+                  </span>
+                  <span>
+                    Version {entry.routeros?.firmwareVersion || '—'} · Target{' '}
+                    {entry.status?.targetVersion || targetVersion || '—'}
+                  </span>
                   <span>Created {formatDateTime(entry.createdAt)}</span>
                 </div>
               </div>
@@ -981,6 +1063,43 @@ const Mikrotiks = () => {
                 placeholder="Deployment notes, on-call hints, or maintenance reminders"
               />
             </label>
+            <div className="connectivity-summary">
+              <h3 className="connectivity-summary__title">Connectivity status</h3>
+              <ul className="connectivity-summary__list">
+                <li>
+                  <span
+                    className={`status-pill status-pill--${connectivityStatusClass(
+                      manageState.details?.connectivity?.api?.status
+                    )}`}
+                  >
+                    API {formatConnectivityLabel(manageState.details?.connectivity?.api?.status)}
+                  </span>
+                  <span className="muted">
+                    Last check: {formatDateTime(manageState.details?.connectivity?.api?.lastCheckedAt)}
+                  </span>
+                </li>
+                <li>
+                  <span
+                    className={`status-pill status-pill--${connectivityStatusClass(
+                      manageState.details?.connectivity?.ssh?.status
+                    )}`}
+                  >
+                    SSH {formatConnectivityLabel(manageState.details?.connectivity?.ssh?.status)}
+                  </span>
+                  <span className="muted">
+                    Last check: {formatDateTime(manageState.details?.connectivity?.ssh?.lastCheckedAt)}
+                  </span>
+                </li>
+              </ul>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={handleTestConnectivity}
+                disabled={testBusy}
+              >
+                {testBusy ? 'Testing…' : 'Test connectivity'}
+              </button>
+            </div>
             {renderRouterFields(manageState.form, handleManageRouterToggle, handleManageRouterField)}
             {connectivityPanel ? <div className="form-grid__full">{connectivityPanel}</div> : null}
             <p className="field-hint">Created {formatDateTime(devices.find((d) => d.id === manageState.deviceId)?.createdAt)}</p>

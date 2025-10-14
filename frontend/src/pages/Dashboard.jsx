@@ -46,7 +46,12 @@ const Dashboard = () => {
 
       const payload = await response.json();
       setMetrics(payload);
-      setLastUpdated(new Date());
+      if (payload?.lastUpdatedAt) {
+        const parsed = new Date(payload.lastUpdatedAt);
+        setLastUpdated(Number.isNaN(parsed.getTime()) ? null : parsed);
+      } else {
+        setLastUpdated(null);
+      }
       setStatus({ type: '', message: '' });
     } catch (error) {
       setStatus({ type: 'error', message: error.message || 'Unable to load dashboard metrics.' });
@@ -103,7 +108,7 @@ const Dashboard = () => {
           </button>
           {lastUpdated ? (
             <span className="dashboard-updated" aria-live="polite">
-              Updated {lastUpdated.toLocaleTimeString()}
+              Last synchronised {lastUpdated.toLocaleString()}
             </span>
           ) : null}
         </div>
@@ -133,6 +138,16 @@ const Dashboard = () => {
               {formatNumber(metrics?.mikrotik?.pending ?? 0)} pending ·{' '}
               {formatNumber(metrics?.mikrotik?.unknown ?? 0)} unknown
             </p>
+          </article>
+          <article className="metric-card metric-card--success">
+            <h3>API online</h3>
+            <p className="metric-value">{formatNumber(metrics?.mikrotik?.apiOnline ?? 0)}</p>
+            <p className="metric-hint">{formatNumber(metrics?.mikrotik?.apiOffline ?? 0)} offline</p>
+          </article>
+          <article className="metric-card metric-card--success">
+            <h3>SSH reachable</h3>
+            <p className="metric-value">{formatNumber(metrics?.mikrotik?.sshOnline ?? 0)}</p>
+            <p className="metric-hint">{formatNumber(metrics?.mikrotik?.sshOffline ?? 0)} offline</p>
           </article>
         </div>
       </section>
