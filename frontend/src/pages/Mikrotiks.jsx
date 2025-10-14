@@ -950,6 +950,16 @@ const Mikrotiks = () => {
               </div>
             </label>
             <label>
+              <span>Update status</span>
+              <select name="status" value={createForm.status} onChange={handleCreateFieldChange}>
+                {statusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
               <span>Tags</span>
               <input
                 name="tags"
@@ -1023,6 +1033,16 @@ const Mikrotiks = () => {
                   ))}
                 </select>
               </div>
+            </label>
+            <label>
+              <span>Update status</span>
+              <select name="status" value={manageState.form.status} onChange={handleManageFieldChange}>
+                {statusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               <span>Tags</span>

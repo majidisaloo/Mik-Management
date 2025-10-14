@@ -160,6 +160,111 @@ const defaultVpnProfilesForm = () => ({
   wireguard: { server: defaultVpnPeerForm(), client: defaultVpnPeerForm() }
 });
 
+const vpnPeerHasConfig = (peer = {}) => {
+  return (
+    peer.enabled === true ||
+    Boolean(peer.serverAddress) ||
+    Boolean(peer.listenPort) ||
+    Boolean(peer.username) ||
+    Boolean(peer.password) ||
+    Boolean(peer.comment) ||
+    Boolean(peer.mtu) ||
+    Boolean(peer.mru) ||
+    Boolean(peer.certificate) ||
+    Boolean(peer.publicKey) ||
+    Boolean(peer.privateKey) ||
+    Boolean(peer.presharedKey) ||
+    Boolean(peer.allowedAddresses) ||
+    Boolean(peer.endpoint) ||
+    Boolean(peer.persistentKeepalive) ||
+    Boolean(peer.secret) ||
+    Boolean(peer.profile)
+  );
+};
+
+const deriveSectionStateFromForm = (form) => {
+  const profile = form.profile ?? {};
+  const monitoring = form.monitoring ?? {};
+  const ospf = form.ospf ?? {};
+  const vpnProfiles = form.vpnProfiles ?? {};
+
+  const sourceEndpoint = profile.endpoints?.source ?? {};
+  const targetEndpoint = profile.endpoints?.target ?? {};
+  const addressing = profile.addressing ?? {};
+
+  const vpnHasValue = ['pptp', 'l2tp', 'openvpn', 'wireguard'].some((key) => {
+    const value = vpnProfiles[key] ?? {};
+    return vpnPeerHasConfig(value.server) || vpnPeerHasConfig(value.client);
+  });
+
+  const monitoringHasValue =
+    (Array.isArray(monitoring.lastPingResults) && monitoring.lastPingResults.length > 0) ||
+    (Array.isArray(monitoring.lastTraceResults) && monitoring.lastTraceResults.length > 0);
+
+  const ospfHasValue =
+    ospf.enabled === false ||
+    (ospf.instance &&
+      (ospf.instance.name ||
+        ospf.instance.routerId ||
+        ospf.instance.areaId !== '0.0.0.0' ||
+        ospf.instance.metric ||
+        ospf.instance.referenceBandwidth)) ||
+    (Array.isArray(ospf.interfaceTemplates) && ospf.interfaceTemplates.length > 0) ||
+    (Array.isArray(ospf.areas) && ospf.areas.length > 0) ||
+    (Array.isArray(ospf.neighbors) && ospf.neighbors.length > 0);
+
+  return {
+    profile: true,
+    addressing: Object.values(addressing).some((value) => Boolean(value)),
+    sourceEndpoint:
+      Boolean(sourceEndpoint.identity) ||
+      (Array.isArray(sourceEndpoint.interfaces) && sourceEndpoint.interfaces.length > 0) ||
+      (Array.isArray(sourceEndpoint.routingTable) && sourceEndpoint.routingTable.length > 0),
+    targetEndpoint:
+      Boolean(targetEndpoint.identity) ||
+      (Array.isArray(targetEndpoint.interfaces) && targetEndpoint.interfaces.length > 0) ||
+      (Array.isArray(targetEndpoint.routingTable) && targetEndpoint.routingTable.length > 0),
+    monitoring: monitoringHasValue,
+    ospf: ospfHasValue,
+    vpn: vpnHasValue
+  };
+};
+
+const createDefaultSectionState = () => ({
+  profile: true,
+  addressing: false,
+  sourceEndpoint: false,
+  targetEndpoint: false,
+  monitoring: false,
+  ospf: false,
+  vpn: false
+});
+
+const CollapsibleSection = ({ label, checked, onToggle, description, children }) => (
+  <section className={`form-section form-section--collapsible${checked ? ' is-open' : ''}`}>
+    <header className="form-section__header">
+      <label className="toggle-field toggle-field--section">
+        <input type="checkbox" checked={checked} onChange={(event) => onToggle(event.target.checked)} />
+        <span>{label}</span>
+      </label>
+      {description ? <p className="form-section__description">{description}</p> : null}
+    </header>
+    {checked ? <div className="form-section__body">{children}</div> : null}
+  </section>
+);
+
+const CollapsibleSubSection = ({ label, checked, onToggle, children }) => (
+  <div className={`collapsible-subsection${checked ? ' is-open' : ''}`}>
+    <div className="collapsible-subsection__header">
+      <label className="toggle-field toggle-field--subsection">
+        <input type="checkbox" checked={checked} onChange={(event) => onToggle(event.target.checked)} />
+        <span>{label}</span>
+      </label>
+    </div>
+    {checked ? <div className="collapsible-subsection__body">{children}</div> : null}
+  </div>
+);
+
 const emptyTunnelForm = () => ({
   name: '',
   groupId: '',
@@ -723,6 +828,10 @@ const Tunnels = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState(() => emptyTunnelForm());
   const [createBusy, setCreateBusy] = useState(false);
+  const [sectionVisibility, setSectionVisibility] = useState({
+    create: createDefaultSectionState(),
+    manage: createDefaultSectionState()
+  });
 
   const [manageState, setManageState] = useState({ open: false, tunnelId: null, form: emptyTunnelForm() });
   const [manageBusy, setManageBusy] = useState(false);
@@ -828,19 +937,23 @@ const Tunnels = () => {
     setDiagnosticsState({ running: false, ping: [], trace: [], error: '' });
     setManageBusy(false);
     setDeleteBusy(false);
+    setSectionVisibility((current) => ({ ...current, manage: createDefaultSectionState() }));
   };
 
   const openCreateModal = () => {
     setCreateForm(emptyTunnelForm());
     setCreateOpen(true);
     setStatus({ type: '', message: '' });
+    setSectionVisibility((current) => ({ ...current, create: createDefaultSectionState() }));
   };
 
   const openManageModal = (record) => {
+    const form = createFormFromRecord(record);
+
     setManageState({
       open: true,
       tunnelId: record.id,
-      form: createFormFromRecord(record)
+      form
     });
     setDiagnosticsState({
       running: false,
@@ -849,6 +962,10 @@ const Tunnels = () => {
       error: ''
     });
     setStatus({ type: '', message: '' });
+    setSectionVisibility((current) => ({
+      ...current,
+      manage: deriveSectionStateFromForm(form)
+    }));
   };
 
   const handleTopLevelChange = (formType, event) => {
@@ -865,6 +982,19 @@ const Tunnels = () => {
       draft.profile.kind = value.toLowerCase();
       draft.profile.ipVersion = value.includes('6') ? 'ipv6' : 'ipv4';
       return draft;
+    });
+  };
+
+  const handleSectionToggle = (formType, section, value) => {
+    setSectionVisibility((current) => {
+      const existing = current[formType] ?? createDefaultSectionState();
+      return {
+        ...current,
+        [formType]: {
+          ...existing,
+          [section]: value
+        }
+      };
     });
   };
 
@@ -1333,6 +1463,7 @@ const Tunnels = () => {
   };
   const renderTunnelForm = (formType, form, options = {}) => {
     const isManage = options.manage === true;
+    const sectionState = sectionVisibility[formType] ?? createDefaultSectionState();
 
     return (
       <>
@@ -1460,8 +1591,11 @@ const Tunnels = () => {
           </div>
         </section>
 
-        <section className="form-section">
-          <h2>Tunnel profile</h2>
+        <CollapsibleSection
+          label="Tunnel profile"
+          checked={sectionState.profile}
+          onToggle={(value) => handleSectionToggle(formType, 'profile', value)}
+        >
           <div className="form-section__grid">
             <label>
               <span>Secret</span>
@@ -1623,10 +1757,20 @@ const Tunnels = () => {
               </div>
             </div>
           </div>
-        </section>
+        </CollapsibleSection>
 
-        <section className="form-section">
-          <h2>Endpoint addressing</h2>
+        <CollapsibleSection
+          label="Addressing & endpoints"
+          checked={sectionState.addressing || sectionState.sourceEndpoint || sectionState.targetEndpoint}
+          onToggle={(value) => {
+            handleSectionToggle(formType, 'addressing', value);
+            if (!value) {
+              handleSectionToggle(formType, 'sourceEndpoint', false);
+              handleSectionToggle(formType, 'targetEndpoint', false);
+            }
+          }}
+          description="IP assignments and device snapshots"
+        >
           <div className="form-section__grid">
             <label>
               <span>Local address</span>
@@ -1686,8 +1830,11 @@ const Tunnels = () => {
             </label>
           </div>
 
-          <div className="endpoint-section">
-            <h3>Source endpoint snapshot</h3>
+          <CollapsibleSubSection
+            label="Source endpoint snapshot"
+            checked={sectionState.sourceEndpoint}
+            onToggle={(value) => handleSectionToggle(formType, 'sourceEndpoint', value)}
+          >
             <label className="wide">
               <span>Identity</span>
               <input
@@ -1827,10 +1974,13 @@ const Tunnels = () => {
                 Add route
               </button>
             </div>
-          </div>
+          </CollapsibleSubSection>
 
-          <div className="endpoint-section">
-            <h3>Target endpoint snapshot</h3>
+          <CollapsibleSubSection
+            label="Target endpoint snapshot"
+            checked={sectionState.targetEndpoint}
+            onToggle={(value) => handleSectionToggle(formType, 'targetEndpoint', value)}
+          >
             <label className="wide">
               <span>Identity</span>
               <input
@@ -1967,11 +2117,15 @@ const Tunnels = () => {
                 Add route
               </button>
             </div>
-          </div>
-        </section>
+          </CollapsibleSubSection>
+        </CollapsibleSection>
 
-        <section className="form-section">
-          <h2>Monitoring & diagnostics</h2>
+        <CollapsibleSection
+          label="Monitoring"
+          checked={sectionState.monitoring}
+          onToggle={(value) => handleSectionToggle(formType, 'monitoring', value)}
+          description="Ping and trace configuration"
+        >
           <div className="form-section__grid">
             <div className="wide">
               <span>Ping targets</span>
@@ -2108,10 +2262,13 @@ const Tunnels = () => {
               </div>
             </div>
           ) : null}
-        </section>
+        </CollapsibleSection>
 
-        <section className="form-section">
-          <h2>OSPF configuration</h2>
+        <CollapsibleSection
+          label="OSPF"
+          checked={sectionState.ospf}
+          onToggle={(value) => handleSectionToggle(formType, 'ospf', value)}
+        >
           <div className="form-section__grid">
             <label className="toggle-field">
               <input
@@ -2377,10 +2534,14 @@ const Tunnels = () => {
               </button>
             </div>
           </div>
-        </section>
+        </CollapsibleSection>
 
-        <section className="form-section">
-          <h2>Remote access profiles</h2>
+        <CollapsibleSection
+          label="VPN profiles"
+          checked={sectionState.vpn}
+          onToggle={(value) => handleSectionToggle(formType, 'vpn', value)}
+          description="PPTP, L2TP, OpenVPN and WireGuard options"
+        >
           {['pptp', 'l2tp', 'openvpn', 'wireguard'].map((key) => (
             <div key={key} className="vpn-group">
               <h3>{key.toUpperCase()}</h3>
@@ -2552,7 +2713,7 @@ const Tunnels = () => {
               </div>
             </div>
           ))}
-        </section>
+        </CollapsibleSection>
       </>
     );
   };

@@ -350,6 +350,17 @@ const sanitizeRouteros = (options = {}, baseline = defaultRouterosOptions()) => 
     baseline.preferredApiFirst
   );
 
+  normalized.sshEnabled = normalizeBoolean(options.sshEnabled, baseline.sshEnabled);
+
+  const sshPortFallback = clampNumber(baseline.sshPort, { min: 1, max: 65535, fallback: 22 });
+  normalized.sshPort = clampNumber(options.sshPort, { min: 1, max: 65535, fallback: sshPortFallback });
+  normalized.sshUsername = normalizeOptionalText(options.sshUsername ?? baseline.sshUsername ?? '');
+  normalized.sshPassword = normalizeOptionalText(options.sshPassword ?? baseline.sshPassword ?? '');
+  normalized.autoAcceptFingerprints = normalizeBoolean(
+    options.autoAcceptFingerprints,
+    baseline.autoAcceptFingerprints
+  );
+
   if (normalized.apiSSL && !options.apiPort && !baseline.apiPort) {
     normalized.apiPort = 8729;
   }
@@ -1013,6 +1024,843 @@ const runTunnelDiscovery = (state) => {
   }
 
   return { mutated, added };
+};
+
+const sanitizeTunnelMetrics = (metrics = {}) => ({
+  latencyMs: parseOptionalNumber(metrics.latencyMs, { min: 0, max: 1_000_000 }),
+  packetLoss: parseOptionalNumber(metrics.packetLoss, { min: 0, max: 100 }),
+  lastCheckedAt: normalizeIsoDate(metrics.lastCheckedAt)
+});
+
+const parseOptionalInteger = (value, { min, max }) => {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+
+  if (!Number.isInteger(parsed)) {
+    return null;
+  }
+
+  if (typeof min === 'number' && parsed < min) {
+    return min;
+  }
+
+  if (typeof max === 'number' && parsed > max) {
+    return max;
+  }
+
+  return parsed;
+};
+
+const allowedTunnelKinds = new Set([
+  'ipip',
+  'ipipv6',
+  'eoip',
+  'eoipv6',
+  'gre',
+  'grev6',
+  '6to4',
+  '6to4-over-ipip',
+  '6to4-over-gre',
+  '6to4-over-eoip'
+]);
+
+const defaultProbeTargets = () => [
+  { address: '4.2.2.4', description: 'Level 3 DNS', enabled: true },
+  { address: '8.8.8.8', description: 'Google DNS', enabled: true },
+  { address: '1.1.1.1', description: 'Cloudflare DNS', enabled: true }
+];
+
+const defaultEndpointSnapshot = () => ({
+  identity: '',
+  interfaces: [],
+  routingTable: []
+});
+
+const defaultTunnelProfile = () => ({
+  kind: 'gre',
+  ipVersion: 'ipv4',
+  allowFastPath: true,
+  secret: '',
+  secretEnabled: true,
+  secretLastGeneratedAt: null,
+  keepAlive: {
+    enabled: true,
+    timeout: 10,
+    retryCount: 3,
+    holdTimer: 10
+  },
+  tunnelId: null,
+  mtu: null,
+  addressing: {
+    localAddress: '',
+    remoteAddress: '',
+    localTunnelIp: '',
+    remoteTunnelIp: '',
+    localIpamPool: '',
+    remoteIpamPool: ''
+  },
+  provisioning: {
+    viaApi: true,
+    viaSsh: true,
+    preferred: 'hybrid'
+  },
+  failover: {
+    disableSecretOnFailure: true,
+    candidateKinds: ['gre', 'ipip', 'eoip', '6to4'],
+    maxAttempts: 3
+  },
+  endpoints: {
+    source: defaultEndpointSnapshot(),
+    target: defaultEndpointSnapshot()
+  },
+  remarks: ''
+});
+
+const defaultTunnelMonitoring = () => ({
+  pingTargets: defaultProbeTargets(),
+  traceTargets: defaultProbeTargets(),
+  lastPingResults: [],
+  lastTraceResults: [],
+  lastUpdatedAt: null
+});
+
+const defaultTunnelOspf = () => ({
+  enabled: false,
+  instance: {
+    name: '',
+    routerId: '',
+    version: 'v2',
+    areaId: '0.0.0.0',
+    redistributeDefaultRoute: false,
+    metric: null,
+    referenceBandwidth: null
+  },
+  interfaceTemplates: [],
+  areas: [],
+  neighbors: []
+});
+
+const defaultVpnPeerConfig = () => ({
+  enabled: false,
+  interface: '',
+  profile: '',
+  serverAddress: '',
+  listenPort: null,
+  username: '',
+  password: '',
+  comment: '',
+  mtu: null,
+  mru: null,
+  allowFastPath: true,
+  certificate: '',
+  publicKey: '',
+  privateKey: '',
+  presharedKey: '',
+  allowedAddresses: '',
+  endpoint: '',
+  persistentKeepalive: null,
+  secret: ''
+});
+
+const defaultVpnProfiles = () => ({
+  pptp: { server: defaultVpnPeerConfig(), client: defaultVpnPeerConfig() },
+  l2tp: { server: defaultVpnPeerConfig(), client: defaultVpnPeerConfig() },
+  openvpn: { server: defaultVpnPeerConfig(), client: defaultVpnPeerConfig() },
+  wireguard: { server: defaultVpnPeerConfig(), client: defaultVpnPeerConfig() }
+});
+
+const sanitizeInterfaceInventory = (interfaces = []) => {
+  if (!Array.isArray(interfaces)) {
+    return [];
+  }
+
+  const seen = new Set();
+
+  return interfaces
+    .map((entry) => {
+      const name = normalizeOptionalText(entry.name ?? '');
+      if (!name) {
+        return null;
+      }
+
+      const key = name.toLowerCase();
+      if (seen.has(key)) {
+        return null;
+      }
+
+      seen.add(key);
+
+      return {
+        name,
+        type: normalizeOptionalText(entry.type ?? ''),
+        macAddress: normalizeOptionalText(entry.macAddress ?? ''),
+        arp: normalizeOptionalText(entry.arp ?? '').toLowerCase(),
+        mtu: parseOptionalInteger(entry.mtu, { min: 64, max: 10000 }),
+        comment: normalizeOptionalText(entry.comment ?? '')
+      };
+    })
+    .filter(Boolean);
+};
+
+const sanitizeRoutingTable = (routes = []) => {
+  if (!Array.isArray(routes)) {
+    return [];
+  }
+
+  const seen = new Set();
+
+  return routes
+    .map((route) => {
+      const destination = normalizeOptionalText(route.destination ?? route.dstAddress ?? '');
+      const gateway = normalizeOptionalText(route.gateway ?? route.nextHop ?? '');
+
+      if (!destination) {
+        return null;
+      }
+
+      const key = `${destination.toLowerCase()}|${gateway.toLowerCase()}`;
+      if (seen.has(key)) {
+        return null;
+      }
+
+      seen.add(key);
+
+      return {
+        destination,
+        gateway,
+        interface: normalizeOptionalText(route.interface ?? ''),
+        distance: parseOptionalInteger(route.distance, { min: 1, max: 255 }),
+        comment: normalizeOptionalText(route.comment ?? ''),
+        active: normalizeBoolean(route.active, true)
+      };
+    })
+    .filter(Boolean);
+};
+
+const sanitizeEndpointSnapshot = (snapshot = {}, baseline = defaultEndpointSnapshot()) => {
+  const normalized = { ...defaultEndpointSnapshot(), ...baseline };
+
+  if (snapshot.identity !== undefined) {
+    normalized.identity = normalizeOptionalText(snapshot.identity);
+  }
+
+  if (snapshot.interfaces !== undefined) {
+    normalized.interfaces = sanitizeInterfaceInventory(snapshot.interfaces);
+  }
+
+  if (snapshot.routingTable !== undefined) {
+    normalized.routingTable = sanitizeRoutingTable(snapshot.routingTable);
+  }
+
+  return normalized;
+};
+
+const sanitizeProbeTargets = (targets, fallback) => {
+  if (!Array.isArray(targets)) {
+    return fallback ? [...fallback] : [];
+  }
+
+  const seen = new Set();
+
+  const result = targets
+    .map((target) => {
+      const address = normalizeOptionalText(target?.address ?? target ?? '');
+      if (!address) {
+        return null;
+      }
+
+      const key = address.toLowerCase();
+      if (seen.has(key)) {
+        return null;
+      }
+
+      seen.add(key);
+
+      return {
+        address,
+        description: normalizeOptionalText(target.description ?? ''),
+        enabled: normalizeBoolean(target.enabled, true)
+      };
+    })
+    .filter(Boolean);
+
+  if (result.length === 0 && fallback) {
+    return [...fallback];
+  }
+
+  return result;
+};
+
+const sanitizeProbeResults = (results = []) => {
+  if (!Array.isArray(results)) {
+    return [];
+  }
+
+  return results
+    .map((entry) => {
+      const address = normalizeOptionalText(entry.address ?? '');
+      if (!address) {
+        return null;
+      }
+
+      return {
+        address,
+        success: normalizeBoolean(entry.success, false),
+        latencyMs: parseOptionalNumber(entry.latencyMs, { min: 0, max: 1_000_000 }),
+        output: normalizeOptionalText(entry.output ?? ''),
+        checkedAt: normalizeIsoDate(entry.checkedAt ?? new Date().toISOString())
+      };
+    })
+    .filter(Boolean);
+};
+
+const sanitizeTraceResults = (results = []) => {
+  if (!Array.isArray(results)) {
+    return [];
+  }
+
+  return results
+    .map((entry) => {
+      const address = normalizeOptionalText(entry.address ?? '');
+      if (!address) {
+        return null;
+      }
+
+      return {
+        address,
+        success: normalizeBoolean(entry.success, false),
+        hops: Array.isArray(entry.hops)
+          ? entry.hops.map((hop) => ({
+              hop: parseOptionalInteger(hop.hop ?? hop.index, { min: 1, max: 512 }),
+              address: normalizeOptionalText(hop.address ?? ''),
+              latencyMs: parseOptionalNumber(hop.latencyMs, { min: 0, max: 1_000_000 })
+            }))
+          : [],
+        output: normalizeOptionalText(entry.output ?? ''),
+        checkedAt: normalizeIsoDate(entry.checkedAt ?? new Date().toISOString())
+      };
+    })
+    .filter(Boolean);
+};
+
+const sanitizeTunnelMonitoring = (monitoring = {}, baseline = defaultTunnelMonitoring()) => {
+  const normalized = { ...defaultTunnelMonitoring(), ...baseline };
+
+  if (monitoring.pingTargets !== undefined) {
+    normalized.pingTargets = sanitizeProbeTargets(monitoring.pingTargets, defaultProbeTargets());
+  }
+
+  if (monitoring.traceTargets !== undefined) {
+    normalized.traceTargets = sanitizeProbeTargets(monitoring.traceTargets, defaultProbeTargets());
+  }
+
+  if (monitoring.lastPingResults !== undefined) {
+    normalized.lastPingResults = sanitizeProbeResults(monitoring.lastPingResults);
+  }
+
+  if (monitoring.lastTraceResults !== undefined) {
+    normalized.lastTraceResults = sanitizeTraceResults(monitoring.lastTraceResults);
+  }
+
+  if (monitoring.lastUpdatedAt !== undefined) {
+    normalized.lastUpdatedAt = normalizeIsoDate(monitoring.lastUpdatedAt);
+  }
+
+  return normalized;
+};
+
+const sanitizeOspfInstance = (instance = {}, baseline = defaultTunnelOspf().instance) => {
+  const normalized = { ...baseline };
+
+  if (instance.name !== undefined) {
+    normalized.name = normalizeOptionalText(instance.name);
+  }
+
+  if (instance.routerId !== undefined) {
+    normalized.routerId = normalizeOptionalText(instance.routerId);
+  }
+
+  if (instance.version !== undefined) {
+    const version = normalizeOptionalText(instance.version ?? '').toLowerCase();
+    normalized.version = version === 'v3' ? 'v3' : 'v2';
+  }
+
+  if (instance.areaId !== undefined || instance.area !== undefined) {
+    normalized.areaId = normalizeOptionalText(instance.areaId ?? instance.area ?? '0.0.0.0') || '0.0.0.0';
+  }
+
+  if (instance.redistributeDefaultRoute !== undefined) {
+    normalized.redistributeDefaultRoute = normalizeBoolean(instance.redistributeDefaultRoute, false);
+  }
+
+  if (instance.metric !== undefined) {
+    normalized.metric = parseOptionalNumber(instance.metric, { min: 0, max: 1_000_000 });
+  }
+
+  if (instance.referenceBandwidth !== undefined) {
+    normalized.referenceBandwidth = parseOptionalNumber(instance.referenceBandwidth, {
+      min: 1,
+      max: 1_000_000
+    });
+  }
+
+  return normalized;
+};
+
+const sanitizeOspfInterfaceTemplates = (templates = []) => {
+  if (!Array.isArray(templates)) {
+    return [];
+  }
+
+  return templates
+    .map((template, index) => {
+      const name = normalizeOptionalText(template.name ?? `template-${index + 1}`);
+      const network = normalizeOptionalText(template.network ?? template.address ?? '');
+
+      if (!network) {
+        return null;
+      }
+
+      return {
+        name,
+        network,
+        cost: parseOptionalInteger(template.cost, { min: 1, max: 65535 }),
+        priority: parseOptionalInteger(template.priority, { min: 0, max: 255 }),
+        passive: normalizeBoolean(template.passive, false),
+        comment: normalizeOptionalText(template.comment ?? '')
+      };
+    })
+    .filter(Boolean);
+};
+
+const sanitizeOspfAreas = (areas = []) => {
+  if (!Array.isArray(areas)) {
+    return [];
+  }
+
+  const seen = new Set();
+
+  return areas
+    .map((area, index) => {
+      const name = normalizeOptionalText(area.name ?? `area-${index + 1}`);
+      const areaId = normalizeOptionalText(area.areaId ?? area.id ?? '');
+
+      if (!areaId) {
+        return null;
+      }
+
+      const key = areaId.toLowerCase();
+      if (seen.has(key)) {
+        return null;
+      }
+
+      seen.add(key);
+
+      return {
+        name,
+        areaId,
+        type: normalizeOptionalText(area.type ?? '').toLowerCase(),
+        authentication: normalizeOptionalText(area.authentication ?? ''),
+        comment: normalizeOptionalText(area.comment ?? '')
+      };
+    })
+    .filter(Boolean);
+};
+
+const sanitizeOspfNeighbors = (neighbors = []) => {
+  if (!Array.isArray(neighbors)) {
+    return [];
+  }
+
+  const seen = new Set();
+
+  return neighbors
+    .map((neighbor, index) => {
+      const address = normalizeOptionalText(neighbor.address ?? neighbor.ip ?? '');
+      if (!address) {
+        return null;
+      }
+
+      const key = address.toLowerCase();
+      if (seen.has(key)) {
+        return null;
+      }
+
+      seen.add(key);
+
+      return {
+        name: normalizeOptionalText(neighbor.name ?? `neighbor-${index + 1}`),
+        address,
+        interface: normalizeOptionalText(neighbor.interface ?? ''),
+        priority: parseOptionalInteger(neighbor.priority, { min: 0, max: 255 }),
+        pollInterval: parseOptionalInteger(neighbor.pollInterval, { min: 1, max: 600 }),
+        state: normalizeOptionalText(neighbor.state ?? ''),
+        comment: normalizeOptionalText(neighbor.comment ?? '')
+      };
+    })
+    .filter(Boolean);
+};
+
+const sanitizeTunnelOspf = (ospf = {}, baseline = defaultTunnelOspf()) => {
+  const normalized = {
+    ...defaultTunnelOspf(),
+    ...baseline,
+    instance: sanitizeOspfInstance({}, baseline.instance ?? defaultTunnelOspf().instance)
+  };
+
+  if (ospf.enabled !== undefined) {
+    normalized.enabled = normalizeBoolean(ospf.enabled, false);
+  }
+
+  normalized.instance = sanitizeOspfInstance(ospf.instance ?? {}, normalized.instance);
+
+  if (ospf.interfaceTemplates !== undefined) {
+    normalized.interfaceTemplates = sanitizeOspfInterfaceTemplates(ospf.interfaceTemplates);
+  }
+
+  if (ospf.areas !== undefined) {
+    normalized.areas = sanitizeOspfAreas(ospf.areas);
+  }
+
+  if (ospf.neighbors !== undefined) {
+    normalized.neighbors = sanitizeOspfNeighbors(ospf.neighbors);
+  }
+
+  return normalized;
+};
+
+const sanitizeVpnPeer = (peer = {}, baseline = defaultVpnPeerConfig()) => {
+  const normalized = { ...baseline };
+
+  if (peer.enabled !== undefined) {
+    normalized.enabled = normalizeBoolean(peer.enabled, false);
+  }
+
+  if (peer.interface !== undefined) {
+    normalized.interface = normalizeOptionalText(peer.interface);
+  }
+
+  if (peer.profile !== undefined) {
+    normalized.profile = normalizeOptionalText(peer.profile);
+  }
+
+  if (peer.serverAddress !== undefined) {
+    normalized.serverAddress = normalizeOptionalText(peer.serverAddress ?? peer.server ?? '');
+  }
+
+  if (peer.listenPort !== undefined) {
+    normalized.listenPort = parseOptionalInteger(peer.listenPort, { min: 1, max: 65535 });
+  }
+
+  if (peer.username !== undefined) {
+    normalized.username = normalizeOptionalText(peer.username);
+  }
+
+  if (peer.password !== undefined) {
+    normalized.password = normalizeOptionalText(peer.password);
+  }
+
+  if (peer.comment !== undefined) {
+    normalized.comment = normalizeOptionalText(peer.comment);
+  }
+
+  if (peer.mtu !== undefined) {
+    normalized.mtu = parseOptionalInteger(peer.mtu, { min: 64, max: 10000 });
+  }
+
+  if (peer.mru !== undefined) {
+    normalized.mru = parseOptionalInteger(peer.mru, { min: 64, max: 10000 });
+  }
+
+  if (peer.allowFastPath !== undefined) {
+    normalized.allowFastPath = normalizeBoolean(peer.allowFastPath, true);
+  }
+
+  if (peer.certificate !== undefined) {
+    normalized.certificate = normalizeOptionalText(peer.certificate);
+  }
+
+  if (peer.publicKey !== undefined) {
+    normalized.publicKey = normalizeOptionalText(peer.publicKey);
+  }
+
+  if (peer.privateKey !== undefined) {
+    normalized.privateKey = normalizeOptionalText(peer.privateKey);
+  }
+
+  if (peer.presharedKey !== undefined) {
+    normalized.presharedKey = normalizeOptionalText(peer.presharedKey);
+  }
+
+  if (peer.allowedAddresses !== undefined) {
+    normalized.allowedAddresses = normalizeOptionalText(peer.allowedAddresses);
+  }
+
+  if (peer.endpoint !== undefined) {
+    normalized.endpoint = normalizeOptionalText(peer.endpoint);
+  }
+
+  if (peer.persistentKeepalive !== undefined) {
+    normalized.persistentKeepalive = parseOptionalInteger(peer.persistentKeepalive, {
+      min: 1,
+      max: 600
+    });
+  }
+
+  if (peer.secret !== undefined) {
+    normalized.secret = normalizeOptionalText(peer.secret);
+  }
+
+  return normalized;
+};
+
+const sanitizeVpnProfiles = (profiles = {}, baseline = defaultVpnProfiles()) => {
+  const normalizedBaseline = defaultVpnProfiles();
+  const normalized = {
+    pptp: {
+      server: sanitizeVpnPeer({}, baseline.pptp?.server ?? normalizedBaseline.pptp.server),
+      client: sanitizeVpnPeer({}, baseline.pptp?.client ?? normalizedBaseline.pptp.client)
+    },
+    l2tp: {
+      server: sanitizeVpnPeer({}, baseline.l2tp?.server ?? normalizedBaseline.l2tp.server),
+      client: sanitizeVpnPeer({}, baseline.l2tp?.client ?? normalizedBaseline.l2tp.client)
+    },
+    openvpn: {
+      server: sanitizeVpnPeer({}, baseline.openvpn?.server ?? normalizedBaseline.openvpn.server),
+      client: sanitizeVpnPeer({}, baseline.openvpn?.client ?? normalizedBaseline.openvpn.client)
+    },
+    wireguard: {
+      server: sanitizeVpnPeer({}, baseline.wireguard?.server ?? normalizedBaseline.wireguard.server),
+      client: sanitizeVpnPeer({}, baseline.wireguard?.client ?? normalizedBaseline.wireguard.client)
+    }
+  };
+
+  if (profiles.pptp !== undefined) {
+    normalized.pptp = {
+      server: sanitizeVpnPeer(profiles.pptp?.server ?? {}, normalized.pptp.server),
+      client: sanitizeVpnPeer(profiles.pptp?.client ?? {}, normalized.pptp.client)
+    };
+  }
+
+  if (profiles.l2tp !== undefined) {
+    normalized.l2tp = {
+      server: sanitizeVpnPeer(profiles.l2tp?.server ?? {}, normalized.l2tp.server),
+      client: sanitizeVpnPeer(profiles.l2tp?.client ?? {}, normalized.l2tp.client)
+    };
+  }
+
+  if (profiles.openvpn !== undefined) {
+    normalized.openvpn = {
+      server: sanitizeVpnPeer(profiles.openvpn?.server ?? {}, normalized.openvpn.server),
+      client: sanitizeVpnPeer(profiles.openvpn?.client ?? {}, normalized.openvpn.client)
+    };
+  }
+
+  if (profiles.wireguard !== undefined) {
+    normalized.wireguard = {
+      server: sanitizeVpnPeer(profiles.wireguard?.server ?? {}, normalized.wireguard.server),
+      client: sanitizeVpnPeer(profiles.wireguard?.client ?? {}, normalized.wireguard.client)
+    };
+  }
+
+  return normalized;
+};
+
+const sanitizeTunnelProfile = (profile = {}, baseline = defaultTunnelProfile()) => {
+  const normalized = { ...defaultTunnelProfile(), ...baseline };
+
+  const rawKind = profile.kind ?? profile.connectionType ?? normalized.kind;
+  const candidateKind = normalizeOptionalText(rawKind ?? '').toLowerCase();
+  if (allowedTunnelKinds.has(candidateKind)) {
+    normalized.kind = candidateKind;
+  } else if (!allowedTunnelKinds.has(normalized.kind)) {
+    normalized.kind = 'gre';
+  }
+
+  if (profile.ipVersion !== undefined) {
+    const candidate = normalizeOptionalText(profile.ipVersion ?? '').toLowerCase();
+    normalized.ipVersion = candidate === 'ipv6' ? 'ipv6' : 'ipv4';
+  } else if (normalized.kind.includes('v6')) {
+    normalized.ipVersion = 'ipv6';
+  }
+
+  if (profile.allowFastPath !== undefined) {
+    normalized.allowFastPath = normalizeBoolean(profile.allowFastPath, true);
+  }
+
+  if (profile.secret !== undefined) {
+    normalized.secret = normalizeOptionalText(profile.secret);
+  }
+
+  if (profile.secretEnabled !== undefined) {
+    normalized.secretEnabled = normalizeBoolean(profile.secretEnabled, normalized.secretEnabled);
+  } else if (!normalized.secret) {
+    normalized.secretEnabled = false;
+  }
+
+  if (profile.secretLastGeneratedAt !== undefined) {
+    normalized.secretLastGeneratedAt = normalizeIsoDate(profile.secretLastGeneratedAt);
+  }
+
+  const keepAliveBaseline = {
+    ...defaultTunnelProfile().keepAlive,
+    ...(normalized.keepAlive ?? {})
+  };
+  const keepAliveInput = profile.keepAlive ?? {};
+  const keepAlive = { ...keepAliveBaseline };
+
+  if (keepAliveInput.enabled !== undefined) {
+    keepAlive.enabled = normalizeBoolean(keepAliveInput.enabled, keepAlive.enabled);
+  }
+
+  if (keepAliveInput.timeout !== undefined) {
+    keepAlive.timeout = clampNumber(keepAliveInput.timeout, {
+      min: 1,
+      max: 600,
+      fallback: keepAlive.timeout
+    });
+  }
+
+  if (keepAliveInput.retryCount !== undefined) {
+    keepAlive.retryCount = clampNumber(keepAliveInput.retryCount, {
+      min: 0,
+      max: 20,
+      fallback: keepAlive.retryCount
+    });
+  }
+
+  if (keepAliveInput.holdTimer !== undefined) {
+    keepAlive.holdTimer = clampNumber(keepAliveInput.holdTimer, {
+      min: 1,
+      max: 600,
+      fallback: keepAlive.holdTimer
+    });
+  }
+
+  normalized.keepAlive = keepAlive;
+
+  if (profile.tunnelId !== undefined) {
+    normalized.tunnelId = parseOptionalInteger(profile.tunnelId, { min: 1, max: 4_294_967_295 });
+  }
+
+  if (profile.mtu !== undefined) {
+    normalized.mtu = parseOptionalInteger(profile.mtu, { min: 296, max: 9_000 });
+  }
+
+  const addressingBaseline = {
+    ...defaultTunnelProfile().addressing,
+    ...(normalized.addressing ?? {})
+  };
+  const addressingInput = profile.addressing ?? profile;
+  const addressing = { ...addressingBaseline };
+
+  if (addressingInput.localAddress !== undefined) {
+    addressing.localAddress = normalizeOptionalText(addressingInput.localAddress);
+  }
+
+  if (addressingInput.remoteAddress !== undefined) {
+    addressing.remoteAddress = normalizeOptionalText(addressingInput.remoteAddress);
+  }
+
+  if (addressingInput.localTunnelIp !== undefined) {
+    addressing.localTunnelIp = normalizeOptionalText(addressingInput.localTunnelIp);
+  }
+
+  if (addressingInput.remoteTunnelIp !== undefined) {
+    addressing.remoteTunnelIp = normalizeOptionalText(addressingInput.remoteTunnelIp);
+  }
+
+  if (addressingInput.localIpamPool !== undefined) {
+    addressing.localIpamPool = normalizeOptionalText(addressingInput.localIpamPool);
+  }
+
+  if (addressingInput.remoteIpamPool !== undefined) {
+    addressing.remoteIpamPool = normalizeOptionalText(addressingInput.remoteIpamPool);
+  }
+
+  normalized.addressing = addressing;
+
+  const provisioningBaseline = {
+    ...defaultTunnelProfile().provisioning,
+    ...(normalized.provisioning ?? {})
+  };
+  const provisioningInput = profile.provisioning ?? {};
+  const provisioning = { ...provisioningBaseline };
+
+  if (provisioningInput.viaApi !== undefined) {
+    provisioning.viaApi = normalizeBoolean(provisioningInput.viaApi, provisioning.viaApi);
+  }
+
+  if (provisioningInput.viaSsh !== undefined) {
+    provisioning.viaSsh = normalizeBoolean(provisioningInput.viaSsh, provisioning.viaSsh);
+  }
+
+  if (provisioningInput.preferred !== undefined) {
+    const preferred = normalizeOptionalText(provisioningInput.preferred ?? '').toLowerCase();
+    provisioning.preferred = ['api', 'ssh', 'hybrid'].includes(preferred)
+      ? preferred
+      : provisioning.viaApi && provisioning.viaSsh
+      ? 'hybrid'
+      : provisioning.viaApi
+      ? 'api'
+      : provisioning.viaSsh
+      ? 'ssh'
+      : 'api';
+  } else if (!['api', 'ssh', 'hybrid'].includes(provisioning.preferred)) {
+    provisioning.preferred = provisioning.viaApi && provisioning.viaSsh ? 'hybrid' : provisioning.viaApi ? 'api' : 'ssh';
+  }
+
+  normalized.provisioning = provisioning;
+
+  const failoverBaseline = {
+    ...defaultTunnelProfile().failover,
+    ...(normalized.failover ?? {})
+  };
+  const failoverInput = profile.failover ?? {};
+  const failover = { ...failoverBaseline };
+
+  if (failoverInput.disableSecretOnFailure !== undefined) {
+    failover.disableSecretOnFailure = normalizeBoolean(failoverInput.disableSecretOnFailure, true);
+  }
+
+  if (failoverInput.candidateKinds !== undefined) {
+    const candidates = Array.isArray(failoverInput.candidateKinds)
+      ? failoverInput.candidateKinds
+          .map((entry) => normalizeOptionalText(entry).toLowerCase())
+          .filter((entry) => allowedTunnelKinds.has(entry))
+      : [];
+    failover.candidateKinds = candidates.length > 0 ? candidates : failover.candidateKinds;
+  }
+
+  if (failoverInput.maxAttempts !== undefined) {
+    failover.maxAttempts = clampNumber(failoverInput.maxAttempts, {
+      min: 1,
+      max: 10,
+      fallback: failover.maxAttempts
+    });
+  }
+
+  normalized.failover = failover;
+
+  const endpointsBaseline = {
+    source: sanitizeEndpointSnapshot({}, normalized.endpoints?.source ?? defaultEndpointSnapshot()),
+    target: sanitizeEndpointSnapshot({}, normalized.endpoints?.target ?? defaultEndpointSnapshot())
+  };
+
+  const endpointsInput = profile.endpoints ?? {};
+  normalized.endpoints = {
+    source: sanitizeEndpointSnapshot(endpointsInput.source ?? {}, endpointsBaseline.source),
+    target: sanitizeEndpointSnapshot(endpointsInput.target ?? {}, endpointsBaseline.target)
+  };
+
+  if (profile.remarks !== undefined) {
+    normalized.remarks = normalizeOptionalText(profile.remarks);
+  }
+
+  return normalized;
 };
 
 export const resolveDatabaseFile = (databasePath = './data/app.db') => {
