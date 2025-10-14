@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
+import { isIP } from 'node:net';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -431,1786 +432,587 @@ const sanitizeTunnelMetrics = (metrics = {}) => ({
   lastCheckedAt: normalizeIsoDate(metrics.lastCheckedAt)
 });
 
-const parseOptionalInteger = (value, { min, max }) => {
-  if (value === null || value === undefined || value === '') {
+const discoveryNotePattern = /\[discovery\]\s+local=([^\s]+)\s+remote=([^\s]+)/i;
+
+const collectNormalizedIpAddresses = (value) => {
+  if (value === null || value === undefined) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    const nested = value.flatMap((entry) => collectNormalizedIpAddresses(entry));
+    return [...new Set(nested.filter(Boolean))];
+  }
+
+  if (typeof value === 'object') {
+    const nested = Object.values(value).flatMap((entry) => collectNormalizedIpAddresses(entry));
+    return [...new Set(nested.filter(Boolean))];
+  }
+
+  const tokens = String(value)
+    .replace(/^[\[\(]+|[\]\)]+$/g, '')
+    .split(/[,;]/)
+    .flatMap((segment) => segment.split(/\s+/))
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  const addresses = tokens
+    .map((segment) => {
+      const withoutPrefix = segment.includes('=') ? segment.split('=').pop() : segment;
+      const slashIndex = withoutPrefix.indexOf('/');
+      const base = slashIndex >= 0 ? withoutPrefix.slice(0, slashIndex) : withoutPrefix;
+      const scopeIndex = base.indexOf('%');
+      const candidate = scopeIndex >= 0 ? base.slice(0, scopeIndex) : base;
+      return candidate && isIP(candidate) ? candidate : null;
+    })
+    .filter(Boolean);
+
+  return [...new Set(addresses)];
+};
+
+const normalizeIpAddress = (value) => {
+  const [address] = collectNormalizedIpAddresses(value);
+  return address ?? null;
+};
+
+const pickField = (entry, keys) => {
+  if (!entry || typeof entry !== 'object') {
     return null;
   }
 
-  const parsed = Number.parseInt(value, 10);
-
-  if (!Number.isInteger(parsed)) {
-    return null;
-  }
-
-  if (typeof min === 'number' && parsed < min) {
-    return min;
-  }
-
-  if (typeof max === 'number' && parsed > max) {
-    return max;
-  }
-
-  return parsed;
-};
-
-const allowedTunnelKinds = new Set([
-  'ipip',
-  'ipipv6',
-  'eoip',
-  'eoipv6',
-  'gre',
-  'grev6',
-  '6to4',
-  '6to4-over-ipip',
-  '6to4-over-gre',
-  '6to4-over-eoip'
-]);
-
-const defaultProbeTargets = () => [
-  { address: '4.2.2.4', description: 'Level 3 DNS', enabled: true },
-  { address: '8.8.8.8', description: 'Google DNS', enabled: true },
-  { address: '1.1.1.1', description: 'Cloudflare DNS', enabled: true }
-];
-
-const defaultEndpointSnapshot = () => ({
-  identity: '',
-  interfaces: [],
-  routingTable: []
-});
-
-const defaultTunnelProfile = () => ({
-  kind: 'gre',
-  ipVersion: 'ipv4',
-  allowFastPath: true,
-  secret: '',
-  secretEnabled: true,
-  secretLastGeneratedAt: null,
-  keepAlive: {
-    enabled: true,
-    timeout: 10,
-    retryCount: 3,
-    holdTimer: 10
-  },
-  tunnelId: null,
-  mtu: null,
-  addressing: {
-    localAddress: '',
-    remoteAddress: '',
-    localTunnelIp: '',
-    remoteTunnelIp: '',
-    localIpamPool: '',
-    remoteIpamPool: ''
-  },
-  provisioning: {
-    viaApi: true,
-    viaSsh: true,
-    preferred: 'hybrid'
-  },
-  failover: {
-    disableSecretOnFailure: true,
-    candidateKinds: ['gre', 'ipip', 'eoip', '6to4'],
-    maxAttempts: 3
-  },
-  endpoints: {
-    source: defaultEndpointSnapshot(),
-    target: defaultEndpointSnapshot()
-  },
-  remarks: ''
-});
-
-const defaultTunnelMonitoring = () => ({
-  pingTargets: defaultProbeTargets(),
-  traceTargets: defaultProbeTargets(),
-  lastPingResults: [],
-  lastTraceResults: [],
-  lastUpdatedAt: null
-});
-
-const defaultTunnelOspf = () => ({
-  enabled: false,
-  instance: {
-    name: '',
-    routerId: '',
-    version: 'v2',
-    areaId: '0.0.0.0',
-    redistributeDefaultRoute: false,
-    metric: null,
-    referenceBandwidth: null
-  },
-  interfaceTemplates: [],
-  areas: [],
-  neighbors: []
-});
-
-const defaultVpnPeerConfig = () => ({
-  enabled: false,
-  interface: '',
-  profile: '',
-  serverAddress: '',
-  listenPort: null,
-  username: '',
-  password: '',
-  comment: '',
-  mtu: null,
-  mru: null,
-  allowFastPath: true,
-  certificate: '',
-  publicKey: '',
-  privateKey: '',
-  presharedKey: '',
-  allowedAddresses: '',
-  endpoint: '',
-  persistentKeepalive: null,
-  secret: ''
-});
-
-const defaultVpnProfiles = () => ({
-  pptp: { server: defaultVpnPeerConfig(), client: defaultVpnPeerConfig() },
-  l2tp: { server: defaultVpnPeerConfig(), client: defaultVpnPeerConfig() },
-  openvpn: { server: defaultVpnPeerConfig(), client: defaultVpnPeerConfig() },
-  wireguard: { server: defaultVpnPeerConfig(), client: defaultVpnPeerConfig() }
-});
-
-const sanitizeInterfaceInventory = (interfaces = []) => {
-  if (!Array.isArray(interfaces)) {
-    return [];
-  }
-
-  const seen = new Set();
-
-  return interfaces
-    .map((entry) => {
-      const name = normalizeOptionalText(entry.name ?? '');
-      if (!name) {
-        return null;
-      }
-
-      const key = name.toLowerCase();
-      if (seen.has(key)) {
-        return null;
-      }
-
-      seen.add(key);
-
-      return {
-        name,
-        type: normalizeOptionalText(entry.type ?? ''),
-        macAddress: normalizeOptionalText(entry.macAddress ?? ''),
-        arp: normalizeOptionalText(entry.arp ?? '').toLowerCase(),
-        mtu: parseOptionalInteger(entry.mtu, { min: 64, max: 10000 }),
-        comment: normalizeOptionalText(entry.comment ?? '')
-      };
-    })
-    .filter(Boolean);
-};
-
-const sanitizeRoutingTable = (routes = []) => {
-  if (!Array.isArray(routes)) {
-    return [];
-  }
-
-  const seen = new Set();
-
-  return routes
-    .map((route) => {
-      const destination = normalizeOptionalText(route.destination ?? route.dstAddress ?? '');
-      const gateway = normalizeOptionalText(route.gateway ?? route.nextHop ?? '');
-
-      if (!destination) {
-        return null;
-      }
-
-      const key = `${destination.toLowerCase()}|${gateway.toLowerCase()}`;
-      if (seen.has(key)) {
-        return null;
-      }
-
-      seen.add(key);
-
-      return {
-        destination,
-        gateway,
-        interface: normalizeOptionalText(route.interface ?? ''),
-        distance: parseOptionalInteger(route.distance, { min: 1, max: 255 }),
-        comment: normalizeOptionalText(route.comment ?? ''),
-        active: normalizeBoolean(route.active, true)
-      };
-    })
-    .filter(Boolean);
-};
-
-const sanitizeEndpointSnapshot = (snapshot = {}, baseline = defaultEndpointSnapshot()) => {
-  const normalized = { ...defaultEndpointSnapshot(), ...baseline };
-
-  if (snapshot.identity !== undefined) {
-    normalized.identity = normalizeOptionalText(snapshot.identity);
-  }
-
-  if (snapshot.interfaces !== undefined) {
-    normalized.interfaces = sanitizeInterfaceInventory(snapshot.interfaces);
-  }
-
-  if (snapshot.routingTable !== undefined) {
-    normalized.routingTable = sanitizeRoutingTable(snapshot.routingTable);
-  }
-
-  return normalized;
-};
-
-const sanitizeProbeTargets = (targets, fallback) => {
-  if (!Array.isArray(targets)) {
-    return fallback ? [...fallback] : [];
-  }
-
-  const seen = new Set();
-
-  const result = targets
-    .map((target) => {
-      const address = normalizeOptionalText(target?.address ?? target ?? '');
-      if (!address) {
-        return null;
-      }
-
-      const key = address.toLowerCase();
-      if (seen.has(key)) {
-        return null;
-      }
-
-      seen.add(key);
-
-      return {
-        address,
-        description: normalizeOptionalText(target.description ?? ''),
-        enabled: normalizeBoolean(target.enabled, true)
-      };
-    })
-    .filter(Boolean);
-
-  if (result.length === 0 && fallback) {
-    return [...fallback];
-  }
-
-  return result;
-};
-
-const sanitizeProbeResults = (results = []) => {
-  if (!Array.isArray(results)) {
-    return [];
-  }
-
-  return results
-    .map((entry) => {
-      const address = normalizeOptionalText(entry.address ?? '');
-      if (!address) {
-        return null;
-      }
-
-      return {
-        address,
-        success: normalizeBoolean(entry.success, false),
-        latencyMs: parseOptionalNumber(entry.latencyMs, { min: 0, max: 1_000_000 }),
-        output: normalizeOptionalText(entry.output ?? ''),
-        checkedAt: normalizeIsoDate(entry.checkedAt ?? new Date().toISOString())
-      };
-    })
-    .filter(Boolean);
-};
-
-const sanitizeTraceResults = (results = []) => {
-  if (!Array.isArray(results)) {
-    return [];
-  }
-
-  return results
-    .map((entry) => {
-      const address = normalizeOptionalText(entry.address ?? '');
-      if (!address) {
-        return null;
-      }
-
-      return {
-        address,
-        success: normalizeBoolean(entry.success, false),
-        hops: Array.isArray(entry.hops)
-          ? entry.hops.map((hop) => ({
-              hop: parseOptionalInteger(hop.hop ?? hop.index, { min: 1, max: 512 }),
-              address: normalizeOptionalText(hop.address ?? ''),
-              latencyMs: parseOptionalNumber(hop.latencyMs, { min: 0, max: 1_000_000 })
-            }))
-          : [],
-        output: normalizeOptionalText(entry.output ?? ''),
-        checkedAt: normalizeIsoDate(entry.checkedAt ?? new Date().toISOString())
-      };
-    })
-    .filter(Boolean);
-};
-
-const sanitizeTunnelMonitoring = (monitoring = {}, baseline = defaultTunnelMonitoring()) => {
-  const normalized = { ...defaultTunnelMonitoring(), ...baseline };
-
-  if (monitoring.pingTargets !== undefined) {
-    normalized.pingTargets = sanitizeProbeTargets(monitoring.pingTargets, defaultProbeTargets());
-  }
-
-  if (monitoring.traceTargets !== undefined) {
-    normalized.traceTargets = sanitizeProbeTargets(monitoring.traceTargets, defaultProbeTargets());
-  }
-
-  if (monitoring.lastPingResults !== undefined) {
-    normalized.lastPingResults = sanitizeProbeResults(monitoring.lastPingResults);
-  }
-
-  if (monitoring.lastTraceResults !== undefined) {
-    normalized.lastTraceResults = sanitizeTraceResults(monitoring.lastTraceResults);
-  }
-
-  if (monitoring.lastUpdatedAt !== undefined) {
-    normalized.lastUpdatedAt = normalizeIsoDate(monitoring.lastUpdatedAt);
-  }
-
-  return normalized;
-};
-
-const sanitizeOspfInstance = (instance = {}, baseline = defaultTunnelOspf().instance) => {
-  const normalized = { ...baseline };
-
-  if (instance.name !== undefined) {
-    normalized.name = normalizeOptionalText(instance.name);
-  }
-
-  if (instance.routerId !== undefined) {
-    normalized.routerId = normalizeOptionalText(instance.routerId);
-  }
-
-  if (instance.version !== undefined) {
-    const version = normalizeOptionalText(instance.version ?? '').toLowerCase();
-    normalized.version = version === 'v3' ? 'v3' : 'v2';
-  }
-
-  if (instance.areaId !== undefined || instance.area !== undefined) {
-    normalized.areaId = normalizeOptionalText(instance.areaId ?? instance.area ?? '0.0.0.0') || '0.0.0.0';
-  }
-
-  if (instance.redistributeDefaultRoute !== undefined) {
-    normalized.redistributeDefaultRoute = normalizeBoolean(instance.redistributeDefaultRoute, false);
-  }
-
-  if (instance.metric !== undefined) {
-    normalized.metric = parseOptionalNumber(instance.metric, { min: 0, max: 1_000_000 });
-  }
-
-  if (instance.referenceBandwidth !== undefined) {
-    normalized.referenceBandwidth = parseOptionalNumber(instance.referenceBandwidth, {
-      min: 1,
-      max: 1_000_000
-    });
-  }
-
-  return normalized;
-};
-
-const sanitizeOspfInterfaceTemplates = (templates = []) => {
-  if (!Array.isArray(templates)) {
-    return [];
-  }
-
-  return templates
-    .map((template, index) => {
-      const name = normalizeOptionalText(template.name ?? `template-${index + 1}`);
-      const network = normalizeOptionalText(template.network ?? template.address ?? '');
-
-      if (!network) {
-        return null;
-      }
-
-      return {
-        name,
-        network,
-        cost: parseOptionalInteger(template.cost, { min: 1, max: 65535 }),
-        priority: parseOptionalInteger(template.priority, { min: 0, max: 255 }),
-        passive: normalizeBoolean(template.passive, false),
-        comment: normalizeOptionalText(template.comment ?? '')
-      };
-    })
-    .filter(Boolean);
-};
-
-const sanitizeOspfAreas = (areas = []) => {
-  if (!Array.isArray(areas)) {
-    return [];
-  }
-
-  const seen = new Set();
-
-  return areas
-    .map((area, index) => {
-      const name = normalizeOptionalText(area.name ?? `area-${index + 1}`);
-      const areaId = normalizeOptionalText(area.areaId ?? area.id ?? '');
-
-      if (!areaId) {
-        return null;
-      }
-
-      const key = areaId.toLowerCase();
-      if (seen.has(key)) {
-        return null;
-      }
-
-      seen.add(key);
-
-      return {
-        name,
-        areaId,
-        type: normalizeOptionalText(area.type ?? '').toLowerCase(),
-        authentication: normalizeOptionalText(area.authentication ?? ''),
-        comment: normalizeOptionalText(area.comment ?? '')
-      };
-    })
-    .filter(Boolean);
-};
-
-const sanitizeOspfNeighbors = (neighbors = []) => {
-  if (!Array.isArray(neighbors)) {
-    return [];
-  }
-
-  const seen = new Set();
-
-  return neighbors
-    .map((neighbor, index) => {
-      const address = normalizeOptionalText(neighbor.address ?? neighbor.ip ?? '');
-      if (!address) {
-        return null;
-      }
-
-      const key = address.toLowerCase();
-      if (seen.has(key)) {
-        return null;
-      }
-
-      seen.add(key);
-
-      return {
-        name: normalizeOptionalText(neighbor.name ?? `neighbor-${index + 1}`),
-        address,
-        interface: normalizeOptionalText(neighbor.interface ?? ''),
-        priority: parseOptionalInteger(neighbor.priority, { min: 0, max: 255 }),
-        pollInterval: parseOptionalInteger(neighbor.pollInterval, { min: 1, max: 600 }),
-        state: normalizeOptionalText(neighbor.state ?? ''),
-        comment: normalizeOptionalText(neighbor.comment ?? '')
-      };
-    })
-    .filter(Boolean);
-};
-
-const sanitizeTunnelOspf = (ospf = {}, baseline = defaultTunnelOspf()) => {
-  const normalized = {
-    ...defaultTunnelOspf(),
-    ...baseline,
-    instance: sanitizeOspfInstance({}, baseline.instance ?? defaultTunnelOspf().instance)
-  };
-
-  if (ospf.enabled !== undefined) {
-    normalized.enabled = normalizeBoolean(ospf.enabled, false);
-  }
-
-  normalized.instance = sanitizeOspfInstance(ospf.instance ?? {}, normalized.instance);
-
-  if (ospf.interfaceTemplates !== undefined) {
-    normalized.interfaceTemplates = sanitizeOspfInterfaceTemplates(ospf.interfaceTemplates);
-  }
-
-  if (ospf.areas !== undefined) {
-    normalized.areas = sanitizeOspfAreas(ospf.areas);
-  }
-
-  if (ospf.neighbors !== undefined) {
-    normalized.neighbors = sanitizeOspfNeighbors(ospf.neighbors);
-  }
-
-  return normalized;
-};
-
-const sanitizeVpnPeer = (peer = {}, baseline = defaultVpnPeerConfig()) => {
-  const normalized = { ...baseline };
-
-  if (peer.enabled !== undefined) {
-    normalized.enabled = normalizeBoolean(peer.enabled, false);
-  }
-
-  if (peer.interface !== undefined) {
-    normalized.interface = normalizeOptionalText(peer.interface);
-  }
-
-  if (peer.profile !== undefined) {
-    normalized.profile = normalizeOptionalText(peer.profile);
-  }
-
-  if (peer.serverAddress !== undefined) {
-    normalized.serverAddress = normalizeOptionalText(peer.serverAddress ?? peer.server ?? '');
-  }
-
-  if (peer.listenPort !== undefined) {
-    normalized.listenPort = parseOptionalInteger(peer.listenPort, { min: 1, max: 65535 });
-  }
-
-  if (peer.username !== undefined) {
-    normalized.username = normalizeOptionalText(peer.username);
-  }
-
-  if (peer.password !== undefined) {
-    normalized.password = normalizeOptionalText(peer.password);
-  }
-
-  if (peer.comment !== undefined) {
-    normalized.comment = normalizeOptionalText(peer.comment);
-  }
-
-  if (peer.mtu !== undefined) {
-    normalized.mtu = parseOptionalInteger(peer.mtu, { min: 64, max: 10000 });
-  }
-
-  if (peer.mru !== undefined) {
-    normalized.mru = parseOptionalInteger(peer.mru, { min: 64, max: 10000 });
-  }
-
-  if (peer.allowFastPath !== undefined) {
-    normalized.allowFastPath = normalizeBoolean(peer.allowFastPath, true);
-  }
-
-  if (peer.certificate !== undefined) {
-    normalized.certificate = normalizeOptionalText(peer.certificate);
-  }
-
-  if (peer.publicKey !== undefined) {
-    normalized.publicKey = normalizeOptionalText(peer.publicKey);
-  }
-
-  if (peer.privateKey !== undefined) {
-    normalized.privateKey = normalizeOptionalText(peer.privateKey);
-  }
-
-  if (peer.presharedKey !== undefined) {
-    normalized.presharedKey = normalizeOptionalText(peer.presharedKey);
-  }
-
-  if (peer.allowedAddresses !== undefined) {
-    normalized.allowedAddresses = normalizeOptionalText(peer.allowedAddresses);
-  }
-
-  if (peer.endpoint !== undefined) {
-    normalized.endpoint = normalizeOptionalText(peer.endpoint);
-  }
-
-  if (peer.persistentKeepalive !== undefined) {
-    normalized.persistentKeepalive = parseOptionalInteger(peer.persistentKeepalive, {
-      min: 1,
-      max: 600
-    });
-  }
-
-  if (peer.secret !== undefined) {
-    normalized.secret = normalizeOptionalText(peer.secret);
-  }
-
-  return normalized;
-};
-
-const sanitizeVpnProfiles = (profiles = {}, baseline = defaultVpnProfiles()) => {
-  const normalizedBaseline = defaultVpnProfiles();
-  const normalized = {
-    pptp: {
-      server: sanitizeVpnPeer({}, baseline.pptp?.server ?? normalizedBaseline.pptp.server),
-      client: sanitizeVpnPeer({}, baseline.pptp?.client ?? normalizedBaseline.pptp.client)
-    },
-    l2tp: {
-      server: sanitizeVpnPeer({}, baseline.l2tp?.server ?? normalizedBaseline.l2tp.server),
-      client: sanitizeVpnPeer({}, baseline.l2tp?.client ?? normalizedBaseline.l2tp.client)
-    },
-    openvpn: {
-      server: sanitizeVpnPeer({}, baseline.openvpn?.server ?? normalizedBaseline.openvpn.server),
-      client: sanitizeVpnPeer({}, baseline.openvpn?.client ?? normalizedBaseline.openvpn.client)
-    },
-    wireguard: {
-      server: sanitizeVpnPeer({}, baseline.wireguard?.server ?? normalizedBaseline.wireguard.server),
-      client: sanitizeVpnPeer({}, baseline.wireguard?.client ?? normalizedBaseline.wireguard.client)
+  for (const key of keys) {
+    if (entry[key] !== undefined && entry[key] !== null && entry[key] !== '') {
+      return entry[key];
     }
-  };
-
-  if (profiles.pptp !== undefined) {
-    normalized.pptp = {
-      server: sanitizeVpnPeer(profiles.pptp?.server ?? {}, normalized.pptp.server),
-      client: sanitizeVpnPeer(profiles.pptp?.client ?? {}, normalized.pptp.client)
-    };
   }
 
-  if (profiles.l2tp !== undefined) {
-    normalized.l2tp = {
-      server: sanitizeVpnPeer(profiles.l2tp?.server ?? {}, normalized.l2tp.server),
-      client: sanitizeVpnPeer(profiles.l2tp?.client ?? {}, normalized.l2tp.client)
-    };
-  }
-
-  if (profiles.openvpn !== undefined) {
-    normalized.openvpn = {
-      server: sanitizeVpnPeer(profiles.openvpn?.server ?? {}, normalized.openvpn.server),
-      client: sanitizeVpnPeer(profiles.openvpn?.client ?? {}, normalized.openvpn.client)
-    };
-  }
-
-  if (profiles.wireguard !== undefined) {
-    normalized.wireguard = {
-      server: sanitizeVpnPeer(profiles.wireguard?.server ?? {}, normalized.wireguard.server),
-      client: sanitizeVpnPeer(profiles.wireguard?.client ?? {}, normalized.wireguard.client)
-    };
-  }
-
-  return normalized;
+  return null;
 };
 
-const sanitizeTunnelProfile = (profile = {}, baseline = defaultTunnelProfile()) => {
-  const normalized = { ...defaultTunnelProfile(), ...baseline };
-
-  const rawKind = profile.kind ?? profile.connectionType ?? normalized.kind;
-  const candidateKind = normalizeOptionalText(rawKind ?? '').toLowerCase();
-  if (allowedTunnelKinds.has(candidateKind)) {
-    normalized.kind = candidateKind;
-  } else if (!allowedTunnelKinds.has(normalized.kind)) {
-    normalized.kind = 'gre';
+const canonicalizeConnectionType = (value) => {
+  const text = normalizeOptionalText(value ?? '');
+  if (!text) {
+    return null;
   }
 
-  if (profile.ipVersion !== undefined) {
-    const candidate = normalizeOptionalText(profile.ipVersion ?? '').toLowerCase();
-    normalized.ipVersion = candidate === 'ipv6' ? 'ipv6' : 'ipv4';
-  } else if (normalized.kind.includes('v6')) {
-    normalized.ipVersion = 'ipv6';
+  if (/wire\s*guard/i.test(text) || /^wg$/i.test(text)) {
+    return 'WireGuard';
+  }
+  if (/ipsec/i.test(text)) {
+    return 'IPsec';
+  }
+  if (/gre/i.test(text)) {
+    return 'GRE';
+  }
+  if (/l2tp/i.test(text)) {
+    return 'L2TP';
+  }
+  if (/pptp/i.test(text)) {
+    return 'PPTP';
   }
 
-  if (profile.allowFastPath !== undefined) {
-    normalized.allowFastPath = normalizeBoolean(profile.allowFastPath, true);
+  return text.toUpperCase();
+};
+
+const normalizeDiscoveredStatus = (value) => {
+  const text = normalizeOptionalText(value ?? '').toLowerCase();
+
+  if (allowedTunnelStates.has(text)) {
+    return text;
   }
 
-  if (profile.secret !== undefined) {
-    normalized.secret = normalizeOptionalText(profile.secret);
+  if (['connected', 'running', 'established', 'active', 'up'].includes(text)) {
+    return 'up';
   }
 
-  if (profile.secretEnabled !== undefined) {
-    normalized.secretEnabled = normalizeBoolean(profile.secretEnabled, normalized.secretEnabled);
-  } else if (!normalized.secret) {
-    normalized.secretEnabled = false;
+  if (['maintenance', 'pending', 'syncing'].includes(text)) {
+    return 'maintenance';
   }
 
-  if (profile.secretLastGeneratedAt !== undefined) {
-    normalized.secretLastGeneratedAt = normalizeIsoDate(profile.secretLastGeneratedAt);
+  if (['disabled', 'inactive', 'error', 'failed', 'offline', 'down', 'disconnected'].includes(text)) {
+    return 'down';
   }
 
-  const keepAliveBaseline = {
-    ...defaultTunnelProfile().keepAlive,
-    ...(normalized.keepAlive ?? {})
-  };
-  const keepAliveInput = profile.keepAlive ?? {};
-  const keepAlive = { ...keepAliveBaseline };
+  return 'down';
+};
 
-  if (keepAliveInput.enabled !== undefined) {
-    keepAlive.enabled = normalizeBoolean(keepAliveInput.enabled, keepAlive.enabled);
+const parseNumericMetric = (value) => {
+  if (value === null || value === undefined) {
+    return null;
   }
 
-  if (keepAliveInput.timeout !== undefined) {
-    keepAlive.timeout = clampNumber(keepAliveInput.timeout, {
-      min: 1,
-      max: 600,
-      fallback: keepAlive.timeout
-    });
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const parsed = parseNumericMetric(entry);
+      if (parsed !== null) {
+        return parsed;
+      }
+    }
+    return null;
   }
 
-  if (keepAliveInput.retryCount !== undefined) {
-    keepAlive.retryCount = clampNumber(keepAliveInput.retryCount, {
-      min: 0,
-      max: 20,
-      fallback: keepAlive.retryCount
-    });
+  if (typeof value === 'object') {
+    for (const entry of Object.values(value)) {
+      const parsed = parseNumericMetric(entry);
+      if (parsed !== null) {
+        return parsed;
+      }
+    }
+    return null;
   }
 
-  if (keepAliveInput.holdTimer !== undefined) {
-    keepAlive.holdTimer = clampNumber(keepAliveInput.holdTimer, {
-      min: 1,
-      max: 600,
-      fallback: keepAlive.holdTimer
-    });
+  const text = String(value).trim();
+  if (!text) {
+    return null;
   }
 
-  normalized.keepAlive = keepAlive;
-
-  if (profile.tunnelId !== undefined) {
-    normalized.tunnelId = parseOptionalInteger(profile.tunnelId, { min: 1, max: 4_294_967_295 });
+  const match = text.match(/-?\d+(?:\.\d+)?/);
+  if (!match) {
+    return null;
   }
 
-  if (profile.mtu !== undefined) {
-    normalized.mtu = parseOptionalInteger(profile.mtu, { min: 296, max: 9_000 });
+  const parsed = Number.parseFloat(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const combineLatency = (a, b) => {
+  const values = [a, b].filter((value) => typeof value === 'number' && Number.isFinite(value));
+  if (!values.length) {
+    return null;
   }
 
-  const addressingBaseline = {
-    ...defaultTunnelProfile().addressing,
-    ...(normalized.addressing ?? {})
-  };
-  const addressingInput = profile.addressing ?? profile;
-  const addressing = { ...addressingBaseline };
+  const sanitized = values.map((value) => (value < 0 ? 0 : value));
+  return Math.min(...sanitized);
+};
 
-  if (addressingInput.localAddress !== undefined) {
-    addressing.localAddress = normalizeOptionalText(addressingInput.localAddress);
+const combinePacketLoss = (a, b) => {
+  const values = [a, b].filter((value) => typeof value === 'number' && Number.isFinite(value));
+  if (!values.length) {
+    return null;
   }
 
-  if (addressingInput.remoteAddress !== undefined) {
-    addressing.remoteAddress = normalizeOptionalText(addressingInput.remoteAddress);
+  const clamped = values.map((value) => {
+    if (value < 0) {
+      return 0;
+    }
+    if (value > 100) {
+      return 100;
+    }
+    return value;
+  });
+
+  return Math.max(...clamped);
+};
+
+const deriveDiscoveredTunnelName = (sourceDevice, targetDevice, sourceCandidate, targetCandidate) => {
+  const sourceName = normalizeOptionalText(sourceDevice?.name ?? '') || `Device ${sourceCandidate.deviceId}`;
+  const targetName = normalizeOptionalText(targetDevice?.name ?? '') || `Device ${targetCandidate.deviceId}`;
+
+  const sourceInterface = normalizeOptionalText(sourceCandidate.interfaceName ?? '');
+  const targetInterface = normalizeOptionalText(targetCandidate.interfaceName ?? '');
+
+  const interfaceLabel =
+    sourceInterface && targetInterface ? ` (${sourceInterface} ↔ ${targetInterface})` : '';
+
+  return `Discovered ${sourceName} ↔ ${targetName}${interfaceLabel}`;
+};
+
+const buildDiscoveryNotes = (sourceDevice, targetDevice, sourceCandidate, targetCandidate) => {
+  const segments = [
+    'Discovered automatically from RouterOS inventory.',
+    `[discovery] local=${sourceCandidate.localAddress} remote=${targetCandidate.localAddress}`
+  ];
+
+  if (sourceCandidate.interfaceName) {
+    segments.push(`source-interface=${sourceCandidate.interfaceName}`);
   }
 
-  if (addressingInput.localTunnelIp !== undefined) {
-    addressing.localTunnelIp = normalizeOptionalText(addressingInput.localTunnelIp);
+  if (targetCandidate.interfaceName) {
+    segments.push(`target-interface=${targetCandidate.interfaceName}`);
   }
 
-  if (addressingInput.remoteTunnelIp !== undefined) {
-    addressing.remoteTunnelIp = normalizeOptionalText(addressingInput.remoteTunnelIp);
+  if (sourceCandidate.remoteDeviceName) {
+    segments.push(`source-remote=${sourceCandidate.remoteDeviceName}`);
   }
 
-  normalized.sshEnabled = normalizeBoolean(options.sshEnabled, baseline.sshEnabled);
+  if (targetCandidate.remoteDeviceName) {
+    segments.push(`target-remote=${targetCandidate.remoteDeviceName}`);
+  }
 
-  const sshPortFallback = clampNumber(baseline.sshPort, { min: 1, max: 65535, fallback: 22 });
-  normalized.sshPort = clampNumber(options.sshPort, { min: 1, max: 65535, fallback: sshPortFallback });
-  normalized.sshUsername = normalizeOptionalText(options.sshUsername ?? baseline.sshUsername ?? '');
-  normalized.sshPassword = normalizeOptionalText(options.sshPassword ?? baseline.sshPassword ?? '');
-  normalized.autoAcceptFingerprints = normalizeBoolean(
-    options.autoAcceptFingerprints,
-    baseline.autoAcceptFingerprints
+  const unmatchedRemotes = sourceCandidate.remoteAddresses.filter(
+    (address) => address !== targetCandidate.localAddress
   );
 
-  if (normalized.apiSSL && !options.apiPort && !baseline.apiPort) {
-    normalized.apiPort = 8729;
+  if (unmatchedRemotes.length > 0) {
+    segments.push(`source-additional-remotes=${unmatchedRemotes.join(',')}`);
   }
 
-  if (addressingInput.remoteIpamPool !== undefined) {
-    addressing.remoteIpamPool = normalizeOptionalText(addressingInput.remoteIpamPool);
-  }
-
-  normalized.addressing = addressing;
-
-  const provisioningBaseline = {
-    ...defaultTunnelProfile().provisioning,
-    ...(normalized.provisioning ?? {})
-  };
-  const provisioningInput = profile.provisioning ?? {};
-  const provisioning = { ...provisioningBaseline };
-
-  if (provisioningInput.viaApi !== undefined) {
-    provisioning.viaApi = normalizeBoolean(provisioningInput.viaApi, provisioning.viaApi);
-  }
-
-  if (provisioningInput.viaSsh !== undefined) {
-    provisioning.viaSsh = normalizeBoolean(provisioningInput.viaSsh, provisioning.viaSsh);
-  }
-
-  if (provisioningInput.preferred !== undefined) {
-    const preferred = normalizeOptionalText(provisioningInput.preferred ?? '').toLowerCase();
-    provisioning.preferred = ['api', 'ssh', 'hybrid'].includes(preferred)
-      ? preferred
-      : provisioning.viaApi && provisioning.viaSsh
-      ? 'hybrid'
-      : provisioning.viaApi
-      ? 'api'
-      : provisioning.viaSsh
-      ? 'ssh'
-      : 'api';
-  } else if (!['api', 'ssh', 'hybrid'].includes(provisioning.preferred)) {
-    provisioning.preferred = provisioning.viaApi && provisioning.viaSsh ? 'hybrid' : provisioning.viaApi ? 'api' : 'ssh';
-  }
-
-  normalized.provisioning = provisioning;
-
-  const failoverBaseline = {
-    ...defaultTunnelProfile().failover,
-    ...(normalized.failover ?? {})
-  };
-  const failoverInput = profile.failover ?? {};
-  const failover = { ...failoverBaseline };
-
-  if (failoverInput.disableSecretOnFailure !== undefined) {
-    failover.disableSecretOnFailure = normalizeBoolean(failoverInput.disableSecretOnFailure, true);
-  }
-
-  if (failoverInput.candidateKinds !== undefined) {
-    const candidates = Array.isArray(failoverInput.candidateKinds)
-      ? failoverInput.candidateKinds
-          .map((entry) => normalizeOptionalText(entry).toLowerCase())
-          .filter((entry) => allowedTunnelKinds.has(entry))
-      : [];
-    failover.candidateKinds = candidates.length > 0 ? candidates : failover.candidateKinds;
-  }
-
-  if (failoverInput.maxAttempts !== undefined) {
-    failover.maxAttempts = clampNumber(failoverInput.maxAttempts, {
-      min: 1,
-      max: 10,
-      fallback: failover.maxAttempts
-    });
-  }
-
-  normalized.failover = failover;
-
-  const endpointsBaseline = {
-    source: sanitizeEndpointSnapshot({}, normalized.endpoints?.source ?? defaultEndpointSnapshot()),
-    target: sanitizeEndpointSnapshot({}, normalized.endpoints?.target ?? defaultEndpointSnapshot())
-  };
-
-  const endpointsInput = profile.endpoints ?? {};
-  normalized.endpoints = {
-    source: sanitizeEndpointSnapshot(endpointsInput.source ?? {}, endpointsBaseline.source),
-    target: sanitizeEndpointSnapshot(endpointsInput.target ?? {}, endpointsBaseline.target)
-  };
-
-  if (profile.remarks !== undefined) {
-    normalized.remarks = normalizeOptionalText(profile.remarks);
-  }
-
-  return normalized;
+  return segments.join(' ');
 };
 
-const sanitizeTunnelMetrics = (metrics = {}) => ({
-  latencyMs: parseOptionalNumber(metrics.latencyMs, { min: 0, max: 1_000_000 }),
-  packetLoss: parseOptionalNumber(metrics.packetLoss, { min: 0, max: 100 }),
-  lastCheckedAt: normalizeIsoDate(metrics.lastCheckedAt)
-});
+const buildDevicePairKey = (deviceAId, deviceBId, addressA, addressB) => {
+  const parsedIds = [deviceAId, deviceBId]
+    .map((value) => Number.parseInt(value, 10))
+    .filter((value) => Number.isInteger(value));
 
-const parseOptionalInteger = (value, { min, max }) => {
-  if (value === null || value === undefined || value === '') {
+  if (parsedIds.length !== 2) {
     return null;
   }
 
-  const parsed = Number.parseInt(value, 10);
+  parsedIds.sort((a, b) => a - b);
 
-  if (!Number.isInteger(parsed)) {
-    return null;
+  if (addressA && addressB) {
+    const normalizedA = normalizeIpAddress(addressA);
+    const normalizedB = normalizeIpAddress(addressB);
+
+    if (normalizedA && normalizedB) {
+      const addresses = [normalizedA, normalizedB].sort();
+      return `${parsedIds[0]}|${parsedIds[1]}|${addresses[0]}|${addresses[1]}`;
+    }
   }
 
-  if (typeof min === 'number' && parsed < min) {
-    return min;
-  }
-
-  if (typeof max === 'number' && parsed > max) {
-    return max;
-  }
-
-  return parsed;
+  return `${parsedIds[0]}|${parsedIds[1]}`;
 };
 
-const allowedTunnelKinds = new Set([
-  'ipip',
-  'ipipv6',
-  'eoip',
-  'eoipv6',
-  'gre',
-  'grev6',
-  '6to4',
-  '6to4-over-ipip',
-  '6to4-over-gre',
-  '6to4-over-eoip'
-]);
-
-const defaultProbeTargets = () => [
-  { address: '4.2.2.4', description: 'Level 3 DNS', enabled: true },
-  { address: '8.8.8.8', description: 'Google DNS', enabled: true },
-  { address: '1.1.1.1', description: 'Cloudflare DNS', enabled: true }
-];
-
-const defaultEndpointSnapshot = () => ({
-  identity: '',
-  interfaces: [],
-  routingTable: []
-});
-
-const defaultTunnelProfile = () => ({
-  kind: 'gre',
-  ipVersion: 'ipv4',
-  allowFastPath: true,
-  secret: '',
-  secretEnabled: true,
-  secretLastGeneratedAt: null,
-  keepAlive: {
-    enabled: true,
-    timeout: 10,
-    retryCount: 3,
-    holdTimer: 10
-  },
-  tunnelId: null,
-  mtu: null,
-  addressing: {
-    localAddress: '',
-    remoteAddress: '',
-    localTunnelIp: '',
-    remoteTunnelIp: '',
-    localIpamPool: '',
-    remoteIpamPool: ''
-  },
-  provisioning: {
-    viaApi: true,
-    viaSsh: true,
-    preferred: 'hybrid'
-  },
-  failover: {
-    disableSecretOnFailure: true,
-    candidateKinds: ['gre', 'ipip', 'eoip', '6to4'],
-    maxAttempts: 3
-  },
-  endpoints: {
-    source: defaultEndpointSnapshot(),
-    target: defaultEndpointSnapshot()
-  },
-  remarks: ''
-});
-
-const defaultTunnelMonitoring = () => ({
-  pingTargets: defaultProbeTargets(),
-  traceTargets: defaultProbeTargets(),
-  lastPingResults: [],
-  lastTraceResults: [],
-  lastUpdatedAt: null
-});
-
-const defaultTunnelOspf = () => ({
-  enabled: false,
-  instance: {
-    name: '',
-    routerId: '',
-    version: 'v2',
-    areaId: '0.0.0.0',
-    redistributeDefaultRoute: false,
-    metric: null,
-    referenceBandwidth: null
-  },
-  interfaceTemplates: [],
-  areas: [],
-  neighbors: []
-});
-
-const defaultVpnPeerConfig = () => ({
-  enabled: false,
-  interface: '',
-  profile: '',
-  serverAddress: '',
-  listenPort: null,
-  username: '',
-  password: '',
-  comment: '',
-  mtu: null,
-  mru: null,
-  allowFastPath: true,
-  certificate: '',
-  publicKey: '',
-  privateKey: '',
-  presharedKey: '',
-  allowedAddresses: '',
-  endpoint: '',
-  persistentKeepalive: null,
-  secret: ''
-});
-
-const defaultVpnProfiles = () => ({
-  pptp: { server: defaultVpnPeerConfig(), client: defaultVpnPeerConfig() },
-  l2tp: { server: defaultVpnPeerConfig(), client: defaultVpnPeerConfig() },
-  openvpn: { server: defaultVpnPeerConfig(), client: defaultVpnPeerConfig() },
-  wireguard: { server: defaultVpnPeerConfig(), client: defaultVpnPeerConfig() }
-});
-
-const sanitizeInterfaceInventory = (interfaces = []) => {
-  if (!Array.isArray(interfaces)) {
+const extractTunnelInventoryCandidates = (device) => {
+  if (!device || typeof device !== 'object') {
     return [];
   }
 
-  const seen = new Set();
-
-  return interfaces
-    .map((entry) => {
-      const name = normalizeOptionalText(entry.name ?? '');
-      if (!name) {
-        return null;
-      }
-
-      const key = name.toLowerCase();
-      if (seen.has(key)) {
-        return null;
-      }
-
-      seen.add(key);
-
-      return {
-        name,
-        type: normalizeOptionalText(entry.type ?? ''),
-        macAddress: normalizeOptionalText(entry.macAddress ?? ''),
-        arp: normalizeOptionalText(entry.arp ?? '').toLowerCase(),
-        mtu: parseOptionalInteger(entry.mtu, { min: 64, max: 10000 }),
-        comment: normalizeOptionalText(entry.comment ?? '')
-      };
-    })
-    .filter(Boolean);
-};
-
-const sanitizeRoutingTable = (routes = []) => {
-  if (!Array.isArray(routes)) {
-    return [];
-  }
-
-  const seen = new Set();
-
-  return routes
-    .map((route) => {
-      const destination = normalizeOptionalText(route.destination ?? route.dstAddress ?? '');
-      const gateway = normalizeOptionalText(route.gateway ?? route.nextHop ?? '');
-
-      if (!destination) {
-        return null;
-      }
-
-      const key = `${destination.toLowerCase()}|${gateway.toLowerCase()}`;
-      if (seen.has(key)) {
-        return null;
-      }
-
-      seen.add(key);
-
-      return {
-        destination,
-        gateway,
-        interface: normalizeOptionalText(route.interface ?? ''),
-        distance: parseOptionalInteger(route.distance, { min: 1, max: 255 }),
-        comment: normalizeOptionalText(route.comment ?? ''),
-        active: normalizeBoolean(route.active, true)
-      };
-    })
-    .filter(Boolean);
-};
-
-const sanitizeEndpointSnapshot = (snapshot = {}, baseline = defaultEndpointSnapshot()) => {
-  const normalized = { ...defaultEndpointSnapshot(), ...baseline };
-
-  if (snapshot.identity !== undefined) {
-    normalized.identity = normalizeOptionalText(snapshot.identity);
-  }
-
-  if (snapshot.interfaces !== undefined) {
-    normalized.interfaces = sanitizeInterfaceInventory(snapshot.interfaces);
-  }
-
-  if (snapshot.routingTable !== undefined) {
-    normalized.routingTable = sanitizeRoutingTable(snapshot.routingTable);
-  }
-
-  return normalized;
-};
-
-const sanitizeProbeTargets = (targets, fallback) => {
-  if (!Array.isArray(targets)) {
-    return fallback ? [...fallback] : [];
-  }
-
-  const seen = new Set();
-
-  const result = targets
-    .map((target) => {
-      const address = normalizeOptionalText(target?.address ?? target ?? '');
-      if (!address) {
-        return null;
-      }
-
-      const key = address.toLowerCase();
-      if (seen.has(key)) {
-        return null;
-      }
-
-      seen.add(key);
-
-      return {
-        address,
-        description: normalizeOptionalText(target.description ?? ''),
-        enabled: normalizeBoolean(target.enabled, true)
-      };
-    })
-    .filter(Boolean);
-
-  if (result.length === 0 && fallback) {
-    return [...fallback];
-  }
-
-  return result;
-};
-
-const sanitizeProbeResults = (results = []) => {
-  if (!Array.isArray(results)) {
-    return [];
-  }
-
-  return results
-    .map((entry) => {
-      const address = normalizeOptionalText(entry.address ?? '');
-      if (!address) {
-        return null;
-      }
-
-      return {
-        address,
-        success: normalizeBoolean(entry.success, false),
-        latencyMs: parseOptionalNumber(entry.latencyMs, { min: 0, max: 1_000_000 }),
-        output: normalizeOptionalText(entry.output ?? ''),
-        checkedAt: normalizeIsoDate(entry.checkedAt ?? new Date().toISOString())
-      };
-    })
-    .filter(Boolean);
-};
-
-const sanitizeTraceResults = (results = []) => {
-  if (!Array.isArray(results)) {
-    return [];
-  }
-
-  return results
-    .map((entry) => {
-      const address = normalizeOptionalText(entry.address ?? '');
-      if (!address) {
-        return null;
-      }
-
-      return {
-        address,
-        success: normalizeBoolean(entry.success, false),
-        hops: Array.isArray(entry.hops)
-          ? entry.hops.map((hop) => ({
-              hop: parseOptionalInteger(hop.hop ?? hop.index, { min: 1, max: 512 }),
-              address: normalizeOptionalText(hop.address ?? ''),
-              latencyMs: parseOptionalNumber(hop.latencyMs, { min: 0, max: 1_000_000 })
-            }))
-          : [],
-        output: normalizeOptionalText(entry.output ?? ''),
-        checkedAt: normalizeIsoDate(entry.checkedAt ?? new Date().toISOString())
-      };
-    })
-    .filter(Boolean);
-};
-
-const sanitizeTunnelMonitoring = (monitoring = {}, baseline = defaultTunnelMonitoring()) => {
-  const normalized = { ...defaultTunnelMonitoring(), ...baseline };
-
-  if (monitoring.pingTargets !== undefined) {
-    normalized.pingTargets = sanitizeProbeTargets(monitoring.pingTargets, defaultProbeTargets());
-  }
-
-  if (monitoring.traceTargets !== undefined) {
-    normalized.traceTargets = sanitizeProbeTargets(monitoring.traceTargets, defaultProbeTargets());
-  }
-
-  if (monitoring.lastPingResults !== undefined) {
-    normalized.lastPingResults = sanitizeProbeResults(monitoring.lastPingResults);
-  }
-
-  if (monitoring.lastTraceResults !== undefined) {
-    normalized.lastTraceResults = sanitizeTraceResults(monitoring.lastTraceResults);
-  }
-
-  if (monitoring.lastUpdatedAt !== undefined) {
-    normalized.lastUpdatedAt = normalizeIsoDate(monitoring.lastUpdatedAt);
-  }
-
-  return normalized;
-};
-
-const sanitizeOspfInstance = (instance = {}, baseline = defaultTunnelOspf().instance) => {
-  const normalized = { ...baseline };
-
-  if (instance.name !== undefined) {
-    normalized.name = normalizeOptionalText(instance.name);
-  }
-
-  if (instance.routerId !== undefined) {
-    normalized.routerId = normalizeOptionalText(instance.routerId);
-  }
-
-  if (instance.version !== undefined) {
-    const version = normalizeOptionalText(instance.version ?? '').toLowerCase();
-    normalized.version = version === 'v3' ? 'v3' : 'v2';
-  }
-
-  if (instance.areaId !== undefined || instance.area !== undefined) {
-    normalized.areaId = normalizeOptionalText(instance.areaId ?? instance.area ?? '0.0.0.0') || '0.0.0.0';
-  }
-
-  if (instance.redistributeDefaultRoute !== undefined) {
-    normalized.redistributeDefaultRoute = normalizeBoolean(instance.redistributeDefaultRoute, false);
-  }
-
-  if (instance.metric !== undefined) {
-    normalized.metric = parseOptionalNumber(instance.metric, { min: 0, max: 1_000_000 });
-  }
-
-  if (instance.referenceBandwidth !== undefined) {
-    normalized.referenceBandwidth = parseOptionalNumber(instance.referenceBandwidth, {
-      min: 1,
-      max: 1_000_000
-    });
-  }
-
-  return normalized;
-};
-
-const sanitizeOspfInterfaceTemplates = (templates = []) => {
-  if (!Array.isArray(templates)) {
-    return [];
-  }
-
-  return templates
-    .map((template, index) => {
-      const name = normalizeOptionalText(template.name ?? `template-${index + 1}`);
-      const network = normalizeOptionalText(template.network ?? template.address ?? '');
-
-      if (!network) {
-        return null;
-      }
-
-      return {
-        name,
-        network,
-        cost: parseOptionalInteger(template.cost, { min: 1, max: 65535 }),
-        priority: parseOptionalInteger(template.priority, { min: 0, max: 255 }),
-        passive: normalizeBoolean(template.passive, false),
-        comment: normalizeOptionalText(template.comment ?? '')
-      };
-    })
-    .filter(Boolean);
-};
-
-const sanitizeOspfAreas = (areas = []) => {
-  if (!Array.isArray(areas)) {
-    return [];
-  }
-
-  const seen = new Set();
-
-  return areas
-    .map((area, index) => {
-      const name = normalizeOptionalText(area.name ?? `area-${index + 1}`);
-      const areaId = normalizeOptionalText(area.areaId ?? area.id ?? '');
-
-      if (!areaId) {
-        return null;
-      }
-
-      const key = areaId.toLowerCase();
-      if (seen.has(key)) {
-        return null;
-      }
-
-      seen.add(key);
-
-      return {
-        name,
-        areaId,
-        type: normalizeOptionalText(area.type ?? '').toLowerCase(),
-        authentication: normalizeOptionalText(area.authentication ?? ''),
-        comment: normalizeOptionalText(area.comment ?? '')
-      };
-    })
-    .filter(Boolean);
-};
-
-const sanitizeOspfNeighbors = (neighbors = []) => {
-  if (!Array.isArray(neighbors)) {
-    return [];
-  }
-
-  const seen = new Set();
-
-  return neighbors
-    .map((neighbor, index) => {
-      const address = normalizeOptionalText(neighbor.address ?? neighbor.ip ?? '');
-      if (!address) {
-        return null;
-      }
-
-      const key = address.toLowerCase();
-      if (seen.has(key)) {
-        return null;
-      }
-
-      seen.add(key);
-
-      return {
-        name: normalizeOptionalText(neighbor.name ?? `neighbor-${index + 1}`),
-        address,
-        interface: normalizeOptionalText(neighbor.interface ?? ''),
-        priority: parseOptionalInteger(neighbor.priority, { min: 0, max: 255 }),
-        pollInterval: parseOptionalInteger(neighbor.pollInterval, { min: 1, max: 600 }),
-        state: normalizeOptionalText(neighbor.state ?? ''),
-        comment: normalizeOptionalText(neighbor.comment ?? '')
-      };
-    })
-    .filter(Boolean);
-};
-
-const sanitizeTunnelOspf = (ospf = {}, baseline = defaultTunnelOspf()) => {
-  const normalized = {
-    ...defaultTunnelOspf(),
-    ...baseline,
-    instance: sanitizeOspfInstance({}, baseline.instance ?? defaultTunnelOspf().instance)
-  };
-
-  if (ospf.enabled !== undefined) {
-    normalized.enabled = normalizeBoolean(ospf.enabled, false);
-  }
-
-  normalized.instance = sanitizeOspfInstance(ospf.instance ?? {}, normalized.instance);
-
-  if (ospf.interfaceTemplates !== undefined) {
-    normalized.interfaceTemplates = sanitizeOspfInterfaceTemplates(ospf.interfaceTemplates);
-  }
-
-  if (ospf.areas !== undefined) {
-    normalized.areas = sanitizeOspfAreas(ospf.areas);
-  }
-
-  if (ospf.neighbors !== undefined) {
-    normalized.neighbors = sanitizeOspfNeighbors(ospf.neighbors);
-  }
-
-  return normalized;
-};
-
-const sanitizeVpnPeer = (peer = {}, baseline = defaultVpnPeerConfig()) => {
-  const normalized = { ...baseline };
-
-  if (peer.enabled !== undefined) {
-    normalized.enabled = normalizeBoolean(peer.enabled, false);
-  }
-
-  if (peer.interface !== undefined) {
-    normalized.interface = normalizeOptionalText(peer.interface);
-  }
-
-  if (peer.profile !== undefined) {
-    normalized.profile = normalizeOptionalText(peer.profile);
-  }
-
-  if (peer.serverAddress !== undefined) {
-    normalized.serverAddress = normalizeOptionalText(peer.serverAddress ?? peer.server ?? '');
-  }
-
-  if (peer.listenPort !== undefined) {
-    normalized.listenPort = parseOptionalInteger(peer.listenPort, { min: 1, max: 65535 });
-  }
-
-  if (peer.username !== undefined) {
-    normalized.username = normalizeOptionalText(peer.username);
-  }
-
-  if (peer.password !== undefined) {
-    normalized.password = normalizeOptionalText(peer.password);
-  }
-
-  if (peer.comment !== undefined) {
-    normalized.comment = normalizeOptionalText(peer.comment);
-  }
-
-  if (peer.mtu !== undefined) {
-    normalized.mtu = parseOptionalInteger(peer.mtu, { min: 64, max: 10000 });
-  }
-
-  if (peer.mru !== undefined) {
-    normalized.mru = parseOptionalInteger(peer.mru, { min: 64, max: 10000 });
-  }
-
-  if (peer.allowFastPath !== undefined) {
-    normalized.allowFastPath = normalizeBoolean(peer.allowFastPath, true);
-  }
-
-  if (peer.certificate !== undefined) {
-    normalized.certificate = normalizeOptionalText(peer.certificate);
-  }
-
-  if (peer.publicKey !== undefined) {
-    normalized.publicKey = normalizeOptionalText(peer.publicKey);
-  }
-
-  if (peer.privateKey !== undefined) {
-    normalized.privateKey = normalizeOptionalText(peer.privateKey);
-  }
-
-  if (peer.presharedKey !== undefined) {
-    normalized.presharedKey = normalizeOptionalText(peer.presharedKey);
-  }
-
-  if (peer.allowedAddresses !== undefined) {
-    normalized.allowedAddresses = normalizeOptionalText(peer.allowedAddresses);
-  }
-
-  if (peer.endpoint !== undefined) {
-    normalized.endpoint = normalizeOptionalText(peer.endpoint);
-  }
-
-  if (peer.persistentKeepalive !== undefined) {
-    normalized.persistentKeepalive = parseOptionalInteger(peer.persistentKeepalive, {
-      min: 1,
-      max: 600
-    });
-  }
-
-  if (peer.secret !== undefined) {
-    normalized.secret = normalizeOptionalText(peer.secret);
-  }
-
-  return normalized;
-};
-
-const sanitizeVpnProfiles = (profiles = {}, baseline = defaultVpnProfiles()) => {
-  const normalizedBaseline = defaultVpnProfiles();
-  const normalized = {
-    pptp: {
-      server: sanitizeVpnPeer({}, baseline.pptp?.server ?? normalizedBaseline.pptp.server),
-      client: sanitizeVpnPeer({}, baseline.pptp?.client ?? normalizedBaseline.pptp.client)
-    },
-    l2tp: {
-      server: sanitizeVpnPeer({}, baseline.l2tp?.server ?? normalizedBaseline.l2tp.server),
-      client: sanitizeVpnPeer({}, baseline.l2tp?.client ?? normalizedBaseline.l2tp.client)
-    },
-    openvpn: {
-      server: sanitizeVpnPeer({}, baseline.openvpn?.server ?? normalizedBaseline.openvpn.server),
-      client: sanitizeVpnPeer({}, baseline.openvpn?.client ?? normalizedBaseline.openvpn.client)
-    },
-    wireguard: {
-      server: sanitizeVpnPeer({}, baseline.wireguard?.server ?? normalizedBaseline.wireguard.server),
-      client: sanitizeVpnPeer({}, baseline.wireguard?.client ?? normalizedBaseline.wireguard.client)
+  const entries = [];
+
+  const enqueue = (collection) => {
+    if (!collection) {
+      return;
+    }
+
+    if (Array.isArray(collection)) {
+      collection.forEach((item) => {
+        if (item && typeof item === 'object') {
+          entries.push(item);
+        }
+      });
+      return;
+    }
+
+    if (typeof collection === 'object') {
+      Object.values(collection).forEach((value) => enqueue(value));
     }
   };
 
-  if (profiles.pptp !== undefined) {
-    normalized.pptp = {
-      server: sanitizeVpnPeer(profiles.pptp?.server ?? {}, normalized.pptp.server),
-      client: sanitizeVpnPeer(profiles.pptp?.client ?? {}, normalized.pptp.client)
-    };
-  }
+  enqueue(device.status?.inventory?.tunnels);
+  enqueue(device.status?.inventory?.interfaces);
+  enqueue(device.status?.inventory?.peers);
+  enqueue(device.status?.inventory?.ipsec);
+  enqueue(device.status?.inventory?.wireguard);
+  enqueue(device.status?.tunnels);
+  enqueue(device.routeros?.tunnels);
+  enqueue(device.routeros?.peers);
+  enqueue(device.tunnels);
 
-  if (profiles.l2tp !== undefined) {
-    normalized.l2tp = {
-      server: sanitizeVpnPeer(profiles.l2tp?.server ?? {}, normalized.l2tp.server),
-      client: sanitizeVpnPeer(profiles.l2tp?.client ?? {}, normalized.l2tp.client)
-    };
-  }
+  const candidates = [];
 
-  if (profiles.openvpn !== undefined) {
-    normalized.openvpn = {
-      server: sanitizeVpnPeer(profiles.openvpn?.server ?? {}, normalized.openvpn.server),
-      client: sanitizeVpnPeer(profiles.openvpn?.client ?? {}, normalized.openvpn.client)
-    };
-  }
+  entries.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') {
+      return;
+    }
 
-  if (profiles.wireguard !== undefined) {
-    normalized.wireguard = {
-      server: sanitizeVpnPeer(profiles.wireguard?.server ?? {}, normalized.wireguard.server),
-      client: sanitizeVpnPeer(profiles.wireguard?.client ?? {}, normalized.wireguard.client)
-    };
-  }
+    const localSource =
+      pickField(entry, ['localAddress', 'local', 'localIp', 'local_ip', 'address', 'cidr', 'localCidr']) ??
+      pickField(entry.local ?? {}, ['address', 'ip', 'ipAddress', 'cidr']) ??
+      pickField(entry.interface ?? {}, ['address', 'ip', 'ipAddress', 'cidr']);
 
-  return normalized;
+    const remoteSource =
+      pickField(entry, [
+        'remoteAddress',
+        'remote',
+        'remoteIp',
+        'remote_ip',
+        'peerAddress',
+        'endpointAddress',
+        'remoteCidr',
+        'peer',
+        'remotePeer'
+      ]) ??
+      pickField(entry.remote ?? {}, ['address', 'ip', 'ipAddress', 'cidr']) ??
+      pickField(entry.peer ?? {}, ['address', 'ip', 'ipAddress', 'cidr']) ??
+      pickField(entry.endpoint ?? {}, ['address', 'ip', 'ipAddress', 'cidr']);
+
+    const localAddresses = collectNormalizedIpAddresses(localSource);
+    const remoteAddresses = collectNormalizedIpAddresses(remoteSource);
+
+    if (!localAddresses.length || !remoteAddresses.length) {
+      return;
+    }
+
+    const interfaceName =
+      pickField(entry, ['interface', 'name', 'iface', 'identity', 'id']) ??
+      pickField(entry.interface ?? {}, ['name', 'id']) ??
+      pickField(entry.peer ?? {}, ['interface', 'name']);
+
+    const remoteDeviceName =
+      pickField(entry, ['remoteName', 'remoteIdentity', 'peerName', 'peerIdentity', 'remoteDevice']) ??
+      pickField(entry.remote ?? {}, ['name', 'identity']) ??
+      pickField(entry.peer ?? {}, ['name', 'identity']);
+
+    const connectionType =
+      canonicalizeConnectionType(
+        pickField(entry, ['connectionType', 'tunnelType', 'type', 'kind', 'mode', 'profile']) ??
+          pickField(entry.profile ?? {}, ['type', 'name'])
+      ) ?? null;
+
+    const status = normalizeDiscoveredStatus(
+      pickField(entry, ['status', 'state', 'operStatus', 'operState', 'running', 'enabled']) ??
+        pickField(entry.interface ?? {}, ['status', 'state'])
+    );
+
+    const latencyMs = parseNumericMetric(
+      pickField(entry, ['latencyMs', 'latency', 'avgLatency', 'averageLatency', 'latestLatency'])
+    );
+
+    const packetLoss = parseNumericMetric(
+      pickField(entry, ['packetLoss', 'loss', 'packetLossPercent', 'lossPercent'])
+    );
+
+    const uniqueRemoteAddresses = [...new Set(remoteAddresses.filter(Boolean))];
+
+    localAddresses.forEach((localAddress) => {
+      const filteredRemotes = uniqueRemoteAddresses.filter((remote) => remote && remote !== localAddress);
+      if (!filteredRemotes.length) {
+        return;
+      }
+
+      candidates.push({
+        deviceId: device.id,
+        deviceName: device.name ?? `Device ${device.id}`,
+        deviceGroupId: Number.isInteger(device.groupId) ? device.groupId : null,
+        interfaceName: interfaceName ? String(interfaceName) : null,
+        connectionType,
+        status,
+        localAddress,
+        remoteAddresses: filteredRemotes,
+        latencyMs,
+        packetLoss,
+        remoteDeviceName: remoteDeviceName ? String(remoteDeviceName) : null
+      });
+    });
+  });
+
+  return candidates;
 };
 
-const sanitizeTunnelProfile = (profile = {}, baseline = defaultTunnelProfile()) => {
-  const normalized = { ...defaultTunnelProfile(), ...baseline };
-
-  const rawKind = profile.kind ?? profile.connectionType ?? normalized.kind;
-  const candidateKind = normalizeOptionalText(rawKind ?? '').toLowerCase();
-  if (allowedTunnelKinds.has(candidateKind)) {
-    normalized.kind = candidateKind;
-  } else if (!allowedTunnelKinds.has(normalized.kind)) {
-    normalized.kind = 'gre';
+const runTunnelDiscovery = (state) => {
+  if (!state || !Array.isArray(state.mikrotiks) || state.mikrotiks.length === 0) {
+    return { mutated: false, added: [] };
   }
 
-  if (profile.ipVersion !== undefined) {
-    const candidate = normalizeOptionalText(profile.ipVersion ?? '').toLowerCase();
-    normalized.ipVersion = candidate === 'ipv6' ? 'ipv6' : 'ipv4';
-  } else if (normalized.kind.includes('v6')) {
-    normalized.ipVersion = 'ipv6';
-  }
-
-  if (profile.allowFastPath !== undefined) {
-    normalized.allowFastPath = normalizeBoolean(profile.allowFastPath, true);
-  }
-
-  if (profile.secret !== undefined) {
-    normalized.secret = normalizeOptionalText(profile.secret);
-  }
-
-  if (profile.secretEnabled !== undefined) {
-    normalized.secretEnabled = normalizeBoolean(profile.secretEnabled, normalized.secretEnabled);
-  } else if (!normalized.secret) {
-    normalized.secretEnabled = false;
-  }
-
-  if (profile.secretLastGeneratedAt !== undefined) {
-    normalized.secretLastGeneratedAt = normalizeIsoDate(profile.secretLastGeneratedAt);
-  }
-
-  const keepAliveBaseline = {
-    ...defaultTunnelProfile().keepAlive,
-    ...(normalized.keepAlive ?? {})
-  };
-  const keepAliveInput = profile.keepAlive ?? {};
-  const keepAlive = { ...keepAliveBaseline };
-
-  if (keepAliveInput.enabled !== undefined) {
-    keepAlive.enabled = normalizeBoolean(keepAliveInput.enabled, keepAlive.enabled);
-  }
-
-  if (keepAliveInput.timeout !== undefined) {
-    keepAlive.timeout = clampNumber(keepAliveInput.timeout, {
-      min: 1,
-      max: 600,
-      fallback: keepAlive.timeout
-    });
-  }
-
-  if (keepAliveInput.retryCount !== undefined) {
-    keepAlive.retryCount = clampNumber(keepAliveInput.retryCount, {
-      min: 0,
-      max: 20,
-      fallback: keepAlive.retryCount
-    });
-  }
-
-  if (keepAliveInput.holdTimer !== undefined) {
-    keepAlive.holdTimer = clampNumber(keepAliveInput.holdTimer, {
-      min: 1,
-      max: 600,
-      fallback: keepAlive.holdTimer
-    });
-  }
-
-  normalized.keepAlive = keepAlive;
-
-const normalizeUrl = (value) => {
-  if (typeof value !== 'string') {
-    return '';
-  }
-
-  const trimmed = value.trim();
-
-  if (!trimmed) {
-    return '';
-  }
-
-  return trimmed.replace(/\s+/g, '').replace(/\/+$/, '');
-};
-
-const sanitizeIpamCollectionEntry = (entry = {}, fallbackPrefix) => {
-  const metadata =
-    entry && typeof entry.metadata === 'object' && entry.metadata !== null && !Array.isArray(entry.metadata)
-      ? { ...entry.metadata }
-      : {};
-
-  Object.keys(metadata).forEach((key) => {
-    if (metadata[key] === undefined) {
-      delete metadata[key];
+  const deviceLookup = new Map();
+  state.mikrotiks.forEach((device) => {
+    if (Number.isInteger(device.id)) {
+      deviceLookup.set(device.id, device);
     }
   });
 
-  const position = typeof entry.index === 'number' ? entry.index + 1 : 1;
-  const fallbackName = fallbackPrefix ? `${fallbackPrefix} ${position}` : `Item ${position}`;
+  if (deviceLookup.size === 0) {
+    return { mutated: false, added: [] };
+  }
 
-  const idCandidate = Number.parseInt(entry.id, 10);
-  const id = Number.isInteger(idCandidate) && idCandidate > 0 ? idCandidate : null;
+  const candidates = [];
+  deviceLookup.forEach((device) => {
+    extractTunnelInventoryCandidates(device).forEach((candidate) => {
+      if (candidate.localAddress && Array.isArray(candidate.remoteAddresses) && candidate.remoteAddresses.length > 0) {
+        candidates.push(candidate);
+      }
+    });
+  });
 
-  return {
-    id,
-    name: normalizeText(entry.name, fallbackName),
-    description: normalizeOptionalText(entry.description ?? ''),
-    metadata
-  };
-};
+  if (!candidates.length) {
+    return { mutated: false, added: [] };
+  }
 
-const sanitizeIpamCollections = (collections = {}) => {
-  const mapList = (list, prefix) => {
-    if (!Array.isArray(list)) {
-      return [];
+  const localIndex = new Map();
+  candidates.forEach((candidate) => {
+    const list = localIndex.get(candidate.localAddress) ?? [];
+    list.push(candidate);
+    localIndex.set(candidate.localAddress, list);
+  });
+
+  const existingManualPairs = new Set();
+  const existingDiscoveredPairs = new Set();
+
+  state.tunnels.forEach((tunnel) => {
+    const sourceId = Number.parseInt(tunnel.sourceId, 10);
+    const targetId = Number.parseInt(tunnel.targetId, 10);
+
+    if (!Number.isInteger(sourceId) || !Number.isInteger(targetId)) {
+      return;
     }
 
-    return list.map((entry, index) => sanitizeIpamCollectionEntry({ ...entry, index }, prefix));
-  };
+    const baseKey = buildDevicePairKey(sourceId, targetId);
+    if (!baseKey) {
+      return;
+    }
 
-  return {
-    sections: mapList(collections.sections, 'Section'),
-    datacenters: mapList(collections.datacenters, 'Datacenter'),
-    ranges: mapList(collections.ranges, 'Range')
-  };
-};
-
-const allowedIpamStatuses = new Set(['connected', 'failed', 'unknown']);
-
-const sanitizeIpamRecord = (record = {}, { identifier, timestamp } = {}) => {
-  const id = Number.isInteger(identifier) && identifier > 0 ? identifier : Number.parseInt(record.id, 10);
-
-  const createdAt = normalizeIsoDate(record.createdAt) ?? normalizeIsoDate(record.created_at) ?? timestamp;
-  const updatedAt = normalizeIsoDate(record.updatedAt) ?? normalizeIsoDate(record.updated_at) ?? createdAt ?? timestamp;
-  const lastCheckedAt =
-    normalizeIsoDate(record.lastCheckedAt) ?? normalizeIsoDate(record.last_checkedAt) ?? normalizeIsoDate(record.last_checked_at);
-
-  const statusCandidate = normalizeOptionalText(record.lastStatus ?? record.last_status ?? 'unknown') || 'unknown';
-  const lastStatus = allowedIpamStatuses.has(statusCandidate.toLowerCase())
-    ? statusCandidate.toLowerCase()
-    : 'unknown';
-
-  return {
-    id: Number.isInteger(id) && id > 0 ? id : identifier,
-    name: normalizeText(record.name, `IPAM ${id || identifier || ''}`.trim()),
-    baseUrl: normalizeUrl(record.baseUrl ?? record.base_url ?? ''),
-    appId: normalizeText(record.appId ?? record.app_id ?? '', ''),
-    appCode: normalizeOptionalText(record.appCode ?? record.app_code ?? ''),
-    appPermissions: normalizeText(record.appPermissions ?? record.app_permissions ?? 'Read', 'Read'),
-    appSecurity: normalizeText(
-      record.appSecurity ?? record.app_security ?? 'SSL with App code token',
-      'SSL with App code token'
-    ),
-    createdAt: createdAt ?? timestamp,
-    updatedAt: updatedAt ?? createdAt ?? timestamp,
-    lastStatus,
-    lastCheckedAt,
-    collections: sanitizeIpamCollections(record.collections ?? record.cached ?? {})
-  };
-};
-
-const presentIpamForClient = (ipam) => ({
-  id: ipam.id,
-  name: ipam.name,
-  baseUrl: ipam.baseUrl,
-  appId: ipam.appId,
-  appPermissions: ipam.appPermissions,
-  appSecurity: ipam.appSecurity,
-  createdAt: ipam.createdAt,
-  updatedAt: ipam.updatedAt,
-  lastStatus: ipam.lastStatus,
-  lastCheckedAt: ipam.lastCheckedAt,
-  collections: sanitizeIpamCollections(ipam.collections)
-});
-
-const sanitizeRouteros = (options = {}, baseline = defaultRouterosOptions()) => {
-  const normalized = { ...baseline };
-
-  if (profile.mtu !== undefined) {
-    normalized.mtu = parseOptionalInteger(profile.mtu, { min: 296, max: 9_000 });
-  }
-
-  const addressingBaseline = {
-    ...defaultTunnelProfile().addressing,
-    ...(normalized.addressing ?? {})
-  };
-  const addressingInput = profile.addressing ?? profile;
-  const addressing = { ...addressingBaseline };
-
-  if (addressingInput.localAddress !== undefined) {
-    addressing.localAddress = normalizeOptionalText(addressingInput.localAddress);
-  }
-
-  if (addressingInput.remoteAddress !== undefined) {
-    addressing.remoteAddress = normalizeOptionalText(addressingInput.remoteAddress);
-  }
-
-  if (addressingInput.localTunnelIp !== undefined) {
-    addressing.localTunnelIp = normalizeOptionalText(addressingInput.localTunnelIp);
-  }
-
-  if (addressingInput.remoteTunnelIp !== undefined) {
-    addressing.remoteTunnelIp = normalizeOptionalText(addressingInput.remoteTunnelIp);
-  }
-
-  if (addressingInput.localIpamPool !== undefined) {
-    addressing.localIpamPool = normalizeOptionalText(addressingInput.localIpamPool);
-  }
-
-  if (addressingInput.remoteIpamPool !== undefined) {
-    addressing.remoteIpamPool = normalizeOptionalText(addressingInput.remoteIpamPool);
-  }
-
-  normalized.addressing = addressing;
-
-  const provisioningBaseline = {
-    ...defaultTunnelProfile().provisioning,
-    ...(normalized.provisioning ?? {})
-  };
-  const provisioningInput = profile.provisioning ?? {};
-  const provisioning = { ...provisioningBaseline };
-
-  if (provisioningInput.viaApi !== undefined) {
-    provisioning.viaApi = normalizeBoolean(provisioningInput.viaApi, provisioning.viaApi);
-  }
-
-  if (provisioningInput.viaSsh !== undefined) {
-    provisioning.viaSsh = normalizeBoolean(provisioningInput.viaSsh, provisioning.viaSsh);
-  }
-
-  if (provisioningInput.preferred !== undefined) {
-    const preferred = normalizeOptionalText(provisioningInput.preferred ?? '').toLowerCase();
-    provisioning.preferred = ['api', 'ssh', 'hybrid'].includes(preferred)
-      ? preferred
-      : provisioning.viaApi && provisioning.viaSsh
-      ? 'hybrid'
-      : provisioning.viaApi
-      ? 'api'
-      : provisioning.viaSsh
-      ? 'ssh'
-      : 'api';
-  } else if (!['api', 'ssh', 'hybrid'].includes(provisioning.preferred)) {
-    provisioning.preferred = provisioning.viaApi && provisioning.viaSsh ? 'hybrid' : provisioning.viaApi ? 'api' : 'ssh';
-  }
-
-  normalized.provisioning = provisioning;
-
-  const failoverBaseline = {
-    ...defaultTunnelProfile().failover,
-    ...(normalized.failover ?? {})
-  };
-  const failoverInput = profile.failover ?? {};
-  const failover = { ...failoverBaseline };
-
-  if (failoverInput.disableSecretOnFailure !== undefined) {
-    failover.disableSecretOnFailure = normalizeBoolean(failoverInput.disableSecretOnFailure, true);
-  }
-
-  if (failoverInput.candidateKinds !== undefined) {
-    const candidates = Array.isArray(failoverInput.candidateKinds)
-      ? failoverInput.candidateKinds
-          .map((entry) => normalizeOptionalText(entry).toLowerCase())
-          .filter((entry) => allowedTunnelKinds.has(entry))
+    const tags = Array.isArray(tunnel.tags)
+      ? tunnel.tags.map((tag) => normalizeOptionalText(tag).toLowerCase())
       : [];
-    failover.candidateKinds = candidates.length > 0 ? candidates : failover.candidateKinds;
-  }
 
-  if (failoverInput.maxAttempts !== undefined) {
-    failover.maxAttempts = clampNumber(failoverInput.maxAttempts, {
-      min: 1,
-      max: 10,
-      fallback: failover.maxAttempts
-    });
-  }
+    if (tags.includes('discovered')) {
+      const match = discoveryNotePattern.exec(tunnel.notes ?? '');
+      if (match) {
+        const addressKey = buildDevicePairKey(sourceId, targetId, match[1], match[2]);
+        if (addressKey) {
+          existingDiscoveredPairs.add(addressKey);
+          return;
+        }
+      }
 
-  normalized.failover = failover;
+      existingDiscoveredPairs.add(baseKey);
+      return;
+    }
 
-  const endpointsBaseline = {
-    source: sanitizeEndpointSnapshot({}, normalized.endpoints?.source ?? defaultEndpointSnapshot()),
-    target: sanitizeEndpointSnapshot({}, normalized.endpoints?.target ?? defaultEndpointSnapshot())
+    existingManualPairs.add(baseKey);
+  });
+
+  const createdPairs = new Set();
+  const added = [];
+  let mutated = false;
+  let nextId = Number.isInteger(state.lastTunnelId) ? state.lastTunnelId : 0;
+
+  const registerPair = (set, deviceAId, deviceBId, addressA, addressB) => {
+    const key = buildDevicePairKey(deviceAId, deviceBId, addressA, addressB);
+    if (key) {
+      set.add(key);
+    }
   };
 
-  const endpointsInput = profile.endpoints ?? {};
-  normalized.endpoints = {
-    source: sanitizeEndpointSnapshot(endpointsInput.source ?? {}, endpointsBaseline.source),
-    target: sanitizeEndpointSnapshot(endpointsInput.target ?? {}, endpointsBaseline.target)
-  };
+  for (const candidate of candidates) {
+    for (const remoteAddress of candidate.remoteAddresses) {
+      const peers = localIndex.get(remoteAddress);
+      if (!peers) {
+        continue;
+      }
 
-  if (profile.remarks !== undefined) {
-    normalized.remarks = normalizeOptionalText(profile.remarks);
+      for (const peer of peers) {
+        if (peer.deviceId === candidate.deviceId) {
+          continue;
+        }
+
+        const baseKey = buildDevicePairKey(candidate.deviceId, peer.deviceId);
+        if (!baseKey) {
+          continue;
+        }
+
+        if (existingManualPairs.has(baseKey)) {
+          continue;
+        }
+
+        const addressKey = buildDevicePairKey(
+          candidate.deviceId,
+          peer.deviceId,
+          candidate.localAddress,
+          peer.localAddress
+        );
+
+        if (!addressKey) {
+          continue;
+        }
+
+        if (existingDiscoveredPairs.has(addressKey) || createdPairs.has(addressKey)) {
+          continue;
+        }
+
+        const [sourceCandidate, targetCandidate] =
+          candidate.deviceId < peer.deviceId ? [candidate, peer] : [peer, candidate];
+
+        const sourceDevice = deviceLookup.get(sourceCandidate.deviceId);
+        const targetDevice = deviceLookup.get(targetCandidate.deviceId);
+
+        if (!sourceDevice || !targetDevice) {
+          continue;
+        }
+
+        const connectionType =
+          canonicalizeConnectionType(sourceCandidate.connectionType) ??
+          canonicalizeConnectionType(targetCandidate.connectionType) ??
+          'GRE';
+
+        const combinedStatus = (() => {
+          const sourceStatus = normalizeDiscoveredStatus(sourceCandidate.status);
+          const targetStatus = normalizeDiscoveredStatus(targetCandidate.status);
+
+          if (sourceStatus === 'maintenance' || targetStatus === 'maintenance') {
+            return 'maintenance';
+          }
+
+          if (sourceStatus === 'up' && targetStatus === 'up') {
+            return 'up';
+          }
+
+          return 'down';
+        })();
+
+        const latencyMs = combineLatency(sourceCandidate.latencyMs, targetCandidate.latencyMs);
+        const packetLoss = combinePacketLoss(sourceCandidate.packetLoss, targetCandidate.packetLoss);
+
+        const timestamp = new Date().toISOString();
+        nextId += 1;
+
+        const groupId =
+          Number.isInteger(sourceDevice.groupId) && sourceDevice.groupId === targetDevice.groupId
+            ? sourceDevice.groupId
+            : null;
+
+        const name = deriveDiscoveredTunnelName(
+          sourceDevice,
+          targetDevice,
+          sourceCandidate,
+          targetCandidate
+        );
+
+        const metrics = sanitizeTunnelMetrics({
+          latencyMs,
+          packetLoss,
+          lastCheckedAt: null
+        });
+
+        const notes = buildDiscoveryNotes(
+          sourceDevice,
+          targetDevice,
+          sourceCandidate,
+          targetCandidate
+        );
+
+        const record = {
+          id: nextId,
+          name,
+          groupId,
+          sourceId: sourceCandidate.deviceId,
+          targetId: targetCandidate.deviceId,
+          connectionType,
+          status: combinedStatus,
+          enabled: false,
+          tags: ['discovered'],
+          notes,
+          metrics,
+          createdAt: timestamp,
+          updatedAt: timestamp
+        };
+
+        state.tunnels.push(record);
+        added.push(record);
+        registerPair(existingDiscoveredPairs, candidate.deviceId, peer.deviceId, candidate.localAddress, peer.localAddress);
+        createdPairs.add(addressKey);
+        mutated = true;
+      }
+    }
   }
 
-  return normalized;
+  if (mutated) {
+    state.lastTunnelId = nextId;
+  }
+
+  return { mutated, added };
 };
 
 export const resolveDatabaseFile = (databasePath = './data/app.db') => {
@@ -4141,6 +2943,17 @@ const initializeDatabase = async (databasePath) => {
       await persist(state);
 
       return { success: true };
+    },
+
+    async discoverTunnelsFromInventory() {
+      const state = await load();
+      const { mutated, added } = runTunnelDiscovery(state);
+
+      if (mutated) {
+        await persist(state);
+      }
+
+      return { success: true, mutated, added };
     },
 
     async listTunnels() {

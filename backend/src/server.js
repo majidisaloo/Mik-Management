@@ -2179,6 +2179,8 @@ const bootstrap = async () => {
 
     const handleListTunnels = async () => {
       try {
+        await db.discoverTunnelsFromInventory();
+
         const [tunnels, groups, mikrotiks] = await Promise.all([
           db.listTunnels(),
           db.listGroups(),
