@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,17 +16,23 @@ const defaultPermissions = () => ({
   settings: false
 });
 
+const TARGET_ROUTEROS_VERSION = '7.14.0';
+
 const defaultState = () => ({
   lastUserId: 0,
   lastRoleId: 0,
   lastGroupId: 0,
   lastMikrotikId: 0,
   lastTunnelId: 0,
+  lastAddressListId: 0,
+  lastFirewallFilterId: 0,
   users: [],
   roles: [],
   groups: [],
   mikrotiks: [],
-  tunnels: []
+  tunnels: [],
+  addressLists: [],
+  firewallFilters: []
 });
 
 const normalizeGroupName = (name, fallback) => {
@@ -95,7 +102,13 @@ const defaultRouterosOptions = () => ({
   apiTimeout: 5000,
   apiRetries: 1,
   allowInsecureCiphers: false,
-  preferredApiFirst: true
+  preferredApiFirst: true,
+  firmwareVersion: '',
+  sshEnabled: false,
+  sshPort: 22,
+  sshUsername: '',
+  sshPassword: '',
+  sshAcceptNewHostKeys: true
 });
 
 const normalizeText = (value, fallback = '') => {
@@ -165,6 +178,147 @@ const normalizeTags = (value) => {
   return [];
 };
 
+const allowedConnectivityStatuses = new Set(['unknown', 'online', 'offline', 'disabled']);
+const allowedAddressReferenceTypes = new Set(['mikrotik', 'group']);
+const allowedFirewallChains = new Set(['input', 'output', 'forward']);
+const allowedFirewallActions = new Set(['accept', 'drop']);
+const allowedFirewallStates = new Set(['new', 'established', 'related', 'invalid', 'syn']);
+
+const defaultConnectivityState = (routeros = defaultRouterosOptions()) => ({
+  api: {
+    status: routeros.apiEnabled ? 'unknown' : 'disabled',
+    lastCheckedAt: null,
+    lastError: null
+  },
+  ssh: {
+    status: routeros.sshEnabled ? 'unknown' : 'disabled',
+    lastCheckedAt: null,
+    fingerprint: null,
+    lastError: null
+  }
+});
+
+const sanitizeConnectivity = (connectivity = {}, routeros = defaultRouterosOptions()) => {
+  const baseline = defaultConnectivityState(routeros);
+  const normalized = { ...baseline };
+
+  const api = connectivity.api ?? {};
+  const apiStatus = typeof api.status === 'string' ? api.status.toLowerCase() : '';
+  normalized.api.status = allowedConnectivityStatuses.has(apiStatus) ? apiStatus : baseline.api.status;
+  if (!routeros.apiEnabled) {
+    normalized.api.status = 'disabled';
+  }
+  normalized.api.lastCheckedAt = typeof api.lastCheckedAt === 'string' ? api.lastCheckedAt : baseline.api.lastCheckedAt;
+  normalized.api.lastError = normalizeOptionalText(api.lastError ?? baseline.api.lastError ?? '') || null;
+
+  const ssh = connectivity.ssh ?? {};
+  const sshStatus = typeof ssh.status === 'string' ? ssh.status.toLowerCase() : '';
+  normalized.ssh.status = allowedConnectivityStatuses.has(sshStatus) ? sshStatus : baseline.ssh.status;
+  if (!routeros.sshEnabled) {
+    normalized.ssh.status = 'disabled';
+  }
+  normalized.ssh.lastCheckedAt = typeof ssh.lastCheckedAt === 'string' ? ssh.lastCheckedAt : baseline.ssh.lastCheckedAt;
+  normalized.ssh.lastError = normalizeOptionalText(ssh.lastError ?? baseline.ssh.lastError ?? '') || null;
+  normalized.ssh.fingerprint = normalizeOptionalText(ssh.fingerprint ?? baseline.ssh.fingerprint ?? '') || null;
+
+  return normalized;
+};
+
+const compareVersionSegments = (segmentsA, segmentsB) => {
+  const length = Math.max(segmentsA.length, segmentsB.length);
+  for (let index = 0; index < length; index += 1) {
+    const a = Number.parseInt(segmentsA[index] ?? '0', 10);
+    const b = Number.parseInt(segmentsB[index] ?? '0', 10);
+
+    if (Number.isNaN(a) && Number.isNaN(b)) {
+      continue;
+    }
+
+    if (Number.isNaN(a)) {
+      return -1;
+    }
+
+    if (Number.isNaN(b)) {
+      return 1;
+    }
+
+    if (a > b) {
+      return 1;
+    }
+
+    if (a < b) {
+      return -1;
+    }
+  }
+
+  return 0;
+};
+
+const compareRouterosVersions = (current, target) => {
+  if (!current || !target) {
+    return 0;
+  }
+
+  const currentSegments = String(current)
+    .split(/[^0-9]+/)
+    .filter(Boolean);
+  const targetSegments = String(target)
+    .split(/[^0-9]+/)
+    .filter(Boolean);
+
+  return compareVersionSegments(currentSegments, targetSegments);
+};
+
+const deriveDeviceStatus = (status = {}, routeros = defaultRouterosOptions()) => {
+  const normalized = { ...sanitizeDeviceStatus(status) };
+  const version = normalizeOptionalText(routeros.firmwareVersion ?? '');
+
+  if (!version) {
+    normalized.updateStatus = 'unknown';
+    return normalized;
+  }
+
+  const comparison = compareRouterosVersions(version, TARGET_ROUTEROS_VERSION);
+  normalized.updateStatus = comparison >= 0 ? 'updated' : 'pending';
+
+  if (!normalized.lastAuditAt) {
+    normalized.lastAuditAt = new Date().toISOString();
+  }
+
+  return normalized;
+};
+
+const sanitizePortExpression = (value) => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  return value.replace(/[^0-9,:;-]/g, '').replace(/;+/g, ';').trim();
+};
+
+const sanitizeFirewallStatesList = (states) => {
+  if (!states) {
+    return [];
+  }
+
+  const source = Array.isArray(states) ? states : String(states).split(',');
+
+  return [...new Set(source.map((entry) => entry.toString().toLowerCase().trim()).filter(Boolean))].filter((entry) =>
+    allowedFirewallStates.has(entry)
+  );
+};
+
+const generateHostFingerprint = (host) => {
+  const normalized = normalizeOptionalText(host);
+
+  if (!normalized) {
+    return null;
+  }
+
+  const digest = crypto.createHash('sha256').update(normalized).digest('hex');
+  return digest.match(/.{1,4}/g)?.join(':') ?? digest;
+};
+
 const sanitizeRouteros = (options = {}, baseline = defaultRouterosOptions()) => {
   const normalized = { ...baseline };
 
@@ -204,6 +358,24 @@ const sanitizeRouteros = (options = {}, baseline = defaultRouterosOptions()) => 
 
   if (!normalized.apiSSL && !options.apiPort && !baseline.apiPort) {
     normalized.apiPort = 8728;
+  }
+
+  normalized.firmwareVersion = normalizeOptionalText(
+    options.firmwareVersion ?? baseline.firmwareVersion ?? ''
+  );
+
+  const sshPortFallback = clampNumber(baseline.sshPort, { min: 1, max: 65535, fallback: 22 });
+  normalized.sshEnabled = normalizeBoolean(options.sshEnabled, baseline.sshEnabled);
+  normalized.sshPort = clampNumber(options.sshPort, { min: 1, max: 65535, fallback: sshPortFallback });
+  normalized.sshUsername = normalizeOptionalText(options.sshUsername ?? baseline.sshUsername ?? '');
+  normalized.sshPassword = normalizeOptionalText(options.sshPassword ?? baseline.sshPassword ?? '');
+  normalized.sshAcceptNewHostKeys = normalizeBoolean(
+    options.sshAcceptNewHostKeys ?? options.sshAcceptUnknownHost,
+    baseline.sshAcceptNewHostKeys
+  );
+
+  if (!normalized.sshEnabled) {
+    normalized.sshPort = clampNumber(22, { min: 1, max: 65535, fallback: 22 });
   }
 
   return normalized;
@@ -616,7 +788,12 @@ const ensureStateShape = async (databaseFile) => {
       mutated = true;
     }
 
-    const status = sanitizeDeviceStatus(device.status);
+    const status = deriveDeviceStatus(device.status, routeros);
+    const connectivity = sanitizeConnectivity(device.connectivity, routeros);
+
+    if (JSON.stringify(connectivity) !== JSON.stringify(device.connectivity ?? {})) {
+      mutated = true;
+    }
 
     return {
       id: identifier,
@@ -627,6 +804,7 @@ const ensureStateShape = async (databaseFile) => {
       notes,
       routeros,
       status,
+      connectivity,
       createdAt,
       updatedAt
     };
@@ -751,6 +929,209 @@ const ensureStateShape = async (databaseFile) => {
 
   sanitizedTunnels.sort((a, b) => a.name.localeCompare(b.name));
   normalized.tunnels = sanitizedTunnels;
+
+  if (!Array.isArray(normalized.addressLists)) {
+    normalized.addressLists = [];
+    mutated = true;
+  }
+
+  if (!Number.isInteger(normalized.lastAddressListId)) {
+    normalized.lastAddressListId = normalized.addressLists.reduce(
+      (max, entry) => Math.max(max, Number.parseInt(entry.id, 10) || 0),
+      0
+    );
+    mutated = true;
+  }
+
+  let nextAddressListIdSeed = Math.max(
+    Number.isInteger(normalized.lastAddressListId) ? normalized.lastAddressListId : 0,
+    normalized.addressLists.reduce((max, entry) => Math.max(max, Number.parseInt(entry.id, 10) || 0), 0)
+  );
+
+  const addressIdentifiers = new Set();
+
+  const sanitizedAddressLists = normalized.addressLists.map((entry) => {
+    let identifier = Number.parseInt(entry.id, 10);
+
+    if (!Number.isInteger(identifier) || identifier <= 0 || addressIdentifiers.has(identifier)) {
+      nextAddressListIdSeed += 1;
+      identifier = nextAddressListIdSeed;
+      mutated = true;
+    }
+
+    addressIdentifiers.add(identifier);
+
+    const createdAt = entry.createdAt ?? new Date().toISOString();
+    const updatedAt = entry.updatedAt ?? createdAt;
+    const name = normalizeText(entry.name, `Address list ${identifier}`);
+    const referenceTypeCandidate = typeof entry.referenceType === 'string' ? entry.referenceType.toLowerCase() : '';
+    const referenceType = allowedAddressReferenceTypes.has(referenceTypeCandidate)
+      ? referenceTypeCandidate
+      : 'mikrotik';
+
+    let referenceId = null;
+    if (referenceType === 'mikrotik') {
+      const candidate = Number.parseInt(entry.referenceId, 10);
+      referenceId = validMikrotikIds.has(candidate) ? candidate : null;
+    } else if (referenceType === 'group') {
+      const candidate = Number.parseInt(entry.referenceId, 10);
+      referenceId = availableGroupIds.has(candidate) ? candidate : null;
+    }
+
+    const address = normalizeOptionalText(entry.address ?? '');
+    const comment = normalizeOptionalText(entry.comment ?? '');
+
+    if (
+      entry.name !== name ||
+      entry.referenceType !== referenceType ||
+      (entry.referenceId ?? null) !== referenceId ||
+      (entry.address ?? '') !== address ||
+      (entry.comment ?? '') !== comment ||
+      entry.createdAt !== createdAt ||
+      entry.updatedAt !== updatedAt
+    ) {
+      mutated = true;
+    }
+
+    return {
+      id: identifier,
+      name,
+      referenceType,
+      referenceId,
+      address,
+      comment,
+      createdAt,
+      updatedAt
+    };
+  });
+
+  if (sanitizedAddressLists.length !== normalized.addressLists.length) {
+    mutated = true;
+  }
+
+  const highestAddressListId = sanitizedAddressLists.reduce((max, entry) => Math.max(max, entry.id), 0);
+
+  if (highestAddressListId !== normalized.lastAddressListId) {
+    normalized.lastAddressListId = Math.max(nextAddressListIdSeed, highestAddressListId);
+    mutated = true;
+  } else if (nextAddressListIdSeed > normalized.lastAddressListId) {
+    normalized.lastAddressListId = nextAddressListIdSeed;
+    mutated = true;
+  }
+
+  normalized.addressLists = sanitizedAddressLists;
+
+  if (!Array.isArray(normalized.firewallFilters)) {
+    normalized.firewallFilters = [];
+    mutated = true;
+  }
+
+  if (!Number.isInteger(normalized.lastFirewallFilterId)) {
+    normalized.lastFirewallFilterId = normalized.firewallFilters.reduce(
+      (max, filter) => Math.max(max, Number.parseInt(filter.id, 10) || 0),
+      0
+    );
+    mutated = true;
+  }
+
+  let nextFirewallIdSeed = Math.max(
+    Number.isInteger(normalized.lastFirewallFilterId) ? normalized.lastFirewallFilterId : 0,
+    normalized.firewallFilters.reduce((max, filter) => Math.max(max, Number.parseInt(filter.id, 10) || 0), 0)
+  );
+
+  const validAddressListIds = new Set(sanitizedAddressLists.map((entry) => entry.id));
+  const firewallIdentifiers = new Set();
+
+  const sanitizedFirewallFilters = normalized.firewallFilters.map((filter) => {
+    let identifier = Number.parseInt(filter.id, 10);
+
+    if (!Number.isInteger(identifier) || identifier <= 0 || firewallIdentifiers.has(identifier)) {
+      nextFirewallIdSeed += 1;
+      identifier = nextFirewallIdSeed;
+      mutated = true;
+    }
+
+    firewallIdentifiers.add(identifier);
+
+    const createdAt = filter.createdAt ?? new Date().toISOString();
+    const updatedAt = filter.updatedAt ?? createdAt;
+    const name = normalizeOptionalText(filter.name ?? `Rule ${identifier}`) || `Rule ${identifier}`;
+    const groupCandidate = Number.parseInt(filter.groupId, 10);
+    const groupId = availableGroupIds.has(groupCandidate) ? groupCandidate : null;
+
+    const chainCandidate = typeof filter.chain === 'string' ? filter.chain.toLowerCase() : '';
+    const chain = allowedFirewallChains.has(chainCandidate) ? chainCandidate : 'forward';
+
+    const sourceAddressListCandidate = Number.parseInt(filter.sourceAddressListId, 10);
+    const sourceAddressListId = validAddressListIds.has(sourceAddressListCandidate)
+      ? sourceAddressListCandidate
+      : null;
+
+    const destinationAddressListCandidate = Number.parseInt(filter.destinationAddressListId, 10);
+    const destinationAddressListId = validAddressListIds.has(destinationAddressListCandidate)
+      ? destinationAddressListCandidate
+      : null;
+
+    const sourcePort = sanitizePortExpression(filter.sourcePort);
+    const destinationPort = sanitizePortExpression(filter.destinationPort);
+
+    const states = sanitizeFirewallStatesList(filter.states);
+    const actionCandidate = typeof filter.action === 'string' ? filter.action.toLowerCase() : '';
+    const action = allowedFirewallActions.has(actionCandidate) ? actionCandidate : 'accept';
+    const enabled = normalizeBoolean(filter.enabled, true);
+    const comment = normalizeOptionalText(filter.comment ?? '');
+
+    if (
+      filter.name !== name ||
+      (filter.groupId ?? null) !== groupId ||
+      filter.chain !== chain ||
+      (filter.sourceAddressListId ?? null) !== sourceAddressListId ||
+      (filter.destinationAddressListId ?? null) !== destinationAddressListId ||
+      (filter.sourcePort ?? '') !== sourcePort ||
+      (filter.destinationPort ?? '') !== destinationPort ||
+      JSON.stringify(filter.states ?? []) !== JSON.stringify(states) ||
+      filter.action !== action ||
+      Boolean(filter.enabled) !== enabled ||
+      (filter.comment ?? '') !== comment ||
+      filter.createdAt !== createdAt ||
+      filter.updatedAt !== updatedAt
+    ) {
+      mutated = true;
+    }
+
+    return {
+      id: identifier,
+      name,
+      groupId,
+      chain,
+      sourceAddressListId,
+      destinationAddressListId,
+      sourcePort,
+      destinationPort,
+      states,
+      action,
+      enabled,
+      comment,
+      createdAt,
+      updatedAt
+    };
+  });
+
+  if (sanitizedFirewallFilters.length !== normalized.firewallFilters.length) {
+    mutated = true;
+  }
+
+  const highestFirewallId = sanitizedFirewallFilters.reduce((max, entry) => Math.max(max, entry.id), 0);
+
+  if (highestFirewallId !== normalized.lastFirewallFilterId) {
+    normalized.lastFirewallFilterId = Math.max(nextFirewallIdSeed, highestFirewallId);
+    mutated = true;
+  } else if (nextFirewallIdSeed > normalized.lastFirewallFilterId) {
+    normalized.lastFirewallFilterId = nextFirewallIdSeed;
+    mutated = true;
+  }
+
+  normalized.firewallFilters = sanitizedFirewallFilters;
 
   const validRoleIds = new Set(normalized.roles.map((role) => role.id));
 
@@ -1164,11 +1545,15 @@ const initializeDatabase = async (databasePath) => {
       const state = await load();
       return state.mikrotiks.map((device) => ({
         ...device,
-        tags: Array.isArray(device.tags) ? [...device.tags] : []
+        tags: Array.isArray(device.tags) ? [...device.tags] : [],
+        connectivity: {
+          api: { ...(device.connectivity?.api ?? {}) },
+          ssh: { ...(device.connectivity?.ssh ?? {}) }
+        }
       }));
     },
 
-    async createMikrotik({ name, host, groupId, tags, notes, routeros, status }) {
+    async createMikrotik({ name, host, groupId, tags, notes, routeros, status, connectivity }) {
       const state = await load();
 
       const normalizedName = normalizeText(name);
@@ -1202,7 +1587,8 @@ const initializeDatabase = async (databasePath) => {
       const normalizedTags = normalizeTags(tags);
       const normalizedNotes = normalizeOptionalText(notes ?? '');
       const routerosBaseline = sanitizeRouteros(routeros, defaultRouterosOptions());
-      const normalizedStatus = sanitizeDeviceStatus(status);
+      const normalizedStatus = deriveDeviceStatus(status, routerosBaseline);
+      const normalizedConnectivity = sanitizeConnectivity(connectivity, routerosBaseline);
 
       const nextId = (Number.isInteger(state.lastMikrotikId) ? state.lastMikrotikId : 0) + 1;
       const timestamp = new Date().toISOString();
@@ -1216,6 +1602,7 @@ const initializeDatabase = async (databasePath) => {
         notes: normalizedNotes,
         routeros: routerosBaseline,
         status: normalizedStatus,
+        connectivity: normalizedConnectivity,
         createdAt: timestamp,
         updatedAt: timestamp
       };
@@ -1227,7 +1614,7 @@ const initializeDatabase = async (databasePath) => {
       return { success: true, mikrotik: record };
     },
 
-    async updateMikrotik(id, { name, host, groupId, tags, notes, routeros, status }) {
+    async updateMikrotik(id, { name, host, groupId, tags, notes, routeros, status, connectivity }) {
       const state = await load();
       const index = state.mikrotiks.findIndex((device) => device.id === id);
 
@@ -1277,7 +1664,12 @@ const initializeDatabase = async (databasePath) => {
       const nextTags =
         tags !== undefined ? normalizeTags(tags) : Array.isArray(existing.tags) ? [...existing.tags] : [];
       const nextNotes = notes !== undefined ? normalizeOptionalText(notes) : existing.notes ?? '';
-      const nextStatus = status !== undefined ? sanitizeDeviceStatus(status) : sanitizeDeviceStatus(existing.status);
+      const nextStatus =
+        status !== undefined ? deriveDeviceStatus(status, normalizedRouteros) : deriveDeviceStatus(existing.status, normalizedRouteros);
+      const nextConnectivity =
+        connectivity !== undefined
+          ? sanitizeConnectivity(connectivity, normalizedRouteros)
+          : sanitizeConnectivity(existing.connectivity, normalizedRouteros);
 
       const record = {
         ...existing,
@@ -1288,6 +1680,7 @@ const initializeDatabase = async (databasePath) => {
         notes: nextNotes,
         routeros: normalizedRouteros,
         status: nextStatus,
+        connectivity: nextConnectivity,
         updatedAt: new Date().toISOString()
       };
 
@@ -1328,6 +1721,424 @@ const initializeDatabase = async (databasePath) => {
         }
       }
 
+      await persist(state);
+
+      return { success: true };
+    },
+
+    async testMikrotikConnectivity(id) {
+      const state = await load();
+      const index = state.mikrotiks.findIndex((device) => device.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      const existing = state.mikrotiks[index];
+      const routerosBaseline = sanitizeRouteros(existing.routeros, defaultRouterosOptions());
+      const timestamp = new Date().toISOString();
+      const host = normalizeOptionalText(existing.host);
+      const lowered = host.toLowerCase();
+
+      const simulateOffline = lowered.includes('offline') || lowered.includes('down');
+      const apiOffline = simulateOffline || lowered.includes('api-down');
+      const sshOffline = simulateOffline || lowered.includes('ssh-down');
+
+      const connectivity = sanitizeConnectivity(
+        {
+          api: {
+            status: routerosBaseline.apiEnabled ? (apiOffline ? 'offline' : 'online') : 'disabled',
+            lastCheckedAt: timestamp,
+            lastError:
+              routerosBaseline.apiEnabled && apiOffline ? 'API host unreachable' : existing.connectivity?.api?.lastError ?? null
+          },
+          ssh: {
+            status: routerosBaseline.sshEnabled ? (sshOffline ? 'offline' : 'online') : 'disabled',
+            lastCheckedAt: timestamp,
+            lastError:
+              routerosBaseline.sshEnabled && sshOffline
+                ? 'SSH negotiation failed'
+                : existing.connectivity?.ssh?.lastError ?? null,
+            fingerprint:
+              routerosBaseline.sshEnabled && !sshOffline
+                ? generateHostFingerprint(existing.host)
+                : existing.connectivity?.ssh?.fingerprint ?? null
+          }
+        },
+        routerosBaseline
+      );
+
+      const simulatedVersion =
+        routerosBaseline.apiEnabled || routerosBaseline.sshEnabled
+          ? lowered.includes('legacy') || lowered.includes('old')
+            ? '6.49.10'
+            : TARGET_ROUTEROS_VERSION
+          : routerosBaseline.firmwareVersion;
+
+      const normalizedRouteros = { ...routerosBaseline, firmwareVersion: simulatedVersion };
+      const status = deriveDeviceStatus(existing.status, normalizedRouteros);
+
+      const record = {
+        ...existing,
+        routeros: normalizedRouteros,
+        status,
+        connectivity,
+        updatedAt: timestamp
+      };
+
+      state.mikrotiks[index] = record;
+      await persist(state);
+
+      return { success: true, mikrotik: record };
+    },
+
+    async listAddressLists() {
+      const state = await load();
+      return state.addressLists.map((entry) => ({ ...entry }));
+    },
+
+    async createAddressList({ name, referenceType, referenceId, address, comment }) {
+      const state = await load();
+
+      const normalizedName = normalizeText(name);
+      if (!normalizedName) {
+        return { success: false, reason: 'name-required' };
+      }
+
+      const typeCandidate = typeof referenceType === 'string' ? referenceType.toLowerCase() : '';
+      if (!allowedAddressReferenceTypes.has(typeCandidate)) {
+        return { success: false, reason: 'type-required' };
+      }
+
+      let normalizedReferenceId = null;
+      if (typeCandidate === 'mikrotik') {
+        const candidate = Number.parseInt(referenceId, 10);
+        if (!Number.isInteger(candidate) || !state.mikrotiks.some((device) => device.id === candidate)) {
+          return { success: false, reason: 'invalid-reference' };
+        }
+        normalizedReferenceId = candidate;
+      } else {
+        const candidate = Number.parseInt(referenceId, 10);
+        if (!Number.isInteger(candidate) || !state.groups.some((group) => group.id === candidate)) {
+          return { success: false, reason: 'invalid-reference' };
+        }
+        normalizedReferenceId = candidate;
+      }
+
+      const normalizedAddress = normalizeOptionalText(address ?? '');
+      const normalizedComment = normalizeOptionalText(comment ?? '');
+
+      const nextId = (Number.isInteger(state.lastAddressListId) ? state.lastAddressListId : 0) + 1;
+      const timestamp = new Date().toISOString();
+
+      const record = {
+        id: nextId,
+        name: normalizedName,
+        referenceType: typeCandidate,
+        referenceId: normalizedReferenceId,
+        address: normalizedAddress,
+        comment: normalizedComment,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      };
+
+      state.addressLists.push(record);
+      state.lastAddressListId = nextId;
+      await persist(state);
+
+      return { success: true, addressList: record };
+    },
+
+    async updateAddressList(id, { name, referenceType, referenceId, address, comment }) {
+      const state = await load();
+      const index = state.addressLists.findIndex((entry) => entry.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      const existing = state.addressLists[index];
+      const normalizedName = name !== undefined ? normalizeText(name, existing.name) : existing.name;
+
+      let normalizedReferenceType = existing.referenceType;
+      if (referenceType !== undefined) {
+        const candidate = typeof referenceType === 'string' ? referenceType.toLowerCase() : '';
+        if (!allowedAddressReferenceTypes.has(candidate)) {
+          return { success: false, reason: 'type-required' };
+        }
+        normalizedReferenceType = candidate;
+      }
+
+      let normalizedReferenceId = existing.referenceId;
+      if (referenceId !== undefined || referenceType !== undefined) {
+        const candidate = referenceId !== undefined ? referenceId : existing.referenceId;
+        const parsed = Number.parseInt(candidate, 10);
+
+        if (normalizedReferenceType === 'mikrotik') {
+          if (!Number.isInteger(parsed) || !state.mikrotiks.some((device) => device.id === parsed)) {
+            return { success: false, reason: 'invalid-reference' };
+          }
+        } else if (!Number.isInteger(parsed) || !state.groups.some((group) => group.id === parsed)) {
+          return { success: false, reason: 'invalid-reference' };
+        }
+
+        normalizedReferenceId = parsed;
+      }
+
+      const normalizedAddress = address !== undefined ? normalizeOptionalText(address) : existing.address ?? '';
+      const normalizedComment = comment !== undefined ? normalizeOptionalText(comment) : existing.comment ?? '';
+
+      const record = {
+        ...existing,
+        name: normalizedName,
+        referenceType: normalizedReferenceType,
+        referenceId: normalizedReferenceId,
+        address: normalizedAddress,
+        comment: normalizedComment,
+        updatedAt: new Date().toISOString()
+      };
+
+      state.addressLists[index] = record;
+      await persist(state);
+
+      return { success: true, addressList: record };
+    },
+
+    async deleteAddressList(id) {
+      const state = await load();
+      const index = state.addressLists.findIndex((entry) => entry.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      state.addressLists.splice(index, 1);
+      const timestamp = new Date().toISOString();
+
+      state.firewallFilters = state.firewallFilters.map((filter) => {
+        if (filter.sourceAddressListId === id || filter.destinationAddressListId === id) {
+          return {
+            ...filter,
+            sourceAddressListId: filter.sourceAddressListId === id ? null : filter.sourceAddressListId,
+            destinationAddressListId:
+              filter.destinationAddressListId === id ? null : filter.destinationAddressListId,
+            updatedAt: timestamp
+          };
+        }
+        return filter;
+      });
+
+      await persist(state);
+
+      return { success: true };
+    },
+
+    async listFirewallFilters() {
+      const state = await load();
+      return state.firewallFilters.map((filter) => ({ ...filter, states: Array.isArray(filter.states) ? [...filter.states] : [] }));
+    },
+
+    async createFirewallFilter({
+      name,
+      groupId,
+      chain,
+      sourceAddressListId,
+      destinationAddressListId,
+      sourcePort,
+      destinationPort,
+      states,
+      action,
+      enabled,
+      comment
+    }) {
+      const state = await load();
+
+      const normalizedName = normalizeOptionalText(name ?? '').trim();
+
+      const parsedGroup = Number.parseInt(groupId, 10);
+      if (!Number.isInteger(parsedGroup) || !state.groups.some((group) => group.id === parsedGroup)) {
+        return { success: false, reason: 'invalid-group' };
+      }
+
+      const chainCandidate = typeof chain === 'string' ? chain.toLowerCase() : '';
+      if (!allowedFirewallChains.has(chainCandidate)) {
+        return { success: false, reason: 'invalid-chain' };
+      }
+
+      let normalizedSourceListId = null;
+      if (sourceAddressListId !== undefined && sourceAddressListId !== null && sourceAddressListId !== '') {
+        const parsed = Number.parseInt(sourceAddressListId, 10);
+        if (!Number.isInteger(parsed) || !state.addressLists.some((entry) => entry.id === parsed)) {
+          return { success: false, reason: 'invalid-source-address-list' };
+        }
+        normalizedSourceListId = parsed;
+      }
+
+      let normalizedDestinationListId = null;
+      if (destinationAddressListId !== undefined && destinationAddressListId !== null && destinationAddressListId !== '') {
+        const parsed = Number.parseInt(destinationAddressListId, 10);
+        if (!Number.isInteger(parsed) || !state.addressLists.some((entry) => entry.id === parsed)) {
+          return { success: false, reason: 'invalid-destination-address-list' };
+        }
+        normalizedDestinationListId = parsed;
+      }
+
+      const normalizedSourcePort = sanitizePortExpression(sourcePort);
+      const normalizedDestinationPort = sanitizePortExpression(destinationPort);
+      const normalizedStates = sanitizeFirewallStatesList(states);
+      const actionCandidate = typeof action === 'string' ? action.toLowerCase() : '';
+      if (!allowedFirewallActions.has(actionCandidate)) {
+        return { success: false, reason: 'invalid-action' };
+      }
+
+      const normalizedEnabled = normalizeBoolean(enabled, true);
+      const normalizedComment = normalizeOptionalText(comment ?? '');
+
+      const nextId = (Number.isInteger(state.lastFirewallFilterId) ? state.lastFirewallFilterId : 0) + 1;
+      const timestamp = new Date().toISOString();
+
+      const record = {
+        id: nextId,
+        name: normalizedName || `Rule ${nextId}`,
+        groupId: parsedGroup,
+        chain: chainCandidate,
+        sourceAddressListId: normalizedSourceListId,
+        destinationAddressListId: normalizedDestinationListId,
+        sourcePort: normalizedSourcePort,
+        destinationPort: normalizedDestinationPort,
+        states: normalizedStates,
+        action: actionCandidate,
+        enabled: normalizedEnabled,
+        comment: normalizedComment,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      };
+
+      state.firewallFilters.push(record);
+      state.lastFirewallFilterId = nextId;
+      await persist(state);
+
+      return { success: true, firewallFilter: record };
+    },
+
+    async updateFirewallFilter(
+      id,
+      {
+        name,
+        groupId,
+        chain,
+        sourceAddressListId,
+        destinationAddressListId,
+        sourcePort,
+        destinationPort,
+        states,
+        action,
+        enabled,
+        comment
+      }
+    ) {
+      const state = await load();
+      const index = state.firewallFilters.findIndex((filter) => filter.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      const existing = state.firewallFilters[index];
+      const normalizedName = name !== undefined ? normalizeOptionalText(name) : existing.name;
+
+      let normalizedGroupId = existing.groupId;
+      if (groupId !== undefined) {
+        const parsed = Number.parseInt(groupId, 10);
+        if (!Number.isInteger(parsed) || !state.groups.some((group) => group.id === parsed)) {
+          return { success: false, reason: 'invalid-group' };
+        }
+        normalizedGroupId = parsed;
+      }
+
+      let normalizedChain = existing.chain;
+      if (chain !== undefined) {
+        const candidate = typeof chain === 'string' ? chain.toLowerCase() : '';
+        if (!allowedFirewallChains.has(candidate)) {
+          return { success: false, reason: 'invalid-chain' };
+        }
+        normalizedChain = candidate;
+      }
+
+      let normalizedSourceListId = existing.sourceAddressListId;
+      if (sourceAddressListId !== undefined) {
+        if (sourceAddressListId === null || sourceAddressListId === '') {
+          normalizedSourceListId = null;
+        } else {
+          const parsed = Number.parseInt(sourceAddressListId, 10);
+          if (!Number.isInteger(parsed) || !state.addressLists.some((entry) => entry.id === parsed)) {
+            return { success: false, reason: 'invalid-source-address-list' };
+          }
+          normalizedSourceListId = parsed;
+        }
+      }
+
+      let normalizedDestinationListId = existing.destinationAddressListId;
+      if (destinationAddressListId !== undefined) {
+        if (destinationAddressListId === null || destinationAddressListId === '') {
+          normalizedDestinationListId = null;
+        } else {
+          const parsed = Number.parseInt(destinationAddressListId, 10);
+          if (!Number.isInteger(parsed) || !state.addressLists.some((entry) => entry.id === parsed)) {
+            return { success: false, reason: 'invalid-destination-address-list' };
+          }
+          normalizedDestinationListId = parsed;
+        }
+      }
+
+      const normalizedSourcePort = sourcePort !== undefined ? sanitizePortExpression(sourcePort) : existing.sourcePort;
+      const normalizedDestinationPort =
+        destinationPort !== undefined ? sanitizePortExpression(destinationPort) : existing.destinationPort;
+      const normalizedStates = states !== undefined ? sanitizeFirewallStatesList(states) : existing.states;
+
+      let normalizedAction = existing.action;
+      if (action !== undefined) {
+        const candidate = typeof action === 'string' ? action.toLowerCase() : '';
+        if (!allowedFirewallActions.has(candidate)) {
+          return { success: false, reason: 'invalid-action' };
+        }
+        normalizedAction = candidate;
+      }
+
+      const normalizedEnabled = enabled !== undefined ? normalizeBoolean(enabled, existing.enabled) : existing.enabled;
+      const normalizedComment = comment !== undefined ? normalizeOptionalText(comment) : existing.comment ?? '';
+
+      const record = {
+        ...existing,
+        name: normalizedName,
+        groupId: normalizedGroupId,
+        chain: normalizedChain,
+        sourceAddressListId: normalizedSourceListId,
+        destinationAddressListId: normalizedDestinationListId,
+        sourcePort: normalizedSourcePort,
+        destinationPort: normalizedDestinationPort,
+        states: normalizedStates,
+        action: normalizedAction,
+        enabled: normalizedEnabled,
+        comment: normalizedComment,
+        updatedAt: new Date().toISOString()
+      };
+
+      state.firewallFilters[index] = record;
+      await persist(state);
+
+      return { success: true, firewallFilter: record };
+    },
+
+    async deleteFirewallFilter(id) {
+      const state = await load();
+      const index = state.firewallFilters.findIndex((filter) => filter.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      state.firewallFilters.splice(index, 1);
       await persist(state);
 
       return { success: true };
@@ -1578,6 +2389,10 @@ const initializeDatabase = async (databasePath) => {
       const updatedMikrotiks = state.mikrotiks.filter((device) => device.status?.updateStatus === 'updated').length;
       const pendingMikrotiks = state.mikrotiks.filter((device) => device.status?.updateStatus === 'pending').length;
       const unknownMikrotiks = Math.max(totalMikrotiks - updatedMikrotiks - pendingMikrotiks, 0);
+      const apiOnline = state.mikrotiks.filter((device) => device.connectivity?.api?.status === 'online').length;
+      const apiOffline = state.mikrotiks.filter((device) => device.connectivity?.api?.status === 'offline').length;
+      const sshOnline = state.mikrotiks.filter((device) => device.connectivity?.ssh?.status === 'online').length;
+      const sshOffline = state.mikrotiks.filter((device) => device.connectivity?.ssh?.status === 'offline').length;
 
       const totalTunnels = state.tunnels.length;
       const tunnelsUp = state.tunnels.filter((tunnel) => tunnel.status === 'up').length;
@@ -1613,7 +2428,12 @@ const initializeDatabase = async (databasePath) => {
           total: totalMikrotiks,
           updated: updatedMikrotiks,
           pending: pendingMikrotiks,
-          unknown: unknownMikrotiks
+          unknown: unknownMikrotiks,
+          apiOnline,
+          apiOffline,
+          sshOnline,
+          sshOffline,
+          target: TARGET_ROUTEROS_VERSION
         },
         tunnels: {
           total: totalTunnels,
