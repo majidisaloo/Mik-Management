@@ -1,7 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
-import { isIP } from 'node:net';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -25,13 +24,15 @@ const defaultState = () => ({
   lastGroupId: 0,
   lastMikrotikId: 0,
   lastTunnelId: 0,
-  lastIpamId: 0,
+  lastAddressListId: 0,
+  lastFirewallFilterId: 0,
   users: [],
   roles: [],
   groups: [],
   mikrotiks: [],
   tunnels: [],
-  ipams: []
+  addressLists: [],
+  firewallFilters: []
 });
 
 const normalizeGroupName = (name, fallback) => {
@@ -102,11 +103,12 @@ const defaultRouterosOptions = () => ({
   apiRetries: 1,
   allowInsecureCiphers: false,
   preferredApiFirst: true,
-  sshEnabled: true,
+  firmwareVersion: '',
+  sshEnabled: false,
   sshPort: 22,
   sshUsername: '',
   sshPassword: '',
-  autoAcceptFingerprints: false
+  sshAcceptNewHostKeys: true
 });
 
 const normalizeText = (value, fallback = '') => {
@@ -176,109 +178,146 @@ const normalizeTags = (value) => {
   return [];
 };
 
-const normalizeUrl = (value) => {
+const allowedConnectivityStatuses = new Set(['unknown', 'online', 'offline', 'disabled']);
+const allowedAddressReferenceTypes = new Set(['mikrotik', 'group']);
+const allowedFirewallChains = new Set(['input', 'output', 'forward']);
+const allowedFirewallActions = new Set(['accept', 'drop']);
+const allowedFirewallStates = new Set(['new', 'established', 'related', 'invalid', 'syn']);
+
+const defaultConnectivityState = (routeros = defaultRouterosOptions()) => ({
+  api: {
+    status: routeros.apiEnabled ? 'unknown' : 'disabled',
+    lastCheckedAt: null,
+    lastError: null
+  },
+  ssh: {
+    status: routeros.sshEnabled ? 'unknown' : 'disabled',
+    lastCheckedAt: null,
+    fingerprint: null,
+    lastError: null
+  }
+});
+
+const sanitizeConnectivity = (connectivity = {}, routeros = defaultRouterosOptions()) => {
+  const baseline = defaultConnectivityState(routeros);
+  const normalized = { ...baseline };
+
+  const api = connectivity.api ?? {};
+  const apiStatus = typeof api.status === 'string' ? api.status.toLowerCase() : '';
+  normalized.api.status = allowedConnectivityStatuses.has(apiStatus) ? apiStatus : baseline.api.status;
+  if (!routeros.apiEnabled) {
+    normalized.api.status = 'disabled';
+  }
+  normalized.api.lastCheckedAt = typeof api.lastCheckedAt === 'string' ? api.lastCheckedAt : baseline.api.lastCheckedAt;
+  normalized.api.lastError = normalizeOptionalText(api.lastError ?? baseline.api.lastError ?? '') || null;
+
+  const ssh = connectivity.ssh ?? {};
+  const sshStatus = typeof ssh.status === 'string' ? ssh.status.toLowerCase() : '';
+  normalized.ssh.status = allowedConnectivityStatuses.has(sshStatus) ? sshStatus : baseline.ssh.status;
+  if (!routeros.sshEnabled) {
+    normalized.ssh.status = 'disabled';
+  }
+  normalized.ssh.lastCheckedAt = typeof ssh.lastCheckedAt === 'string' ? ssh.lastCheckedAt : baseline.ssh.lastCheckedAt;
+  normalized.ssh.lastError = normalizeOptionalText(ssh.lastError ?? baseline.ssh.lastError ?? '') || null;
+  normalized.ssh.fingerprint = normalizeOptionalText(ssh.fingerprint ?? baseline.ssh.fingerprint ?? '') || null;
+
+  return normalized;
+};
+
+const compareVersionSegments = (segmentsA, segmentsB) => {
+  const length = Math.max(segmentsA.length, segmentsB.length);
+  for (let index = 0; index < length; index += 1) {
+    const a = Number.parseInt(segmentsA[index] ?? '0', 10);
+    const b = Number.parseInt(segmentsB[index] ?? '0', 10);
+
+    if (Number.isNaN(a) && Number.isNaN(b)) {
+      continue;
+    }
+
+    if (Number.isNaN(a)) {
+      return -1;
+    }
+
+    if (Number.isNaN(b)) {
+      return 1;
+    }
+
+    if (a > b) {
+      return 1;
+    }
+
+    if (a < b) {
+      return -1;
+    }
+  }
+
+  return 0;
+};
+
+const compareRouterosVersions = (current, target) => {
+  if (!current || !target) {
+    return 0;
+  }
+
+  const currentSegments = String(current)
+    .split(/[^0-9]+/)
+    .filter(Boolean);
+  const targetSegments = String(target)
+    .split(/[^0-9]+/)
+    .filter(Boolean);
+
+  return compareVersionSegments(currentSegments, targetSegments);
+};
+
+const deriveDeviceStatus = (status = {}, routeros = defaultRouterosOptions()) => {
+  const normalized = { ...sanitizeDeviceStatus(status) };
+  const version = normalizeOptionalText(routeros.firmwareVersion ?? '');
+
+  if (!version) {
+    normalized.updateStatus = 'unknown';
+    return normalized;
+  }
+
+  const comparison = compareRouterosVersions(version, TARGET_ROUTEROS_VERSION);
+  normalized.updateStatus = comparison >= 0 ? 'updated' : 'pending';
+
+  if (!normalized.lastAuditAt) {
+    normalized.lastAuditAt = new Date().toISOString();
+  }
+
+  return normalized;
+};
+
+const sanitizePortExpression = (value) => {
   if (typeof value !== 'string') {
     return '';
   }
 
-  const trimmed = value.trim();
+  return value.replace(/[^0-9,:;-]/g, '').replace(/;+/g, ';').trim();
+};
 
-  if (!trimmed) {
-    return '';
+const sanitizeFirewallStatesList = (states) => {
+  if (!states) {
+    return [];
   }
 
-  return trimmed.replace(/\s+/g, '').replace(/\/+$/, '');
+  const source = Array.isArray(states) ? states : String(states).split(',');
+
+  return [...new Set(source.map((entry) => entry.toString().toLowerCase().trim()).filter(Boolean))].filter((entry) =>
+    allowedFirewallStates.has(entry)
+  );
 };
 
-const sanitizeIpamCollectionEntry = (entry = {}, fallbackPrefix) => {
-  const metadata =
-    entry && typeof entry.metadata === 'object' && entry.metadata !== null && !Array.isArray(entry.metadata)
-      ? { ...entry.metadata }
-      : {};
+const generateHostFingerprint = (host) => {
+  const normalized = normalizeOptionalText(host);
 
-  Object.keys(metadata).forEach((key) => {
-    if (metadata[key] === undefined) {
-      delete metadata[key];
-    }
-  });
+  if (!normalized) {
+    return null;
+  }
 
-  const position = typeof entry.index === 'number' ? entry.index + 1 : 1;
-  const fallbackName = fallbackPrefix ? `${fallbackPrefix} ${position}` : `Item ${position}`;
-
-  const idCandidate = Number.parseInt(entry.id, 10);
-  const id = Number.isInteger(idCandidate) && idCandidate > 0 ? idCandidate : null;
-
-  return {
-    id,
-    name: normalizeText(entry.name, fallbackName),
-    description: normalizeOptionalText(entry.description ?? ''),
-    metadata
-  };
+  const digest = crypto.createHash('sha256').update(normalized).digest('hex');
+  return digest.match(/.{1,4}/g)?.join(':') ?? digest;
 };
-
-const sanitizeIpamCollections = (collections = {}) => {
-  const mapList = (list, prefix) => {
-    if (!Array.isArray(list)) {
-      return [];
-    }
-
-    return list.map((entry, index) => sanitizeIpamCollectionEntry({ ...entry, index }, prefix));
-  };
-
-  return {
-    sections: mapList(collections.sections, 'Section'),
-    datacenters: mapList(collections.datacenters, 'Datacenter'),
-    ranges: mapList(collections.ranges, 'Range')
-  };
-};
-
-const allowedIpamStatuses = new Set(['connected', 'failed', 'unknown']);
-
-const sanitizeIpamRecord = (record = {}, { identifier, timestamp } = {}) => {
-  const id = Number.isInteger(identifier) && identifier > 0 ? identifier : Number.parseInt(record.id, 10);
-
-  const createdAt = normalizeIsoDate(record.createdAt) ?? normalizeIsoDate(record.created_at) ?? timestamp;
-  const updatedAt = normalizeIsoDate(record.updatedAt) ?? normalizeIsoDate(record.updated_at) ?? createdAt ?? timestamp;
-  const lastCheckedAt =
-    normalizeIsoDate(record.lastCheckedAt) ?? normalizeIsoDate(record.last_checkedAt) ?? normalizeIsoDate(record.last_checked_at);
-
-  const statusCandidate = normalizeOptionalText(record.lastStatus ?? record.last_status ?? 'unknown') || 'unknown';
-  const lastStatus = allowedIpamStatuses.has(statusCandidate.toLowerCase())
-    ? statusCandidate.toLowerCase()
-    : 'unknown';
-
-  return {
-    id: Number.isInteger(id) && id > 0 ? id : identifier,
-    name: normalizeText(record.name, `IPAM ${id || identifier || ''}`.trim()),
-    baseUrl: normalizeUrl(record.baseUrl ?? record.base_url ?? ''),
-    appId: normalizeText(record.appId ?? record.app_id ?? '', ''),
-    appCode: normalizeOptionalText(record.appCode ?? record.app_code ?? ''),
-    appPermissions: normalizeText(record.appPermissions ?? record.app_permissions ?? 'Read', 'Read'),
-    appSecurity: normalizeText(
-      record.appSecurity ?? record.app_security ?? 'SSL with App code token',
-      'SSL with App code token'
-    ),
-    createdAt: createdAt ?? timestamp,
-    updatedAt: updatedAt ?? createdAt ?? timestamp,
-    lastStatus,
-    lastCheckedAt,
-    collections: sanitizeIpamCollections(record.collections ?? record.cached ?? {})
-  };
-};
-
-const presentIpamForClient = (ipam) => ({
-  id: ipam.id,
-  name: ipam.name,
-  baseUrl: ipam.baseUrl,
-  appId: ipam.appId,
-  appPermissions: ipam.appPermissions,
-  appSecurity: ipam.appSecurity,
-  createdAt: ipam.createdAt,
-  updatedAt: ipam.updatedAt,
-  lastStatus: ipam.lastStatus,
-  lastCheckedAt: ipam.lastCheckedAt,
-  collections: sanitizeIpamCollections(ipam.collections)
-});
 
 const sanitizeRouteros = (options = {}, baseline = defaultRouterosOptions()) => {
   const normalized = { ...baseline };
@@ -1744,7 +1783,26 @@ const sanitizeTunnelProfile = (profile = {}, baseline = defaultTunnelProfile()) 
     addressing.remoteIpamPool = normalizeOptionalText(addressingInput.remoteIpamPool);
   }
 
-  normalized.addressing = addressing;
+  normalized.firmwareVersion = normalizeOptionalText(
+    options.firmwareVersion ?? baseline.firmwareVersion ?? ''
+  );
+
+  const sshPortFallback = clampNumber(baseline.sshPort, { min: 1, max: 65535, fallback: 22 });
+  normalized.sshEnabled = normalizeBoolean(options.sshEnabled, baseline.sshEnabled);
+  normalized.sshPort = clampNumber(options.sshPort, { min: 1, max: 65535, fallback: sshPortFallback });
+  normalized.sshUsername = normalizeOptionalText(options.sshUsername ?? baseline.sshUsername ?? '');
+  normalized.sshPassword = normalizeOptionalText(options.sshPassword ?? baseline.sshPassword ?? '');
+  normalized.sshAcceptNewHostKeys = normalizeBoolean(
+    options.sshAcceptNewHostKeys ?? options.sshAcceptUnknownHost,
+    baseline.sshAcceptNewHostKeys
+  );
+
+  if (!normalized.sshEnabled) {
+    normalized.sshPort = clampNumber(22, { min: 1, max: 65535, fallback: 22 });
+  }
+
+  return normalized;
+};
 
   const provisioningBaseline = {
     ...defaultTunnelProfile().provisioning,
@@ -2459,13 +2517,23 @@ const ensureStateShape = async (databaseFile) => {
       mutated = true;
     }
 
+    const status = deriveDeviceStatus(device.status, routeros);
+    const connectivity = sanitizeConnectivity(device.connectivity, routeros);
+
+    if (JSON.stringify(connectivity) !== JSON.stringify(device.connectivity ?? {})) {
+      mutated = true;
+    }
+
     return {
       id: identifier,
       name,
-      referenceType,
-      referenceId,
-      address,
-      comment,
+      host,
+      groupId,
+      tags,
+      notes,
+      routeros,
+      status,
+      connectivity,
       createdAt,
       updatedAt
     };
@@ -2588,6 +2656,209 @@ const ensureStateShape = async (databaseFile) => {
       monitoring,
       ospf,
       vpnProfiles,
+      createdAt,
+      updatedAt
+    };
+  });
+
+  if (sanitizedFirewallFilters.length !== normalized.firewallFilters.length) {
+    mutated = true;
+  }
+
+  const highestFirewallId = sanitizedFirewallFilters.reduce((max, entry) => Math.max(max, entry.id), 0);
+
+  if (highestFirewallId !== normalized.lastFirewallFilterId) {
+    normalized.lastFirewallFilterId = Math.max(nextFirewallIdSeed, highestFirewallId);
+    mutated = true;
+  } else if (nextFirewallIdSeed > normalized.lastFirewallFilterId) {
+    normalized.lastFirewallFilterId = nextFirewallIdSeed;
+    mutated = true;
+  }
+
+  normalized.firewallFilters = sanitizedFirewallFilters;
+
+  if (!Array.isArray(normalized.addressLists)) {
+    normalized.addressLists = [];
+    mutated = true;
+  }
+
+  if (!Number.isInteger(normalized.lastAddressListId)) {
+    normalized.lastAddressListId = normalized.addressLists.reduce(
+      (max, entry) => Math.max(max, Number.parseInt(entry.id, 10) || 0),
+      0
+    );
+    mutated = true;
+  }
+
+  let nextAddressListIdSeed = Math.max(
+    Number.isInteger(normalized.lastAddressListId) ? normalized.lastAddressListId : 0,
+    normalized.addressLists.reduce((max, entry) => Math.max(max, Number.parseInt(entry.id, 10) || 0), 0)
+  );
+
+  const addressIdentifiers = new Set();
+
+  const sanitizedAddressLists = normalized.addressLists.map((entry) => {
+    let identifier = Number.parseInt(entry.id, 10);
+
+    if (!Number.isInteger(identifier) || identifier <= 0 || addressIdentifiers.has(identifier)) {
+      nextAddressListIdSeed += 1;
+      identifier = nextAddressListIdSeed;
+      mutated = true;
+    }
+
+    addressIdentifiers.add(identifier);
+
+    const createdAt = entry.createdAt ?? new Date().toISOString();
+    const updatedAt = entry.updatedAt ?? createdAt;
+    const name = normalizeText(entry.name, `Address list ${identifier}`);
+    const referenceTypeCandidate = typeof entry.referenceType === 'string' ? entry.referenceType.toLowerCase() : '';
+    const referenceType = allowedAddressReferenceTypes.has(referenceTypeCandidate)
+      ? referenceTypeCandidate
+      : 'mikrotik';
+
+    let referenceId = null;
+    if (referenceType === 'mikrotik') {
+      const candidate = Number.parseInt(entry.referenceId, 10);
+      referenceId = validMikrotikIds.has(candidate) ? candidate : null;
+    } else if (referenceType === 'group') {
+      const candidate = Number.parseInt(entry.referenceId, 10);
+      referenceId = availableGroupIds.has(candidate) ? candidate : null;
+    }
+
+    const address = normalizeOptionalText(entry.address ?? '');
+    const comment = normalizeOptionalText(entry.comment ?? '');
+
+    if (
+      entry.name !== name ||
+      entry.referenceType !== referenceType ||
+      (entry.referenceId ?? null) !== referenceId ||
+      (entry.address ?? '') !== address ||
+      (entry.comment ?? '') !== comment ||
+      entry.createdAt !== createdAt ||
+      entry.updatedAt !== updatedAt
+    ) {
+      mutated = true;
+    }
+
+    return {
+      id: identifier,
+      name,
+      referenceType,
+      referenceId,
+      address,
+      comment,
+      createdAt,
+      updatedAt
+    };
+  });
+
+  if (sanitizedAddressLists.length !== normalized.addressLists.length) {
+    mutated = true;
+  }
+
+  const highestAddressListId = sanitizedAddressLists.reduce((max, entry) => Math.max(max, entry.id), 0);
+
+  if (highestAddressListId !== normalized.lastAddressListId) {
+    normalized.lastAddressListId = Math.max(nextAddressListIdSeed, highestAddressListId);
+    mutated = true;
+  } else if (nextAddressListIdSeed > normalized.lastAddressListId) {
+    normalized.lastAddressListId = nextAddressListIdSeed;
+    mutated = true;
+  }
+
+  normalized.addressLists = sanitizedAddressLists;
+
+  if (!Array.isArray(normalized.firewallFilters)) {
+    normalized.firewallFilters = [];
+    mutated = true;
+  }
+
+  if (!Number.isInteger(normalized.lastFirewallFilterId)) {
+    normalized.lastFirewallFilterId = normalized.firewallFilters.reduce(
+      (max, filter) => Math.max(max, Number.parseInt(filter.id, 10) || 0),
+      0
+    );
+    mutated = true;
+  }
+
+  let nextFirewallIdSeed = Math.max(
+    Number.isInteger(normalized.lastFirewallFilterId) ? normalized.lastFirewallFilterId : 0,
+    normalized.firewallFilters.reduce((max, filter) => Math.max(max, Number.parseInt(filter.id, 10) || 0), 0)
+  );
+
+  const validAddressListIds = new Set(sanitizedAddressLists.map((entry) => entry.id));
+  const firewallIdentifiers = new Set();
+
+  const sanitizedFirewallFilters = normalized.firewallFilters.map((filter) => {
+    let identifier = Number.parseInt(filter.id, 10);
+
+    if (!Number.isInteger(identifier) || identifier <= 0 || firewallIdentifiers.has(identifier)) {
+      nextFirewallIdSeed += 1;
+      identifier = nextFirewallIdSeed;
+      mutated = true;
+    }
+
+    firewallIdentifiers.add(identifier);
+
+    const createdAt = filter.createdAt ?? new Date().toISOString();
+    const updatedAt = filter.updatedAt ?? createdAt;
+    const name = normalizeOptionalText(filter.name ?? `Rule ${identifier}`) || `Rule ${identifier}`;
+    const groupCandidate = Number.parseInt(filter.groupId, 10);
+    const groupId = availableGroupIds.has(groupCandidate) ? groupCandidate : null;
+
+    const chainCandidate = typeof filter.chain === 'string' ? filter.chain.toLowerCase() : '';
+    const chain = allowedFirewallChains.has(chainCandidate) ? chainCandidate : 'forward';
+
+    const sourceAddressListCandidate = Number.parseInt(filter.sourceAddressListId, 10);
+    const sourceAddressListId = validAddressListIds.has(sourceAddressListCandidate)
+      ? sourceAddressListCandidate
+      : null;
+
+    const destinationAddressListCandidate = Number.parseInt(filter.destinationAddressListId, 10);
+    const destinationAddressListId = validAddressListIds.has(destinationAddressListCandidate)
+      ? destinationAddressListCandidate
+      : null;
+
+    const sourcePort = sanitizePortExpression(filter.sourcePort);
+    const destinationPort = sanitizePortExpression(filter.destinationPort);
+
+    const states = sanitizeFirewallStatesList(filter.states);
+    const actionCandidate = typeof filter.action === 'string' ? filter.action.toLowerCase() : '';
+    const action = allowedFirewallActions.has(actionCandidate) ? actionCandidate : 'accept';
+    const enabled = normalizeBoolean(filter.enabled, true);
+    const comment = normalizeOptionalText(filter.comment ?? '');
+
+    if (
+      filter.name !== name ||
+      (filter.groupId ?? null) !== groupId ||
+      filter.chain !== chain ||
+      (filter.sourceAddressListId ?? null) !== sourceAddressListId ||
+      (filter.destinationAddressListId ?? null) !== destinationAddressListId ||
+      (filter.sourcePort ?? '') !== sourcePort ||
+      (filter.destinationPort ?? '') !== destinationPort ||
+      JSON.stringify(filter.states ?? []) !== JSON.stringify(states) ||
+      filter.action !== action ||
+      Boolean(filter.enabled) !== enabled ||
+      (filter.comment ?? '') !== comment ||
+      filter.createdAt !== createdAt ||
+      filter.updatedAt !== updatedAt
+    ) {
+      mutated = true;
+    }
+
+    return {
+      id: identifier,
+      name,
+      groupId,
+      chain,
+      sourceAddressListId,
+      destinationAddressListId,
+      sourcePort,
+      destinationPort,
+      states,
+      action,
+      enabled,
+      comment,
       createdAt,
       updatedAt
     };
@@ -3890,17 +4161,6 @@ const initializeDatabase = async (databasePath) => {
       await persist(state);
 
       return { success: true };
-    },
-
-    async discoverTunnelsFromInventory() {
-      const state = await load();
-      const { mutated, added } = runTunnelDiscovery(state);
-
-      if (mutated) {
-        await persist(state);
-      }
-
-      return { success: true, mutated, added };
     },
 
     async listTunnels() {

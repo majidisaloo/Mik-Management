@@ -14,11 +14,12 @@ const defaultRouterForm = () => ({
   apiRetries: '1',
   allowInsecureCiphers: false,
   preferredApiFirst: true,
-  sshEnabled: true,
+  firmwareVersion: '',
+  sshEnabled: false,
   sshPort: '22',
   sshUsername: '',
   sshPassword: '',
-  autoAcceptFingerprints: false
+  sshAcceptNewHostKeys: true
 });
 
 const emptyDeviceForm = () => ({
@@ -50,66 +51,41 @@ const formatDateTime = (value) => {
   });
 };
 
-const formatConnectivityStatus = (value) => {
-  if (!value) {
+const formatConnectivityLabel = (status) => {
+  if (!status) {
     return 'Unknown';
   }
 
-  const readable = String(value)
-    .replace(/[-_]+/g, ' ')
-    .trim()
-    .toLowerCase();
-
-  if (!readable) {
-    return 'Unknown';
+  const normalized = status.toLowerCase();
+  if (normalized === 'online') {
+    return 'Online';
   }
-
-  return readable.charAt(0).toUpperCase() + readable.slice(1);
+  if (normalized === 'offline') {
+    return 'Offline';
+  }
+  if (normalized === 'disabled') {
+    return 'Disabled';
+  }
+  return 'Unknown';
 };
 
-const normalizeStatusVariant = (value) => {
-  if (!value) {
+function getConnectivityStatusClass(status) {
+  if (!status) {
     return 'unknown';
   }
 
-  const normalized = String(value).toLowerCase();
-
-  if (['up', 'ok', 'online', 'reachable', 'success', 'ready'].includes(normalized)) {
+  const normalized = status.toLowerCase();
+  if (normalized === 'online') {
     return 'success';
   }
-
-  if (['down', 'offline', 'failed', 'error', 'unreachable'].includes(normalized)) {
+  if (normalized === 'offline') {
     return 'danger';
   }
-
-  if (['warning', 'degraded', 'unstable', 'partial'].includes(normalized)) {
-    return 'warning';
+  if (normalized === 'disabled') {
+    return 'info';
   }
-
-  if (['pending', 'testing', 'running', 'checking'].includes(normalized)) {
-    return 'pending';
-  }
-
   return 'unknown';
-};
-
-const formatLatency = (value) => {
-  if (value === null || value === undefined) {
-    return '—';
-  }
-
-  const numeric = Number(value);
-
-  if (!Number.isFinite(numeric) || numeric < 0) {
-    return '—';
-  }
-
-  if (numeric >= 10) {
-    return `${Math.round(numeric)} ms`;
-  }
-
-  return `${Math.round(numeric * 10) / 10} ms`;
-};
+}
 
 const toFormState = (device) => {
   if (!device) {
@@ -139,12 +115,13 @@ const toFormState = (device) => {
         router.allowInsecureCiphers !== undefined ? Boolean(router.allowInsecureCiphers) : false,
       preferredApiFirst:
         router.preferredApiFirst !== undefined ? Boolean(router.preferredApiFirst) : true,
-      sshEnabled: router.sshEnabled !== undefined ? Boolean(router.sshEnabled) : true,
+      firmwareVersion: router.firmwareVersion ?? '',
+      sshEnabled: router.sshEnabled !== undefined ? Boolean(router.sshEnabled) : false,
       sshPort: router.sshPort ? String(router.sshPort) : '22',
       sshUsername: router.sshUsername ?? '',
       sshPassword: router.sshPassword ?? '',
-      autoAcceptFingerprints:
-        router.autoAcceptFingerprints !== undefined ? Boolean(router.autoAcceptFingerprints) : false
+      sshAcceptNewHostKeys:
+        router.sshAcceptNewHostKeys !== undefined ? Boolean(router.sshAcceptNewHostKeys) : true
     }
   };
 };
@@ -177,11 +154,12 @@ const toPayload = (form) => ({
     apiRetries: form.routeros.apiRetries ? Number.parseInt(form.routeros.apiRetries, 10) : undefined,
     allowInsecureCiphers: Boolean(form.routeros.allowInsecureCiphers),
     preferredApiFirst: Boolean(form.routeros.preferredApiFirst),
+    firmwareVersion: form.routeros.firmwareVersion,
     sshEnabled: Boolean(form.routeros.sshEnabled),
     sshPort: form.routeros.sshPort ? Number.parseInt(form.routeros.sshPort, 10) : undefined,
     sshUsername: form.routeros.sshUsername,
     sshPassword: form.routeros.sshPassword,
-    autoAcceptFingerprints: Boolean(form.routeros.autoAcceptFingerprints)
+    sshAcceptNewHostKeys: Boolean(form.routeros.sshAcceptNewHostKeys)
   }
 });
 
@@ -205,10 +183,7 @@ const Mikrotiks = () => {
   });
   const [manageBusy, setManageBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
-  const managedDevice = useMemo(
-    () => devices.find((device) => device.id === manageState.deviceId),
-    [devices, manageState.deviceId]
-  );
+  const [testBusy, setTestBusy] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -590,6 +565,15 @@ const Mikrotiks = () => {
             <input type="checkbox" checked={apiActive} onChange={() => onToggle('apiEnabled')} />
             <span>RouterOS API</span>
           </label>
+          <label className={`toggle-chip${tlsActive ? ' toggle-chip--active' : ''}`} aria-disabled={!apiActive}>
+            <input
+              type="checkbox"
+              checked={formState.routeros.apiSSL}
+              onChange={() => onToggle('apiSSL')}
+              disabled={!apiActive}
+            />
+            <span>Use TLS (8729)</span>
+          </label>
           <label className={`toggle-chip${formState.routeros.preferredApiFirst ? ' toggle-chip--active' : ''}`}>
             <input
               type="checkbox"
@@ -750,11 +734,56 @@ const Mikrotiks = () => {
                   </div>
                 ) : null}
               </>
-            ) : (
-              <p className="empty-hint">Enable the RouterOS API to configure ports and credentials.</p>
-            )}
-          </section>
+            ) : null}
+          </div>
+        ) : (
+          <p className="empty-hint">Enable the RouterOS API to configure ports and credentials.</p>
+        )}
+
+        <div className="routeros-config__version">
+          <label>
+            <span>Detected RouterOS version</span>
+            <input
+              name="firmwareVersion"
+              value={formState.routeros.firmwareVersion}
+              onChange={onFieldChange}
+              placeholder="Detected after connectivity test"
+              readOnly
+            />
+          </label>
+          <p className="muted">Target version: {targetVersion || '—'}</p>
         </div>
+
+        {sshActive ? (
+          <div className="form-grid routeros-config__grid">
+            <label>
+              <span>SSH port</span>
+              <input
+                name="sshPort"
+                type="number"
+                min="1"
+                value={formState.routeros.sshPort}
+                onChange={onFieldChange}
+              />
+            </label>
+            <label>
+              <span>SSH username</span>
+              <input name="sshUsername" value={formState.routeros.sshUsername} onChange={onFieldChange} />
+            </label>
+            <label>
+              <span>SSH password</span>
+              <input
+                name="sshPassword"
+                type="password"
+                autoComplete="off"
+                value={formState.routeros.sshPassword}
+                onChange={onFieldChange}
+              />
+            </label>
+          </div>
+        ) : (
+          <p className="empty-hint">Enable SSH to configure fallback credentials.</p>
+        )}
       </div>
     );
   };
@@ -869,18 +898,20 @@ const Mikrotiks = () => {
                 <div className="management-list__meta">
                   <span>{entry.host}</span>
                   <span>{entry.groupName ? `Group: ${entry.groupName}` : 'No group assigned'}</span>
-                  <span className={`status-pill status-pill--${entry.status?.updateStatus ?? 'unknown'}`}>
+                  <span
+                    className={`status-pill status-pill--${(entry.status?.updateStatus || 'unknown').toLowerCase()}`}
+                  >
                     {entry.status?.updateStatus ?? 'unknown'}
                   </span>
                   <span
-                    className={`status-pill status-pill--${connectivityStatusClass(
+                    className={`status-pill status-pill--${getConnectivityStatusClass(
                       entry.connectivity?.api?.status
                     )}`}
                   >
                     API {formatConnectivityLabel(entry.connectivity?.api?.status)}
                   </span>
                   <span
-                    className={`status-pill status-pill--${connectivityStatusClass(
+                    className={`status-pill status-pill--${getConnectivityStatusClass(
                       entry.connectivity?.ssh?.status
                     )}`}
                   >
@@ -948,16 +979,6 @@ const Mikrotiks = () => {
                   ))}
                 </select>
               </div>
-            </label>
-            <label>
-              <span>Update status</span>
-              <select name="status" value={createForm.status} onChange={handleCreateFieldChange}>
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
             </label>
             <label>
               <span>Tags</span>
@@ -1035,16 +1056,6 @@ const Mikrotiks = () => {
               </div>
             </label>
             <label>
-              <span>Update status</span>
-              <select name="status" value={manageState.form.status} onChange={handleManageFieldChange}>
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
               <span>Tags</span>
               <input
                 name="tags"
@@ -1068,7 +1079,7 @@ const Mikrotiks = () => {
               <ul className="connectivity-summary__list">
                 <li>
                   <span
-                    className={`status-pill status-pill--${connectivityStatusClass(
+                    className={`status-pill status-pill--${getConnectivityStatusClass(
                       manageState.details?.connectivity?.api?.status
                     )}`}
                   >
@@ -1080,7 +1091,7 @@ const Mikrotiks = () => {
                 </li>
                 <li>
                   <span
-                    className={`status-pill status-pill--${connectivityStatusClass(
+                    className={`status-pill status-pill--${getConnectivityStatusClass(
                       manageState.details?.connectivity?.ssh?.status
                     )}`}
                   >
