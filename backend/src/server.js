@@ -1,6 +1,7 @@
 import http from 'http';
 import { URL } from 'url';
 import crypto from 'crypto';
+import { spawn } from 'child_process';
 import initializeDatabase, { resolveDatabaseFile } from './database.js';
 import { ensureDatabaseConfig, getConfigFilePath } from './config.js';
 import getProjectVersion from './version.js';
@@ -144,6 +145,45 @@ const parseInteger = (value) => {
   return Number.isInteger(parsed) ? parsed : null;
 };
 
+const generateSecret = ({ bytes, encoding } = {}) => {
+  const minBytes = 16;
+  const maxBytes = 128;
+  const normalizedBytes = Math.min(Math.max(Number(bytes) || 32, minBytes), maxBytes);
+  const normalizedEncoding = typeof encoding === 'string' ? encoding.toLowerCase() : 'base64url';
+  const buffer = crypto.randomBytes(normalizedBytes);
+
+  if (normalizedEncoding === 'hex') {
+    return {
+      secret: buffer.toString('hex'),
+      encoding: 'hex',
+      bytes: normalizedBytes,
+      entropyBits: normalizedBytes * 8
+    };
+  }
+
+  if (normalizedEncoding === 'base64') {
+    return {
+      secret: buffer.toString('base64'),
+      encoding: 'base64',
+      bytes: normalizedBytes,
+      entropyBits: normalizedBytes * 8
+    };
+  }
+
+  const base64Url = buffer
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/u, '');
+
+  return {
+    secret: base64Url,
+    encoding: 'base64url',
+    bytes: normalizedBytes,
+    entropyBits: normalizedBytes * 8
+  };
+};
+
 const normalizeTagsInput = (value) => {
   if (!value) {
     return [];
@@ -166,6 +206,26 @@ const normalizeNotesInput = (value) => {
   }
 
   return value.trim();
+};
+
+const deepClone = (value, fallback = null) => {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== 'object') {
+    return value;
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (error) {
+    return fallback;
+  }
 };
 
 const buildRouterosPayload = (input = {}) => ({
@@ -204,6 +264,163 @@ const normalizeRoleIds = (roleIds, roles) => {
 const ensureNumber = (value, fallback) => {
   const parsed = parseInteger(value);
   return parsed ?? fallback;
+};
+
+const runProcess = (command, args = [], { timeout = 15000 } = {}) =>
+  new Promise((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    let timer;
+
+    try {
+      const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+
+      const finalize = (result) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        if (timer) {
+          clearTimeout(timer);
+        }
+        resolve(result);
+      };
+
+      timer = setTimeout(() => {
+        child.kill('SIGKILL');
+        finalize({
+          success: false,
+          code: null,
+          signal: 'SIGKILL',
+          stdout,
+          stderr,
+          timedOut: true
+        });
+      }, Math.max(timeout, 1000));
+
+      child.stdout.on('data', (chunk) => {
+        stdout += chunk.toString();
+      });
+
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk.toString();
+      });
+
+      child.on('error', (error) => {
+        finalize({
+          success: false,
+          code: null,
+          signal: null,
+          stdout,
+          stderr: stderr ? `${stderr}\n${error.message}` : error.message,
+          timedOut: false,
+          error
+        });
+      });
+
+      child.on('close', (code, signal) => {
+        finalize({
+          success: code === 0,
+          code,
+          signal,
+          stdout,
+          stderr,
+          timedOut: false
+        });
+      });
+    } catch (error) {
+      resolve({
+        success: false,
+        code: null,
+        signal: null,
+        stdout,
+        stderr: error.message,
+        timedOut: false,
+        error
+      });
+    }
+  });
+
+const parsePingLatency = (output) => {
+  if (!output) {
+    return null;
+  }
+
+  const linuxMatch = output.match(/=\s*([^/]+)\/([^/]+)\/([^/]+)\/([^/\s]+)\s*ms/);
+  if (linuxMatch && linuxMatch[2]) {
+    const parsed = Number.parseFloat(linuxMatch[2]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  const winMatch = output.match(/Average =\s*([0-9.]+)ms/i);
+  if (winMatch && winMatch[1]) {
+    const parsed = Number.parseFloat(winMatch[1]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+};
+
+const parseTracerouteOutput = (output) => {
+  if (!output) {
+    return [];
+  }
+
+  const hops = [];
+  const lines = output.split(/\r?\n/);
+  const hopPattern = /^(\s*)(\d+)\s+([^\s]+)\s+(.*)$/;
+
+  lines.forEach((line) => {
+    const match = line.match(hopPattern);
+    if (!match) {
+      return;
+    }
+
+    const hopIndex = Number.parseInt(match[2], 10);
+    if (!Number.isInteger(hopIndex)) {
+      return;
+    }
+
+    const rest = match[4];
+    const latencyMatch = rest.match(/([0-9.]+)\s*ms/);
+    const latency = latencyMatch ? Number.parseFloat(latencyMatch[1]) : null;
+
+    hops.push({
+      hop: hopIndex,
+      address: match[3],
+      latencyMs: Number.isFinite(latency) ? latency : null
+    });
+  });
+
+  return hops;
+};
+
+const sanitizeDiagnosticTargets = (targets, fallback = []) => {
+  if (!Array.isArray(targets)) {
+    return fallback;
+  }
+
+  const normalized = [];
+  const seen = new Set();
+
+  targets.forEach((target) => {
+    const address = typeof target === 'string' ? target.trim() : normalizeString(target?.address ?? '');
+    if (!address) {
+      return;
+    }
+
+    const key = address.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    normalized.push(address);
+  });
+
+  return normalized;
 };
 
 const mapRole = (role) => ({
@@ -311,6 +528,10 @@ const mapTunnel = (tunnel, groups, mikrotiks) => {
       packetLoss: typeof tunnel.metrics?.packetLoss === 'number' ? tunnel.metrics.packetLoss : null,
       lastCheckedAt: tunnel.metrics?.lastCheckedAt ?? null
     },
+    profile: deepClone(tunnel.profile ?? null, null),
+    monitoring: deepClone(tunnel.monitoring ?? null, null),
+    ospf: deepClone(tunnel.ospf ?? null, null),
+    vpnProfiles: deepClone(tunnel.vpnProfiles ?? null, null),
     createdAt: tunnel.createdAt,
     updatedAt: tunnel.updatedAt
   };
@@ -1254,7 +1475,11 @@ const bootstrap = async () => {
         enabled,
         tags,
         notes,
-        metrics
+        metrics,
+        profile,
+        monitoring,
+        ospf,
+        vpnProfiles
       } = body ?? {};
 
       const normalizedName = normalizeString(name);
@@ -1275,7 +1500,11 @@ const bootstrap = async () => {
           enabled,
           tags,
           notes,
-          metrics
+          metrics,
+          profile,
+          monitoring,
+          ospf,
+          vpnProfiles
         });
 
         if (!result.success && result.reason === 'invalid-group') {
@@ -1396,6 +1625,163 @@ const bootstrap = async () => {
       } catch (error) {
         console.error('Delete tunnel error', error);
         sendJson(res, 500, { message: 'Unable to delete the tunnel right now.' });
+      }
+    };
+
+    const handleGenerateSecret = async () => {
+      try {
+        const body = await parseJsonBody(req);
+        const requestedBytes = parseInteger(body?.bytes ?? body?.length);
+        const encoding = typeof body?.encoding === 'string' ? body.encoding : undefined;
+        const result = generateSecret({ bytes: requestedBytes ?? undefined, encoding });
+
+        sendJson(res, 200, {
+          ...result,
+          generatedAt: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Secret generation error', error);
+        sendJson(res, 500, { message: 'Unable to generate a secret right now.' });
+      }
+    };
+
+    const handlePingDiagnostics = async () => {
+      const body = await parseJsonBody(req);
+      const targets = sanitizeDiagnosticTargets(body?.targets ?? body?.addresses ?? []);
+      if (targets.length === 0) {
+        sendJson(res, 400, { message: 'At least one target address is required.' });
+        return;
+      }
+
+      const tunnelId = parseInteger(body?.tunnelId);
+      const count = parseInteger(body?.count) ?? 4;
+      const timeout = parseInteger(body?.timeout);
+      const command = process.platform === 'win32' ? 'ping' : 'ping';
+      const results = [];
+
+      try {
+        for (const address of targets) {
+          const args = process.platform === 'win32'
+            ? ['-n', String(count), address]
+            : ['-c', String(count), '-W', '2', address];
+          const outcome = await runProcess(command, args, {
+            timeout: timeout ? Math.max(timeout, 1000) : 15000
+          });
+          const output = (outcome.stdout || outcome.stderr || '').trim();
+          const latencyMs = parsePingLatency(output);
+
+          results.push({
+            address,
+            success: Boolean(outcome.success),
+            command: `${command} ${args.join(' ')}`.trim(),
+            exitCode: outcome.code,
+            timedOut: Boolean(outcome.timedOut),
+            latencyMs: latencyMs ?? null,
+            output
+          });
+        }
+
+        if (Number.isInteger(tunnelId) && tunnelId > 0) {
+          const payload = {
+            monitoring: {
+              lastPingResults: results.map((entry) => ({
+                address: entry.address,
+                success: entry.success,
+                latencyMs: entry.latencyMs,
+                output: entry.output,
+                checkedAt: new Date().toISOString()
+              })),
+              lastUpdatedAt: new Date().toISOString()
+            }
+          };
+
+          try {
+            await db.updateTunnel(tunnelId, payload);
+          } catch (error) {
+            console.warn('Failed to persist ping diagnostics', error);
+          }
+        }
+
+        sendJson(res, 200, { results });
+      } catch (error) {
+        console.error('Ping diagnostics error', error);
+        sendJson(res, 500, { message: 'Unable to execute ping diagnostics right now.' });
+      }
+    };
+
+    const handleTracerouteDiagnostics = async () => {
+      const body = await parseJsonBody(req);
+      const targets = sanitizeDiagnosticTargets(body?.targets ?? body?.addresses ?? []);
+      if (targets.length === 0) {
+        sendJson(res, 400, { message: 'At least one target address is required.' });
+        return;
+      }
+
+      const tunnelId = parseInteger(body?.tunnelId);
+      const maxHops = parseInteger(body?.maxHops) ?? 30;
+      const timeout = parseInteger(body?.timeout);
+      const traceTimeout = timeout ? Math.max(timeout, 1000) : 30000;
+
+      const preferTraceroute = process.platform === 'win32' ? 'tracert' : 'traceroute';
+      const fallbackTraceroute = process.platform === 'win32' ? 'tracert' : 'tracepath';
+
+      const results = [];
+
+      try {
+        for (const address of targets) {
+          const baseArgs = process.platform === 'win32'
+            ? ['-d', address]
+            : ['-n', '-m', String(maxHops), address];
+
+          let command = preferTraceroute;
+          let args = [...baseArgs];
+          let outcome = await runProcess(command, args, { timeout: traceTimeout });
+
+          if (!outcome.success && outcome.error && outcome.error.code === 'ENOENT' && fallbackTraceroute !== command) {
+            command = fallbackTraceroute;
+            args = process.platform === 'win32' ? ['-d', address] : ['-n', address];
+            outcome = await runProcess(command, args, { timeout: traceTimeout });
+          }
+
+          const output = (outcome.stdout || outcome.stderr || '').trim();
+          const hops = parseTracerouteOutput(output);
+
+          results.push({
+            address,
+            success: Boolean(outcome.success),
+            command: `${command} ${args.join(' ')}`.trim(),
+            exitCode: outcome.code,
+            timedOut: Boolean(outcome.timedOut),
+            output,
+            hops
+          });
+        }
+
+        if (Number.isInteger(tunnelId) && tunnelId > 0) {
+          const payload = {
+            monitoring: {
+              lastTraceResults: results.map((entry) => ({
+                address: entry.address,
+                success: entry.success,
+                hops: entry.hops,
+                output: entry.output,
+                checkedAt: new Date().toISOString()
+              })),
+              lastUpdatedAt: new Date().toISOString()
+            }
+          };
+
+          try {
+            await db.updateTunnel(tunnelId, payload);
+          } catch (error) {
+            console.warn('Failed to persist traceroute diagnostics', error);
+          }
+        }
+
+        sendJson(res, 200, { results });
+      } catch (error) {
+        console.error('Traceroute diagnostics error', error);
+        sendJson(res, 500, { message: 'Unable to execute traceroute diagnostics right now.' });
       }
     };
 
@@ -1590,6 +1976,24 @@ const bootstrap = async () => {
 
       if (method === 'POST' && (canonicalPath === '/api/tunnels' || resourcePath === '/tunnels')) {
         await handleCreateTunnel();
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/tools/secret' || resourcePath === '/tools/secret')) {
+        await handleGenerateSecret();
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/tools/ping' || resourcePath === '/tools/ping')) {
+        await handlePingDiagnostics();
+        return;
+      }
+
+      if (
+        method === 'POST' &&
+        (canonicalPath === '/api/tools/traceroute' || resourcePath === '/tools/traceroute')
+      ) {
+        await handleTracerouteDiagnostics();
         return;
       }
 

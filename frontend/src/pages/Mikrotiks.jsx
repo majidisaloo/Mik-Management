@@ -19,7 +19,12 @@ const defaultRouterForm = () => ({
   apiTimeout: '5000',
   apiRetries: '1',
   allowInsecureCiphers: false,
-  preferredApiFirst: true
+  preferredApiFirst: true,
+  sshEnabled: true,
+  sshPort: '22',
+  sshUsername: '',
+  sshPassword: '',
+  autoAcceptFingerprints: false
 });
 
 const emptyDeviceForm = () => ({
@@ -52,6 +57,67 @@ const formatDateTime = (value) => {
   });
 };
 
+const formatConnectivityStatus = (value) => {
+  if (!value) {
+    return 'Unknown';
+  }
+
+  const readable = String(value)
+    .replace(/[-_]+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+  if (!readable) {
+    return 'Unknown';
+  }
+
+  return readable.charAt(0).toUpperCase() + readable.slice(1);
+};
+
+const normalizeStatusVariant = (value) => {
+  if (!value) {
+    return 'unknown';
+  }
+
+  const normalized = String(value).toLowerCase();
+
+  if (['up', 'ok', 'online', 'reachable', 'success', 'ready'].includes(normalized)) {
+    return 'success';
+  }
+
+  if (['down', 'offline', 'failed', 'error', 'unreachable'].includes(normalized)) {
+    return 'danger';
+  }
+
+  if (['warning', 'degraded', 'unstable', 'partial'].includes(normalized)) {
+    return 'warning';
+  }
+
+  if (['pending', 'testing', 'running', 'checking'].includes(normalized)) {
+    return 'pending';
+  }
+
+  return 'unknown';
+};
+
+const formatLatency = (value) => {
+  if (value === null || value === undefined) {
+    return '—';
+  }
+
+  const numeric = Number(value);
+
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return '—';
+  }
+
+  if (numeric >= 10) {
+    return `${Math.round(numeric)} ms`;
+  }
+
+  return `${Math.round(numeric * 10) / 10} ms`;
+};
+
 const toFormState = (device) => {
   if (!device) {
     return emptyDeviceForm();
@@ -80,7 +146,13 @@ const toFormState = (device) => {
       allowInsecureCiphers:
         router.allowInsecureCiphers !== undefined ? Boolean(router.allowInsecureCiphers) : false,
       preferredApiFirst:
-        router.preferredApiFirst !== undefined ? Boolean(router.preferredApiFirst) : true
+        router.preferredApiFirst !== undefined ? Boolean(router.preferredApiFirst) : true,
+      sshEnabled: router.sshEnabled !== undefined ? Boolean(router.sshEnabled) : true,
+      sshPort: router.sshPort ? String(router.sshPort) : '22',
+      sshUsername: router.sshUsername ?? '',
+      sshPassword: router.sshPassword ?? '',
+      autoAcceptFingerprints:
+        router.autoAcceptFingerprints !== undefined ? Boolean(router.autoAcceptFingerprints) : false
     }
   };
 };
@@ -113,7 +185,12 @@ const toPayload = (form) => ({
     apiTimeout: form.routeros.apiTimeout ? Number.parseInt(form.routeros.apiTimeout, 10) : undefined,
     apiRetries: form.routeros.apiRetries ? Number.parseInt(form.routeros.apiRetries, 10) : undefined,
     allowInsecureCiphers: Boolean(form.routeros.allowInsecureCiphers),
-    preferredApiFirst: Boolean(form.routeros.preferredApiFirst)
+    preferredApiFirst: Boolean(form.routeros.preferredApiFirst),
+    sshEnabled: Boolean(form.routeros.sshEnabled),
+    sshPort: form.routeros.sshPort ? Number.parseInt(form.routeros.sshPort, 10) : undefined,
+    sshUsername: form.routeros.sshUsername,
+    sshPassword: form.routeros.sshPassword,
+    autoAcceptFingerprints: Boolean(form.routeros.autoAcceptFingerprints)
   }
 });
 
@@ -131,6 +208,10 @@ const Mikrotiks = () => {
   const [manageState, setManageState] = useState({ open: false, deviceId: null, form: emptyDeviceForm() });
   const [manageBusy, setManageBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const managedDevice = useMemo(
+    () => devices.find((device) => device.id === manageState.deviceId),
+    [devices, manageState.deviceId]
+  );
 
   useEffect(() => {
     if (!user) {
@@ -440,112 +521,250 @@ const Mikrotiks = () => {
   const renderRouterFields = (formState, onToggle, onFieldChange) => {
     const apiActive = formState.routeros.apiEnabled;
     const tlsActive = apiActive && formState.routeros.apiSSL;
+    const sshActive = formState.routeros.sshEnabled;
 
     return (
       <div className="routeros-panel routeros-config">
+        <div className="routeros-config__header">
+          <h3>Access channels</h3>
+          <p className="routeros-config__intro">
+            Choose which management paths MikroManage should use and configure their credentials.
+          </p>
+        </div>
+
         <div className="routeros-config__toggles">
+          <label className={`toggle-chip${sshActive ? ' toggle-chip--active' : ''}`}>
+            <input type="checkbox" checked={sshActive} onChange={() => onToggle('sshEnabled')} />
+            <span>SSH access</span>
+          </label>
           <label className={`toggle-chip${apiActive ? ' toggle-chip--active' : ''}`}>
             <input type="checkbox" checked={apiActive} onChange={() => onToggle('apiEnabled')} />
             <span>RouterOS API</span>
-          </label>
-          <label
-            className={`toggle-chip${tlsActive ? ' toggle-chip--active' : ''}`}
-            aria-disabled={!apiActive}
-          >
-            <input
-              type="checkbox"
-              checked={formState.routeros.apiSSL}
-              onChange={() => onToggle('apiSSL')}
-              disabled={!apiActive}
-            />
-            <span>Use TLS (8729)</span>
           </label>
           <label className={`toggle-chip${formState.routeros.preferredApiFirst ? ' toggle-chip--active' : ''}`}>
             <input
               type="checkbox"
               checked={formState.routeros.preferredApiFirst}
               onChange={() => onToggle('preferredApiFirst')}
-              disabled={!apiActive}
             />
             <span>Prefer API before SSH</span>
           </label>
         </div>
 
-        {apiActive ? (
-          <div className="form-grid routeros-config__grid">
-            <label>
-              <span>API port</span>
-              <input
-                name="apiPort"
-                type="number"
-                min="1"
-                value={formState.routeros.apiPort}
-                onChange={onFieldChange}
-              />
-            </label>
-            <label>
-              <span>Username</span>
-              <input name="apiUsername" value={formState.routeros.apiUsername} onChange={onFieldChange} />
-            </label>
-            <label>
-              <span>Password / token</span>
-              <input
-                name="apiPassword"
-                type="password"
-                autoComplete="off"
-                value={formState.routeros.apiPassword}
-                onChange={onFieldChange}
-              />
-            </label>
-            <label>
-              <span>Timeout (ms)</span>
-              <input
-                name="apiTimeout"
-                type="number"
-                min="100"
-                step="100"
-                value={formState.routeros.apiTimeout}
-                onChange={onFieldChange}
-              />
-            </label>
-            <label>
-              <span>Retries</span>
-              <input
-                name="apiRetries"
-                type="number"
-                min="0"
-                max="5"
-                value={formState.routeros.apiRetries}
-                onChange={onFieldChange}
-              />
-            </label>
-            {tlsActive ? (
+        <div className="routeros-config__layout">
+          <section className="routeros-config__column">
+            <header className="routeros-config__column-header">
+              <h4>SSH settings</h4>
+              <p>Used for CLI automations, diagnostics, and failover commands.</p>
+            </header>
+            {sshActive ? (
               <>
-                <label className="toggle-field">
+                <div className="form-grid routeros-config__grid routeros-config__grid--compact">
+                  <label>
+                    <span>SSH port</span>
+                    <input
+                      name="sshPort"
+                      type="number"
+                      min="1"
+                      value={formState.routeros.sshPort}
+                      onChange={onFieldChange}
+                    />
+                  </label>
+                  <label>
+                    <span>Username</span>
+                    <input name="sshUsername" value={formState.routeros.sshUsername} onChange={onFieldChange} />
+                  </label>
+                  <label>
+                    <span>Password / key</span>
+                    <input
+                      name="sshPassword"
+                      type="password"
+                      autoComplete="off"
+                      value={formState.routeros.sshPassword}
+                      onChange={onFieldChange}
+                    />
+                  </label>
+                </div>
+                <label className="toggle-field toggle-field--soft">
                   <input
                     type="checkbox"
-                    checked={formState.routeros.verifyTLS}
-                    onChange={() => onToggle('verifyTLS')}
+                    checked={formState.routeros.autoAcceptFingerprints}
+                    onChange={() => onToggle('autoAcceptFingerprints')}
                   />
-                  <span>Verify TLS certificates</span>
-                </label>
-                <label className="toggle-field">
-                  <input
-                    type="checkbox"
-                    checked={formState.routeros.allowInsecureCiphers}
-                    onChange={() => onToggle('allowInsecureCiphers')}
-                  />
-                  <span>Allow legacy ciphers</span>
+                  <span>Auto-accept fingerprints</span>
                 </label>
               </>
-            ) : null}
-          </div>
-        ) : (
-          <p className="empty-hint">Enable the RouterOS API to configure ports and credentials.</p>
-        )}
+            ) : (
+              <p className="empty-hint">
+                Enable SSH access to fall back to RouterOS CLI automation when the API is unavailable.
+              </p>
+            )}
+          </section>
+
+          <section className="routeros-config__column">
+            <header className="routeros-config__column-header">
+              <h4>API settings</h4>
+              <p>Configure the RouterOS API listener and authentication details.</p>
+            </header>
+            {apiActive ? (
+              <>
+                <label className="toggle-field toggle-field--soft">
+                  <input
+                    type="checkbox"
+                    checked={formState.routeros.apiSSL}
+                    onChange={() => onToggle('apiSSL')}
+                  />
+                  <span>Use TLS (8729)</span>
+                </label>
+                <div className="form-grid routeros-config__grid routeros-config__grid--compact">
+                  <label>
+                    <span>API port</span>
+                    <input
+                      name="apiPort"
+                      type="number"
+                      min="1"
+                      value={formState.routeros.apiPort}
+                      onChange={onFieldChange}
+                    />
+                  </label>
+                  <label>
+                    <span>Username</span>
+                    <input name="apiUsername" value={formState.routeros.apiUsername} onChange={onFieldChange} />
+                  </label>
+                  <label>
+                    <span>Password / token</span>
+                    <input
+                      name="apiPassword"
+                      type="password"
+                      autoComplete="off"
+                      value={formState.routeros.apiPassword}
+                      onChange={onFieldChange}
+                    />
+                  </label>
+                  <label>
+                    <span>Timeout (ms)</span>
+                    <input
+                      name="apiTimeout"
+                      type="number"
+                      min="100"
+                      step="100"
+                      value={formState.routeros.apiTimeout}
+                      onChange={onFieldChange}
+                    />
+                  </label>
+                  <label>
+                    <span>Retries</span>
+                    <input
+                      name="apiRetries"
+                      type="number"
+                      min="0"
+                      max="5"
+                      value={formState.routeros.apiRetries}
+                      onChange={onFieldChange}
+                    />
+                  </label>
+                </div>
+                {tlsActive ? (
+                  <div className="routeros-config__subtoggles">
+                    <label className="toggle-field toggle-field--soft">
+                      <input
+                        type="checkbox"
+                        checked={formState.routeros.verifyTLS}
+                        onChange={() => onToggle('verifyTLS')}
+                      />
+                      <span>Verify TLS certificates</span>
+                    </label>
+                    <label className="toggle-field toggle-field--soft">
+                      <input
+                        type="checkbox"
+                        checked={formState.routeros.allowInsecureCiphers}
+                        onChange={() => onToggle('allowInsecureCiphers')}
+                      />
+                      <span>Allow legacy ciphers</span>
+                    </label>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <p className="empty-hint">Enable the RouterOS API to configure ports and credentials.</p>
+            )}
+          </section>
+        </div>
       </div>
     );
   };
+
+  const renderConnectivityPanel = (device) => {
+    if (!device) {
+      return null;
+    }
+
+    const connectivity = device.routeros?.connectivity ?? {};
+    const channels = [
+      {
+        key: 'api',
+        label: 'RouterOS API',
+        endpoint:
+          connectivity.api?.endpoint ||
+          (device.routeros?.apiEnabled ? `${device.host}:${device.routeros?.apiPort ?? 8728}` : 'Disabled'),
+        status: connectivity.api?.status || (device.routeros?.apiEnabled ? 'unknown' : 'disabled'),
+        latency: connectivity.api?.latencyMs ?? null,
+        lastCheckedAt: connectivity.api?.lastCheckedAt ?? null
+      },
+      {
+        key: 'ssh',
+        label: 'SSH',
+        endpoint:
+          connectivity.ssh?.endpoint ||
+          (device.routeros?.sshEnabled ? `${device.host}:${device.routeros?.sshPort ?? 22}` : 'Disabled'),
+        status: connectivity.ssh?.status || (device.routeros?.sshEnabled ? 'unknown' : 'disabled'),
+        latency: connectivity.ssh?.latencyMs ?? null,
+        lastCheckedAt: connectivity.ssh?.lastCheckedAt ?? null
+      }
+    ];
+
+    return (
+      <section className="connectivity-panel" aria-labelledby="connectivity-status-heading">
+        <div className="connectivity-panel__header">
+          <div>
+            <h3 id="connectivity-status-heading">Connectivity status</h3>
+            <p>Latest health checks for MikroTik access channels.</p>
+          </div>
+        </div>
+        <div className="connectivity-panel__grid">
+          {channels.map((channel) => {
+            const variant = normalizeStatusVariant(channel.status);
+            const statusLabel = channel.status === 'disabled' ? 'Disabled' : formatConnectivityStatus(channel.status);
+
+            return (
+              <article key={channel.key} className={`connectivity-card connectivity-card--${variant}`}>
+                <header className="connectivity-card__header">
+                  <span className="connectivity-card__title">{channel.label}</span>
+                  <span className={`status-pill status-pill--${variant}`}>{statusLabel}</span>
+                </header>
+                <dl className="connectivity-card__meta">
+                  <div>
+                    <dt>Endpoint</dt>
+                    <dd>{channel.endpoint || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Latest latency</dt>
+                    <dd>{formatLatency(channel.latency)}</dd>
+                  </div>
+                  <div>
+                    <dt>Last check</dt>
+                    <dd>{formatDateTime(channel.lastCheckedAt)}</dd>
+                  </div>
+                </dl>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    );
+  };
+
+  const connectivityPanel = renderConnectivityPanel(managedDevice);
 
   return (
     <div>
@@ -637,14 +856,16 @@ const Mikrotiks = () => {
             </label>
             <label>
               <span>Group</span>
-              <select name="groupId" value={createForm.groupId} onChange={handleCreateFieldChange}>
-                <option value="">No group</option>
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
+              <div className="select-control">
+                <select name="groupId" value={createForm.groupId} onChange={handleCreateFieldChange}>
+                  <option value="">No group</option>
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </label>
             <label>
               <span>Update status</span>
@@ -720,14 +941,16 @@ const Mikrotiks = () => {
             </label>
             <label>
               <span>Group</span>
-              <select name="groupId" value={manageState.form.groupId} onChange={handleManageFieldChange}>
-                <option value="">No group</option>
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
+              <div className="select-control">
+                <select name="groupId" value={manageState.form.groupId} onChange={handleManageFieldChange}>
+                  <option value="">No group</option>
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </label>
             <label>
               <span>Update status</span>
@@ -759,6 +982,7 @@ const Mikrotiks = () => {
               />
             </label>
             {renderRouterFields(manageState.form, handleManageRouterToggle, handleManageRouterField)}
+            {connectivityPanel ? <div className="form-grid__full">{connectivityPanel}</div> : null}
             <p className="field-hint">Created {formatDateTime(devices.find((d) => d.id === manageState.deviceId)?.createdAt)}</p>
           </form>
         </Modal>
