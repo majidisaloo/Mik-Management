@@ -3,49 +3,407 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mik Management - Welcome</title>
+    <title>Mik Management - Network Command Center</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body>
-    <header class="hero">
-      <div class="hero__content">
-        <h1>Welcome to Mik Management</h1>
-        <p>Your quick start guide to running the registration portal locally.</p>
-        <a class="button" href="/register">Go to Registration</a>
-      </div>
-    </header>
+  <body data-theme="light">
+    <div class="app-shell">
+      <%- include('partials/topbar', { nav }) %>
 
-    <main class="container">
-      <section>
-        <h2>Installation Guide</h2>
-        <ol>
-          <li>Install <strong>Node.js</strong> version 18 or newer from the official website.</li>
-          <li>Clone this repository with <code>git clone &lt;repository-url&gt;</code>.</li>
-          <li>Open the project folder and run <code>npm install</code> to install dependencies.</li>
-          <li>Start the server with <code>npm start</code>.</li>
-          <li>Visit <a href="http://localhost:3000">http://localhost:3000</a> in your browser.</li>
-        </ol>
-      </section>
+      <main class="main">
+        <header class="page-hero">
+          <div>
+            <h1>Operational overview</h1>
+            <p>
+              Real-time visibility into MikroTik infrastructure, automated tunnels, phpIPAM
+              allocations, and supporting DNS services.
+            </p>
+          </div>
+          <a class="button button--primary" href="/settings">Open settings</a>
+        </header>
 
-      <section>
-        <h2>Essential Git Usage</h2>
-        <p>The following commands are all you need to collaborate with this project:</p>
-        <ul>
-          <li><code>git status</code> – check what changed.</li>
-          <li><code>git add .</code> – stage your updates.</li>
-          <li><code>git commit -m "Describe your change"</code> – save your work.</li>
-          <li><code>git push origin main</code> – publish your commit to the remote repository.</li>
-        </ul>
-        <p>Always pull the latest updates with <code>git pull</code> before you start a new change.</p>
-      </section>
-    </main>
+        <section class="card-grid" aria-label="Infrastructure summary">
+          <article class="status-card">
+            <div class="status-card__meta">
+              <h2>Total Mikrotiks</h2>
+              <p>Devices synced with Mik Management</p>
+            </div>
+            <span class="status-card__value"><%= metrics.totalMikrotiks %></span>
+          </article>
+          <article class="status-card">
+            <div class="status-card__meta">
+              <h2>Updated Mikrotiks</h2>
+              <p>Running RouterOS target release (<%= targetRouterOs %>)</p>
+            </div>
+            <span class="status-card__value"><%= metrics.updatedMikrotiks %></span>
+          </article>
+          <article class="status-card">
+            <div class="status-card__meta">
+              <h2>Out-of-date Mikrotiks</h2>
+              <p>Upgrade pending or unknown</p>
+            </div>
+            <span class="status-card__value"><%= metrics.outOfDate %></span>
+          </article>
+          <article class="status-card">
+            <div class="status-card__meta">
+              <h2>Tunnel summary</h2>
+              <p>
+                <strong><%= metrics.tunnelSummary.active %></strong> active of
+                <strong><%= metrics.tunnelSummary.total %></strong>
+              </p>
+            </div>
+            <span class="status-card__value status-card__value--pill">
+              <span class="pill pill--success">Active: <%= metrics.tunnelSummary.active %></span>
+              <span class="pill pill--muted">Inactive: <%= metrics.tunnelSummary.inactive %></span>
+            </span>
+          </article>
+        </section>
 
-    <footer class="footer">
-      <p>&copy; <span id="year"></span> Mik Management. All rights reserved.</p>
-    </footer>
+        <section class="panel">
+          <header class="panel__header">
+            <div>
+              <h2>Tunnel operations</h2>
+              <p>Encryption keys, /30 allocations, and state for automated peers.</p>
+            </div>
+          </header>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">Tunnel</th>
+                  <th scope="col">Device</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Encryption</th>
+                  <th scope="col">Range</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Latency</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (tunnels.length === 0) { %>
+                <tr>
+                  <td class="text-muted" colspan="7">No tunnels have been configured yet.</td>
+                </tr>
+                <% } %>
+                <% tunnels.forEach((tunnel) => { %>
+                <tr>
+                  <td>
+                    <strong><%= tunnel.name %></strong>
+                    <small class="text-muted"><%= tunnel.last_updated ? new Date(tunnel.last_updated).toLocaleString() : '' %></small>
+                  </td>
+                  <td><%= tunnel.deviceName %></td>
+                  <td><%= tunnel.tunnel_type %></td>
+                  <td><%= tunnel.encryption || '—' %></td>
+                  <td><%= tunnel.local_cidr %> → <%= tunnel.remote_cidr %></td>
+                  <td>
+                    <span class="status-indicator status-indicator--<%= tunnel.status === 'up' ? 'success' : 'danger' %>">
+                      <span class="status-indicator__dot" aria-hidden="true"></span>
+                      <span><%= tunnel.status %></span>
+                    </span>
+                  </td>
+                  <td><%= typeof tunnel.latency_ms === 'number' ? tunnel.latency_ms.toFixed(1) : '—' %> ms</td>
+                </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-    <script>
-      document.getElementById('year').textContent = new Date().getFullYear();
-    </script>
+        <section class="panel">
+          <header class="panel__header">
+            <div>
+              <h2>MikroTik health</h2>
+              <p>API, SSH status, and interface visibility for each router.</p>
+            </div>
+          </header>
+          <div class="panel__body grid grid--two">
+            <% if (mikrotiks.length === 0) { %>
+            <p class="text-muted">No MikroTik devices are registered yet.</p>
+            <% } %>
+            <% mikrotiks.forEach((device) => { %>
+            <article class="device-card">
+              <header class="device-card__header">
+                <div>
+                  <h3><%= device.name %></h3>
+                  <p class="text-muted"><%= device.host %></p>
+                </div>
+                <div class="device-card__statuses">
+                  <span class="status-indicator status-indicator--<%= device.last_api_status === 'connected' ? 'success' : 'danger' %>">
+                    <span class="status-indicator__dot" aria-hidden="true"></span>
+                    API
+                  </span>
+                  <span class="status-indicator status-indicator--<%= device.last_ssh_status === 'connected' ? 'success' : 'danger' %>">
+                    <span class="status-indicator__dot" aria-hidden="true"></span>
+                    SSH
+                  </span>
+                </div>
+              </header>
+              <dl class="device-card__meta">
+                <div>
+                  <dt>RouterOS</dt>
+                  <dd><%= device.routeros_version || 'unknown' %></dd>
+                </div>
+                <div>
+                  <dt>Tunnel type</dt>
+                  <dd><%= device.tunnel_type %></dd>
+                </div>
+                <div>
+                  <dt>Encryption key</dt>
+                  <dd><code><%= device.encryption_key || 'n/a' %></code></dd>
+                </div>
+                <div>
+                  <dt>Keepalive</dt>
+                  <dd><%= device.tunnel_timeout %>s</dd>
+                </div>
+              </dl>
+              <div class="device-card__section">
+                <h4>Interfaces</h4>
+                <ul class="chip-list">
+                  <% device.interfaces.forEach((iface) => { %>
+                  <li class="chip chip--<%= iface.status === 'up' ? 'success' : 'muted' %>">
+                    <strong><%= iface.name %></strong>
+                    <span><%= iface.address || 'unassigned' %></span>
+                  </li>
+                  <% }); %>
+                </ul>
+              </div>
+              <div class="device-card__section">
+                <h4>Tunnels</h4>
+                <ul class="chip-list">
+                  <% device.tunnels.forEach((t) => { %>
+                  <li class="chip chip--outline">
+                    <strong><%= t.name %></strong>
+                    <span><%= t.tunnel_type %> · <%= t.status %> · <%= t.latency_ms ? t.latency_ms.toFixed(1) : '—' %> ms</span>
+                  </li>
+                  <% }); %>
+                </ul>
+              </div>
+            </article>
+            <% }); %>
+          </div>
+        </section>
+
+        <section class="panel panel--split">
+          <div class="panel__column">
+            <header class="panel__header">
+              <div>
+                <h2>Routing intelligence</h2>
+                <p>Latency across critical paths and relationship graph.</p>
+              </div>
+            </header>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Source</th>
+                    <th scope="col">Destination</th>
+                    <th scope="col">Latency</th>
+                    <th scope="col">Path</th>
+                    <th scope="col">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% if (routingChecks.length === 0) { %>
+                  <tr>
+                    <td class="text-muted" colspan="5">No routing checks recorded.</td>
+                  </tr>
+                  <% } %>
+                  <% routingChecks.forEach((check) => { %>
+                  <tr>
+                    <td><%= check.source %></td>
+                    <td><%= check.destination %></td>
+                    <td><%= typeof check.latencyMs === 'number' ? check.latencyMs.toFixed(1) : '—' %> ms</td>
+                    <td class="path">
+                      <% check.path.forEach((segment, index) => { %>
+                      <span class="path__segment"><%= segment %></span>
+                      <% if (index < check.path.length - 1) { %>
+                      <span class="path__divider" aria-hidden="true">→</span>
+                      <% } %>
+                      <% }); %>
+                    </td>
+                    <td>
+                      <span class="status-indicator status-indicator--<%= check.status === 'pass' ? 'success' : 'danger' %>">
+                        <span class="status-indicator__dot" aria-hidden="true"></span>
+                        <%= check.status %>
+                      </span>
+                    </td>
+                  </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="panel__column">
+            <div class="graph-card">
+              <h3>Topology preview</h3>
+              <svg class="graph" viewBox="0 0 520 240" role="img" aria-label="Routing graph">
+                <% routingGraph.edges.forEach((edge) => { %>
+                <% const source = routingGraph.nodes.find((node) => node.id === edge.from); %>
+                <% const target = routingGraph.nodes.find((node) => node.id === edge.to); %>
+                <% if (source && target) { %>
+                <line x1="<%= source.x %>" y1="<%= source.y %>" x2="<%= target.x %>" y2="<%= target.y %>" />
+                <% } %>
+                <% }); %>
+                <% routingGraph.nodes.forEach((node) => { %>
+                <g>
+                  <circle cx="<%= node.x %>" cy="<%= node.y %>" r="22"></circle>
+                  <text x="<%= node.x %>" y="<%= node.y %>" dominant-baseline="middle" text-anchor="middle">
+                    <%= node.id %>
+                  </text>
+                </g>
+                <% }); %>
+              </svg>
+              <p class="graph-card__hint">Edges represent preferred routing decisions with measured latency in milliseconds.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <header class="panel__header">
+            <div>
+              <h2>Firewall snapshot</h2>
+              <p>High-level rules applied across the fleet.</p>
+            </div>
+          </header>
+          <div class="panel__body grid grid--two">
+            <% firewallSnapshot.forEach((item) => { %>
+            <article class="device-card">
+              <header class="device-card__header">
+                <div>
+                  <h3><%= item.device %></h3>
+                  <p class="text-muted">Policy review</p>
+                </div>
+              </header>
+              <ul class="rule-list">
+                <% item.rules.forEach((rule) => { %>
+                <li>
+                  <span class="rule-list__badge rule-list__badge--<%= rule.action === 'accept' ? 'success' : 'danger' %>"><%= rule.action %></span>
+                  <div>
+                    <strong><%= rule.description %></strong>
+                    <p class="text-muted">Scope: <%= rule.appliedTo %></p>
+                  </div>
+                </li>
+                <% }); %>
+              </ul>
+            </article>
+            <% }); %>
+          </div>
+        </section>
+
+        <section class="panel panel--split">
+          <div class="panel__column">
+            <header class="panel__header">
+              <div>
+                <h2>IPAM integrations</h2>
+                <p>Connected phpIPAM instances with cached structure.</p>
+              </div>
+            </header>
+            <ul class="ipam-list">
+              <% if (ipams.length === 0) { %>
+              <li class="ipam-list__empty">No IPAM systems have been linked yet.</li>
+              <% } %>
+              <% ipams.forEach((ipam) => { %>
+              <li class="ipam-card">
+                <div class="ipam-card__header">
+                  <div>
+                    <h3><%= ipam.name %></h3>
+                    <p class="text-muted"><%= ipam.base_url %></p>
+                  </div>
+                  <span class="status-indicator status-indicator--<%= ipam.last_status === 'connected' ? 'success' : 'danger' %>">
+                    <span class="status-indicator__dot" aria-hidden="true"></span>
+                    <%= ipam.last_status %>
+                  </span>
+                </div>
+                <dl class="ipam-card__meta">
+                  <div>
+                    <dt>App ID</dt>
+                    <dd><%= ipam.app_id %></dd>
+                  </div>
+                  <div>
+                    <dt>Permissions</dt>
+                    <dd><%= ipam.app_permissions %></dd>
+                  </div>
+                  <div>
+                    <dt>Security</dt>
+                    <dd><%= ipam.app_security %></dd>
+                  </div>
+                  <div>
+                    <dt>Last checked</dt>
+                    <dd><%= ipam.last_checked_at ? new Date(ipam.last_checked_at).toLocaleString() : 'never' %></dd>
+                  </div>
+                </dl>
+              </li>
+              <% }); %>
+            </ul>
+          </div>
+          <div class="panel__column">
+            <header class="panel__header">
+              <div>
+                <h2>DNS authority</h2>
+                <p>Reverse PTR coverage and management endpoints.</p>
+              </div>
+            </header>
+            <ul class="dns-list">
+              <% dnsServers.forEach((server) => { %>
+              <li>
+                <div>
+                  <h3><%= server.name %></h3>
+                  <p class="text-muted"><%= server.ip_address %></p>
+                </div>
+                <dl>
+                  <div>
+                    <dt>API endpoint</dt>
+                    <dd><%= server.api_endpoint || '—' %></dd>
+                  </div>
+                  <div>
+                    <dt>PTR zone</dt>
+                    <dd><%= server.ptr_zone || '—' %></dd>
+                  </div>
+                </dl>
+              </li>
+              <% }); %>
+            </ul>
+          </div>
+        </section>
+
+        <section class="panel">
+          <header class="panel__header">
+            <div>
+              <h2>Group explorer</h2>
+              <p>Hierarchy inspired by vCenter for quick navigation.</p>
+            </div>
+          </header>
+          <div class="group-tree" data-group-tree>
+            <% function renderGroup(nodes) { %>
+            <ul>
+              <% nodes.forEach((node) => { %>
+              <li>
+                <div class="group-node" data-group-node>
+                  <button class="group-node__toggle" type="button" data-group-toggle aria-expanded="true">
+                    <span aria-hidden="true">▾</span>
+                    <span class="sr-only">Toggle children</span>
+                  </button>
+                  <div class="group-node__content">
+                    <span class="group-node__title"><%= node.name %></span>
+                    <span class="group-node__meta">Created <%= new Date(node.createdAt).toLocaleString() %></span>
+                  </div>
+                </div>
+                <% if (node.children && node.children.length > 0) { %>
+                <div class="group-node__children" data-group-children>
+                  <%- renderGroup(node.children) %>
+                </div>
+                <% } %>
+              </li>
+              <% }); %>
+            </ul>
+            <% } %>
+            <%- renderGroup(groupTree) %>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/theme.js" defer></script>
+    <script src="/dashboard.js" defer></script>
   </body>
 </html>

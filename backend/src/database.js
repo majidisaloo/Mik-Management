@@ -21,11 +21,13 @@ const defaultState = () => ({
   lastGroupId: 0,
   lastMikrotikId: 0,
   lastTunnelId: 0,
+  lastIpamId: 0,
   users: [],
   roles: [],
   groups: [],
   mikrotiks: [],
-  tunnels: []
+  tunnels: [],
+  ipams: []
 });
 
 const normalizeGroupName = (name, fallback) => {
@@ -164,6 +166,110 @@ const normalizeTags = (value) => {
 
   return [];
 };
+
+const normalizeUrl = (value) => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return '';
+  }
+
+  return trimmed.replace(/\s+/g, '').replace(/\/+$/, '');
+};
+
+const sanitizeIpamCollectionEntry = (entry = {}, fallbackPrefix) => {
+  const metadata =
+    entry && typeof entry.metadata === 'object' && entry.metadata !== null && !Array.isArray(entry.metadata)
+      ? { ...entry.metadata }
+      : {};
+
+  Object.keys(metadata).forEach((key) => {
+    if (metadata[key] === undefined) {
+      delete metadata[key];
+    }
+  });
+
+  const position = typeof entry.index === 'number' ? entry.index + 1 : 1;
+  const fallbackName = fallbackPrefix ? `${fallbackPrefix} ${position}` : `Item ${position}`;
+
+  const idCandidate = Number.parseInt(entry.id, 10);
+  const id = Number.isInteger(idCandidate) && idCandidate > 0 ? idCandidate : null;
+
+  return {
+    id,
+    name: normalizeText(entry.name, fallbackName),
+    description: normalizeOptionalText(entry.description ?? ''),
+    metadata
+  };
+};
+
+const sanitizeIpamCollections = (collections = {}) => {
+  const mapList = (list, prefix) => {
+    if (!Array.isArray(list)) {
+      return [];
+    }
+
+    return list.map((entry, index) => sanitizeIpamCollectionEntry({ ...entry, index }, prefix));
+  };
+
+  return {
+    sections: mapList(collections.sections, 'Section'),
+    datacenters: mapList(collections.datacenters, 'Datacenter'),
+    ranges: mapList(collections.ranges, 'Range')
+  };
+};
+
+const allowedIpamStatuses = new Set(['connected', 'failed', 'unknown']);
+
+const sanitizeIpamRecord = (record = {}, { identifier, timestamp } = {}) => {
+  const id = Number.isInteger(identifier) && identifier > 0 ? identifier : Number.parseInt(record.id, 10);
+
+  const createdAt = normalizeIsoDate(record.createdAt) ?? normalizeIsoDate(record.created_at) ?? timestamp;
+  const updatedAt = normalizeIsoDate(record.updatedAt) ?? normalizeIsoDate(record.updated_at) ?? createdAt ?? timestamp;
+  const lastCheckedAt =
+    normalizeIsoDate(record.lastCheckedAt) ?? normalizeIsoDate(record.last_checkedAt) ?? normalizeIsoDate(record.last_checked_at);
+
+  const statusCandidate = normalizeOptionalText(record.lastStatus ?? record.last_status ?? 'unknown') || 'unknown';
+  const lastStatus = allowedIpamStatuses.has(statusCandidate.toLowerCase())
+    ? statusCandidate.toLowerCase()
+    : 'unknown';
+
+  return {
+    id: Number.isInteger(id) && id > 0 ? id : identifier,
+    name: normalizeText(record.name, `IPAM ${id || identifier || ''}`.trim()),
+    baseUrl: normalizeUrl(record.baseUrl ?? record.base_url ?? ''),
+    appId: normalizeText(record.appId ?? record.app_id ?? '', ''),
+    appCode: normalizeOptionalText(record.appCode ?? record.app_code ?? ''),
+    appPermissions: normalizeText(record.appPermissions ?? record.app_permissions ?? 'Read', 'Read'),
+    appSecurity: normalizeText(
+      record.appSecurity ?? record.app_security ?? 'SSL with App code token',
+      'SSL with App code token'
+    ),
+    createdAt: createdAt ?? timestamp,
+    updatedAt: updatedAt ?? createdAt ?? timestamp,
+    lastStatus,
+    lastCheckedAt,
+    collections: sanitizeIpamCollections(record.collections ?? record.cached ?? {})
+  };
+};
+
+const presentIpamForClient = (ipam) => ({
+  id: ipam.id,
+  name: ipam.name,
+  baseUrl: ipam.baseUrl,
+  appId: ipam.appId,
+  appPermissions: ipam.appPermissions,
+  appSecurity: ipam.appSecurity,
+  createdAt: ipam.createdAt,
+  updatedAt: ipam.updatedAt,
+  lastStatus: ipam.lastStatus,
+  lastCheckedAt: ipam.lastCheckedAt,
+  collections: sanitizeIpamCollections(ipam.collections)
+});
 
 const sanitizeRouteros = (options = {}, baseline = defaultRouterosOptions()) => {
   const normalized = { ...baseline };
@@ -431,6 +537,68 @@ const ensureStateShape = async (databaseFile) => {
       (max, group) => Math.max(max, Number.parseInt(group.id, 10) || 0),
       0
     );
+    mutated = true;
+  }
+
+  if (!Array.isArray(normalized.ipams)) {
+    normalized.ipams = [];
+    mutated = true;
+  }
+
+  if (!Number.isInteger(normalized.lastIpamId)) {
+    normalized.lastIpamId = normalized.ipams.reduce(
+      (max, ipam) => Math.max(max, Number.parseInt(ipam.id, 10) || 0),
+      0
+    );
+    mutated = true;
+  }
+
+  let nextIpamIdSeed = Math.max(
+    Number.isInteger(normalized.lastIpamId) ? normalized.lastIpamId : 0,
+    normalized.ipams.reduce((max, ipam) => Math.max(max, Number.parseInt(ipam.id, 10) || 0), 0)
+  );
+
+  const usedIpamIds = new Set();
+  const ipamTimestamp = new Date().toISOString();
+
+  normalized.ipams = normalized.ipams.map((ipam) => {
+    let identifier = Number.parseInt(ipam.id, 10);
+
+    if (!Number.isInteger(identifier) || identifier <= 0 || usedIpamIds.has(identifier)) {
+      nextIpamIdSeed += 1;
+      identifier = nextIpamIdSeed;
+      mutated = true;
+    }
+
+    usedIpamIds.add(identifier);
+
+    const sanitized = sanitizeIpamRecord(ipam, { identifier, timestamp: ipamTimestamp });
+
+    const originalLastStatus = normalizeOptionalText(ipam.lastStatus ?? ipam.last_status ?? 'unknown') || 'unknown';
+    const originalLastCheckedAt =
+      normalizeIsoDate(ipam.lastCheckedAt ?? ipam.last_checkedAt ?? ipam.last_checked_at) ?? null;
+
+    if (
+      sanitized.name !== ipam.name ||
+      sanitized.baseUrl !== (ipam.baseUrl ?? ipam.base_url) ||
+      sanitized.appId !== (ipam.appId ?? ipam.app_id) ||
+      sanitized.appCode !== (ipam.appCode ?? ipam.app_code ?? '') ||
+      sanitized.appPermissions !== (ipam.appPermissions ?? ipam.app_permissions) ||
+      sanitized.appSecurity !== (ipam.appSecurity ?? ipam.app_security) ||
+      sanitized.createdAt !== (ipam.createdAt ?? ipam.created_at) ||
+      sanitized.updatedAt !== (ipam.updatedAt ?? ipam.updated_at) ||
+      sanitized.lastStatus !== originalLastStatus.toLowerCase() ||
+      sanitized.lastCheckedAt !== originalLastCheckedAt ||
+      JSON.stringify(sanitized.collections) !== JSON.stringify(ipam.collections ?? ipam.cached ?? {})
+    ) {
+      mutated = true;
+    }
+
+    return sanitized;
+  });
+
+  if (nextIpamIdSeed > normalized.lastIpamId) {
+    normalized.lastIpamId = nextIpamIdSeed;
     mutated = true;
   }
 
@@ -1160,6 +1328,142 @@ const initializeDatabase = async (databasePath) => {
       return { success: true };
     },
 
+    async listIpams() {
+      const state = await load();
+      return state.ipams.map((ipam) => presentIpamForClient(ipam));
+    },
+
+    async createIpam({ name, baseUrl, appId, appCode, appPermissions, appSecurity }) {
+      const state = await load();
+
+      const normalizedName = normalizeText(name);
+      const normalizedBaseUrl = normalizeUrl(baseUrl);
+      const normalizedAppId = normalizeText(appId);
+      const normalizedAppCode = normalizeOptionalText(appCode ?? '');
+      const normalizedPermissions = normalizeText(appPermissions ?? 'Read', 'Read');
+      const normalizedSecurity = normalizeText(
+        appSecurity ?? 'SSL with App code token',
+        'SSL with App code token'
+      );
+
+      if (!normalizedName) {
+        return { success: false, reason: 'name-required' };
+      }
+
+      if (!normalizedBaseUrl) {
+        return { success: false, reason: 'base-url-required' };
+      }
+
+      if (!normalizedAppId) {
+        return { success: false, reason: 'app-id-required' };
+      }
+
+      if (!normalizedAppCode) {
+        return { success: false, reason: 'app-code-required' };
+      }
+
+      const duplicate = state.ipams.find(
+        (ipam) => ipam.baseUrl === normalizedBaseUrl && ipam.appId.toLowerCase() === normalizedAppId.toLowerCase()
+      );
+
+      if (duplicate) {
+        return { success: false, reason: 'duplicate-integration' };
+      }
+
+      const nextId = (Number.isInteger(state.lastIpamId) ? state.lastIpamId : 0) + 1;
+      const timestamp = new Date().toISOString();
+
+      const record = {
+        id: nextId,
+        name: normalizedName,
+        baseUrl: normalizedBaseUrl,
+        appId: normalizedAppId,
+        appCode: normalizedAppCode,
+        appPermissions: normalizedPermissions,
+        appSecurity: normalizedSecurity,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        lastStatus: 'unknown',
+        lastCheckedAt: null,
+        collections: sanitizeIpamCollections()
+      };
+
+      state.ipams.push(record);
+      state.lastIpamId = nextId;
+      await persist(state);
+
+      return { success: true, ipam: presentIpamForClient(record) };
+    },
+
+    async getIpamById(id) {
+      const state = await load();
+      const ipam = state.ipams.find((entry) => entry.id === id);
+      return ipam ? { ...ipam, collections: sanitizeIpamCollections(ipam.collections) } : null;
+    },
+
+    async deleteIpam(id) {
+      const state = await load();
+      const index = state.ipams.findIndex((ipam) => ipam.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      state.ipams.splice(index, 1);
+      await persist(state);
+
+      return { success: true };
+    },
+
+    async updateIpamStatus(id, { status, checkedAt }) {
+      const state = await load();
+      const index = state.ipams.findIndex((ipam) => ipam.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      const ipam = state.ipams[index];
+      const timestamp = new Date().toISOString();
+      const loweredStatus = (status || '').toLowerCase();
+      const normalizedStatus = allowedIpamStatuses.has(loweredStatus) ? loweredStatus : 'unknown';
+      const normalizedCheckedAt = checkedAt ? normalizeIsoDate(checkedAt) ?? timestamp : timestamp;
+
+      state.ipams[index] = {
+        ...ipam,
+        lastStatus: normalizedStatus,
+        lastCheckedAt: normalizedCheckedAt,
+        updatedAt: timestamp
+      };
+
+      await persist(state);
+
+      return { success: true, ipam: presentIpamForClient(state.ipams[index]) };
+    },
+
+    async replaceIpamCollections(id, collections) {
+      const state = await load();
+      const index = state.ipams.findIndex((ipam) => ipam.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      const sanitizedCollections = sanitizeIpamCollections(collections);
+      const timestamp = new Date().toISOString();
+      const ipam = state.ipams[index];
+
+      state.ipams[index] = {
+        ...ipam,
+        collections: sanitizedCollections,
+        updatedAt: timestamp
+      };
+
+      await persist(state);
+
+      return { success: true, ipam: presentIpamForClient(state.ipams[index]) };
+    },
+
     async listMikrotiks() {
       const state = await load();
       return state.mikrotiks.map((device) => ({
@@ -1608,6 +1912,39 @@ const initializeDatabase = async (databasePath) => {
         .sort((a, b) => (b.packetLoss ?? 0) - (a.packetLoss ?? 0))
         .slice(0, 10);
 
+      const updatedTimestamps = [];
+      const captureTimestamp = (value) => {
+        const iso = normalizeIsoDate(value);
+        if (iso) {
+          updatedTimestamps.push(iso);
+        }
+      };
+
+      state.mikrotiks.forEach((device) => {
+        captureTimestamp(device.updatedAt);
+        if (device.status) {
+          captureTimestamp(device.status.lastAuditAt);
+        }
+      });
+
+      state.tunnels.forEach((tunnel) => {
+        captureTimestamp(tunnel.updatedAt);
+        if (tunnel.metrics) {
+          captureTimestamp(tunnel.metrics.lastCheckedAt);
+        }
+      });
+
+      if (Array.isArray(state.ipams)) {
+        state.ipams.forEach((ipam) => {
+          captureTimestamp(ipam.updatedAt);
+          captureTimestamp(ipam.lastCheckedAt);
+        });
+      }
+
+      const lastUpdatedAt = updatedTimestamps.length
+        ? new Date(Math.max(...updatedTimestamps.map((value) => new Date(value).getTime()))).toISOString()
+        : null;
+
       return {
         mikrotik: {
           total: totalMikrotiks,
@@ -1622,7 +1959,8 @@ const initializeDatabase = async (databasePath) => {
           maintenance: tunnelsMaintenance,
           latencyLeaderboard,
           packetLossLeaderboard
-        }
+        },
+        lastUpdatedAt
       };
     },
 

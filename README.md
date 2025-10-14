@@ -184,6 +184,7 @@ npm run build
 To refresh the Nginx content:
 
 ```bash
+sudo systemctl start nginx
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
