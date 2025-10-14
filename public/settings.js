@@ -395,20 +395,34 @@ function initIpamForm() {
     const payload = serialiseForm(form);
     submitButton.disabled = true;
     submitButton.textContent = 'Saving…';
+    let feedbackText = 'Add IPAM';
     try {
-      await fetch('/api/ipams', {
+      const result = await fetch('/api/ipams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       }).then(toJson);
       form.reset();
       await loadIpams();
+      if (result && result.test) {
+        if (result.test.status === 'connected') {
+          feedbackText = 'Saved & connected ✓';
+        } else if (result.test.status === 'failed') {
+          feedbackText = 'Saved – test failed';
+        }
+      } else {
+        feedbackText = 'Saved ✓';
+      }
     } catch (error) {
       console.error('Failed to add IPAM integration', error);
       alert('Unable to add IPAM integration. Check the form and try again.');
+      feedbackText = 'Try again';
     } finally {
       submitButton.disabled = false;
-      submitButton.textContent = 'Add IPAM';
+      submitButton.textContent = feedbackText;
+      setTimeout(() => {
+        submitButton.textContent = 'Add IPAM';
+      }, 2000);
     }
   });
 }

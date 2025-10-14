@@ -662,7 +662,7 @@ app.get('/api/ipams', (req, res) => {
   res.json({ ipams, collections });
 });
 
-app.post('/api/ipams', (req, res) => {
+app.post('/api/ipams', async (req, res) => {
   const { name, baseUrl, appId, appCode, appPermissions, appSecurity } = req.body;
 
   if (!name || !baseUrl || !appId || !appCode) {
@@ -686,7 +686,27 @@ app.post('/api/ipams', (req, res) => {
       now
     );
     const created = db.prepare('SELECT * FROM ipam_integrations WHERE id = ?').get(lastInsertRowid);
-    res.status(201).json({ ipam: created });
+
+    let testResult = null;
+    try {
+      testResult = await testIpamConnection(created);
+    } catch (error) {
+      console.warn('Initial phpIPAM test failed:', error);
+    }
+
+    try {
+      const status = (testResult && testResult.status) || 'unknown';
+      const checkedAt = new Date().toISOString();
+      db.prepare(
+        'UPDATE ipam_integrations SET last_status = ?, last_checked_at = ? WHERE id = ?'
+      ).run(status, checkedAt, created.id);
+    } catch (error) {
+      console.warn('Unable to persist phpIPAM status after create:', error);
+    }
+
+    const refreshed = db.prepare('SELECT * FROM ipam_integrations WHERE id = ?').get(lastInsertRowid) || created;
+
+    res.status(201).json({ ipam: refreshed, test: testResult });
   } catch (error) {
     console.error('Failed to insert IPAM integration:', error);
     res.status(500).json({ error: 'Failed to add IPAM integration.' });
@@ -838,217 +858,6 @@ app.post('/api/ipams/:id/sync', async (req, res) => {
     ).run('failed', now, ipam.id);
     res.status(502).json({ error: error.message || 'Unable to synchronise phpIPAM.' });
   }
-});
-
-app.get('/api/mikrotiks', (req, res) => {
-  const mikrotikDevices = getMikrotiks().map((device) => ({
-    ...device,
-    interfaces: getMikrotikInterfaces(device.id),
-    tunnels: getMikrotikTunnels(device.id)
-  }));
-  res.json({ mikrotiks: mikrotikDevices, targetRouterOs: TARGET_ROUTEROS_VERSION });
-});
-
-app.post('/api/mikrotiks', (req, res) => {
-  const {
-    name,
-    host,
-    apiPort,
-    sshPort,
-    username,
-    password,
-    routerosVersion,
-    encryptionKey,
-    tunnelTimeout,
-    tunnelType
-  } = req.body;
-
-  if (!name || !host || !username || !password) {
-    return res.status(400).json({ error: 'Name, host, username, and password are required.' });
-  }
-
-  const now = new Date().toISOString();
-  const insert = db.prepare(`
-    INSERT INTO mikrotik_devices (name, host, api_port, ssh_port, username, password, routeros_version, encryption_key, tunnel_timeout, tunnel_type, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  try {
-    const { lastInsertRowid } = insert.run(
-      name.trim(),
-      host.trim(),
-      apiPort ? Number(apiPort) : 8728,
-      sshPort ? Number(sshPort) : 22,
-      username.trim(),
-      password.trim(),
-      (routerosVersion || '').trim(),
-      (encryptionKey || '').trim(),
-      tunnelTimeout ? Number(tunnelTimeout) : 60,
-      (tunnelType || 'WireGuard').trim(),
-      now
-    );
-    const created = db.prepare('SELECT * FROM mikrotik_devices WHERE id = ?').get(lastInsertRowid);
-    res.status(201).json({ mikrotik: created });
-  } catch (error) {
-    console.error('Failed to insert Mikrotik device:', error);
-    res.status(500).json({ error: 'Failed to add Mikrotik device.' });
-  }
-});
-
-app.delete('/api/mikrotiks/:id', (req, res) => {
-  const { id } = req.params;
-  const result = db.prepare('DELETE FROM mikrotik_devices WHERE id = ?').run(id);
-  if (result.changes === 0) {
-    return res.status(404).json({ error: 'Mikrotik device not found.' });
-  }
-  res.status(204).end();
-});
-
-app.post('/api/mikrotiks/:id/test', async (req, res) => {
-  const { id } = req.params;
-  const mikrotik = db.prepare('SELECT * FROM mikrotik_devices WHERE id = ?').get(id);
-  if (!mikrotik) {
-    return res.status(404).json({ error: 'Mikrotik device not found.' });
-  }
-
-  const [apiResult, sshResult] = await Promise.all([
-    testPort(mikrotik.host, mikrotik.api_port),
-    testPort(mikrotik.host, mikrotik.ssh_port)
-  ]);
-
-  const now = new Date().toISOString();
-  db.prepare(`
-    UPDATE mikrotik_devices
-    SET last_api_status = ?, last_ssh_status = ?, last_checked_at = ?
-    WHERE id = ?
-  `).run(
-    apiResult.ok ? 'connected' : 'failed',
-    sshResult.ok ? 'connected' : 'failed',
-    now,
-    id
-  );
-
-  res.json({
-    api: {
-      status: apiResult.ok ? 'connected' : 'failed',
-      message: apiResult.ok ? 'API port reachable' : apiResult.error || 'Connection failed'
-    },
-    ssh: {
-      status: sshResult.ok ? 'connected' : 'failed',
-      message: sshResult.ok ? 'SSH port reachable' : sshResult.error || 'Connection failed'
-    }
-  });
-});
-
-app.get('/api/dns', (req, res) => {
-  res.json({ dnsServers: getDnsServers() });
-});
-
-app.post('/api/dns', (req, res) => {
-  const { name, ipAddress, apiEndpoint, ptrZone } = req.body;
-
-  if (!name || !ipAddress) {
-    return res.status(400).json({ error: 'Name and IP address are required.' });
-  }
-
-  const now = new Date().toISOString();
-  const insert = db.prepare(`
-    INSERT INTO dns_servers (name, ip_address, api_endpoint, ptr_zone, created_at)
-    VALUES (?, ?, ?, ?, ?)
-  `);
-
-  try {
-    const { lastInsertRowid } = insert.run(
-      name.trim(),
-      ipAddress.trim(),
-      apiEndpoint ? apiEndpoint.trim() : null,
-      ptrZone ? ptrZone.trim() : null,
-      now
-    );
-    const created = db.prepare('SELECT * FROM dns_servers WHERE id = ?').get(lastInsertRowid);
-    res.status(201).json({ dns: created });
-  } catch (error) {
-    console.error('Failed to insert DNS server:', error);
-    res.status(500).json({ error: 'Failed to add DNS server.' });
-  }
-});
-
-app.delete('/api/dns/:id', (req, res) => {
-  const { id } = req.params;
-  const result = db.prepare('DELETE FROM dns_servers WHERE id = ?').run(id);
-  if (result.changes === 0) {
-    return res.status(404).json({ error: 'DNS server not found.' });
-  }
-  res.status(204).end();
-});
-
-app.get('/register', (req, res) => {
-  res.render('register', buildRegisterModel());
-});
-
-app.get('/api/ipams', (req, res) => {
-  const ipams = getIpams();
-  const collections = groupCollectionsByIpam(getIpamCollections());
-  res.json({ ipams, collections });
-});
-
-app.post('/api/ipams', (req, res) => {
-  const { name, baseUrl, appId, appCode, appPermissions, appSecurity } = req.body;
-
-  if (!name || !baseUrl || !appId || !appCode) {
-    return res.status(400).json({ error: 'Name, base URL, App ID, and App Code are required.' });
-  }
-
-  const now = new Date().toISOString();
-  const insert = db.prepare(`
-    INSERT INTO ipam_integrations (name, base_url, app_id, app_code, app_permissions, app_security, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  try {
-    const { lastInsertRowid } = insert.run(
-      name.trim(),
-      baseUrl.trim(),
-      appId.trim(),
-      appCode.trim(),
-      (appPermissions || 'Read').trim(),
-      (appSecurity || 'SSL with App code token').trim(),
-      now
-    );
-    const created = db.prepare('SELECT * FROM ipam_integrations WHERE id = ?').get(lastInsertRowid);
-    res.status(201).json({ ipam: created });
-  } catch (error) {
-    console.error('Failed to insert IPAM integration:', error);
-    res.status(500).json({ error: 'Failed to add IPAM integration.' });
-  }
-});
-
-app.delete('/api/ipams/:id', (req, res) => {
-  const { id } = req.params;
-  const deleteStmt = db.prepare('DELETE FROM ipam_integrations WHERE id = ?');
-  const result = deleteStmt.run(id);
-  if (result.changes === 0) {
-    return res.status(404).json({ error: 'IPAM integration not found.' });
-  }
-  res.status(204).end();
-});
-
-app.post('/api/ipams/:id/test', async (req, res) => {
-  const { id } = req.params;
-  const ipam = db.prepare('SELECT * FROM ipam_integrations WHERE id = ?').get(id);
-  if (!ipam) {
-    return res.status(404).json({ error: 'IPAM integration not found.' });
-  }
-
-  const result = await testIpamConnection(ipam);
-  const update = db.prepare(`
-    UPDATE ipam_integrations
-    SET last_status = ?, last_checked_at = ?
-    WHERE id = ?
-  `);
-  update.run(result.status, new Date().toISOString(), id);
-
-  res.json(result);
 });
 
 app.get('/api/mikrotiks', (req, res) => {

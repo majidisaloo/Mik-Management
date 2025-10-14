@@ -119,6 +119,23 @@ const Layout = () => {
     );
   };
 
+  const renderLogoutButton = (placement = 'header') => {
+    const variant = placement === 'sidebar' ? 'sidebar' : 'header';
+
+    return (
+      <button
+        type="button"
+        onClick={handleSignOut}
+        className={`logout-button logout-button--${variant}`}
+      >
+        <span className="logout-button__icon" aria-hidden="true">
+          <LogoutIcon />
+        </span>
+        <span className="logout-button__label">Logout</span>
+      </button>
+    );
+  };
+
   const navigation = useMemo(
     () => [
       {
@@ -238,14 +255,7 @@ const Layout = () => {
         </Link>
         <div className={`header-actions${user ? ' header-actions--authed' : ''}`}>
           {!user && renderThemeToggle('header')}
-          {user ? (
-            <button type="button" onClick={handleSignOut} className="logout-button">
-              <span className="logout-button__icon" aria-hidden="true">
-                <LogoutIcon />
-              </span>
-              <span className="logout-button__label">Logout</span>
-            </button>
-          ) : (
+          {user ? null : (
             <nav>
               {meta.registrationOpen ? <NavLink to="/register">Register</NavLink> : null}
               <NavLink to="/" end>
@@ -275,7 +285,10 @@ const Layout = () => {
                 </div>
               ))}
             </nav>
-            <div className="sidebar-footer">{renderThemeToggle('sidebar')}</div>
+            <div className="sidebar-footer">
+              {renderThemeToggle('sidebar')}
+              <div className="sidebar-footer__actions">{renderLogoutButton('sidebar')}</div>
+            </div>
           </aside>
           <main className="app-main">
             <Outlet />

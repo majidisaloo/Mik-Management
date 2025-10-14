@@ -105,6 +105,312 @@ const parseJsonBody = (req) =>
     });
   });
 
+const DEFAULT_PHPIPAM_TIMEOUT_MS = 7000;
+
+const normalisePhpIpamBaseUrl = (baseUrl) => {
+  if (typeof baseUrl !== 'string') {
+    return '';
+  }
+
+  const trimmed = baseUrl.trim();
+
+  if (!trimmed) {
+    return '';
+  }
+
+  return trimmed.replace(/\s+/g, '').replace(/\/+$/, '');
+};
+
+const resolvePhpIpamId = (record, fallbackKeys = []) => {
+  if (!record || typeof record !== 'object') {
+    return null;
+  }
+
+  const candidates = [
+    'id',
+    'ID',
+    'sectionId',
+    'sectionID',
+    'sectionid',
+    'subnetId',
+    'subnetID',
+    'subnetid',
+    'locationId',
+    'locationID',
+    'locationid',
+    ...fallbackKeys
+  ];
+
+  for (const key of candidates) {
+    if (record[key] !== undefined && record[key] !== null && record[key] !== '') {
+      return record[key];
+    }
+  }
+
+  return null;
+};
+
+const normalisePhpIpamList = (data) => {
+  if (!data) {
+    return [];
+  }
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (typeof data === 'object') {
+    return Object.values(data);
+  }
+
+  return [];
+};
+
+const intToIpv4 = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  const unsigned = numeric >>> 0;
+  return [unsigned >>> 24, (unsigned >>> 16) & 255, (unsigned >>> 8) & 255, unsigned & 255].join('.');
+};
+
+const formatPhpIpamSubnet = (value) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    if (value.includes(':') || value.includes('.')) {
+      return value;
+    }
+
+    const numeric = Number(value);
+
+    if (!Number.isNaN(numeric)) {
+      return intToIpv4(numeric) ?? value;
+    }
+
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    return intToIpv4(value);
+  }
+
+  return `${value}`;
+};
+
+const phpIpamFetch = async (ipam, endpoint, options = {}) => {
+  const baseUrl = normalisePhpIpamBaseUrl(ipam.baseUrl);
+
+  if (!baseUrl) {
+    throw new Error('Missing base URL');
+  }
+
+  const appId = ipam.appId ? encodeURIComponent(ipam.appId) : null;
+
+  if (!appId) {
+    throw new Error('Missing App ID');
+  }
+
+  const trimmedEndpoint = `${endpoint || ''}`.replace(/^\/+/, '');
+  const url = `${baseUrl}/${appId}/${trimmedEndpoint}`;
+
+  const allowNotFound = Boolean(options.allowNotFound);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeout ?? DEFAULT_PHPIPAM_TIMEOUT_MS);
+
+  let response;
+
+  try {
+    response = await fetch(url, {
+      method: options.method || 'GET',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mik-Management/1.0',
+        'phpipam-token': ipam.appCode ?? '',
+        ...(options.headers || {})
+      },
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('phpIPAM request timed out');
+    }
+    throw new Error(error.message || 'Failed to reach phpIPAM');
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  let payload;
+  const contentType = response.headers.get('content-type') || '';
+
+  try {
+    if (contentType.includes('application/json')) {
+      payload = await response.json();
+    } else {
+      const text = await response.text();
+      payload = text ? JSON.parse(text) : {};
+    }
+  } catch (error) {
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    throw new Error('Unexpected response from phpIPAM');
+  }
+
+  if (!response.ok) {
+    if (response.status === 404 && allowNotFound) {
+      return [];
+    }
+
+    const message = payload && typeof payload === 'object' && payload.message ? payload.message : `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+
+  if (payload && typeof payload === 'object' && payload.success === false) {
+    if (allowNotFound && /not\s+found/i.test(payload.message || '')) {
+      return [];
+    }
+
+    throw new Error(payload.message || 'phpIPAM request failed');
+  }
+
+  if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {
+    if (payload.data === null && allowNotFound) {
+      return [];
+    }
+
+    return payload.data;
+  }
+
+  return payload;
+};
+
+const testPhpIpamConnection = async (ipam) => {
+  try {
+    const response = await phpIpamFetch(ipam, 'user/');
+
+    if (response && typeof response === 'object') {
+      const username = response.username || response.data?.username;
+      return {
+        status: 'connected',
+        message: username ? `Authenticated as ${username}` : 'phpIPAM connection succeeded'
+      };
+    }
+
+    return { status: 'connected', message: 'phpIPAM connection succeeded' };
+  } catch (error) {
+    return { status: 'failed', message: error.message || 'Unable to reach phpIPAM' };
+  }
+};
+
+const syncPhpIpamStructure = async (ipam) => {
+  const sectionsPayload = normalisePhpIpamList(await phpIpamFetch(ipam, 'sections/'));
+  const sections = sectionsPayload.map((section) => {
+    const identifier = resolvePhpIpamId(section, ['section']);
+    const sectionId = Number.parseInt(identifier, 10);
+    const metadata = {};
+
+    if (section.section !== undefined) {
+      metadata.slug = section.section;
+    }
+
+    if (section.order !== undefined) {
+      metadata.order = section.order;
+    }
+
+    return {
+      id: Number.isInteger(sectionId) ? sectionId : identifier,
+      name: section.name || section.section || `Section ${identifier ?? ''}`,
+      description: section.description || '',
+      metadata
+    };
+  });
+
+  let datacentersPayload = [];
+
+  try {
+    datacentersPayload = normalisePhpIpamList(await phpIpamFetch(ipam, 'tools/locations/', { allowNotFound: true }));
+  } catch (error) {
+    if (!/not\s+found/i.test(error.message || '')) {
+      throw error;
+    }
+  }
+
+  if (!datacentersPayload.length) {
+    datacentersPayload = normalisePhpIpamList(await phpIpamFetch(ipam, 'tools/sites/', { allowNotFound: true }));
+  }
+
+  const datacenters = datacentersPayload.map((entry) => {
+    const identifier = resolvePhpIpamId(entry, ['code']);
+    const dcId = Number.parseInt(identifier, 10);
+    const metadata = {};
+
+    if (entry.code) {
+      metadata.code = entry.code;
+    }
+
+    if (entry.address) {
+      metadata.address = entry.address;
+    }
+
+    return {
+      id: Number.isInteger(dcId) ? dcId : identifier,
+      name: entry.name || entry.code || `Datacenter ${identifier ?? ''}`,
+      description: entry.description || entry.address || '',
+      metadata
+    };
+  });
+
+  const ranges = [];
+
+  for (const section of sections) {
+    const sectionId = section.id ?? resolvePhpIpamId(section, ['sectionId']);
+
+    if (!sectionId) {
+      continue;
+    }
+
+    const rawRanges = normalisePhpIpamList(
+      await phpIpamFetch(ipam, `sections/${sectionId}/subnets/`, { allowNotFound: true })
+    );
+
+    for (const entry of rawRanges) {
+      const identifier = resolvePhpIpamId(entry, ['subnetId', 'subnet']);
+      const rangeId = Number.parseInt(identifier, 10);
+
+      const subnet = formatPhpIpamSubnet(entry.subnet ?? entry.network ?? identifier);
+      const mask = entry.mask ?? entry.cidr ?? entry.bit ?? entry.netmask;
+      const parsedMask = Number.parseInt(mask, 10);
+      const cidr = subnet && Number.isInteger(parsedMask) ? `${subnet}/${parsedMask}` : subnet || identifier;
+
+      const metadata = {
+        cidr: cidr || '',
+        sectionId,
+        vlanId: entry.vlanId ?? entry.vlanid ?? entry.vlan ?? null
+      };
+
+      Object.keys(metadata).forEach((key) => {
+        if (metadata[key] === null || metadata[key] === undefined || metadata[key] === '') {
+          delete metadata[key];
+        }
+      });
+
+      ranges.push({
+        id: Number.isInteger(rangeId) ? rangeId : identifier,
+        name: entry.description || entry.hostname || cidr || `Range ${identifier ?? ''}`,
+        description: entry.description || '',
+        metadata
+      });
+    }
+  }
+
+  return { sections, datacenters, ranges };
+};
+
 const parsePermissions = (permissions = {}) => {
   const normalized = { ...basePermissions };
   if (permissions && typeof permissions === 'object') {
@@ -2222,6 +2528,161 @@ const bootstrap = async () => {
       }
     };
 
+    const handleListIpams = async () => {
+      try {
+        const ipams = await db.listIpams();
+        sendJson(res, 200, { ipams });
+      } catch (error) {
+        console.error('List IPAMs error', error);
+        sendJson(res, 500, { message: 'Unable to load phpIPAM integrations.' });
+      }
+    };
+
+    const handleCreateIpam = async () => {
+      const body = await parseJsonBody(req);
+      const { name, baseUrl, appId, appCode, appPermissions, appSecurity } = body ?? {};
+
+      try {
+        const result = await db.createIpam({ name, baseUrl, appId, appCode, appPermissions, appSecurity });
+
+        if (!result.success) {
+          if (result.reason === 'duplicate-integration') {
+            sendJson(res, 409, {
+              message: 'An integration with this base URL and App ID already exists.'
+            });
+            return;
+          }
+
+          if (
+            result.reason === 'name-required' ||
+            result.reason === 'base-url-required' ||
+            result.reason === 'app-id-required' ||
+            result.reason === 'app-code-required'
+          ) {
+            sendJson(res, 400, { message: 'Name, base URL, App ID, and App Code are required.' });
+            return;
+          }
+
+          throw new Error('Unable to create IPAM integration');
+        }
+
+        let ipam = result.ipam;
+        let testResult = null;
+
+        try {
+          testResult = await testPhpIpamConnection(ipam);
+          const timestamp = new Date().toISOString();
+          await db.updateIpamStatus(ipam.id, { status: testResult.status, checkedAt: timestamp });
+          const refreshed = await db.getIpamById(ipam.id);
+          if (refreshed) {
+            ipam = refreshed;
+          }
+        } catch (error) {
+          console.warn('Initial phpIPAM test failed', error);
+        }
+
+        sendJson(res, 201, { ipam, test: testResult });
+      } catch (error) {
+        console.error('Create IPAM error', error);
+        sendJson(res, 500, { message: 'Unable to add the phpIPAM integration.' });
+      }
+    };
+
+    const handleDeleteIpam = async (ipamId) => {
+      if (!Number.isInteger(ipamId) || ipamId <= 0) {
+        sendJson(res, 400, { message: 'A valid IPAM id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.deleteIpam(ipamId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'IPAM integration not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to delete IPAM integration');
+        }
+
+        sendNoContent(res);
+      } catch (error) {
+        console.error('Delete IPAM error', error);
+        sendJson(res, 500, { message: 'Unable to delete the phpIPAM integration.' });
+      }
+    };
+
+    const handleTestIpam = async (ipamId) => {
+      if (!Number.isInteger(ipamId) || ipamId <= 0) {
+        sendJson(res, 400, { message: 'A valid IPAM id is required.' });
+        return;
+      }
+
+      try {
+        const ipam = await db.getIpamById(ipamId);
+
+        if (!ipam) {
+          sendJson(res, 404, { message: 'IPAM integration not found.' });
+          return;
+        }
+
+        const result = await testPhpIpamConnection(ipam);
+        const timestamp = new Date().toISOString();
+        await db.updateIpamStatus(ipamId, { status: result.status, checkedAt: timestamp });
+
+        sendJson(res, 200, {
+          ok: result.status === 'connected',
+          status: result.status,
+          message: result.message
+        });
+      } catch (error) {
+        console.error('Test IPAM error', error);
+        sendJson(res, 500, { message: 'Unable to verify phpIPAM connectivity.' });
+      }
+    };
+
+    const handleSyncIpam = async (ipamId) => {
+      if (!Number.isInteger(ipamId) || ipamId <= 0) {
+        sendJson(res, 400, { message: 'A valid IPAM id is required.' });
+        return;
+      }
+
+      try {
+        const ipam = await db.getIpamById(ipamId);
+
+        if (!ipam) {
+          sendJson(res, 404, { message: 'IPAM integration not found.' });
+          return;
+        }
+
+        const collections = await syncPhpIpamStructure(ipam);
+        await db.replaceIpamCollections(ipamId, collections);
+        const timestamp = new Date().toISOString();
+        await db.updateIpamStatus(ipamId, { status: 'connected', checkedAt: timestamp });
+
+        sendJson(res, 200, {
+          sections: collections.sections.length,
+          datacenters: collections.datacenters.length,
+          ranges: collections.ranges.length
+        });
+      } catch (error) {
+        console.error('Sync IPAM error', error);
+
+        if (Number.isInteger(ipamId) && ipamId > 0) {
+          try {
+            await db.updateIpamStatus(ipamId, { status: 'failed', checkedAt: new Date().toISOString() });
+          } catch (updateError) {
+            console.error('Failed to record IPAM failure status', updateError);
+          }
+        }
+
+        sendJson(res, 502, {
+          message: error.message || 'Unable to synchronise phpIPAM structure.'
+        });
+      }
+    };
+
     try {
       if (method === 'GET' && (canonicalPath === '/health' || resourcePath === '/health')) {
         sendJson(res, 200, { status: 'ok' });
@@ -2253,6 +2714,42 @@ const bootstrap = async () => {
       ) {
         await handleDashboardMetrics();
         return;
+      }
+
+      if (method === 'GET' && (canonicalPath === '/api/ipams' || resourcePath === '/ipams')) {
+        await handleListIpams();
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/ipams' || resourcePath === '/ipams')) {
+        await handleCreateIpam();
+        return;
+      }
+
+      if (resourceSegments[0] === 'ipams' && resourceSegments.length >= 2) {
+        const idSegment = resourceSegments[1];
+        const ipamId = Number.parseInt(idSegment, 10);
+
+        if (resourceSegments.length === 2) {
+          if (method === 'DELETE') {
+            await handleDeleteIpam(ipamId);
+            return;
+          }
+        }
+
+        if (resourceSegments.length === 3 && method === 'POST') {
+          const action = resourceSegments[2];
+
+          if (action === 'test') {
+            await handleTestIpam(ipamId);
+            return;
+          }
+
+          if (action === 'sync') {
+            await handleSyncIpam(ipamId);
+            return;
+          }
+        }
       }
 
       if (method === 'GET' && (canonicalPath === '/api/config-info' || resourcePath === '/config-info')) {

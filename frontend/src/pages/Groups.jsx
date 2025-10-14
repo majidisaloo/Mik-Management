@@ -131,6 +131,7 @@ const Groups = () => {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [filter, setFilter] = useState('');
   const [expandedNodes, setExpandedNodes] = useState(() => new Set());
+  const [selectedGroupId, setSelectedGroupId] = useState(null);
 
   useEffect(() => {
     if (!user) {
@@ -283,8 +284,8 @@ const Groups = () => {
     return parentOptions.filter((option) => !disallowed.has(option.value));
   };
 
-  const openCreateModal = () => {
-    setCreateForm(emptyGroupForm);
+  const openCreateModal = (parentId = '') => {
+    setCreateForm({ name: '', parentId: parentId || '' });
     setCreateOpen(true);
     setStatus({ type: '', message: '' });
   };
@@ -338,6 +339,85 @@ const Groups = () => {
       }
     }));
   };
+
+  useEffect(() => {
+    if (!selectedGroupId && rootGroupId) {
+      setSelectedGroupId(rootGroupId);
+    }
+  }, [rootGroupId, selectedGroupId]);
+
+  useEffect(() => {
+    if (selectedGroupId && !groupLookup.has(selectedGroupId)) {
+      if (rootGroupId) {
+        setSelectedGroupId(rootGroupId);
+      } else if (orderedGroups.length > 0) {
+        setSelectedGroupId(orderedGroups[0].id);
+      } else {
+        setSelectedGroupId(null);
+      }
+    }
+  }, [groupLookup, orderedGroups, rootGroupId, selectedGroupId]);
+
+  useEffect(() => {
+    if (!filteredTreeIds.length) {
+      return;
+    }
+
+    if (!selectedGroupId || !filteredTreeIds.includes(selectedGroupId)) {
+      setSelectedGroupId(filteredTreeIds[0]);
+    }
+  }, [filteredTreeIds, selectedGroupId]);
+
+  useEffect(() => {
+    if (!loading && filteredTreeIds.length === 0) {
+      setSelectedGroupId(null);
+    }
+  }, [filteredTreeIds, loading]);
+
+  const selectedGroup = useMemo(() => (selectedGroupId ? groupLookup.get(selectedGroupId) ?? null : null), [
+    selectedGroupId,
+    groupLookup
+  ]);
+
+  const selectedTreeNode = useMemo(() => findNodeById(tree, selectedGroupId), [tree, selectedGroupId]);
+
+  const descendantCount = useMemo(() => {
+    if (!selectedTreeNode) {
+      return 0;
+    }
+
+    return collectDescendantIds(selectedTreeNode).size;
+  }, [selectedTreeNode]);
+
+  const directChildren = useMemo(
+    () => groups.filter((group) => group.parentId === (selectedGroup ? selectedGroup.id : null)),
+    [groups, selectedGroup]
+  );
+
+  const selectedBreadcrumb = useMemo(() => {
+    if (!selectedGroup) {
+      return [];
+    }
+
+    const chain = [];
+    let current = selectedGroup;
+    const guard = new Set();
+
+    while (current && !guard.has(current.id)) {
+      chain.unshift(current.name);
+      guard.add(current.id);
+
+      if (!current.parentId) {
+        break;
+      }
+
+      current = groupLookup.get(current.parentId) ?? null;
+    }
+
+    return chain;
+  }, [groupLookup, selectedGroup]);
+
+  const hasTreeResults = filteredTree.length > 0;
 
   const handleCreateGroup = async (event) => {
     event.preventDefault();
@@ -470,11 +550,12 @@ const Groups = () => {
       const parentName = node.parentId ? groupLookup.get(node.parentId)?.name ?? '—' : '';
       const childLabel =
         totalChildren > 0 ? `${totalChildren} ${totalChildren === 1 ? 'child' : 'children'}` : 'No children';
+      const isActive = selectedGroupId === node.id;
 
       return (
         <li
           key={node.id}
-          className={`group-tree__item${depth > 0 ? ' group-tree__branch' : ''}`}
+          className={`group-tree__item${depth > 0 ? ' group-tree__branch' : ''}${isActive ? ' group-tree__item--active' : ''}`}
           style={depth > 0 ? { marginLeft: '0.35rem' } : undefined}
         >
           <div className="group-tree__header">
@@ -494,7 +575,13 @@ const Groups = () => {
                   ·
                 </span>
               )}
-              <span>{node.name}</span>
+              <button
+                type="button"
+                className={`group-tree__select${isActive ? ' is-active' : ''}`}
+                onClick={() => setSelectedGroupId(node.id)}
+              >
+                {node.name}
+              </button>
             </div>
             <div className="group-tree__controls">
               <button
@@ -545,7 +632,11 @@ const Groups = () => {
               Collapse all
             </button>
           </div>
-          <button type="button" className="action-button action-button--primary" onClick={openCreateModal}>
+          <button
+            type="button"
+            className="action-button action-button--primary"
+            onClick={() => openCreateModal(selectedGroupId ?? '')}
+          >
             Add group
           </button>
         </div>
@@ -553,15 +644,92 @@ const Groups = () => {
 
       {status.message ? <div className={`page-status page-status--${status.type}`}>{status.message}</div> : null}
 
-      {loading ? (
-        <p>Loading groups…</p>
-      ) : filteredTree.length === 0 ? (
-        <p>{query ? 'No groups match your filter.' : 'No groups available yet.'}</p>
-      ) : (
-        <ul className="group-tree" aria-live="polite">
-          {renderTreeNodes(filteredTree)}
-        </ul>
-      )}
+      <div className="group-workspace">
+        <aside className="group-workspace__tree" aria-live="polite">
+          {loading ? (
+            <p>Loading groups…</p>
+          ) : filteredTree.length === 0 ? (
+            <p>{query ? 'No groups match your filter.' : 'No groups available yet.'}</p>
+          ) : (
+            <ul className="group-tree">{renderTreeNodes(filteredTree)}</ul>
+          )}
+        </aside>
+        <section className="group-workspace__detail">
+          {hasTreeResults && selectedGroup ? (
+            <article className="group-detail">
+              <header className="group-detail__header">
+                <div>
+                  <p className="group-detail__path">{selectedBreadcrumb.join(' / ')}</p>
+                  <h2>{selectedGroup.name}</h2>
+                </div>
+                <div className="group-detail__actions">
+                  <button
+                    type="button"
+                    className="action-button action-button--ghost"
+                    onClick={() => openManageModal(selectedGroup)}
+                  >
+                    Edit group
+                  </button>
+                  <button
+                    type="button"
+                    className="action-button action-button--primary"
+                    onClick={() => openCreateModal(selectedGroup.id)}
+                  >
+                    Add subgroup
+                  </button>
+                </div>
+              </header>
+              <div className="group-detail__meta">
+                <div>
+                  <span>Parent</span>
+                  <strong>{selectedGroup.parentId ? groupLookup.get(selectedGroup.parentId)?.name ?? '—' : 'Top level'}</strong>
+                </div>
+                <div>
+                  <span>Created</span>
+                  <strong>{formatDateTime(selectedGroup.createdAt)}</strong>
+                </div>
+                <div>
+                  <span>Updated</span>
+                  <strong>{formatDateTime(selectedGroup.updatedAt)}</strong>
+                </div>
+                <div>
+                  <span>Children</span>
+                  <strong>{childCountMap.get(selectedGroup.id) ?? 0}</strong>
+                </div>
+                <div>
+                  <span>Total descendants</span>
+                  <strong>{descendantCount}</strong>
+                </div>
+              </div>
+              <div className="group-detail__children">
+                <h3>Direct descendants</h3>
+                {directChildren.length > 0 ? (
+                  <ul>
+                    {directChildren.map((child) => (
+                      <li key={child.id}>
+                        <button type="button" className="link-button" onClick={() => setSelectedGroupId(child.id)}>
+                          {child.name}
+                        </button>
+                        <span>{formatDateTime(child.updatedAt)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted">No child groups yet.</p>
+                )}
+              </div>
+            </article>
+          ) : (
+            <div className="group-detail group-detail--empty">
+              <p className="muted">
+                {query && !hasTreeResults
+                  ? 'No groups match your filter.'
+                  : 'Select a group from the tree to review its metadata.'}
+              </p>
+            </div>
+          )}
+        </section>
+      </div>
 
       {createOpen ? (
         <Modal
