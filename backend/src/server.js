@@ -18,6 +18,8 @@ const basePermissions = {
   settings: false
 };
 
+const TARGET_ROUTEROS_VERSION = '7.14.0';
+
 const pepperPassword = (password, secret) => `${password}${secret}`;
 
 const hashPassword = (password, secret) => {
@@ -178,7 +180,16 @@ const buildRouterosPayload = (input = {}) => ({
   apiTimeout: parseInteger(input.apiTimeout),
   apiRetries: parseInteger(input.apiRetries),
   allowInsecureCiphers: normalizeBooleanFlag(input.allowInsecureCiphers, false),
-  preferredApiFirst: normalizeBooleanFlag(input.preferredApiFirst, true)
+  preferredApiFirst: normalizeBooleanFlag(input.preferredApiFirst, true),
+  firmwareVersion: normalizeString(input.firmwareVersion),
+  sshEnabled: normalizeBooleanFlag(input.sshEnabled, false),
+  sshPort: parseInteger(input.sshPort),
+  sshUsername: normalizeString(input.sshUsername),
+  sshPassword: typeof input.sshPassword === 'string' ? input.sshPassword.trim() : '',
+  sshAcceptNewHostKeys: normalizeBooleanFlag(
+    input.sshAcceptNewHostKeys !== undefined ? input.sshAcceptNewHostKeys : input.sshAcceptUnknownHost,
+    true
+  )
 });
 
 const buildDeviceStatusPayload = (input = {}) => {
@@ -275,15 +286,92 @@ const mapMikrotik = (device, groups) => {
       apiTimeout: ensureNumber(routeros.apiTimeout, 5000),
       apiRetries: ensureNumber(routeros.apiRetries, 1),
       allowInsecureCiphers: normalizeBooleanFlag(routeros.allowInsecureCiphers, false),
-      preferredApiFirst: normalizeBooleanFlag(routeros.preferredApiFirst, true)
+      preferredApiFirst: normalizeBooleanFlag(routeros.preferredApiFirst, true),
+      firmwareVersion: typeof routeros.firmwareVersion === 'string' ? routeros.firmwareVersion : '',
+      sshEnabled: Boolean(routeros.sshEnabled),
+      sshPort: ensureNumber(routeros.sshPort, 22),
+      sshUsername: typeof routeros.sshUsername === 'string' ? routeros.sshUsername : '',
+      sshPassword: typeof routeros.sshPassword === 'string' ? routeros.sshPassword : '',
+      sshAcceptNewHostKeys: normalizeBooleanFlag(routeros.sshAcceptNewHostKeys, true)
     },
     status: {
       updateStatus:
         typeof device.status?.updateStatus === 'string' ? device.status.updateStatus : 'unknown',
-      lastAuditAt: device.status?.lastAuditAt ?? null
+      lastAuditAt: device.status?.lastAuditAt ?? null,
+      targetVersion: TARGET_ROUTEROS_VERSION
+    },
+    connectivity: {
+      api: {
+        status: typeof device.connectivity?.api?.status === 'string' ? device.connectivity.api.status : 'unknown',
+        lastCheckedAt: device.connectivity?.api?.lastCheckedAt ?? null,
+        lastError: device.connectivity?.api?.lastError ?? null
+      },
+      ssh: {
+        status: typeof device.connectivity?.ssh?.status === 'string' ? device.connectivity.ssh.status : 'unknown',
+        lastCheckedAt: device.connectivity?.ssh?.lastCheckedAt ?? null,
+        fingerprint: device.connectivity?.ssh?.fingerprint ?? null,
+        lastError: device.connectivity?.ssh?.lastError ?? null
+      }
     },
     createdAt: device.createdAt,
     updatedAt: device.updatedAt
+  };
+};
+
+const mapAddressList = (entry, groups, mikrotiks) => {
+  const referenceType = entry.referenceType ?? 'mikrotik';
+  let referenceName = null;
+
+  if (referenceType === 'mikrotik' && entry.referenceId) {
+    const device = mikrotiks.find((candidate) => candidate.id === entry.referenceId);
+    referenceName = device ? device.name : null;
+  }
+
+  if (referenceType === 'group' && entry.referenceId) {
+    const group = groups.find((candidate) => candidate.id === entry.referenceId);
+    referenceName = group ? group.name : null;
+  }
+
+  return {
+    id: entry.id,
+    name: entry.name,
+    referenceType,
+    referenceId: entry.referenceId ?? null,
+    referenceName,
+    address: entry.address ?? '',
+    comment: entry.comment ?? '',
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt
+  };
+};
+
+const mapFirewallFilter = (filter, groups, addressLists) => {
+  const group = filter.groupId ? groups.find((entry) => entry.id === filter.groupId) : null;
+  const sourceList = filter.sourceAddressListId
+    ? addressLists.find((entry) => entry.id === filter.sourceAddressListId)
+    : null;
+  const destinationList = filter.destinationAddressListId
+    ? addressLists.find((entry) => entry.id === filter.destinationAddressListId)
+    : null;
+
+  return {
+    id: filter.id,
+    name: filter.name,
+    groupId: filter.groupId ?? null,
+    groupName: group ? group.name : null,
+    chain: filter.chain,
+    sourceAddressListId: filter.sourceAddressListId ?? null,
+    sourceAddressListName: sourceList ? sourceList.name : null,
+    destinationAddressListId: filter.destinationAddressListId ?? null,
+    destinationAddressListName: destinationList ? destinationList.name : null,
+    sourcePort: filter.sourcePort ?? '',
+    destinationPort: filter.destinationPort ?? '',
+    states: Array.isArray(filter.states) ? [...filter.states] : [],
+    action: filter.action,
+    enabled: Boolean(filter.enabled),
+    comment: filter.comment ?? '',
+    createdAt: filter.createdAt,
+    updatedAt: filter.updatedAt
   };
 };
 
@@ -1055,7 +1143,8 @@ const bootstrap = async () => {
         const [devices, groups] = await Promise.all([db.listMikrotiks(), db.listGroups()]);
         sendJson(res, 200, {
           mikrotiks: devices.map((device) => mapMikrotik(device, groups)),
-          groups: groups.map(mapGroup)
+          groups: groups.map(mapGroup),
+          targetRouterOs: TARGET_ROUTEROS_VERSION
         });
       } catch (error) {
         console.error('List Mikrotiks error', error);
@@ -1113,7 +1202,8 @@ const bootstrap = async () => {
         const groups = await db.listGroups();
         sendJson(res, 201, {
           message: 'Mikrotik device added successfully.',
-          mikrotik: mapMikrotik(result.mikrotik, groups)
+          mikrotik: mapMikrotik(result.mikrotik, groups),
+          targetRouterOs: TARGET_ROUTEROS_VERSION
         });
       } catch (error) {
         console.error('Create Mikrotik error', error);
@@ -1190,11 +1280,348 @@ const bootstrap = async () => {
         const groups = await db.listGroups();
         sendJson(res, 200, {
           message: 'Mikrotik device updated successfully.',
-          mikrotik: mapMikrotik(result.mikrotik, groups)
+          mikrotik: mapMikrotik(result.mikrotik, groups),
+          targetRouterOs: TARGET_ROUTEROS_VERSION
         });
       } catch (error) {
         console.error('Update Mikrotik error', error);
         sendJson(res, 500, { message: 'Unable to update the Mikrotik device right now.' });
+      }
+    };
+
+    const handleTestMikrotikConnectivity = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.testMikrotikConnectivity(deviceId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to refresh connectivity.');
+        }
+
+        const groups = await db.listGroups();
+        sendJson(res, 200, {
+          message: 'Connectivity refreshed successfully.',
+          mikrotik: mapMikrotik(result.mikrotik, groups),
+          targetRouterOs: TARGET_ROUTEROS_VERSION
+        });
+      } catch (error) {
+        console.error('Test Mikrotik connectivity error', error);
+        sendJson(res, 500, { message: 'Unable to verify device connectivity right now.' });
+      }
+    };
+
+    const handleListFirewallInventory = async () => {
+      try {
+        const [addressLists, filters, groups, mikrotiks] = await Promise.all([
+          db.listAddressLists(),
+          db.listFirewallFilters(),
+          db.listGroups(),
+          db.listMikrotiks()
+        ]);
+
+        const mappedAddressLists = addressLists.map((entry) => mapAddressList(entry, groups, mikrotiks));
+        const mappedFilters = filters.map((filter) => mapFirewallFilter(filter, groups, addressLists));
+
+        sendJson(res, 200, {
+          addressLists: mappedAddressLists,
+          filters: mappedFilters,
+          groups: groups.map(mapGroup),
+          mikrotiks: mikrotiks.map((device) => mapMikrotik(device, groups)),
+          targetRouterOs: TARGET_ROUTEROS_VERSION
+        });
+      } catch (error) {
+        console.error('List firewall inventory error', error);
+        sendJson(res, 500, { message: 'Unable to load firewall inventory.' });
+      }
+    };
+
+    const handleCreateAddressList = async () => {
+      const body = await parseJsonBody(req);
+      const { name, referenceType, referenceId, address, comment } = body ?? {};
+
+      try {
+        const result = await db.createAddressList({ name, referenceType, referenceId, address, comment });
+
+        if (!result.success && result.reason === 'name-required') {
+          sendJson(res, 400, { message: 'List name is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'type-required') {
+          sendJson(res, 400, { message: 'A valid reference type is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-reference') {
+          sendJson(res, 400, { message: 'The selected reference is invalid.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to create address list.');
+        }
+
+        const [groups, mikrotiks] = await Promise.all([db.listGroups(), db.listMikrotiks()]);
+        sendJson(res, 201, {
+          message: 'Address list entry created successfully.',
+          addressList: mapAddressList(result.addressList, groups, mikrotiks)
+        });
+      } catch (error) {
+        console.error('Create address list error', error);
+        sendJson(res, 500, { message: 'Unable to create the address list entry right now.' });
+      }
+    };
+
+    const handleUpdateAddressList = async (listId) => {
+      if (!Number.isInteger(listId) || listId <= 0) {
+        sendJson(res, 400, { message: 'A valid address list id is required.' });
+        return;
+      }
+
+      const body = await parseJsonBody(req);
+      const { name, referenceType, referenceId, address, comment } = body ?? {};
+
+      try {
+        const result = await db.updateAddressList(listId, { name, referenceType, referenceId, address, comment });
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Address list entry not found.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'type-required') {
+          sendJson(res, 400, { message: 'A valid reference type is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-reference') {
+          sendJson(res, 400, { message: 'The selected reference is invalid.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to update address list entry.');
+        }
+
+        const [groups, mikrotiks] = await Promise.all([db.listGroups(), db.listMikrotiks()]);
+        sendJson(res, 200, {
+          message: 'Address list entry updated successfully.',
+          addressList: mapAddressList(result.addressList, groups, mikrotiks)
+        });
+      } catch (error) {
+        console.error('Update address list error', error);
+        sendJson(res, 500, { message: 'Unable to update the address list entry right now.' });
+      }
+    };
+
+    const handleDeleteAddressList = async (listId) => {
+      if (!Number.isInteger(listId) || listId <= 0) {
+        sendJson(res, 400, { message: 'A valid address list id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.deleteAddressList(listId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Address list entry not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to delete address list entry.');
+        }
+
+        sendNoContent(res);
+      } catch (error) {
+        console.error('Delete address list error', error);
+        sendJson(res, 500, { message: 'Unable to delete the address list entry right now.' });
+      }
+    };
+
+    const handleCreateFirewallFilter = async () => {
+      const body = await parseJsonBody(req);
+      const {
+        name,
+        groupId,
+        chain,
+        sourceAddressListId,
+        destinationAddressListId,
+        sourcePort,
+        destinationPort,
+        states,
+        action,
+        enabled,
+        comment
+      } = body ?? {};
+
+      try {
+        const result = await db.createFirewallFilter({
+          name,
+          groupId,
+          chain,
+          sourceAddressListId,
+          destinationAddressListId,
+          sourcePort,
+          destinationPort,
+          states,
+          action,
+          enabled,
+          comment
+        });
+
+        if (!result.success && result.reason === 'invalid-group') {
+          sendJson(res, 400, { message: 'The selected group does not exist.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-chain') {
+          sendJson(res, 400, { message: 'A valid firewall chain is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-source-address-list') {
+          sendJson(res, 400, { message: 'Select a valid source address list.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-destination-address-list') {
+          sendJson(res, 400, { message: 'Select a valid destination address list.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-action') {
+          sendJson(res, 400, { message: 'A valid action (accept or drop) is required.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to create firewall filter.');
+        }
+
+        const [addressLists, groups] = await Promise.all([db.listAddressLists(), db.listGroups()]);
+        sendJson(res, 201, {
+          message: 'Firewall filter created successfully.',
+          filter: mapFirewallFilter(result.firewallFilter, groups, addressLists)
+        });
+      } catch (error) {
+        console.error('Create firewall filter error', error);
+        sendJson(res, 500, { message: 'Unable to create the firewall filter right now.' });
+      }
+    };
+
+    const handleUpdateFirewallFilter = async (filterId) => {
+      if (!Number.isInteger(filterId) || filterId <= 0) {
+        sendJson(res, 400, { message: 'A valid firewall rule id is required.' });
+        return;
+      }
+
+      const body = await parseJsonBody(req);
+      const {
+        name,
+        groupId,
+        chain,
+        sourceAddressListId,
+        destinationAddressListId,
+        sourcePort,
+        destinationPort,
+        states,
+        action,
+        enabled,
+        comment
+      } = body ?? {};
+
+      try {
+        const result = await db.updateFirewallFilter(filterId, {
+          name,
+          groupId,
+          chain,
+          sourceAddressListId,
+          destinationAddressListId,
+          sourcePort,
+          destinationPort,
+          states,
+          action,
+          enabled,
+          comment
+        });
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Firewall rule not found.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-group') {
+          sendJson(res, 400, { message: 'The selected group does not exist.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-chain') {
+          sendJson(res, 400, { message: 'A valid firewall chain is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-source-address-list') {
+          sendJson(res, 400, { message: 'Select a valid source address list.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-destination-address-list') {
+          sendJson(res, 400, { message: 'Select a valid destination address list.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-action') {
+          sendJson(res, 400, { message: 'A valid action (accept or drop) is required.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to update firewall filter.');
+        }
+
+        const [addressLists, groups] = await Promise.all([db.listAddressLists(), db.listGroups()]);
+        sendJson(res, 200, {
+          message: 'Firewall filter updated successfully.',
+          filter: mapFirewallFilter(result.firewallFilter, groups, addressLists)
+        });
+      } catch (error) {
+        console.error('Update firewall filter error', error);
+        sendJson(res, 500, { message: 'Unable to update the firewall filter right now.' });
+      }
+    };
+
+    const handleDeleteFirewallFilter = async (filterId) => {
+      if (!Number.isInteger(filterId) || filterId <= 0) {
+        sendJson(res, 400, { message: 'A valid firewall rule id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.deleteFirewallFilter(filterId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Firewall rule not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to delete firewall filter.');
+        }
+
+        sendNoContent(res);
+      } catch (error) {
+        console.error('Delete firewall filter error', error);
+        sendJson(res, 500, { message: 'Unable to delete the firewall filter right now.' });
       }
     };
 
@@ -1563,9 +1990,65 @@ const bootstrap = async () => {
         }
       }
 
+      if (resourceSegments[0] === 'mikrotiks' && resourceSegments.length === 3) {
+        const deviceId = Number.parseInt(resourceSegments[1], 10);
+        const action = resourceSegments[2];
+
+        if (method === 'POST' && action === 'test-connectivity') {
+          await handleTestMikrotikConnectivity(deviceId);
+          return;
+        }
+      }
+
       if (method === 'POST' && (canonicalPath === '/api/mikrotiks' || resourcePath === '/mikrotiks')) {
         await handleCreateMikrotik();
         return;
+      }
+
+      if (method === 'GET' && (canonicalPath === '/api/firewall' || resourcePath === '/firewall')) {
+        await handleListFirewallInventory();
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/address-lists' || resourcePath === '/address-lists')) {
+        await handleCreateAddressList();
+        return;
+      }
+
+      if (resourceSegments[0] === 'address-lists' && resourceSegments.length === 2) {
+        const listId = Number.parseInt(resourceSegments[1], 10);
+
+        if (method === 'PUT') {
+          await handleUpdateAddressList(listId);
+          return;
+        }
+
+        if (method === 'DELETE') {
+          await handleDeleteAddressList(listId);
+          return;
+        }
+      }
+
+      if (
+        method === 'POST' &&
+        (canonicalPath === '/api/firewall/filters' || resourcePath === '/firewall/filters')
+      ) {
+        await handleCreateFirewallFilter();
+        return;
+      }
+
+      if (resourceSegments[0] === 'firewall' && resourceSegments[1] === 'filters' && resourceSegments.length === 3) {
+        const filterId = Number.parseInt(resourceSegments[2], 10);
+
+        if (method === 'PUT') {
+          await handleUpdateFirewallFilter(filterId);
+          return;
+        }
+
+        if (method === 'DELETE') {
+          await handleDeleteFirewallFilter(filterId);
+          return;
+        }
       }
 
       if (method === 'GET' && (canonicalPath === '/api/tunnels' || resourcePath === '/tunnels')) {
