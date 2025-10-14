@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mik Management - Settings</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body data-theme="light">
+    <div class="app-shell">
+      <%- include('partials/topbar', { nav }) %>
+
+      <main class="main">
+        <header class="page-hero">
+          <div>
+            <h1>Settings & integrations</h1>
+            <p>Manage phpIPAM, MikroTik connectivity, DNS authorities, and security defaults.</p>
+          </div>
+        </header>
+
+        <section class="panel">
+          <header class="panel__header">
+            <div>
+              <h2>phpIPAM connectors</h2>
+              <p>Provide App ID and App Code to synchronise sections, datacenters, and ranges.</p>
+            </div>
+          </header>
+          <div class="panel__body panel__body--split">
+            <form class="form" id="ipam-form">
+              <div class="form__group">
+                <label for="ipam-name">Display name</label>
+                <input id="ipam-name" name="name" type="text" placeholder="Core phpIPAM" required />
+              </div>
+              <div class="form__group">
+                <label for="ipam-base-url">Base API URL</label>
+                <input id="ipam-base-url" name="baseUrl" type="url" placeholder="https://phpipam.example/api" required />
+              </div>
+              <div class="form__grid">
+                <div class="form__group">
+                  <label for="ipam-app-id">App ID</label>
+                  <input id="ipam-app-id" name="appId" type="text" required />
+                </div>
+                <div class="form__group">
+                  <label for="ipam-app-code">App code</label>
+                  <input id="ipam-app-code" name="appCode" type="text" required />
+                </div>
+              </div>
+              <div class="form__grid">
+                <div class="form__group">
+                  <label for="ipam-permissions">App permissions</label>
+                  <select id="ipam-permissions" name="appPermissions">
+                    <option value="Read">Read</option>
+                    <option value="Read/Write">Read/Write</option>
+                    <option value="Full">Full</option>
+                  </select>
+                </div>
+                <div class="form__group">
+                  <label for="ipam-security">App security</label>
+                  <select id="ipam-security" name="appSecurity">
+                    <option value="SSL with App code token">SSL with App code token</option>
+                    <option value="SSL with SSL certificate">SSL with SSL certificate</option>
+                    <option value="Token only">Token only</option>
+                  </select>
+                </div>
+              </div>
+              <button class="button button--primary" type="submit">Add IPAM</button>
+            </form>
+            <div class="list-stack" data-ipam-list>
+              <% if (ipams.length === 0) { %>
+              <p class="text-muted">No phpIPAM connectors yet. Add one to begin synchronisation.</p>
+              <% } %>
+              <% ipams.forEach((ipam) => { const collections = groupedCollections[ipam.id] || { sections: [], datacenters: [], ranges: [] }; %>
+              <article class="ipam-card" data-ipam-item data-ipam-id="<%= ipam.id %>">
+                <header class="ipam-card__header">
+                  <div>
+                    <h3><%= ipam.name %></h3>
+                    <p class="text-muted"><%= ipam.base_url %></p>
+                  </div>
+                  <span class="status-indicator status-indicator--<%= ipam.last_status === 'connected' ? 'success' : 'danger' %>">
+                    <span class="status-indicator__dot" aria-hidden="true"></span>
+                    <%= ipam.last_status %>
+                  </span>
+                </header>
+                <dl class="ipam-card__meta">
+                  <div>
+                    <dt>App ID</dt>
+                    <dd><%= ipam.app_id %></dd>
+                  </div>
+                  <div>
+                    <dt>Permissions</dt>
+                    <dd><%= ipam.app_permissions %></dd>
+                  </div>
+                  <div>
+                    <dt>Security</dt>
+                    <dd><%= ipam.app_security %></dd>
+                  </div>
+                  <div>
+                    <dt>Last check</dt>
+                    <dd><%= ipam.last_checked_at ? new Date(ipam.last_checked_at).toLocaleString() : 'Never' %></dd>
+                  </div>
+                </dl>
+                <div class="ipam-card__collections">
+                  <h4>Cached structure</h4>
+                  <div class="collection-grid">
+                    <div>
+                      <h5>Sections</h5>
+                      <ul>
+                        <% collections.sections.forEach((section) => { %>
+                        <li>
+                          <strong><%= section.name %></strong>
+                          <span class="text-muted"><%= section.description || '' %></span>
+                        </li>
+                        <% }); %>
+                        <% if (collections.sections.length === 0) { %>
+                        <li class="text-muted">No sections cached.</li>
+                        <% } %>
+                      </ul>
+                    </div>
+                    <div>
+                      <h5>Datacenters</h5>
+                      <ul>
+                        <% collections.datacenters.forEach((dc) => { %>
+                        <li>
+                          <strong><%= dc.name %></strong>
+                          <span class="text-muted"><%= dc.description || '' %></span>
+                        </li>
+                        <% }); %>
+                        <% if (collections.datacenters.length === 0) { %>
+                        <li class="text-muted">No datacenters cached.</li>
+                        <% } %>
+                      </ul>
+                    </div>
+                    <div>
+                      <h5>Ranges</h5>
+                      <ul>
+                        <% collections.ranges.forEach((range) => { %>
+                        <li>
+                          <strong><%= range.name %></strong>
+                          <span class="text-muted"><%= (range.metadata && range.metadata.cidr) || range.description || '' %></span>
+                        </li>
+                        <% }); %>
+                        <% if (collections.ranges.length === 0) { %>
+                        <li class="text-muted">No ranges cached.</li>
+                        <% } %>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                <footer class="card-actions">
+                  <button class="button button--ghost" type="button" data-test-ipam data-ipam-id="<%= ipam.id %>">
+                    Test connection
+                  </button>
+                  <button class="button button--danger" type="button" data-remove-ipam data-ipam-id="<%= ipam.id %>">
+                    Remove
+                  </button>
+                </footer>
+              </article>
+              <% }); %>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <header class="panel__header">
+            <div>
+              <h2>MikroTik onboarding</h2>
+              <p>
+                Store API and SSH credentials, tunnel defaults, and RouterOS target
+                (<%= targetRouterOs %>). Test both API and SSH reachability on demand.
+              </p>
+            </div>
+          </header>
+          <div class="panel__body panel__body--split">
+            <form class="form" id="mikrotik-form">
+              <div class="form__group">
+                <label for="mik-name">Display name</label>
+                <input id="mik-name" name="name" type="text" placeholder="Mik-Core-R1" required />
+              </div>
+              <div class="form__grid">
+                <div class="form__group">
+                  <label for="mik-host">Host / IP</label>
+                  <input id="mik-host" name="host" type="text" placeholder="10.10.10.1" required />
+                </div>
+                <div class="form__group">
+                  <label for="mik-routeros">RouterOS version</label>
+                  <input id="mik-routeros" name="routerosVersion" type="text" placeholder="7.14.0" />
+                </div>
+              </div>
+              <div class="form__grid">
+                <div class="form__group">
+                  <label for="mik-api-port">API port</label>
+                  <input id="mik-api-port" name="apiPort" type="number" min="1" max="65535" value="8728" />
+                </div>
+                <div class="form__group">
+                  <label for="mik-ssh-port">SSH port</label>
+                  <input id="mik-ssh-port" name="sshPort" type="number" min="1" max="65535" value="22" />
+                </div>
+              </div>
+              <div class="form__grid">
+                <div class="form__group">
+                  <label for="mik-username">API username</label>
+                  <input id="mik-username" name="username" type="text" required />
+                </div>
+                <div class="form__group">
+                  <label for="mik-password">API password</label>
+                  <input id="mik-password" name="password" type="password" required />
+                </div>
+              </div>
+              <div class="form__grid">
+                <div class="form__group">
+                  <label for="mik-encryption">Encryption key</label>
+                  <input id="mik-encryption" name="encryptionKey" type="text" placeholder="wg1-secret" />
+                </div>
+                <div class="form__group">
+                  <label for="mik-timeout">Tunnel keepalive (seconds)</label>
+                  <input id="mik-timeout" name="tunnelTimeout" type="number" min="10" max="600" value="60" />
+                </div>
+              </div>
+              <div class="form__group">
+                <label for="mik-type">Tunnel type</label>
+                <select id="mik-type" name="tunnelType">
+                  <option value="WireGuard">WireGuard</option>
+                  <option value="IPsec">IPsec</option>
+                  <option value="GRE">GRE</option>
+                  <option value="L2TP">L2TP</option>
+                </select>
+              </div>
+              <button class="button button--primary" type="submit">Add MikroTik</button>
+            </form>
+            <div class="list-stack" data-mikrotik-list>
+              <% if (mikrotikDevices.length === 0) { %>
+              <p class="text-muted">No MikroTik devices on record. Add one to monitor connectivity.</p>
+              <% } %>
+              <% mikrotikDevices.forEach((device) => { %>
+              <article class="device-card" data-mikrotik-item data-mikrotik-id="<%= device.id %>">
+                <header class="device-card__header">
+                  <div>
+                    <h3><%= device.name %></h3>
+                    <p class="text-muted"><%= device.host %></p>
+                  </div>
+                  <div class="device-card__statuses">
+                    <span class="status-indicator status-indicator--<%= device.last_api_status === 'connected' ? 'success' : 'danger' %>">
+                      <span class="status-indicator__dot" aria-hidden="true"></span>API
+                    </span>
+                    <span class="status-indicator status-indicator--<%= device.last_ssh_status === 'connected' ? 'success' : 'danger' %>">
+                      <span class="status-indicator__dot" aria-hidden="true"></span>SSH
+                    </span>
+                  </div>
+                </header>
+                <dl class="device-card__meta">
+                  <div>
+                    <dt>RouterOS</dt>
+                    <dd><%= device.routeros_version || 'unknown' %></dd>
+                  </div>
+                  <div>
+                    <dt>Tunnel type</dt>
+                    <dd><%= device.tunnel_type %></dd>
+                  </div>
+                  <div>
+                    <dt>Encryption key</dt>
+                    <dd><code><%= device.encryption_key || 'n/a' %></code></dd>
+                  </div>
+                  <div>
+                    <dt>Keepalive</dt>
+                    <dd><%= device.tunnel_timeout %>s</dd>
+                  </div>
+                </dl>
+                <div class="device-card__section">
+                  <h4>Interfaces</h4>
+                  <ul class="chip-list">
+                    <% device.interfaces.forEach((iface) => { %>
+                    <li class="chip chip--<%= iface.status === 'up' ? 'success' : 'muted' %>">
+                      <strong><%= iface.name %></strong>
+                      <span><%= iface.address || 'unassigned' %></span>
+                    </li>
+                    <% }); %>
+                    <% if (device.interfaces.length === 0) { %>
+                    <li class="chip chip--muted">No interfaces cached.</li>
+                    <% } %>
+                  </ul>
+                </div>
+                <div class="device-card__section">
+                  <h4>Tunnels</h4>
+                  <ul class="chip-list">
+                    <% device.tunnels.forEach((tunnel) => { %>
+                    <li class="chip chip--outline">
+                      <strong><%= tunnel.name %></strong>
+                      <span><%= tunnel.tunnel_type %> · <%= tunnel.status %> · <%= tunnel.latency_ms ? tunnel.latency_ms.toFixed(1) : '—' %> ms</span>
+                    </li>
+                    <% }); %>
+                    <% if (device.tunnels.length === 0) { %>
+                    <li class="chip chip--muted">No tunnels cached.</li>
+                    <% } %>
+                  </ul>
+                </div>
+                <footer class="card-actions">
+                  <button class="button button--ghost" type="button" data-test-mikrotik data-mikrotik-id="<%= device.id %>">
+                    Test API & SSH
+                  </button>
+                  <button class="button button--danger" type="button" data-remove-mikrotik data-mikrotik-id="<%= device.id %>">
+                    Remove
+                  </button>
+                </footer>
+              </article>
+              <% }); %>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel panel--split">
+          <div class="panel__column">
+            <header class="panel__header">
+              <div>
+                <h2>Routing policies</h2>
+                <p>Preview group-to-group reachability checks and tunnel sourcing.</p>
+              </div>
+            </header>
+            <div class="routing-card">
+              <form class="form form--inline">
+                <div class="form__group">
+                  <label for="routing-source">Source group</label>
+                  <select id="routing-source">
+                    <option>Mik-Group Root</option>
+                    <option>OVH-EN-Host</option>
+                    <option>OVH-EN-Router-Range</option>
+                  </select>
+                </div>
+                <div class="form__group">
+                  <label for="routing-target">Target group</label>
+                  <select id="routing-target">
+                    <option>OVH-EN-Host</option>
+                    <option>Mik-Group Root</option>
+                    <option>FR</option>
+                  </select>
+                </div>
+                <button class="button" type="button" disabled>Check reachability</button>
+              </form>
+              <div class="routing-card__sample">
+                <h4>Sample result</h4>
+                <p class="text-muted">OVH-EN-Router-Range → FR via Core-to-EN (11.2 ms)</p>
+                <p class="text-muted">Visual graph generated on the dashboard.</p>
+              </div>
+            </div>
+          </div>
+          <div class="panel__column">
+            <header class="panel__header">
+              <div>
+                <h2>Firewall composer</h2>
+                <p>Define high-level access policies between groups.</p>
+              </div>
+            </header>
+            <form class="form" id="firewall-form">
+              <div class="form__group">
+                <label for="fw-source">Allowed group</label>
+                <select id="fw-source" name="source">
+                  <option>NetOps</option>
+                  <option>Developers</option>
+                  <option>Read-only</option>
+                </select>
+              </div>
+              <div class="form__group">
+                <label for="fw-target">Target host group</label>
+                <select id="fw-target" name="target">
+                  <option>OVH-EN-Host</option>
+                  <option>Shatel-SSD-Cloud</option>
+                  <option>Core routers</option>
+                </select>
+              </div>
+              <div class="form__group">
+                <label for="fw-action">Action</label>
+                <select id="fw-action" name="action">
+                  <option value="allow">Allow</option>
+                  <option value="deny">Deny</option>
+                </select>
+              </div>
+              <div class="form__group">
+                <label for="fw-comment">Comment</label>
+                <input id="fw-comment" name="comment" type="text" placeholder="Allow SSH management" />
+              </div>
+              <button class="button" type="button" disabled>Save rule (coming soon)</button>
+            </form>
+          </div>
+        </section>
+
+        <section class="panel">
+          <header class="panel__header">
+            <div>
+              <h2>DNS authorities</h2>
+              <p>Add PTR zones and automation endpoints for DNS synchronisation.</p>
+            </div>
+          </header>
+          <div class="panel__body panel__body--split">
+            <form class="form" id="dns-form">
+              <div class="form__group">
+                <label for="dns-name">Display name</label>
+                <input id="dns-name" name="name" type="text" placeholder="Authoritative DNS" required />
+              </div>
+              <div class="form__group">
+                <label for="dns-ip">IP address</label>
+                <input id="dns-ip" name="ipAddress" type="text" placeholder="198.51.100.10" required />
+              </div>
+              <div class="form__group">
+                <label for="dns-api">API endpoint</label>
+                <input id="dns-api" name="apiEndpoint" type="url" placeholder="https://dns.example/api" />
+              </div>
+              <div class="form__group">
+                <label for="dns-ptr">PTR zone</label>
+                <input id="dns-ptr" name="ptrZone" type="text" placeholder="100.51.198.in-addr.arpa" />
+              </div>
+              <button class="button button--primary" type="submit">Add DNS server</button>
+            </form>
+            <div class="list-stack" data-dns-list>
+              <% if (dnsServers.length === 0) { %>
+              <p class="text-muted">No DNS authorities registered.</p>
+              <% } %>
+              <% dnsServers.forEach((server) => { %>
+              <article class="dns-card" data-dns-item data-dns-id="<%= server.id %>">
+                <header>
+                  <div>
+                    <h3><%= server.name %></h3>
+                    <p class="text-muted"><%= server.ip_address %></p>
+                  </div>
+                  <button class="button button--danger" type="button" data-remove-dns data-dns-id="<%= server.id %>">
+                    Remove
+                  </button>
+                </header>
+                <dl>
+                  <div>
+                    <dt>API endpoint</dt>
+                    <dd><%= server.api_endpoint || '—' %></dd>
+                  </div>
+                  <div>
+                    <dt>PTR zone</dt>
+                    <dd><%= server.ptr_zone || '—' %></dd>
+                  </div>
+                </dl>
+              </article>
+              <% }); %>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/theme.js" defer></script>
+    <script src="/settings.js" defer></script>
+  </body>
+</html>

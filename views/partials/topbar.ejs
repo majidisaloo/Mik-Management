@@ -1,0 +1,17 @@
+<header class="topbar">
+  <div class="topbar__brand">
+    <a class="topbar__logo" href="/">Mik Management</a>
+    <nav class="topbar__nav" aria-label="Primary navigation">
+      <a class="topbar__link <%= nav && nav.current === 'dashboard' ? 'is-active' : '' %>" href="/">Dashboard</a>
+      <a class="topbar__link <%= nav && nav.current === 'settings' ? 'is-active' : '' %>" href="/settings">Settings</a>
+      <a class="topbar__link <%= nav && nav.current === 'register' ? 'is-active' : '' %>" href="/register">Users</a>
+    </nav>
+  </div>
+  <div class="topbar__actions">
+    <button class="theme-toggle" type="button" data-theme-toggle aria-label="Toggle dark mode">
+      <span class="theme-toggle__icon" aria-hidden="true"></span>
+      <span class="theme-toggle__label">Dark mode</span>
+    </button>
+    <a class="button button--logout" href="#logout">Logout</a>
+  </div>
+</header>

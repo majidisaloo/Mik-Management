@@ -6,85 +6,84 @@
     <title>Mik Management - Register</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body>
-    <main class="container">
-      <header class="page-header">
-        <h1>Create an Account</h1>
-        <p>Complete the form to store a new user in the database.</p>
-        <a class="link" href="/">Back to installation guide</a>
-      </header>
+  <body data-theme="light">
+    <div class="app-shell app-shell--narrow">
+      <%- include('partials/topbar', { nav }) %>
 
-      <% if (error) { %>
-      <div class="alert alert--error"><%= error %></div>
-      <% } %>
-      <% if (success) { %>
-      <div class="alert alert--success"><%= success %></div>
-      <% } %>
+      <main class="main main--narrow">
+        <header class="page-hero page-hero--center">
+          <div>
+            <h1>Create an account</h1>
+            <p>Store a new local user for Mik Management access.</p>
+          </div>
+        </header>
 
-      <form class="form" action="/register" method="post" novalidate>
-        <div class="form__group">
-          <label for="firstName">First Name</label>
-          <input
-            type="text"
-            id="firstName"
-            name="firstName"
-            value="<%= formData.firstName %>"
-            required
-            autocomplete="given-name"
-          />
-        </div>
+        <% if (error) { %>
+        <div class="alert alert--error" role="alert"><%= error %></div>
+        <% } %>
+        <% if (success) { %>
+        <div class="alert alert--success" role="status"><%= success %></div>
+        <% } %>
 
-        <div class="form__group">
-          <label for="lastName">Last Name</label>
-          <input
-            type="text"
-            id="lastName"
-            name="lastName"
-            value="<%= formData.lastName %>"
-            required
-            autocomplete="family-name"
-          />
-        </div>
+        <form class="form form--card" action="/register" method="post" novalidate>
+          <div class="form__grid">
+            <div class="form__group">
+              <label for="firstName">First name</label>
+              <input
+                type="text"
+                id="firstName"
+                name="firstName"
+                value="<%= formData.firstName %>"
+                required
+                autocomplete="given-name"
+              />
+            </div>
+            <div class="form__group">
+              <label for="lastName">Last name</label>
+              <input
+                type="text"
+                id="lastName"
+                name="lastName"
+                value="<%= formData.lastName %>"
+                required
+                autocomplete="family-name"
+              />
+            </div>
+          </div>
+          <div class="form__group">
+            <label for="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value="<%= formData.email %>"
+              required
+              autocomplete="email"
+            />
+          </div>
+          <div class="form__grid">
+            <div class="form__group">
+              <label for="password">Password</label>
+              <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password" />
+              <small class="form__hint">Use at least 8 characters.</small>
+            </div>
+            <div class="form__group">
+              <label for="confirmPassword">Confirm password</label>
+              <input
+                type="password"
+                id="confirmPassword"
+                name="confirmPassword"
+                required
+                minlength="8"
+                autocomplete="new-password"
+              />
+            </div>
+          </div>
+          <button class="button button--primary" type="submit">Register user</button>
+        </form>
+      </main>
+    </div>
 
-        <div class="form__group">
-          <label for="email">Email</label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            value="<%= formData.email %>"
-            required
-            autocomplete="email"
-          />
-        </div>
-
-        <div class="form__group">
-          <label for="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            name="password"
-            required
-            minlength="8"
-            autocomplete="new-password"
-          />
-          <small class="form__hint">Use at least 8 characters.</small>
-        </div>
-
-        <div class="form__group">
-          <label for="confirmPassword">Confirm Password</label>
-          <input
-            type="password"
-            id="confirmPassword"
-            name="confirmPassword"
-            required
-            minlength="8"
-            autocomplete="new-password"
-          />
-        </div>
-
-        <button class="button" type="submit">Register</button>
-      </form>
-    </main>
+    <script src="/theme.js" defer></script>
   </body>
 </html>
