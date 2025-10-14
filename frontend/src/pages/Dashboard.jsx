@@ -134,6 +134,16 @@ const Dashboard = () => {
               {formatNumber(metrics?.mikrotik?.unknown ?? 0)} unknown
             </p>
           </article>
+          <article className="metric-card metric-card--success">
+            <h3>API online</h3>
+            <p className="metric-value">{formatNumber(metrics?.mikrotik?.apiOnline ?? 0)}</p>
+            <p className="metric-hint">{formatNumber(metrics?.mikrotik?.apiOffline ?? 0)} offline</p>
+          </article>
+          <article className="metric-card metric-card--success">
+            <h3>SSH reachable</h3>
+            <p className="metric-value">{formatNumber(metrics?.mikrotik?.sshOnline ?? 0)}</p>
+            <p className="metric-hint">{formatNumber(metrics?.mikrotik?.sshOffline ?? 0)} offline</p>
+          </article>
         </div>
       </section>
 
