@@ -784,6 +784,51 @@ const Mikrotiks = () => {
         ) : (
           <p className="empty-hint">Enable SSH to configure fallback credentials.</p>
         )}
+
+        <div className="routeros-config__version">
+          <label>
+            <span>Detected RouterOS version</span>
+            <input
+              name="firmwareVersion"
+              value={formState.routeros.firmwareVersion}
+              onChange={onFieldChange}
+              placeholder="Detected after connectivity test"
+              readOnly
+            />
+          </label>
+          <p className="muted">Target version: {targetVersion || '—'}</p>
+        </div>
+
+        {sshActive ? (
+          <div className="form-grid routeros-config__grid">
+            <label>
+              <span>SSH port</span>
+              <input
+                name="sshPort"
+                type="number"
+                min="1"
+                value={formState.routeros.sshPort}
+                onChange={onFieldChange}
+              />
+            </label>
+            <label>
+              <span>SSH username</span>
+              <input name="sshUsername" value={formState.routeros.sshUsername} onChange={onFieldChange} />
+            </label>
+            <label>
+              <span>SSH password</span>
+              <input
+                name="sshPassword"
+                type="password"
+                autoComplete="off"
+                value={formState.routeros.sshPassword}
+                onChange={onFieldChange}
+              />
+            </label>
+          </div>
+        ) : (
+          <p className="empty-hint">Enable SSH to configure fallback credentials.</p>
+        )}
       </div>
     );
   };
@@ -969,16 +1014,14 @@ const Mikrotiks = () => {
             </label>
             <label>
               <span>Group</span>
-              <div className="select-control">
-                <select name="groupId" value={createForm.groupId} onChange={handleCreateFieldChange}>
-                  <option value="">No group</option>
-                  {groups.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <select name="groupId" value={createForm.groupId} onChange={handleCreateFieldChange}>
+                <option value="">No group</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               <span>Tags</span>
@@ -1044,16 +1087,14 @@ const Mikrotiks = () => {
             </label>
             <label>
               <span>Group</span>
-              <div className="select-control">
-                <select name="groupId" value={manageState.form.groupId} onChange={handleManageFieldChange}>
-                  <option value="">No group</option>
-                  {groups.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <select name="groupId" value={manageState.form.groupId} onChange={handleManageFieldChange}>
+                <option value="">No group</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               <span>Tags</span>

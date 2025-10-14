@@ -2740,6 +2740,219 @@ const ensureStateShape = async (databaseFile) => {
       mutated = true;
     }
 
+    const status = deriveDeviceStatus(device.status, routeros);
+    const connectivity = sanitizeConnectivity(device.connectivity, routeros);
+
+    if (JSON.stringify(connectivity) !== JSON.stringify(device.connectivity ?? {})) {
+      mutated = true;
+    }
+
+    return {
+      id: identifier,
+      name,
+      host,
+      groupId,
+      tags,
+      notes,
+      routeros,
+      status,
+      connectivity,
+      createdAt,
+      updatedAt
+    };
+  });
+
+  if (sanitizedAddressLists.length !== normalized.addressLists.length) {
+    mutated = true;
+  }
+
+  const highestAddressListId = sanitizedAddressLists.reduce((max, entry) => Math.max(max, entry.id), 0);
+
+  if (highestAddressListId !== normalized.lastAddressListId) {
+    normalized.lastAddressListId = Math.max(nextAddressListIdSeed, highestAddressListId);
+    mutated = true;
+  } else if (nextAddressListIdSeed > normalized.lastAddressListId) {
+    normalized.lastAddressListId = nextAddressListIdSeed;
+    mutated = true;
+  }
+
+  normalized.addressLists = sanitizedAddressLists;
+
+  if (!Array.isArray(normalized.firewallFilters)) {
+    normalized.firewallFilters = [];
+    mutated = true;
+  }
+
+  if (!Number.isInteger(normalized.lastFirewallFilterId)) {
+    normalized.lastFirewallFilterId = normalized.firewallFilters.reduce(
+      (max, filter) => Math.max(max, Number.parseInt(filter.id, 10) || 0),
+      0
+    );
+    mutated = true;
+  }
+
+  let nextFirewallIdSeed = Math.max(
+    Number.isInteger(normalized.lastFirewallFilterId) ? normalized.lastFirewallFilterId : 0,
+    normalized.firewallFilters.reduce((max, filter) => Math.max(max, Number.parseInt(filter.id, 10) || 0), 0)
+  );
+
+  const validAddressListIds = new Set(sanitizedAddressLists.map((entry) => entry.id));
+  const firewallIdentifiers = new Set();
+
+  const sanitizedFirewallFilters = normalized.firewallFilters.map((filter) => {
+    let identifier = Number.parseInt(filter.id, 10);
+
+    if (!Number.isInteger(identifier) || identifier <= 0 || firewallIdentifiers.has(identifier)) {
+      nextFirewallIdSeed += 1;
+      identifier = nextFirewallIdSeed;
+      mutated = true;
+    }
+
+    firewallIdentifiers.add(identifier);
+
+    const createdAt = filter.createdAt ?? new Date().toISOString();
+    const updatedAt = filter.updatedAt ?? createdAt;
+    const name = normalizeOptionalText(filter.name ?? `Rule ${identifier}`) || `Rule ${identifier}`;
+    const groupCandidate = Number.parseInt(filter.groupId, 10);
+    const groupId = availableGroupIds.has(groupCandidate) ? groupCandidate : null;
+
+    const chainCandidate = typeof filter.chain === 'string' ? filter.chain.toLowerCase() : '';
+    const chain = allowedFirewallChains.has(chainCandidate) ? chainCandidate : 'forward';
+
+    const sourceAddressListCandidate = Number.parseInt(filter.sourceAddressListId, 10);
+    const sourceAddressListId = validAddressListIds.has(sourceAddressListCandidate)
+      ? sourceAddressListCandidate
+      : null;
+
+    const destinationAddressListCandidate = Number.parseInt(filter.destinationAddressListId, 10);
+    const destinationAddressListId = validAddressListIds.has(destinationAddressListCandidate)
+      ? destinationAddressListCandidate
+      : null;
+
+    const sourcePort = sanitizePortExpression(filter.sourcePort);
+    const destinationPort = sanitizePortExpression(filter.destinationPort);
+
+    const states = sanitizeFirewallStatesList(filter.states);
+    const actionCandidate = typeof filter.action === 'string' ? filter.action.toLowerCase() : '';
+    const action = allowedFirewallActions.has(actionCandidate) ? actionCandidate : 'accept';
+    const enabled = normalizeBoolean(filter.enabled, true);
+    const comment = normalizeOptionalText(filter.comment ?? '');
+
+    if (
+      filter.name !== name ||
+      (filter.groupId ?? null) !== groupId ||
+      filter.chain !== chain ||
+      (filter.sourceAddressListId ?? null) !== sourceAddressListId ||
+      (filter.destinationAddressListId ?? null) !== destinationAddressListId ||
+      (filter.sourcePort ?? '') !== sourcePort ||
+      (filter.destinationPort ?? '') !== destinationPort ||
+      JSON.stringify(filter.states ?? []) !== JSON.stringify(states) ||
+      filter.action !== action ||
+      Boolean(filter.enabled) !== enabled ||
+      (filter.comment ?? '') !== comment ||
+      filter.createdAt !== createdAt ||
+      filter.updatedAt !== updatedAt
+    ) {
+      mutated = true;
+    }
+
+    return {
+      id: identifier,
+      name,
+      groupId,
+      chain,
+      sourceAddressListId,
+      destinationAddressListId,
+      sourcePort,
+      destinationPort,
+      states,
+      action,
+      enabled,
+      comment,
+      createdAt,
+      updatedAt
+    };
+  });
+
+  if (sanitizedFirewallFilters.length !== normalized.firewallFilters.length) {
+    mutated = true;
+  }
+
+  const highestFirewallId = sanitizedFirewallFilters.reduce((max, entry) => Math.max(max, entry.id), 0);
+
+  if (highestFirewallId !== normalized.lastFirewallFilterId) {
+    normalized.lastFirewallFilterId = Math.max(nextFirewallIdSeed, highestFirewallId);
+    mutated = true;
+  } else if (nextFirewallIdSeed > normalized.lastFirewallFilterId) {
+    normalized.lastFirewallFilterId = nextFirewallIdSeed;
+    mutated = true;
+  }
+
+  normalized.firewallFilters = sanitizedFirewallFilters;
+
+  if (!Array.isArray(normalized.addressLists)) {
+    normalized.addressLists = [];
+    mutated = true;
+  }
+
+  if (!Number.isInteger(normalized.lastAddressListId)) {
+    normalized.lastAddressListId = normalized.addressLists.reduce(
+      (max, entry) => Math.max(max, Number.parseInt(entry.id, 10) || 0),
+      0
+    );
+    mutated = true;
+  }
+
+  let nextAddressListIdSeed = Math.max(
+    Number.isInteger(normalized.lastAddressListId) ? normalized.lastAddressListId : 0,
+    normalized.addressLists.reduce((max, entry) => Math.max(max, Number.parseInt(entry.id, 10) || 0), 0)
+  );
+
+  const addressIdentifiers = new Set();
+
+  const sanitizedAddressLists = normalized.addressLists.map((entry) => {
+    let identifier = Number.parseInt(entry.id, 10);
+
+    if (!Number.isInteger(identifier) || identifier <= 0 || addressIdentifiers.has(identifier)) {
+      nextAddressListIdSeed += 1;
+      identifier = nextAddressListIdSeed;
+      mutated = true;
+    }
+
+    addressIdentifiers.add(identifier);
+
+    const createdAt = entry.createdAt ?? new Date().toISOString();
+    const updatedAt = entry.updatedAt ?? createdAt;
+    const name = normalizeText(entry.name, `Address list ${identifier}`);
+    const referenceTypeCandidate = typeof entry.referenceType === 'string' ? entry.referenceType.toLowerCase() : '';
+    const referenceType = allowedAddressReferenceTypes.has(referenceTypeCandidate)
+      ? referenceTypeCandidate
+      : 'mikrotik';
+
+    let referenceId = null;
+    if (referenceType === 'mikrotik') {
+      const candidate = Number.parseInt(entry.referenceId, 10);
+      referenceId = validMikrotikIds.has(candidate) ? candidate : null;
+    } else if (referenceType === 'group') {
+      const candidate = Number.parseInt(entry.referenceId, 10);
+      referenceId = availableGroupIds.has(candidate) ? candidate : null;
+    }
+
+    const address = normalizeOptionalText(entry.address ?? '');
+    const comment = normalizeOptionalText(entry.comment ?? '');
+
+    if (
+      entry.name !== name ||
+      entry.referenceType !== referenceType ||
+      (entry.referenceId ?? null) !== referenceId ||
+      (entry.address ?? '') !== address ||
+      (entry.comment ?? '') !== comment ||
+      entry.createdAt !== createdAt ||
+      entry.updatedAt !== updatedAt
+    ) {
+      mutated = true;
+    }
+
     return {
       id: identifier,
       name,

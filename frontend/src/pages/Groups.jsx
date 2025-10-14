@@ -233,7 +233,10 @@ const Groups = () => {
     return map;
   }, [groups]);
 
-  const selectedGroup = selectedId ? groupLookup.get(selectedId) ?? null : null;
+  const selectedGroup = useMemo(
+    () => (selectedId ? groupLookup.get(selectedId) ?? null : null),
+    [groupLookup, selectedId]
+  );
   const selectedNode = useMemo(() => findNodeById(tree, selectedId), [tree, selectedId]);
   const filteredTree = useMemo(() => filterTreeByQuery(tree, filter), [tree, filter]);
   const selectedDescendants = useMemo(() => countDescendants(selectedNode), [selectedNode]);
