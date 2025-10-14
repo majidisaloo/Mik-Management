@@ -25,15 +25,13 @@ const defaultState = () => ({
   lastGroupId: 0,
   lastMikrotikId: 0,
   lastTunnelId: 0,
-  lastAddressListId: 0,
-  lastFirewallFilterId: 0,
+  lastIpamId: 0,
   users: [],
   roles: [],
   groups: [],
   mikrotiks: [],
   tunnels: [],
-  addressLists: [],
-  firewallFilters: []
+  ipams: []
 });
 
 const normalizeGroupName = (name, fallback) => {
@@ -104,12 +102,11 @@ const defaultRouterosOptions = () => ({
   apiRetries: 1,
   allowInsecureCiphers: false,
   preferredApiFirst: true,
-  firmwareVersion: '',
-  sshEnabled: false,
+  sshEnabled: true,
   sshPort: 22,
   sshUsername: '',
   sshPassword: '',
-  sshAcceptNewHostKeys: true
+  autoAcceptFingerprints: false
 });
 
 const normalizeText = (value, fallback = '') => {
@@ -1190,6 +1187,68 @@ const ensureStateShape = async (databaseFile) => {
     mutated = true;
   }
 
+  if (!Array.isArray(normalized.ipams)) {
+    normalized.ipams = [];
+    mutated = true;
+  }
+
+  if (!Number.isInteger(normalized.lastIpamId)) {
+    normalized.lastIpamId = normalized.ipams.reduce(
+      (max, ipam) => Math.max(max, Number.parseInt(ipam.id, 10) || 0),
+      0
+    );
+    mutated = true;
+  }
+
+  let nextIpamIdSeed = Math.max(
+    Number.isInteger(normalized.lastIpamId) ? normalized.lastIpamId : 0,
+    normalized.ipams.reduce((max, ipam) => Math.max(max, Number.parseInt(ipam.id, 10) || 0), 0)
+  );
+
+  const usedIpamIds = new Set();
+  const ipamTimestamp = new Date().toISOString();
+
+  normalized.ipams = normalized.ipams.map((ipam) => {
+    let identifier = Number.parseInt(ipam.id, 10);
+
+    if (!Number.isInteger(identifier) || identifier <= 0 || usedIpamIds.has(identifier)) {
+      nextIpamIdSeed += 1;
+      identifier = nextIpamIdSeed;
+      mutated = true;
+    }
+
+    usedIpamIds.add(identifier);
+
+    const sanitized = sanitizeIpamRecord(ipam, { identifier, timestamp: ipamTimestamp });
+
+    const originalLastStatus = normalizeOptionalText(ipam.lastStatus ?? ipam.last_status ?? 'unknown') || 'unknown';
+    const originalLastCheckedAt =
+      normalizeIsoDate(ipam.lastCheckedAt ?? ipam.last_checkedAt ?? ipam.last_checked_at) ?? null;
+
+    if (
+      sanitized.name !== ipam.name ||
+      sanitized.baseUrl !== (ipam.baseUrl ?? ipam.base_url) ||
+      sanitized.appId !== (ipam.appId ?? ipam.app_id) ||
+      sanitized.appCode !== (ipam.appCode ?? ipam.app_code ?? '') ||
+      sanitized.appPermissions !== (ipam.appPermissions ?? ipam.app_permissions) ||
+      sanitized.appSecurity !== (ipam.appSecurity ?? ipam.app_security) ||
+      sanitized.createdAt !== (ipam.createdAt ?? ipam.created_at) ||
+      sanitized.updatedAt !== (ipam.updatedAt ?? ipam.updated_at) ||
+      sanitized.lastStatus !== originalLastStatus.toLowerCase() ||
+      sanitized.lastCheckedAt !== originalLastCheckedAt ||
+      JSON.stringify(sanitized.collections) !== JSON.stringify(ipam.collections ?? ipam.cached ?? {})
+    ) {
+      mutated = true;
+    }
+
+    return sanitized;
+  });
+
+  if (nextIpamIdSeed > normalized.lastIpamId) {
+    normalized.lastIpamId = nextIpamIdSeed;
+    mutated = true;
+  }
+
   let nextGroupIdSeed = Math.max(
     Number.isInteger(normalized.lastGroupId) ? normalized.lastGroupId : 0,
     normalized.groups.reduce((max, group) => Math.max(max, Number.parseInt(group.id, 10) || 0), 0)
@@ -1455,7 +1514,7 @@ const ensureStateShape = async (databaseFile) => {
     const sourceId = validMikrotikIds.has(sourceCandidate) ? sourceCandidate : null;
     const targetId = validMikrotikIds.has(targetCandidate) ? targetCandidate : null;
 
-    const connectionType = normalizeOptionalText(tunnel.connectionType ?? tunnel.type ?? '') || 'GRE';
+    const connectionType = (normalizeOptionalText(tunnel.connectionType ?? tunnel.type ?? '') || 'GRE').toUpperCase();
 
     const rawState = typeof tunnel.state === 'string' ? tunnel.state : tunnel.status;
     const normalizedState = typeof rawState === 'string' ? rawState.toLowerCase() : '';
@@ -1465,6 +1524,10 @@ const ensureStateShape = async (databaseFile) => {
     const tags = normalizeTags(tunnel.tags);
     const notes = normalizeOptionalText(tunnel.notes ?? '');
     const metrics = sanitizeTunnelMetrics(tunnel.metrics ?? tunnel);
+    const profile = sanitizeTunnelProfile(tunnel.profile ?? {}, tunnel.profile ?? defaultTunnelProfile());
+    const monitoring = sanitizeTunnelMonitoring(tunnel.monitoring ?? {}, tunnel.monitoring ?? defaultTunnelMonitoring());
+    const ospf = sanitizeTunnelOspf(tunnel.ospf ?? {}, tunnel.ospf ?? defaultTunnelOspf());
+    const vpnProfiles = sanitizeVpnProfiles(tunnel.vpnProfiles ?? {}, tunnel.vpnProfiles ?? defaultVpnProfiles());
 
     if (
       tunnel.name !== name ||
@@ -1478,6 +1541,10 @@ const ensureStateShape = async (databaseFile) => {
       JSON.stringify(tunnel.tags ?? []) !== JSON.stringify(tags) ||
       (tunnel.notes ?? '') !== notes ||
       JSON.stringify(tunnel.metrics ?? {}) !== JSON.stringify(metrics) ||
+      JSON.stringify(tunnel.profile ?? {}) !== JSON.stringify(profile) ||
+      JSON.stringify(tunnel.monitoring ?? {}) !== JSON.stringify(monitoring) ||
+      JSON.stringify(tunnel.ospf ?? {}) !== JSON.stringify(ospf) ||
+      JSON.stringify(tunnel.vpnProfiles ?? {}) !== JSON.stringify(vpnProfiles) ||
       tunnel.createdAt !== createdAt ||
       tunnel.updatedAt !== updatedAt
     ) {
@@ -1496,6 +1563,10 @@ const ensureStateShape = async (databaseFile) => {
       tags,
       notes,
       metrics,
+      profile,
+      monitoring,
+      ospf,
+      vpnProfiles,
       createdAt,
       updatedAt
     };
@@ -1651,34 +1722,38 @@ const ensureStateShape = async (databaseFile) => {
       ? sourceAddressListCandidate
       : null;
 
-    const destinationAddressListCandidate = Number.parseInt(filter.destinationAddressListId, 10);
-    const destinationAddressListId = validAddressListIds.has(destinationAddressListCandidate)
-      ? destinationAddressListCandidate
-      : null;
+    const connectionType = (normalizeOptionalText(tunnel.connectionType ?? tunnel.type ?? '') || 'GRE').toUpperCase();
 
     const sourcePort = sanitizePortExpression(filter.sourcePort);
     const destinationPort = sanitizePortExpression(filter.destinationPort);
 
-    const states = sanitizeFirewallStatesList(filter.states);
-    const actionCandidate = typeof filter.action === 'string' ? filter.action.toLowerCase() : '';
-    const action = allowedFirewallActions.has(actionCandidate) ? actionCandidate : 'accept';
-    const enabled = normalizeBoolean(filter.enabled, true);
-    const comment = normalizeOptionalText(filter.comment ?? '');
+    const enabled = normalizeBoolean(tunnel.enabled, true);
+    const tags = normalizeTags(tunnel.tags);
+    const notes = normalizeOptionalText(tunnel.notes ?? '');
+    const metrics = sanitizeTunnelMetrics(tunnel.metrics ?? tunnel);
+    const profile = sanitizeTunnelProfile(tunnel.profile ?? {}, tunnel.profile ?? defaultTunnelProfile());
+    const monitoring = sanitizeTunnelMonitoring(tunnel.monitoring ?? {}, tunnel.monitoring ?? defaultTunnelMonitoring());
+    const ospf = sanitizeTunnelOspf(tunnel.ospf ?? {}, tunnel.ospf ?? defaultTunnelOspf());
+    const vpnProfiles = sanitizeVpnProfiles(tunnel.vpnProfiles ?? {}, tunnel.vpnProfiles ?? defaultVpnProfiles());
 
     if (
-      filter.name !== name ||
-      (filter.groupId ?? null) !== groupId ||
-      filter.chain !== chain ||
-      (filter.sourceAddressListId ?? null) !== sourceAddressListId ||
-      (filter.destinationAddressListId ?? null) !== destinationAddressListId ||
-      (filter.sourcePort ?? '') !== sourcePort ||
-      (filter.destinationPort ?? '') !== destinationPort ||
-      JSON.stringify(filter.states ?? []) !== JSON.stringify(states) ||
-      filter.action !== action ||
-      Boolean(filter.enabled) !== enabled ||
-      (filter.comment ?? '') !== comment ||
-      filter.createdAt !== createdAt ||
-      filter.updatedAt !== updatedAt
+      tunnel.name !== name ||
+      tunnel.groupId !== groupId ||
+      tunnel.sourceId !== sourceId ||
+      tunnel.targetId !== targetId ||
+      tunnel.connectionType !== connectionType ||
+      tunnel.state !== status ||
+      tunnel.status !== status ||
+      tunnel.enabled !== enabled ||
+      JSON.stringify(tunnel.tags ?? []) !== JSON.stringify(tags) ||
+      (tunnel.notes ?? '') !== notes ||
+      JSON.stringify(tunnel.metrics ?? {}) !== JSON.stringify(metrics) ||
+      JSON.stringify(tunnel.profile ?? {}) !== JSON.stringify(profile) ||
+      JSON.stringify(tunnel.monitoring ?? {}) !== JSON.stringify(monitoring) ||
+      JSON.stringify(tunnel.ospf ?? {}) !== JSON.stringify(ospf) ||
+      JSON.stringify(tunnel.vpnProfiles ?? {}) !== JSON.stringify(vpnProfiles) ||
+      tunnel.createdAt !== createdAt ||
+      tunnel.updatedAt !== updatedAt
     ) {
       mutated = true;
     }
@@ -1695,7 +1770,13 @@ const ensureStateShape = async (databaseFile) => {
       states,
       action,
       enabled,
-      comment,
+      tags,
+      notes,
+      metrics,
+      profile,
+      monitoring,
+      ospf,
+      vpnProfiles,
       createdAt,
       updatedAt
     };
@@ -2123,6 +2204,142 @@ const initializeDatabase = async (databasePath) => {
       await persist(state);
 
       return { success: true };
+    },
+
+    async listIpams() {
+      const state = await load();
+      return state.ipams.map((ipam) => presentIpamForClient(ipam));
+    },
+
+    async createIpam({ name, baseUrl, appId, appCode, appPermissions, appSecurity }) {
+      const state = await load();
+
+      const normalizedName = normalizeText(name);
+      const normalizedBaseUrl = normalizeUrl(baseUrl);
+      const normalizedAppId = normalizeText(appId);
+      const normalizedAppCode = normalizeOptionalText(appCode ?? '');
+      const normalizedPermissions = normalizeText(appPermissions ?? 'Read', 'Read');
+      const normalizedSecurity = normalizeText(
+        appSecurity ?? 'SSL with App code token',
+        'SSL with App code token'
+      );
+
+      if (!normalizedName) {
+        return { success: false, reason: 'name-required' };
+      }
+
+      if (!normalizedBaseUrl) {
+        return { success: false, reason: 'base-url-required' };
+      }
+
+      if (!normalizedAppId) {
+        return { success: false, reason: 'app-id-required' };
+      }
+
+      if (!normalizedAppCode) {
+        return { success: false, reason: 'app-code-required' };
+      }
+
+      const duplicate = state.ipams.find(
+        (ipam) => ipam.baseUrl === normalizedBaseUrl && ipam.appId.toLowerCase() === normalizedAppId.toLowerCase()
+      );
+
+      if (duplicate) {
+        return { success: false, reason: 'duplicate-integration' };
+      }
+
+      const nextId = (Number.isInteger(state.lastIpamId) ? state.lastIpamId : 0) + 1;
+      const timestamp = new Date().toISOString();
+
+      const record = {
+        id: nextId,
+        name: normalizedName,
+        baseUrl: normalizedBaseUrl,
+        appId: normalizedAppId,
+        appCode: normalizedAppCode,
+        appPermissions: normalizedPermissions,
+        appSecurity: normalizedSecurity,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        lastStatus: 'unknown',
+        lastCheckedAt: null,
+        collections: sanitizeIpamCollections()
+      };
+
+      state.ipams.push(record);
+      state.lastIpamId = nextId;
+      await persist(state);
+
+      return { success: true, ipam: presentIpamForClient(record) };
+    },
+
+    async getIpamById(id) {
+      const state = await load();
+      const ipam = state.ipams.find((entry) => entry.id === id);
+      return ipam ? { ...ipam, collections: sanitizeIpamCollections(ipam.collections) } : null;
+    },
+
+    async deleteIpam(id) {
+      const state = await load();
+      const index = state.ipams.findIndex((ipam) => ipam.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      state.ipams.splice(index, 1);
+      await persist(state);
+
+      return { success: true };
+    },
+
+    async updateIpamStatus(id, { status, checkedAt }) {
+      const state = await load();
+      const index = state.ipams.findIndex((ipam) => ipam.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      const ipam = state.ipams[index];
+      const timestamp = new Date().toISOString();
+      const loweredStatus = (status || '').toLowerCase();
+      const normalizedStatus = allowedIpamStatuses.has(loweredStatus) ? loweredStatus : 'unknown';
+      const normalizedCheckedAt = checkedAt ? normalizeIsoDate(checkedAt) ?? timestamp : timestamp;
+
+      state.ipams[index] = {
+        ...ipam,
+        lastStatus: normalizedStatus,
+        lastCheckedAt: normalizedCheckedAt,
+        updatedAt: timestamp
+      };
+
+      await persist(state);
+
+      return { success: true, ipam: presentIpamForClient(state.ipams[index]) };
+    },
+
+    async replaceIpamCollections(id, collections) {
+      const state = await load();
+      const index = state.ipams.findIndex((ipam) => ipam.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      const sanitizedCollections = sanitizeIpamCollections(collections);
+      const timestamp = new Date().toISOString();
+      const ipam = state.ipams[index];
+
+      state.ipams[index] = {
+        ...ipam,
+        collections: sanitizedCollections,
+        updatedAt: timestamp
+      };
+
+      await persist(state);
+
+      return { success: true, ipam: presentIpamForClient(state.ipams[index]) };
     },
 
     async listMikrotiks() {
@@ -2757,7 +2974,11 @@ const initializeDatabase = async (databasePath) => {
       enabled,
       tags,
       notes,
-      metrics
+      metrics,
+      profile,
+      monitoring,
+      ospf,
+      vpnProfiles
     }) {
       const state = await load();
 
@@ -2812,7 +3033,7 @@ const initializeDatabase = async (databasePath) => {
         return { success: false, reason: 'duplicate-endpoint' };
       }
 
-      const normalizedConnectionType = normalizeText(connectionType) || 'GRE';
+      const normalizedConnectionType = (normalizeText(connectionType) || 'GRE').toUpperCase();
       const normalizedStatus = allowedTunnelStates.has((status ?? '').toLowerCase())
         ? status.toLowerCase()
         : 'down';
@@ -2820,6 +3041,10 @@ const initializeDatabase = async (databasePath) => {
       const normalizedTags = normalizeTags(tags);
       const normalizedNotes = normalizeOptionalText(notes ?? '');
       const normalizedMetrics = sanitizeTunnelMetrics(metrics ?? {});
+      const normalizedProfile = sanitizeTunnelProfile(profile ?? {}, defaultTunnelProfile());
+      const normalizedMonitoring = sanitizeTunnelMonitoring(monitoring ?? {}, defaultTunnelMonitoring());
+      const normalizedOspf = sanitizeTunnelOspf(ospf ?? {}, defaultTunnelOspf());
+      const normalizedVpnProfiles = sanitizeVpnProfiles(vpnProfiles ?? {}, defaultVpnProfiles());
 
       const nextId = (Number.isInteger(state.lastTunnelId) ? state.lastTunnelId : 0) + 1;
       const timestamp = new Date().toISOString();
@@ -2836,6 +3061,10 @@ const initializeDatabase = async (databasePath) => {
         tags: normalizedTags,
         notes: normalizedNotes,
         metrics: normalizedMetrics,
+        profile: normalizedProfile,
+        monitoring: normalizedMonitoring,
+        ospf: normalizedOspf,
+        vpnProfiles: normalizedVpnProfiles,
         createdAt: timestamp,
         updatedAt: timestamp
       };
@@ -2857,7 +3086,11 @@ const initializeDatabase = async (databasePath) => {
       enabled,
       tags,
       notes,
-      metrics
+      metrics,
+      profile,
+      monitoring,
+      ospf,
+      vpnProfiles
     }) {
       const state = await load();
       const index = state.tunnels.findIndex((tunnel) => tunnel.id === id);
@@ -2923,7 +3156,9 @@ const initializeDatabase = async (databasePath) => {
       }
 
       const normalizedConnectionType =
-        connectionType !== undefined ? normalizeText(connectionType) || 'GRE' : existing.connectionType;
+        connectionType !== undefined
+          ? (normalizeText(connectionType) || 'GRE').toUpperCase()
+          : existing.connectionType;
       const normalizedStatus =
         status !== undefined && allowedTunnelStates.has(status.toLowerCase())
           ? status.toLowerCase()
@@ -2932,6 +3167,24 @@ const initializeDatabase = async (databasePath) => {
       const normalizedTags = tags !== undefined ? normalizeTags(tags) : Array.isArray(existing.tags) ? [...existing.tags] : [];
       const normalizedNotes = notes !== undefined ? normalizeOptionalText(notes) : existing.notes ?? '';
       const normalizedMetrics = metrics !== undefined ? sanitizeTunnelMetrics(metrics) : sanitizeTunnelMetrics(existing.metrics);
+      const existingProfile = sanitizeTunnelProfile(existing.profile ?? {}, defaultTunnelProfile());
+      const normalizedProfile =
+        profile !== undefined
+          ? sanitizeTunnelProfile(profile ?? {}, existingProfile)
+          : existingProfile;
+      const existingMonitoring = sanitizeTunnelMonitoring(existing.monitoring ?? {}, defaultTunnelMonitoring());
+      const normalizedMonitoring =
+        monitoring !== undefined
+          ? sanitizeTunnelMonitoring(monitoring ?? {}, existingMonitoring)
+          : existingMonitoring;
+      const existingOspf = sanitizeTunnelOspf(existing.ospf ?? {}, defaultTunnelOspf());
+      const normalizedOspf =
+        ospf !== undefined ? sanitizeTunnelOspf(ospf ?? {}, existingOspf) : existingOspf;
+      const existingVpnProfiles = sanitizeVpnProfiles(existing.vpnProfiles ?? {}, defaultVpnProfiles());
+      const normalizedVpnProfiles =
+        vpnProfiles !== undefined
+          ? sanitizeVpnProfiles(vpnProfiles ?? {}, existingVpnProfiles)
+          : existingVpnProfiles;
 
       const tunnel = {
         ...existing,
@@ -2945,6 +3198,10 @@ const initializeDatabase = async (databasePath) => {
         tags: normalizedTags,
         notes: normalizedNotes,
         metrics: normalizedMetrics,
+        profile: normalizedProfile,
+        monitoring: normalizedMonitoring,
+        ospf: normalizedOspf,
+        vpnProfiles: normalizedVpnProfiles,
         updatedAt: new Date().toISOString()
       };
 
@@ -3018,6 +3275,39 @@ const initializeDatabase = async (databasePath) => {
         .sort((a, b) => (b.packetLoss ?? 0) - (a.packetLoss ?? 0))
         .slice(0, 10);
 
+      const updatedTimestamps = [];
+      const captureTimestamp = (value) => {
+        const iso = normalizeIsoDate(value);
+        if (iso) {
+          updatedTimestamps.push(iso);
+        }
+      };
+
+      state.mikrotiks.forEach((device) => {
+        captureTimestamp(device.updatedAt);
+        if (device.status) {
+          captureTimestamp(device.status.lastAuditAt);
+        }
+      });
+
+      state.tunnels.forEach((tunnel) => {
+        captureTimestamp(tunnel.updatedAt);
+        if (tunnel.metrics) {
+          captureTimestamp(tunnel.metrics.lastCheckedAt);
+        }
+      });
+
+      if (Array.isArray(state.ipams)) {
+        state.ipams.forEach((ipam) => {
+          captureTimestamp(ipam.updatedAt);
+          captureTimestamp(ipam.lastCheckedAt);
+        });
+      }
+
+      const lastUpdatedAt = updatedTimestamps.length
+        ? new Date(Math.max(...updatedTimestamps.map((value) => new Date(value).getTime()))).toISOString()
+        : null;
+
       return {
         mikrotik: {
           total: totalMikrotiks,
@@ -3037,7 +3327,8 @@ const initializeDatabase = async (databasePath) => {
           maintenance: tunnelsMaintenance,
           latencyLeaderboard,
           packetLossLeaderboard
-        }
+        },
+        lastUpdatedAt
       };
     },
 
