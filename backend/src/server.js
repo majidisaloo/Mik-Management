@@ -2,6 +2,7 @@ import http from 'http';
 import https from 'https';
 import { URL } from 'url';
 import crypto from 'crypto';
+import { spawn } from 'child_process';
 import initializeDatabase, { resolveDatabaseFile } from './database.js';
 import { ensureDatabaseConfig, getConfigFilePath } from './config.js';
 import getProjectVersion from './version.js';
@@ -194,6 +195,8 @@ const basePermissions = {
   mikrotiks: false,
   settings: false
 };
+
+const TARGET_ROUTEROS_VERSION = '7.14.0';
 
 const pepperPassword = (password, secret) => `${password}${secret}`;
 
@@ -628,6 +631,45 @@ const parseInteger = (value) => {
   return Number.isInteger(parsed) ? parsed : null;
 };
 
+const generateSecret = ({ bytes, encoding } = {}) => {
+  const minBytes = 16;
+  const maxBytes = 128;
+  const normalizedBytes = Math.min(Math.max(Number(bytes) || 32, minBytes), maxBytes);
+  const normalizedEncoding = typeof encoding === 'string' ? encoding.toLowerCase() : 'base64url';
+  const buffer = crypto.randomBytes(normalizedBytes);
+
+  if (normalizedEncoding === 'hex') {
+    return {
+      secret: buffer.toString('hex'),
+      encoding: 'hex',
+      bytes: normalizedBytes,
+      entropyBits: normalizedBytes * 8
+    };
+  }
+
+  if (normalizedEncoding === 'base64') {
+    return {
+      secret: buffer.toString('base64'),
+      encoding: 'base64',
+      bytes: normalizedBytes,
+      entropyBits: normalizedBytes * 8
+    };
+  }
+
+  const base64Url = buffer
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/u, '');
+
+  return {
+    secret: base64Url,
+    encoding: 'base64url',
+    bytes: normalizedBytes,
+    entropyBits: normalizedBytes * 8
+  };
+};
+
 const normalizeTagsInput = (value) => {
   if (!value) {
     return [];
@@ -652,6 +694,26 @@ const normalizeNotesInput = (value) => {
   return value.trim();
 };
 
+const deepClone = (value, fallback = null) => {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== 'object') {
+    return value;
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (error) {
+    return fallback;
+  }
+};
+
 const buildRouterosPayload = (input = {}) => ({
   apiEnabled: normalizeBooleanFlag(input.apiEnabled, false),
   apiPort: parseInteger(input.apiPort),
@@ -662,7 +724,16 @@ const buildRouterosPayload = (input = {}) => ({
   apiTimeout: parseInteger(input.apiTimeout),
   apiRetries: parseInteger(input.apiRetries),
   allowInsecureCiphers: normalizeBooleanFlag(input.allowInsecureCiphers, false),
-  preferredApiFirst: normalizeBooleanFlag(input.preferredApiFirst, true)
+  preferredApiFirst: normalizeBooleanFlag(input.preferredApiFirst, true),
+  firmwareVersion: normalizeString(input.firmwareVersion),
+  sshEnabled: normalizeBooleanFlag(input.sshEnabled, false),
+  sshPort: parseInteger(input.sshPort),
+  sshUsername: normalizeString(input.sshUsername),
+  sshPassword: typeof input.sshPassword === 'string' ? input.sshPassword.trim() : '',
+  sshAcceptNewHostKeys: normalizeBooleanFlag(
+    input.sshAcceptNewHostKeys !== undefined ? input.sshAcceptNewHostKeys : input.sshAcceptUnknownHost,
+    true
+  )
 });
 
 const buildDeviceStatusPayload = (input = {}) => {
@@ -688,6 +759,163 @@ const normalizeRoleIds = (roleIds, roles) => {
 const ensureNumber = (value, fallback) => {
   const parsed = parseInteger(value);
   return parsed ?? fallback;
+};
+
+const runProcess = (command, args = [], { timeout = 15000 } = {}) =>
+  new Promise((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    let timer;
+
+    try {
+      const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+
+      const finalize = (result) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        if (timer) {
+          clearTimeout(timer);
+        }
+        resolve(result);
+      };
+
+      timer = setTimeout(() => {
+        child.kill('SIGKILL');
+        finalize({
+          success: false,
+          code: null,
+          signal: 'SIGKILL',
+          stdout,
+          stderr,
+          timedOut: true
+        });
+      }, Math.max(timeout, 1000));
+
+      child.stdout.on('data', (chunk) => {
+        stdout += chunk.toString();
+      });
+
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk.toString();
+      });
+
+      child.on('error', (error) => {
+        finalize({
+          success: false,
+          code: null,
+          signal: null,
+          stdout,
+          stderr: stderr ? `${stderr}\n${error.message}` : error.message,
+          timedOut: false,
+          error
+        });
+      });
+
+      child.on('close', (code, signal) => {
+        finalize({
+          success: code === 0,
+          code,
+          signal,
+          stdout,
+          stderr,
+          timedOut: false
+        });
+      });
+    } catch (error) {
+      resolve({
+        success: false,
+        code: null,
+        signal: null,
+        stdout,
+        stderr: error.message,
+        timedOut: false,
+        error
+      });
+    }
+  });
+
+const parsePingLatency = (output) => {
+  if (!output) {
+    return null;
+  }
+
+  const linuxMatch = output.match(/=\s*([^/]+)\/([^/]+)\/([^/]+)\/([^/\s]+)\s*ms/);
+  if (linuxMatch && linuxMatch[2]) {
+    const parsed = Number.parseFloat(linuxMatch[2]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  const winMatch = output.match(/Average =\s*([0-9.]+)ms/i);
+  if (winMatch && winMatch[1]) {
+    const parsed = Number.parseFloat(winMatch[1]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+};
+
+const parseTracerouteOutput = (output) => {
+  if (!output) {
+    return [];
+  }
+
+  const hops = [];
+  const lines = output.split(/\r?\n/);
+  const hopPattern = /^(\s*)(\d+)\s+([^\s]+)\s+(.*)$/;
+
+  lines.forEach((line) => {
+    const match = line.match(hopPattern);
+    if (!match) {
+      return;
+    }
+
+    const hopIndex = Number.parseInt(match[2], 10);
+    if (!Number.isInteger(hopIndex)) {
+      return;
+    }
+
+    const rest = match[4];
+    const latencyMatch = rest.match(/([0-9.]+)\s*ms/);
+    const latency = latencyMatch ? Number.parseFloat(latencyMatch[1]) : null;
+
+    hops.push({
+      hop: hopIndex,
+      address: match[3],
+      latencyMs: Number.isFinite(latency) ? latency : null
+    });
+  });
+
+  return hops;
+};
+
+const sanitizeDiagnosticTargets = (targets, fallback = []) => {
+  if (!Array.isArray(targets)) {
+    return fallback;
+  }
+
+  const normalized = [];
+  const seen = new Set();
+
+  targets.forEach((target) => {
+    const address = typeof target === 'string' ? target.trim() : normalizeString(target?.address ?? '');
+    if (!address) {
+      return;
+    }
+
+    const key = address.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    normalized.push(address);
+  });
+
+  return normalized;
 };
 
 const mapRole = (role) => ({
@@ -759,15 +987,92 @@ const mapMikrotik = (device, groups) => {
       apiTimeout: ensureNumber(routeros.apiTimeout, 5000),
       apiRetries: ensureNumber(routeros.apiRetries, 1),
       allowInsecureCiphers: normalizeBooleanFlag(routeros.allowInsecureCiphers, false),
-      preferredApiFirst: normalizeBooleanFlag(routeros.preferredApiFirst, true)
+      preferredApiFirst: normalizeBooleanFlag(routeros.preferredApiFirst, true),
+      firmwareVersion: typeof routeros.firmwareVersion === 'string' ? routeros.firmwareVersion : '',
+      sshEnabled: Boolean(routeros.sshEnabled),
+      sshPort: ensureNumber(routeros.sshPort, 22),
+      sshUsername: typeof routeros.sshUsername === 'string' ? routeros.sshUsername : '',
+      sshPassword: typeof routeros.sshPassword === 'string' ? routeros.sshPassword : '',
+      sshAcceptNewHostKeys: normalizeBooleanFlag(routeros.sshAcceptNewHostKeys, true)
     },
     status: {
       updateStatus:
         typeof device.status?.updateStatus === 'string' ? device.status.updateStatus : 'unknown',
-      lastAuditAt: device.status?.lastAuditAt ?? null
+      lastAuditAt: device.status?.lastAuditAt ?? null,
+      targetVersion: TARGET_ROUTEROS_VERSION
+    },
+    connectivity: {
+      api: {
+        status: typeof device.connectivity?.api?.status === 'string' ? device.connectivity.api.status : 'unknown',
+        lastCheckedAt: device.connectivity?.api?.lastCheckedAt ?? null,
+        lastError: device.connectivity?.api?.lastError ?? null
+      },
+      ssh: {
+        status: typeof device.connectivity?.ssh?.status === 'string' ? device.connectivity.ssh.status : 'unknown',
+        lastCheckedAt: device.connectivity?.ssh?.lastCheckedAt ?? null,
+        fingerprint: device.connectivity?.ssh?.fingerprint ?? null,
+        lastError: device.connectivity?.ssh?.lastError ?? null
+      }
     },
     createdAt: device.createdAt,
     updatedAt: device.updatedAt
+  };
+};
+
+const mapAddressList = (entry, groups, mikrotiks) => {
+  const referenceType = entry.referenceType ?? 'mikrotik';
+  let referenceName = null;
+
+  if (referenceType === 'mikrotik' && entry.referenceId) {
+    const device = mikrotiks.find((candidate) => candidate.id === entry.referenceId);
+    referenceName = device ? device.name : null;
+  }
+
+  if (referenceType === 'group' && entry.referenceId) {
+    const group = groups.find((candidate) => candidate.id === entry.referenceId);
+    referenceName = group ? group.name : null;
+  }
+
+  return {
+    id: entry.id,
+    name: entry.name,
+    referenceType,
+    referenceId: entry.referenceId ?? null,
+    referenceName,
+    address: entry.address ?? '',
+    comment: entry.comment ?? '',
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt
+  };
+};
+
+const mapFirewallFilter = (filter, groups, addressLists) => {
+  const group = filter.groupId ? groups.find((entry) => entry.id === filter.groupId) : null;
+  const sourceList = filter.sourceAddressListId
+    ? addressLists.find((entry) => entry.id === filter.sourceAddressListId)
+    : null;
+  const destinationList = filter.destinationAddressListId
+    ? addressLists.find((entry) => entry.id === filter.destinationAddressListId)
+    : null;
+
+  return {
+    id: filter.id,
+    name: filter.name,
+    groupId: filter.groupId ?? null,
+    groupName: group ? group.name : null,
+    chain: filter.chain,
+    sourceAddressListId: filter.sourceAddressListId ?? null,
+    sourceAddressListName: sourceList ? sourceList.name : null,
+    destinationAddressListId: filter.destinationAddressListId ?? null,
+    destinationAddressListName: destinationList ? destinationList.name : null,
+    sourcePort: filter.sourcePort ?? '',
+    destinationPort: filter.destinationPort ?? '',
+    states: Array.isArray(filter.states) ? [...filter.states] : [],
+    action: filter.action,
+    enabled: Boolean(filter.enabled),
+    comment: filter.comment ?? '',
+    createdAt: filter.createdAt,
+    updatedAt: filter.updatedAt
   };
 };
 
@@ -795,6 +1100,10 @@ const mapTunnel = (tunnel, groups, mikrotiks) => {
       packetLoss: typeof tunnel.metrics?.packetLoss === 'number' ? tunnel.metrics.packetLoss : null,
       lastCheckedAt: tunnel.metrics?.lastCheckedAt ?? null
     },
+    profile: deepClone(tunnel.profile ?? null, null),
+    monitoring: deepClone(tunnel.monitoring ?? null, null),
+    ospf: deepClone(tunnel.ospf ?? null, null),
+    vpnProfiles: deepClone(tunnel.vpnProfiles ?? null, null),
     createdAt: tunnel.createdAt,
     updatedAt: tunnel.updatedAt
   };
@@ -1539,7 +1848,8 @@ const bootstrap = async () => {
         const [devices, groups] = await Promise.all([db.listMikrotiks(), db.listGroups()]);
         sendJson(res, 200, {
           mikrotiks: devices.map((device) => mapMikrotik(device, groups)),
-          groups: groups.map(mapGroup)
+          groups: groups.map(mapGroup),
+          targetRouterOs: TARGET_ROUTEROS_VERSION
         });
       } catch (error) {
         console.error('List Mikrotiks error', error);
@@ -1597,7 +1907,8 @@ const bootstrap = async () => {
         const groups = await db.listGroups();
         sendJson(res, 201, {
           message: 'Mikrotik device added successfully.',
-          mikrotik: mapMikrotik(result.mikrotik, groups)
+          mikrotik: mapMikrotik(result.mikrotik, groups),
+          targetRouterOs: TARGET_ROUTEROS_VERSION
         });
       } catch (error) {
         console.error('Create Mikrotik error', error);
@@ -1674,11 +1985,348 @@ const bootstrap = async () => {
         const groups = await db.listGroups();
         sendJson(res, 200, {
           message: 'Mikrotik device updated successfully.',
-          mikrotik: mapMikrotik(result.mikrotik, groups)
+          mikrotik: mapMikrotik(result.mikrotik, groups),
+          targetRouterOs: TARGET_ROUTEROS_VERSION
         });
       } catch (error) {
         console.error('Update Mikrotik error', error);
         sendJson(res, 500, { message: 'Unable to update the Mikrotik device right now.' });
+      }
+    };
+
+    const handleTestMikrotikConnectivity = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.testMikrotikConnectivity(deviceId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to refresh connectivity.');
+        }
+
+        const groups = await db.listGroups();
+        sendJson(res, 200, {
+          message: 'Connectivity refreshed successfully.',
+          mikrotik: mapMikrotik(result.mikrotik, groups),
+          targetRouterOs: TARGET_ROUTEROS_VERSION
+        });
+      } catch (error) {
+        console.error('Test Mikrotik connectivity error', error);
+        sendJson(res, 500, { message: 'Unable to verify device connectivity right now.' });
+      }
+    };
+
+    const handleListFirewallInventory = async () => {
+      try {
+        const [addressLists, filters, groups, mikrotiks] = await Promise.all([
+          db.listAddressLists(),
+          db.listFirewallFilters(),
+          db.listGroups(),
+          db.listMikrotiks()
+        ]);
+
+        const mappedAddressLists = addressLists.map((entry) => mapAddressList(entry, groups, mikrotiks));
+        const mappedFilters = filters.map((filter) => mapFirewallFilter(filter, groups, addressLists));
+
+        sendJson(res, 200, {
+          addressLists: mappedAddressLists,
+          filters: mappedFilters,
+          groups: groups.map(mapGroup),
+          mikrotiks: mikrotiks.map((device) => mapMikrotik(device, groups)),
+          targetRouterOs: TARGET_ROUTEROS_VERSION
+        });
+      } catch (error) {
+        console.error('List firewall inventory error', error);
+        sendJson(res, 500, { message: 'Unable to load firewall inventory.' });
+      }
+    };
+
+    const handleCreateAddressList = async () => {
+      const body = await parseJsonBody(req);
+      const { name, referenceType, referenceId, address, comment } = body ?? {};
+
+      try {
+        const result = await db.createAddressList({ name, referenceType, referenceId, address, comment });
+
+        if (!result.success && result.reason === 'name-required') {
+          sendJson(res, 400, { message: 'List name is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'type-required') {
+          sendJson(res, 400, { message: 'A valid reference type is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-reference') {
+          sendJson(res, 400, { message: 'The selected reference is invalid.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to create address list.');
+        }
+
+        const [groups, mikrotiks] = await Promise.all([db.listGroups(), db.listMikrotiks()]);
+        sendJson(res, 201, {
+          message: 'Address list entry created successfully.',
+          addressList: mapAddressList(result.addressList, groups, mikrotiks)
+        });
+      } catch (error) {
+        console.error('Create address list error', error);
+        sendJson(res, 500, { message: 'Unable to create the address list entry right now.' });
+      }
+    };
+
+    const handleUpdateAddressList = async (listId) => {
+      if (!Number.isInteger(listId) || listId <= 0) {
+        sendJson(res, 400, { message: 'A valid address list id is required.' });
+        return;
+      }
+
+      const body = await parseJsonBody(req);
+      const { name, referenceType, referenceId, address, comment } = body ?? {};
+
+      try {
+        const result = await db.updateAddressList(listId, { name, referenceType, referenceId, address, comment });
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Address list entry not found.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'type-required') {
+          sendJson(res, 400, { message: 'A valid reference type is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-reference') {
+          sendJson(res, 400, { message: 'The selected reference is invalid.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to update address list entry.');
+        }
+
+        const [groups, mikrotiks] = await Promise.all([db.listGroups(), db.listMikrotiks()]);
+        sendJson(res, 200, {
+          message: 'Address list entry updated successfully.',
+          addressList: mapAddressList(result.addressList, groups, mikrotiks)
+        });
+      } catch (error) {
+        console.error('Update address list error', error);
+        sendJson(res, 500, { message: 'Unable to update the address list entry right now.' });
+      }
+    };
+
+    const handleDeleteAddressList = async (listId) => {
+      if (!Number.isInteger(listId) || listId <= 0) {
+        sendJson(res, 400, { message: 'A valid address list id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.deleteAddressList(listId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Address list entry not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to delete address list entry.');
+        }
+
+        sendNoContent(res);
+      } catch (error) {
+        console.error('Delete address list error', error);
+        sendJson(res, 500, { message: 'Unable to delete the address list entry right now.' });
+      }
+    };
+
+    const handleCreateFirewallFilter = async () => {
+      const body = await parseJsonBody(req);
+      const {
+        name,
+        groupId,
+        chain,
+        sourceAddressListId,
+        destinationAddressListId,
+        sourcePort,
+        destinationPort,
+        states,
+        action,
+        enabled,
+        comment
+      } = body ?? {};
+
+      try {
+        const result = await db.createFirewallFilter({
+          name,
+          groupId,
+          chain,
+          sourceAddressListId,
+          destinationAddressListId,
+          sourcePort,
+          destinationPort,
+          states,
+          action,
+          enabled,
+          comment
+        });
+
+        if (!result.success && result.reason === 'invalid-group') {
+          sendJson(res, 400, { message: 'The selected group does not exist.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-chain') {
+          sendJson(res, 400, { message: 'A valid firewall chain is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-source-address-list') {
+          sendJson(res, 400, { message: 'Select a valid source address list.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-destination-address-list') {
+          sendJson(res, 400, { message: 'Select a valid destination address list.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-action') {
+          sendJson(res, 400, { message: 'A valid action (accept or drop) is required.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to create firewall filter.');
+        }
+
+        const [addressLists, groups] = await Promise.all([db.listAddressLists(), db.listGroups()]);
+        sendJson(res, 201, {
+          message: 'Firewall filter created successfully.',
+          filter: mapFirewallFilter(result.firewallFilter, groups, addressLists)
+        });
+      } catch (error) {
+        console.error('Create firewall filter error', error);
+        sendJson(res, 500, { message: 'Unable to create the firewall filter right now.' });
+      }
+    };
+
+    const handleUpdateFirewallFilter = async (filterId) => {
+      if (!Number.isInteger(filterId) || filterId <= 0) {
+        sendJson(res, 400, { message: 'A valid firewall rule id is required.' });
+        return;
+      }
+
+      const body = await parseJsonBody(req);
+      const {
+        name,
+        groupId,
+        chain,
+        sourceAddressListId,
+        destinationAddressListId,
+        sourcePort,
+        destinationPort,
+        states,
+        action,
+        enabled,
+        comment
+      } = body ?? {};
+
+      try {
+        const result = await db.updateFirewallFilter(filterId, {
+          name,
+          groupId,
+          chain,
+          sourceAddressListId,
+          destinationAddressListId,
+          sourcePort,
+          destinationPort,
+          states,
+          action,
+          enabled,
+          comment
+        });
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Firewall rule not found.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-group') {
+          sendJson(res, 400, { message: 'The selected group does not exist.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-chain') {
+          sendJson(res, 400, { message: 'A valid firewall chain is required.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-source-address-list') {
+          sendJson(res, 400, { message: 'Select a valid source address list.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-destination-address-list') {
+          sendJson(res, 400, { message: 'Select a valid destination address list.' });
+          return;
+        }
+
+        if (!result.success && result.reason === 'invalid-action') {
+          sendJson(res, 400, { message: 'A valid action (accept or drop) is required.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to update firewall filter.');
+        }
+
+        const [addressLists, groups] = await Promise.all([db.listAddressLists(), db.listGroups()]);
+        sendJson(res, 200, {
+          message: 'Firewall filter updated successfully.',
+          filter: mapFirewallFilter(result.firewallFilter, groups, addressLists)
+        });
+      } catch (error) {
+        console.error('Update firewall filter error', error);
+        sendJson(res, 500, { message: 'Unable to update the firewall filter right now.' });
+      }
+    };
+
+    const handleDeleteFirewallFilter = async (filterId) => {
+      if (!Number.isInteger(filterId) || filterId <= 0) {
+        sendJson(res, 400, { message: 'A valid firewall rule id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.deleteFirewallFilter(filterId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Firewall rule not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to delete firewall filter.');
+        }
+
+        sendNoContent(res);
+      } catch (error) {
+        console.error('Delete firewall filter error', error);
+        sendJson(res, 500, { message: 'Unable to delete the firewall filter right now.' });
       }
     };
 
@@ -1709,6 +2357,8 @@ const bootstrap = async () => {
 
     const handleListTunnels = async () => {
       try {
+        await db.discoverTunnelsFromInventory();
+
         const [tunnels, groups, mikrotiks] = await Promise.all([
           db.listTunnels(),
           db.listGroups(),
@@ -1738,7 +2388,11 @@ const bootstrap = async () => {
         enabled,
         tags,
         notes,
-        metrics
+        metrics,
+        profile,
+        monitoring,
+        ospf,
+        vpnProfiles
       } = body ?? {};
 
       const normalizedName = normalizeString(name);
@@ -1759,7 +2413,11 @@ const bootstrap = async () => {
           enabled,
           tags,
           notes,
-          metrics
+          metrics,
+          profile,
+          monitoring,
+          ospf,
+          vpnProfiles
         });
 
         if (!result.success && result.reason === 'invalid-group') {
@@ -1880,6 +2538,163 @@ const bootstrap = async () => {
       } catch (error) {
         console.error('Delete tunnel error', error);
         sendJson(res, 500, { message: 'Unable to delete the tunnel right now.' });
+      }
+    };
+
+    const handleGenerateSecret = async () => {
+      try {
+        const body = await parseJsonBody(req);
+        const requestedBytes = parseInteger(body?.bytes ?? body?.length);
+        const encoding = typeof body?.encoding === 'string' ? body.encoding : undefined;
+        const result = generateSecret({ bytes: requestedBytes ?? undefined, encoding });
+
+        sendJson(res, 200, {
+          ...result,
+          generatedAt: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Secret generation error', error);
+        sendJson(res, 500, { message: 'Unable to generate a secret right now.' });
+      }
+    };
+
+    const handlePingDiagnostics = async () => {
+      const body = await parseJsonBody(req);
+      const targets = sanitizeDiagnosticTargets(body?.targets ?? body?.addresses ?? []);
+      if (targets.length === 0) {
+        sendJson(res, 400, { message: 'At least one target address is required.' });
+        return;
+      }
+
+      const tunnelId = parseInteger(body?.tunnelId);
+      const count = parseInteger(body?.count) ?? 4;
+      const timeout = parseInteger(body?.timeout);
+      const command = process.platform === 'win32' ? 'ping' : 'ping';
+      const results = [];
+
+      try {
+        for (const address of targets) {
+          const args = process.platform === 'win32'
+            ? ['-n', String(count), address]
+            : ['-c', String(count), '-W', '2', address];
+          const outcome = await runProcess(command, args, {
+            timeout: timeout ? Math.max(timeout, 1000) : 15000
+          });
+          const output = (outcome.stdout || outcome.stderr || '').trim();
+          const latencyMs = parsePingLatency(output);
+
+          results.push({
+            address,
+            success: Boolean(outcome.success),
+            command: `${command} ${args.join(' ')}`.trim(),
+            exitCode: outcome.code,
+            timedOut: Boolean(outcome.timedOut),
+            latencyMs: latencyMs ?? null,
+            output
+          });
+        }
+
+        if (Number.isInteger(tunnelId) && tunnelId > 0) {
+          const payload = {
+            monitoring: {
+              lastPingResults: results.map((entry) => ({
+                address: entry.address,
+                success: entry.success,
+                latencyMs: entry.latencyMs,
+                output: entry.output,
+                checkedAt: new Date().toISOString()
+              })),
+              lastUpdatedAt: new Date().toISOString()
+            }
+          };
+
+          try {
+            await db.updateTunnel(tunnelId, payload);
+          } catch (error) {
+            console.warn('Failed to persist ping diagnostics', error);
+          }
+        }
+
+        sendJson(res, 200, { results });
+      } catch (error) {
+        console.error('Ping diagnostics error', error);
+        sendJson(res, 500, { message: 'Unable to execute ping diagnostics right now.' });
+      }
+    };
+
+    const handleTracerouteDiagnostics = async () => {
+      const body = await parseJsonBody(req);
+      const targets = sanitizeDiagnosticTargets(body?.targets ?? body?.addresses ?? []);
+      if (targets.length === 0) {
+        sendJson(res, 400, { message: 'At least one target address is required.' });
+        return;
+      }
+
+      const tunnelId = parseInteger(body?.tunnelId);
+      const maxHops = parseInteger(body?.maxHops) ?? 30;
+      const timeout = parseInteger(body?.timeout);
+      const traceTimeout = timeout ? Math.max(timeout, 1000) : 30000;
+
+      const preferTraceroute = process.platform === 'win32' ? 'tracert' : 'traceroute';
+      const fallbackTraceroute = process.platform === 'win32' ? 'tracert' : 'tracepath';
+
+      const results = [];
+
+      try {
+        for (const address of targets) {
+          const baseArgs = process.platform === 'win32'
+            ? ['-d', address]
+            : ['-n', '-m', String(maxHops), address];
+
+          let command = preferTraceroute;
+          let args = [...baseArgs];
+          let outcome = await runProcess(command, args, { timeout: traceTimeout });
+
+          if (!outcome.success && outcome.error && outcome.error.code === 'ENOENT' && fallbackTraceroute !== command) {
+            command = fallbackTraceroute;
+            args = process.platform === 'win32' ? ['-d', address] : ['-n', address];
+            outcome = await runProcess(command, args, { timeout: traceTimeout });
+          }
+
+          const output = (outcome.stdout || outcome.stderr || '').trim();
+          const hops = parseTracerouteOutput(output);
+
+          results.push({
+            address,
+            success: Boolean(outcome.success),
+            command: `${command} ${args.join(' ')}`.trim(),
+            exitCode: outcome.code,
+            timedOut: Boolean(outcome.timedOut),
+            output,
+            hops
+          });
+        }
+
+        if (Number.isInteger(tunnelId) && tunnelId > 0) {
+          const payload = {
+            monitoring: {
+              lastTraceResults: results.map((entry) => ({
+                address: entry.address,
+                success: entry.success,
+                hops: entry.hops,
+                output: entry.output,
+                checkedAt: new Date().toISOString()
+              })),
+              lastUpdatedAt: new Date().toISOString()
+            }
+          };
+
+          try {
+            await db.updateTunnel(tunnelId, payload);
+          } catch (error) {
+            console.warn('Failed to persist traceroute diagnostics', error);
+          }
+        }
+
+        sendJson(res, 200, { results });
+      } catch (error) {
+        console.error('Traceroute diagnostics error', error);
+        sendJson(res, 500, { message: 'Unable to execute traceroute diagnostics right now.' });
       }
     };
 
@@ -2238,9 +3053,65 @@ const bootstrap = async () => {
         }
       }
 
+      if (resourceSegments[0] === 'mikrotiks' && resourceSegments.length === 3) {
+        const deviceId = Number.parseInt(resourceSegments[1], 10);
+        const action = resourceSegments[2];
+
+        if (method === 'POST' && action === 'test-connectivity') {
+          await handleTestMikrotikConnectivity(deviceId);
+          return;
+        }
+      }
+
       if (method === 'POST' && (canonicalPath === '/api/mikrotiks' || resourcePath === '/mikrotiks')) {
         await handleCreateMikrotik();
         return;
+      }
+
+      if (method === 'GET' && (canonicalPath === '/api/firewall' || resourcePath === '/firewall')) {
+        await handleListFirewallInventory();
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/address-lists' || resourcePath === '/address-lists')) {
+        await handleCreateAddressList();
+        return;
+      }
+
+      if (resourceSegments[0] === 'address-lists' && resourceSegments.length === 2) {
+        const listId = Number.parseInt(resourceSegments[1], 10);
+
+        if (method === 'PUT') {
+          await handleUpdateAddressList(listId);
+          return;
+        }
+
+        if (method === 'DELETE') {
+          await handleDeleteAddressList(listId);
+          return;
+        }
+      }
+
+      if (
+        method === 'POST' &&
+        (canonicalPath === '/api/firewall/filters' || resourcePath === '/firewall/filters')
+      ) {
+        await handleCreateFirewallFilter();
+        return;
+      }
+
+      if (resourceSegments[0] === 'firewall' && resourceSegments[1] === 'filters' && resourceSegments.length === 3) {
+        const filterId = Number.parseInt(resourceSegments[2], 10);
+
+        if (method === 'PUT') {
+          await handleUpdateFirewallFilter(filterId);
+          return;
+        }
+
+        if (method === 'DELETE') {
+          await handleDeleteFirewallFilter(filterId);
+          return;
+        }
       }
 
       if (method === 'GET' && (canonicalPath === '/api/tunnels' || resourcePath === '/tunnels')) {
@@ -2265,6 +3136,24 @@ const bootstrap = async () => {
 
       if (method === 'POST' && (canonicalPath === '/api/tunnels' || resourcePath === '/tunnels')) {
         await handleCreateTunnel();
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/tools/secret' || resourcePath === '/tools/secret')) {
+        await handleGenerateSecret();
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/tools/ping' || resourcePath === '/tools/ping')) {
+        await handlePingDiagnostics();
+        return;
+      }
+
+      if (
+        method === 'POST' &&
+        (canonicalPath === '/api/tools/traceroute' || resourcePath === '/tools/traceroute')
+      ) {
+        await handleTracerouteDiagnostics();
         return;
       }
 
