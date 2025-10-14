@@ -340,6 +340,85 @@ const Groups = () => {
     }));
   };
 
+  useEffect(() => {
+    if (!selectedGroupId && rootGroupId) {
+      setSelectedGroupId(rootGroupId);
+    }
+  }, [rootGroupId, selectedGroupId]);
+
+  useEffect(() => {
+    if (selectedGroupId && !groupLookup.has(selectedGroupId)) {
+      if (rootGroupId) {
+        setSelectedGroupId(rootGroupId);
+      } else if (orderedGroups.length > 0) {
+        setSelectedGroupId(orderedGroups[0].id);
+      } else {
+        setSelectedGroupId(null);
+      }
+    }
+  }, [groupLookup, orderedGroups, rootGroupId, selectedGroupId]);
+
+  useEffect(() => {
+    if (!filteredTreeIds.length) {
+      return;
+    }
+
+    if (!selectedGroupId || !filteredTreeIds.includes(selectedGroupId)) {
+      setSelectedGroupId(filteredTreeIds[0]);
+    }
+  }, [filteredTreeIds, selectedGroupId]);
+
+  useEffect(() => {
+    if (!loading && filteredTreeIds.length === 0) {
+      setSelectedGroupId(null);
+    }
+  }, [filteredTreeIds, loading]);
+
+  const selectedGroup = useMemo(() => (selectedGroupId ? groupLookup.get(selectedGroupId) ?? null : null), [
+    selectedGroupId,
+    groupLookup
+  ]);
+
+  const selectedTreeNode = useMemo(() => findNodeById(tree, selectedGroupId), [tree, selectedGroupId]);
+
+  const descendantCount = useMemo(() => {
+    if (!selectedTreeNode) {
+      return 0;
+    }
+
+    return collectDescendantIds(selectedTreeNode).size;
+  }, [selectedTreeNode]);
+
+  const directChildren = useMemo(
+    () => groups.filter((group) => group.parentId === (selectedGroup ? selectedGroup.id : null)),
+    [groups, selectedGroup]
+  );
+
+  const selectedBreadcrumb = useMemo(() => {
+    if (!selectedGroup) {
+      return [];
+    }
+
+    const chain = [];
+    let current = selectedGroup;
+    const guard = new Set();
+
+    while (current && !guard.has(current.id)) {
+      chain.unshift(current.name);
+      guard.add(current.id);
+
+      if (!current.parentId) {
+        break;
+      }
+
+      current = groupLookup.get(current.parentId) ?? null;
+    }
+
+    return chain;
+  }, [groupLookup, selectedGroup]);
+
+  const hasTreeResults = filteredTree.length > 0;
+
   const handleCreateGroup = async (event) => {
     event.preventDefault();
     setCreateBusy(true);

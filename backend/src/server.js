@@ -1,9 +1,187 @@
 import http from 'http';
+import https from 'https';
 import { URL } from 'url';
 import crypto from 'crypto';
+import { spawn } from 'child_process';
 import initializeDatabase, { resolveDatabaseFile } from './database.js';
 import { ensureDatabaseConfig, getConfigFilePath } from './config.js';
 import getProjectVersion from './version.js';
+
+const normalizeHeaderInit = (headersInit = {}) => {
+  const headers = {};
+
+  if (Array.isArray(headersInit)) {
+    headersInit.forEach(([key, value]) => {
+      if (key !== undefined && value !== undefined) {
+        headers[String(key).toLowerCase()] = String(value);
+      }
+    });
+    return headers;
+  }
+
+  if (headersInit instanceof Map) {
+    headersInit.forEach((value, key) => {
+      if (key !== undefined && value !== undefined) {
+        headers[String(key).toLowerCase()] = String(value);
+      }
+    });
+    return headers;
+  }
+
+  Object.entries(headersInit).forEach(([key, value]) => {
+    if (value !== undefined) {
+      headers[String(key).toLowerCase()] = String(value);
+    }
+  });
+
+  return headers;
+};
+
+const createNodeFetch = () => {
+  return (input, init = {}) =>
+    new Promise((resolve, reject) => {
+      let settled = false;
+
+      const fulfill = (value) => {
+        if (!settled) {
+          settled = true;
+          resolve(value);
+        }
+      };
+
+      const fail = (error) => {
+        if (!settled) {
+          settled = true;
+          reject(error);
+        }
+      };
+
+      let url;
+
+      try {
+        url = typeof input === 'string' ? new URL(input) : new URL(input.url ?? input.href);
+      } catch (error) {
+        fail(error);
+        return;
+      }
+
+      const transport = url.protocol === 'https:' ? https : http;
+      const method = (init.method || 'GET').toUpperCase();
+      const headers = normalizeHeaderInit(init.headers);
+
+      const requestOptions = {
+        method,
+        headers
+      };
+
+      const request = transport.request(url, requestOptions, (response) => {
+        const chunks = [];
+
+        response.on('data', (chunk) => {
+          chunks.push(Buffer.from(chunk));
+        });
+
+        response.on('end', () => {
+          const bodyBuffer = Buffer.concat(chunks);
+          const text = bodyBuffer.toString('utf-8');
+          const headerStore = new Map();
+
+          Object.entries(response.headers).forEach(([key, value]) => {
+            if (value === undefined) {
+              return;
+            }
+
+            if (Array.isArray(value)) {
+              headerStore.set(key.toLowerCase(), value.join(', '));
+            } else {
+              headerStore.set(key.toLowerCase(), String(value));
+            }
+          });
+
+          fulfill({
+            ok: (response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 300,
+            status: response.statusCode ?? 0,
+            statusText: response.statusMessage ?? '',
+            headers: {
+              get(name) {
+                return headerStore.get(String(name).toLowerCase()) ?? null;
+              }
+            },
+            async json() {
+              if (!text) {
+                return {};
+              }
+
+              try {
+                return JSON.parse(text);
+              } catch (error) {
+                throw new Error('Invalid JSON response');
+              }
+            },
+            async text() {
+              return text;
+            }
+          });
+        });
+
+        response.on('error', (error) => {
+          fail(error);
+        });
+      });
+
+      request.on('error', (error) => {
+        fail(error);
+      });
+
+      if (init.signal) {
+        const abortHandler = () => {
+          const abortError = new Error('The operation was aborted');
+          abortError.name = 'AbortError';
+          fail(abortError);
+          request.destroy(abortError);
+        };
+
+        if (init.signal.aborted) {
+          abortHandler();
+          return;
+        }
+
+        init.signal.addEventListener('abort', abortHandler, { once: true });
+        request.on('close', () => {
+          init.signal.removeEventListener('abort', abortHandler);
+        });
+      }
+
+      if (init.body) {
+        if (typeof init.body === 'string' || Buffer.isBuffer(init.body)) {
+          request.write(init.body);
+        } else if (init.body instanceof URLSearchParams) {
+          request.write(init.body.toString());
+        } else {
+          request.write(JSON.stringify(init.body));
+        }
+      }
+
+      request.end();
+    });
+};
+
+let cachedFetch = null;
+
+const resolveFetch = () => {
+  if (cachedFetch) {
+    return cachedFetch;
+  }
+
+  if (typeof globalThis.fetch === 'function') {
+    cachedFetch = globalThis.fetch.bind(globalThis);
+    return cachedFetch;
+  }
+
+  cachedFetch = createNodeFetch();
+  globalThis.fetch = cachedFetch;
+  return cachedFetch;
+};
 
 const normalizeString = (value) => (typeof value === 'string' ? value.trim() : '');
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -104,6 +282,313 @@ const parseJsonBody = (req) =>
     });
   });
 
+const DEFAULT_PHPIPAM_TIMEOUT_MS = 7000;
+
+const normalisePhpIpamBaseUrl = (baseUrl) => {
+  if (typeof baseUrl !== 'string') {
+    return '';
+  }
+
+  const trimmed = baseUrl.trim();
+
+  if (!trimmed) {
+    return '';
+  }
+
+  return trimmed.replace(/\s+/g, '').replace(/\/+$/, '');
+};
+
+const resolvePhpIpamId = (record, fallbackKeys = []) => {
+  if (!record || typeof record !== 'object') {
+    return null;
+  }
+
+  const candidates = [
+    'id',
+    'ID',
+    'sectionId',
+    'sectionID',
+    'sectionid',
+    'subnetId',
+    'subnetID',
+    'subnetid',
+    'locationId',
+    'locationID',
+    'locationid',
+    ...fallbackKeys
+  ];
+
+  for (const key of candidates) {
+    if (record[key] !== undefined && record[key] !== null && record[key] !== '') {
+      return record[key];
+    }
+  }
+
+  return null;
+};
+
+const normalisePhpIpamList = (data) => {
+  if (!data) {
+    return [];
+  }
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (typeof data === 'object') {
+    return Object.values(data);
+  }
+
+  return [];
+};
+
+const intToIpv4 = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  const unsigned = numeric >>> 0;
+  return [unsigned >>> 24, (unsigned >>> 16) & 255, (unsigned >>> 8) & 255, unsigned & 255].join('.');
+};
+
+const formatPhpIpamSubnet = (value) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    if (value.includes(':') || value.includes('.')) {
+      return value;
+    }
+
+    const numeric = Number(value);
+
+    if (!Number.isNaN(numeric)) {
+      return intToIpv4(numeric) ?? value;
+    }
+
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    return intToIpv4(value);
+  }
+
+  return `${value}`;
+};
+
+const phpIpamFetch = async (ipam, endpoint, options = {}) => {
+  const fetchImpl = await resolveFetch();
+  const baseUrl = normalisePhpIpamBaseUrl(ipam.baseUrl);
+
+  if (!baseUrl) {
+    throw new Error('Missing base URL');
+  }
+
+  const appId = ipam.appId ? encodeURIComponent(ipam.appId) : null;
+
+  if (!appId) {
+    throw new Error('Missing App ID');
+  }
+
+  const trimmedEndpoint = `${endpoint || ''}`.replace(/^\/+/, '');
+  const url = `${baseUrl}/${appId}/${trimmedEndpoint}`;
+
+  const allowNotFound = Boolean(options.allowNotFound);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeout ?? DEFAULT_PHPIPAM_TIMEOUT_MS);
+
+  let response;
+
+  try {
+    response = await fetchImpl(url, {
+      method: options.method || 'GET',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mik-Management/1.0',
+        'phpipam-token': ipam.appCode ?? '',
+        ...(options.headers || {})
+      },
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('phpIPAM request timed out');
+    }
+    throw new Error(error.message || 'Failed to reach phpIPAM');
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  let payload;
+  const contentType = response.headers.get('content-type') || '';
+
+  try {
+    if (contentType.includes('application/json')) {
+      payload = await response.json();
+    } else {
+      const text = await response.text();
+      payload = text ? JSON.parse(text) : {};
+    }
+  } catch (error) {
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    throw new Error('Unexpected response from phpIPAM');
+  }
+
+  if (!response.ok) {
+    if (response.status === 404 && allowNotFound) {
+      return [];
+    }
+
+    const message = payload && typeof payload === 'object' && payload.message ? payload.message : `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+
+  if (payload && typeof payload === 'object' && payload.success === false) {
+    if (allowNotFound && /not\s+found/i.test(payload.message || '')) {
+      return [];
+    }
+
+    throw new Error(payload.message || 'phpIPAM request failed');
+  }
+
+  if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {
+    if (payload.data === null && allowNotFound) {
+      return [];
+    }
+
+    return payload.data;
+  }
+
+  return payload;
+};
+
+const testPhpIpamConnection = async (ipam) => {
+  try {
+    const response = await phpIpamFetch(ipam, 'user/');
+
+    if (response && typeof response === 'object') {
+      const username = response.username || response.data?.username;
+      return {
+        status: 'connected',
+        message: username ? `Authenticated as ${username}` : 'phpIPAM connection succeeded'
+      };
+    }
+
+    return { status: 'connected', message: 'phpIPAM connection succeeded' };
+  } catch (error) {
+    return { status: 'failed', message: error.message || 'Unable to reach phpIPAM' };
+  }
+};
+
+const syncPhpIpamStructure = async (ipam) => {
+  const sectionsPayload = normalisePhpIpamList(await phpIpamFetch(ipam, 'sections/'));
+  const sections = sectionsPayload.map((section) => {
+    const identifier = resolvePhpIpamId(section, ['section']);
+    const sectionId = Number.parseInt(identifier, 10);
+    const metadata = {};
+
+    if (section.section !== undefined) {
+      metadata.slug = section.section;
+    }
+
+    if (section.order !== undefined) {
+      metadata.order = section.order;
+    }
+
+    return {
+      id: Number.isInteger(sectionId) ? sectionId : identifier,
+      name: section.name || section.section || `Section ${identifier ?? ''}`,
+      description: section.description || '',
+      metadata
+    };
+  });
+
+  let datacentersPayload = [];
+
+  try {
+    datacentersPayload = normalisePhpIpamList(await phpIpamFetch(ipam, 'tools/locations/', { allowNotFound: true }));
+  } catch (error) {
+    if (!/not\s+found/i.test(error.message || '')) {
+      throw error;
+    }
+  }
+
+  if (!datacentersPayload.length) {
+    datacentersPayload = normalisePhpIpamList(await phpIpamFetch(ipam, 'tools/sites/', { allowNotFound: true }));
+  }
+
+  const datacenters = datacentersPayload.map((entry) => {
+    const identifier = resolvePhpIpamId(entry, ['code']);
+    const dcId = Number.parseInt(identifier, 10);
+    const metadata = {};
+
+    if (entry.code) {
+      metadata.code = entry.code;
+    }
+
+    if (entry.address) {
+      metadata.address = entry.address;
+    }
+
+    return {
+      id: Number.isInteger(dcId) ? dcId : identifier,
+      name: entry.name || entry.code || `Datacenter ${identifier ?? ''}`,
+      description: entry.description || entry.address || '',
+      metadata
+    };
+  });
+
+  const ranges = [];
+
+  for (const section of sections) {
+    const sectionId = section.id ?? resolvePhpIpamId(section, ['sectionId']);
+
+    if (!sectionId) {
+      continue;
+    }
+
+    const rawRanges = normalisePhpIpamList(
+      await phpIpamFetch(ipam, `sections/${sectionId}/subnets/`, { allowNotFound: true })
+    );
+
+    for (const entry of rawRanges) {
+      const identifier = resolvePhpIpamId(entry, ['subnetId', 'subnet']);
+      const rangeId = Number.parseInt(identifier, 10);
+
+      const subnet = formatPhpIpamSubnet(entry.subnet ?? entry.network ?? identifier);
+      const mask = entry.mask ?? entry.cidr ?? entry.bit ?? entry.netmask;
+      const parsedMask = Number.parseInt(mask, 10);
+      const cidr = subnet && Number.isInteger(parsedMask) ? `${subnet}/${parsedMask}` : subnet || identifier;
+
+      const metadata = {
+        cidr: cidr || '',
+        sectionId,
+        vlanId: entry.vlanId ?? entry.vlanid ?? entry.vlan ?? null
+      };
+
+      Object.keys(metadata).forEach((key) => {
+        if (metadata[key] === null || metadata[key] === undefined || metadata[key] === '') {
+          delete metadata[key];
+        }
+      });
+
+      ranges.push({
+        id: Number.isInteger(rangeId) ? rangeId : identifier,
+        name: entry.description || entry.hostname || cidr || `Range ${identifier ?? ''}`,
+        description: entry.description || '',
+        metadata
+      });
+    }
+  }
+
+  return { sections, datacenters, ranges };
+};
+
 const parsePermissions = (permissions = {}) => {
   const normalized = { ...basePermissions };
   if (permissions && typeof permissions === 'object') {
@@ -146,6 +631,45 @@ const parseInteger = (value) => {
   return Number.isInteger(parsed) ? parsed : null;
 };
 
+const generateSecret = ({ bytes, encoding } = {}) => {
+  const minBytes = 16;
+  const maxBytes = 128;
+  const normalizedBytes = Math.min(Math.max(Number(bytes) || 32, minBytes), maxBytes);
+  const normalizedEncoding = typeof encoding === 'string' ? encoding.toLowerCase() : 'base64url';
+  const buffer = crypto.randomBytes(normalizedBytes);
+
+  if (normalizedEncoding === 'hex') {
+    return {
+      secret: buffer.toString('hex'),
+      encoding: 'hex',
+      bytes: normalizedBytes,
+      entropyBits: normalizedBytes * 8
+    };
+  }
+
+  if (normalizedEncoding === 'base64') {
+    return {
+      secret: buffer.toString('base64'),
+      encoding: 'base64',
+      bytes: normalizedBytes,
+      entropyBits: normalizedBytes * 8
+    };
+  }
+
+  const base64Url = buffer
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/u, '');
+
+  return {
+    secret: base64Url,
+    encoding: 'base64url',
+    bytes: normalizedBytes,
+    entropyBits: normalizedBytes * 8
+  };
+};
+
 const normalizeTagsInput = (value) => {
   if (!value) {
     return [];
@@ -168,6 +692,26 @@ const normalizeNotesInput = (value) => {
   }
 
   return value.trim();
+};
+
+const deepClone = (value, fallback = null) => {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== 'object') {
+    return value;
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (error) {
+    return fallback;
+  }
 };
 
 const buildRouterosPayload = (input = {}) => ({
@@ -215,6 +759,163 @@ const normalizeRoleIds = (roleIds, roles) => {
 const ensureNumber = (value, fallback) => {
   const parsed = parseInteger(value);
   return parsed ?? fallback;
+};
+
+const runProcess = (command, args = [], { timeout = 15000 } = {}) =>
+  new Promise((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    let timer;
+
+    try {
+      const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+
+      const finalize = (result) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        if (timer) {
+          clearTimeout(timer);
+        }
+        resolve(result);
+      };
+
+      timer = setTimeout(() => {
+        child.kill('SIGKILL');
+        finalize({
+          success: false,
+          code: null,
+          signal: 'SIGKILL',
+          stdout,
+          stderr,
+          timedOut: true
+        });
+      }, Math.max(timeout, 1000));
+
+      child.stdout.on('data', (chunk) => {
+        stdout += chunk.toString();
+      });
+
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk.toString();
+      });
+
+      child.on('error', (error) => {
+        finalize({
+          success: false,
+          code: null,
+          signal: null,
+          stdout,
+          stderr: stderr ? `${stderr}\n${error.message}` : error.message,
+          timedOut: false,
+          error
+        });
+      });
+
+      child.on('close', (code, signal) => {
+        finalize({
+          success: code === 0,
+          code,
+          signal,
+          stdout,
+          stderr,
+          timedOut: false
+        });
+      });
+    } catch (error) {
+      resolve({
+        success: false,
+        code: null,
+        signal: null,
+        stdout,
+        stderr: error.message,
+        timedOut: false,
+        error
+      });
+    }
+  });
+
+const parsePingLatency = (output) => {
+  if (!output) {
+    return null;
+  }
+
+  const linuxMatch = output.match(/=\s*([^/]+)\/([^/]+)\/([^/]+)\/([^/\s]+)\s*ms/);
+  if (linuxMatch && linuxMatch[2]) {
+    const parsed = Number.parseFloat(linuxMatch[2]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  const winMatch = output.match(/Average =\s*([0-9.]+)ms/i);
+  if (winMatch && winMatch[1]) {
+    const parsed = Number.parseFloat(winMatch[1]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+};
+
+const parseTracerouteOutput = (output) => {
+  if (!output) {
+    return [];
+  }
+
+  const hops = [];
+  const lines = output.split(/\r?\n/);
+  const hopPattern = /^(\s*)(\d+)\s+([^\s]+)\s+(.*)$/;
+
+  lines.forEach((line) => {
+    const match = line.match(hopPattern);
+    if (!match) {
+      return;
+    }
+
+    const hopIndex = Number.parseInt(match[2], 10);
+    if (!Number.isInteger(hopIndex)) {
+      return;
+    }
+
+    const rest = match[4];
+    const latencyMatch = rest.match(/([0-9.]+)\s*ms/);
+    const latency = latencyMatch ? Number.parseFloat(latencyMatch[1]) : null;
+
+    hops.push({
+      hop: hopIndex,
+      address: match[3],
+      latencyMs: Number.isFinite(latency) ? latency : null
+    });
+  });
+
+  return hops;
+};
+
+const sanitizeDiagnosticTargets = (targets, fallback = []) => {
+  if (!Array.isArray(targets)) {
+    return fallback;
+  }
+
+  const normalized = [];
+  const seen = new Set();
+
+  targets.forEach((target) => {
+    const address = typeof target === 'string' ? target.trim() : normalizeString(target?.address ?? '');
+    if (!address) {
+      return;
+    }
+
+    const key = address.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    normalized.push(address);
+  });
+
+  return normalized;
 };
 
 const mapRole = (role) => ({
@@ -399,6 +1100,10 @@ const mapTunnel = (tunnel, groups, mikrotiks) => {
       packetLoss: typeof tunnel.metrics?.packetLoss === 'number' ? tunnel.metrics.packetLoss : null,
       lastCheckedAt: tunnel.metrics?.lastCheckedAt ?? null
     },
+    profile: deepClone(tunnel.profile ?? null, null),
+    monitoring: deepClone(tunnel.monitoring ?? null, null),
+    ospf: deepClone(tunnel.ospf ?? null, null),
+    vpnProfiles: deepClone(tunnel.vpnProfiles ?? null, null),
     createdAt: tunnel.createdAt,
     updatedAt: tunnel.updatedAt
   };
@@ -1652,6 +2357,8 @@ const bootstrap = async () => {
 
     const handleListTunnels = async () => {
       try {
+        await db.discoverTunnelsFromInventory();
+
         const [tunnels, groups, mikrotiks] = await Promise.all([
           db.listTunnels(),
           db.listGroups(),
@@ -1681,7 +2388,11 @@ const bootstrap = async () => {
         enabled,
         tags,
         notes,
-        metrics
+        metrics,
+        profile,
+        monitoring,
+        ospf,
+        vpnProfiles
       } = body ?? {};
 
       const normalizedName = normalizeString(name);
@@ -1702,7 +2413,11 @@ const bootstrap = async () => {
           enabled,
           tags,
           notes,
-          metrics
+          metrics,
+          profile,
+          monitoring,
+          ospf,
+          vpnProfiles
         });
 
         if (!result.success && result.reason === 'invalid-group') {
@@ -1826,6 +2541,163 @@ const bootstrap = async () => {
       }
     };
 
+    const handleGenerateSecret = async () => {
+      try {
+        const body = await parseJsonBody(req);
+        const requestedBytes = parseInteger(body?.bytes ?? body?.length);
+        const encoding = typeof body?.encoding === 'string' ? body.encoding : undefined;
+        const result = generateSecret({ bytes: requestedBytes ?? undefined, encoding });
+
+        sendJson(res, 200, {
+          ...result,
+          generatedAt: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Secret generation error', error);
+        sendJson(res, 500, { message: 'Unable to generate a secret right now.' });
+      }
+    };
+
+    const handlePingDiagnostics = async () => {
+      const body = await parseJsonBody(req);
+      const targets = sanitizeDiagnosticTargets(body?.targets ?? body?.addresses ?? []);
+      if (targets.length === 0) {
+        sendJson(res, 400, { message: 'At least one target address is required.' });
+        return;
+      }
+
+      const tunnelId = parseInteger(body?.tunnelId);
+      const count = parseInteger(body?.count) ?? 4;
+      const timeout = parseInteger(body?.timeout);
+      const command = process.platform === 'win32' ? 'ping' : 'ping';
+      const results = [];
+
+      try {
+        for (const address of targets) {
+          const args = process.platform === 'win32'
+            ? ['-n', String(count), address]
+            : ['-c', String(count), '-W', '2', address];
+          const outcome = await runProcess(command, args, {
+            timeout: timeout ? Math.max(timeout, 1000) : 15000
+          });
+          const output = (outcome.stdout || outcome.stderr || '').trim();
+          const latencyMs = parsePingLatency(output);
+
+          results.push({
+            address,
+            success: Boolean(outcome.success),
+            command: `${command} ${args.join(' ')}`.trim(),
+            exitCode: outcome.code,
+            timedOut: Boolean(outcome.timedOut),
+            latencyMs: latencyMs ?? null,
+            output
+          });
+        }
+
+        if (Number.isInteger(tunnelId) && tunnelId > 0) {
+          const payload = {
+            monitoring: {
+              lastPingResults: results.map((entry) => ({
+                address: entry.address,
+                success: entry.success,
+                latencyMs: entry.latencyMs,
+                output: entry.output,
+                checkedAt: new Date().toISOString()
+              })),
+              lastUpdatedAt: new Date().toISOString()
+            }
+          };
+
+          try {
+            await db.updateTunnel(tunnelId, payload);
+          } catch (error) {
+            console.warn('Failed to persist ping diagnostics', error);
+          }
+        }
+
+        sendJson(res, 200, { results });
+      } catch (error) {
+        console.error('Ping diagnostics error', error);
+        sendJson(res, 500, { message: 'Unable to execute ping diagnostics right now.' });
+      }
+    };
+
+    const handleTracerouteDiagnostics = async () => {
+      const body = await parseJsonBody(req);
+      const targets = sanitizeDiagnosticTargets(body?.targets ?? body?.addresses ?? []);
+      if (targets.length === 0) {
+        sendJson(res, 400, { message: 'At least one target address is required.' });
+        return;
+      }
+
+      const tunnelId = parseInteger(body?.tunnelId);
+      const maxHops = parseInteger(body?.maxHops) ?? 30;
+      const timeout = parseInteger(body?.timeout);
+      const traceTimeout = timeout ? Math.max(timeout, 1000) : 30000;
+
+      const preferTraceroute = process.platform === 'win32' ? 'tracert' : 'traceroute';
+      const fallbackTraceroute = process.platform === 'win32' ? 'tracert' : 'tracepath';
+
+      const results = [];
+
+      try {
+        for (const address of targets) {
+          const baseArgs = process.platform === 'win32'
+            ? ['-d', address]
+            : ['-n', '-m', String(maxHops), address];
+
+          let command = preferTraceroute;
+          let args = [...baseArgs];
+          let outcome = await runProcess(command, args, { timeout: traceTimeout });
+
+          if (!outcome.success && outcome.error && outcome.error.code === 'ENOENT' && fallbackTraceroute !== command) {
+            command = fallbackTraceroute;
+            args = process.platform === 'win32' ? ['-d', address] : ['-n', address];
+            outcome = await runProcess(command, args, { timeout: traceTimeout });
+          }
+
+          const output = (outcome.stdout || outcome.stderr || '').trim();
+          const hops = parseTracerouteOutput(output);
+
+          results.push({
+            address,
+            success: Boolean(outcome.success),
+            command: `${command} ${args.join(' ')}`.trim(),
+            exitCode: outcome.code,
+            timedOut: Boolean(outcome.timedOut),
+            output,
+            hops
+          });
+        }
+
+        if (Number.isInteger(tunnelId) && tunnelId > 0) {
+          const payload = {
+            monitoring: {
+              lastTraceResults: results.map((entry) => ({
+                address: entry.address,
+                success: entry.success,
+                hops: entry.hops,
+                output: entry.output,
+                checkedAt: new Date().toISOString()
+              })),
+              lastUpdatedAt: new Date().toISOString()
+            }
+          };
+
+          try {
+            await db.updateTunnel(tunnelId, payload);
+          } catch (error) {
+            console.warn('Failed to persist traceroute diagnostics', error);
+          }
+        }
+
+        sendJson(res, 200, { results });
+      } catch (error) {
+        console.error('Traceroute diagnostics error', error);
+        sendJson(res, 500, { message: 'Unable to execute traceroute diagnostics right now.' });
+      }
+    };
+
     const handleDashboardMetrics = async () => {
       try {
         const snapshot = await db.getDashboardSnapshot();
@@ -1833,6 +2705,161 @@ const bootstrap = async () => {
       } catch (error) {
         console.error('Dashboard metrics error', error);
         sendJson(res, 500, { message: 'Unable to load dashboard metrics.' });
+      }
+    };
+
+    const handleListIpams = async () => {
+      try {
+        const ipams = await db.listIpams();
+        sendJson(res, 200, { ipams });
+      } catch (error) {
+        console.error('List IPAMs error', error);
+        sendJson(res, 500, { message: 'Unable to load phpIPAM integrations.' });
+      }
+    };
+
+    const handleCreateIpam = async () => {
+      const body = await parseJsonBody(req);
+      const { name, baseUrl, appId, appCode, appPermissions, appSecurity } = body ?? {};
+
+      try {
+        const result = await db.createIpam({ name, baseUrl, appId, appCode, appPermissions, appSecurity });
+
+        if (!result.success) {
+          if (result.reason === 'duplicate-integration') {
+            sendJson(res, 409, {
+              message: 'An integration with this base URL and App ID already exists.'
+            });
+            return;
+          }
+
+          if (
+            result.reason === 'name-required' ||
+            result.reason === 'base-url-required' ||
+            result.reason === 'app-id-required' ||
+            result.reason === 'app-code-required'
+          ) {
+            sendJson(res, 400, { message: 'Name, base URL, App ID, and App Code are required.' });
+            return;
+          }
+
+          throw new Error('Unable to create IPAM integration');
+        }
+
+        let ipam = result.ipam;
+        let testResult = null;
+
+        try {
+          testResult = await testPhpIpamConnection(ipam);
+          const timestamp = new Date().toISOString();
+          await db.updateIpamStatus(ipam.id, { status: testResult.status, checkedAt: timestamp });
+          const refreshed = await db.getIpamById(ipam.id);
+          if (refreshed) {
+            ipam = refreshed;
+          }
+        } catch (error) {
+          console.warn('Initial phpIPAM test failed', error);
+        }
+
+        sendJson(res, 201, { ipam, test: testResult });
+      } catch (error) {
+        console.error('Create IPAM error', error);
+        sendJson(res, 500, { message: 'Unable to add the phpIPAM integration.' });
+      }
+    };
+
+    const handleDeleteIpam = async (ipamId) => {
+      if (!Number.isInteger(ipamId) || ipamId <= 0) {
+        sendJson(res, 400, { message: 'A valid IPAM id is required.' });
+        return;
+      }
+
+      try {
+        const result = await db.deleteIpam(ipamId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'IPAM integration not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to delete IPAM integration');
+        }
+
+        sendNoContent(res);
+      } catch (error) {
+        console.error('Delete IPAM error', error);
+        sendJson(res, 500, { message: 'Unable to delete the phpIPAM integration.' });
+      }
+    };
+
+    const handleTestIpam = async (ipamId) => {
+      if (!Number.isInteger(ipamId) || ipamId <= 0) {
+        sendJson(res, 400, { message: 'A valid IPAM id is required.' });
+        return;
+      }
+
+      try {
+        const ipam = await db.getIpamById(ipamId);
+
+        if (!ipam) {
+          sendJson(res, 404, { message: 'IPAM integration not found.' });
+          return;
+        }
+
+        const result = await testPhpIpamConnection(ipam);
+        const timestamp = new Date().toISOString();
+        await db.updateIpamStatus(ipamId, { status: result.status, checkedAt: timestamp });
+
+        sendJson(res, 200, {
+          ok: result.status === 'connected',
+          status: result.status,
+          message: result.message
+        });
+      } catch (error) {
+        console.error('Test IPAM error', error);
+        sendJson(res, 500, { message: 'Unable to verify phpIPAM connectivity.' });
+      }
+    };
+
+    const handleSyncIpam = async (ipamId) => {
+      if (!Number.isInteger(ipamId) || ipamId <= 0) {
+        sendJson(res, 400, { message: 'A valid IPAM id is required.' });
+        return;
+      }
+
+      try {
+        const ipam = await db.getIpamById(ipamId);
+
+        if (!ipam) {
+          sendJson(res, 404, { message: 'IPAM integration not found.' });
+          return;
+        }
+
+        const collections = await syncPhpIpamStructure(ipam);
+        await db.replaceIpamCollections(ipamId, collections);
+        const timestamp = new Date().toISOString();
+        await db.updateIpamStatus(ipamId, { status: 'connected', checkedAt: timestamp });
+
+        sendJson(res, 200, {
+          sections: collections.sections.length,
+          datacenters: collections.datacenters.length,
+          ranges: collections.ranges.length
+        });
+      } catch (error) {
+        console.error('Sync IPAM error', error);
+
+        if (Number.isInteger(ipamId) && ipamId > 0) {
+          try {
+            await db.updateIpamStatus(ipamId, { status: 'failed', checkedAt: new Date().toISOString() });
+          } catch (updateError) {
+            console.error('Failed to record IPAM failure status', updateError);
+          }
+        }
+
+        sendJson(res, 502, {
+          message: error.message || 'Unable to synchronise phpIPAM structure.'
+        });
       }
     };
 
@@ -1867,6 +2894,42 @@ const bootstrap = async () => {
       ) {
         await handleDashboardMetrics();
         return;
+      }
+
+      if (method === 'GET' && (canonicalPath === '/api/ipams' || resourcePath === '/ipams')) {
+        await handleListIpams();
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/ipams' || resourcePath === '/ipams')) {
+        await handleCreateIpam();
+        return;
+      }
+
+      if (resourceSegments[0] === 'ipams' && resourceSegments.length >= 2) {
+        const idSegment = resourceSegments[1];
+        const ipamId = Number.parseInt(idSegment, 10);
+
+        if (resourceSegments.length === 2) {
+          if (method === 'DELETE') {
+            await handleDeleteIpam(ipamId);
+            return;
+          }
+        }
+
+        if (resourceSegments.length === 3 && method === 'POST') {
+          const action = resourceSegments[2];
+
+          if (action === 'test') {
+            await handleTestIpam(ipamId);
+            return;
+          }
+
+          if (action === 'sync') {
+            await handleSyncIpam(ipamId);
+            return;
+          }
+        }
       }
 
       if (method === 'GET' && (canonicalPath === '/api/config-info' || resourcePath === '/config-info')) {
@@ -2073,6 +3136,24 @@ const bootstrap = async () => {
 
       if (method === 'POST' && (canonicalPath === '/api/tunnels' || resourcePath === '/tunnels')) {
         await handleCreateTunnel();
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/tools/secret' || resourcePath === '/tools/secret')) {
+        await handleGenerateSecret();
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/tools/ping' || resourcePath === '/tools/ping')) {
+        await handlePingDiagnostics();
+        return;
+      }
+
+      if (
+        method === 'POST' &&
+        (canonicalPath === '/api/tools/traceroute' || resourcePath === '/tools/traceroute')
+      ) {
+        await handleTracerouteDiagnostics();
         return;
       }
 
