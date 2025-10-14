@@ -1,10 +1,187 @@
 import http from 'http';
+import https from 'https';
 import { URL } from 'url';
 import crypto from 'crypto';
 import { spawn } from 'child_process';
 import initializeDatabase, { resolveDatabaseFile } from './database.js';
 import { ensureDatabaseConfig, getConfigFilePath } from './config.js';
 import getProjectVersion from './version.js';
+
+const normalizeHeaderInit = (headersInit = {}) => {
+  const headers = {};
+
+  if (Array.isArray(headersInit)) {
+    headersInit.forEach(([key, value]) => {
+      if (key !== undefined && value !== undefined) {
+        headers[String(key).toLowerCase()] = String(value);
+      }
+    });
+    return headers;
+  }
+
+  if (headersInit instanceof Map) {
+    headersInit.forEach((value, key) => {
+      if (key !== undefined && value !== undefined) {
+        headers[String(key).toLowerCase()] = String(value);
+      }
+    });
+    return headers;
+  }
+
+  Object.entries(headersInit).forEach(([key, value]) => {
+    if (value !== undefined) {
+      headers[String(key).toLowerCase()] = String(value);
+    }
+  });
+
+  return headers;
+};
+
+const createNodeFetch = () => {
+  return (input, init = {}) =>
+    new Promise((resolve, reject) => {
+      let settled = false;
+
+      const fulfill = (value) => {
+        if (!settled) {
+          settled = true;
+          resolve(value);
+        }
+      };
+
+      const fail = (error) => {
+        if (!settled) {
+          settled = true;
+          reject(error);
+        }
+      };
+
+      let url;
+
+      try {
+        url = typeof input === 'string' ? new URL(input) : new URL(input.url ?? input.href);
+      } catch (error) {
+        fail(error);
+        return;
+      }
+
+      const transport = url.protocol === 'https:' ? https : http;
+      const method = (init.method || 'GET').toUpperCase();
+      const headers = normalizeHeaderInit(init.headers);
+
+      const requestOptions = {
+        method,
+        headers
+      };
+
+      const request = transport.request(url, requestOptions, (response) => {
+        const chunks = [];
+
+        response.on('data', (chunk) => {
+          chunks.push(Buffer.from(chunk));
+        });
+
+        response.on('end', () => {
+          const bodyBuffer = Buffer.concat(chunks);
+          const text = bodyBuffer.toString('utf-8');
+          const headerStore = new Map();
+
+          Object.entries(response.headers).forEach(([key, value]) => {
+            if (value === undefined) {
+              return;
+            }
+
+            if (Array.isArray(value)) {
+              headerStore.set(key.toLowerCase(), value.join(', '));
+            } else {
+              headerStore.set(key.toLowerCase(), String(value));
+            }
+          });
+
+          fulfill({
+            ok: (response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 300,
+            status: response.statusCode ?? 0,
+            statusText: response.statusMessage ?? '',
+            headers: {
+              get(name) {
+                return headerStore.get(String(name).toLowerCase()) ?? null;
+              }
+            },
+            async json() {
+              if (!text) {
+                return {};
+              }
+
+              try {
+                return JSON.parse(text);
+              } catch (error) {
+                throw new Error('Invalid JSON response');
+              }
+            },
+            async text() {
+              return text;
+            }
+          });
+        });
+
+        response.on('error', (error) => {
+          fail(error);
+        });
+      });
+
+      request.on('error', (error) => {
+        fail(error);
+      });
+
+      if (init.signal) {
+        const abortHandler = () => {
+          const abortError = new Error('The operation was aborted');
+          abortError.name = 'AbortError';
+          fail(abortError);
+          request.destroy(abortError);
+        };
+
+        if (init.signal.aborted) {
+          abortHandler();
+          return;
+        }
+
+        init.signal.addEventListener('abort', abortHandler, { once: true });
+        request.on('close', () => {
+          init.signal.removeEventListener('abort', abortHandler);
+        });
+      }
+
+      if (init.body) {
+        if (typeof init.body === 'string' || Buffer.isBuffer(init.body)) {
+          request.write(init.body);
+        } else if (init.body instanceof URLSearchParams) {
+          request.write(init.body.toString());
+        } else {
+          request.write(JSON.stringify(init.body));
+        }
+      }
+
+      request.end();
+    });
+};
+
+let cachedFetch = null;
+
+const resolveFetch = () => {
+  if (cachedFetch) {
+    return cachedFetch;
+  }
+
+  if (typeof globalThis.fetch === 'function') {
+    cachedFetch = globalThis.fetch.bind(globalThis);
+    return cachedFetch;
+  }
+
+  cachedFetch = createNodeFetch();
+  globalThis.fetch = cachedFetch;
+  return cachedFetch;
+};
 
 const normalizeString = (value) => (typeof value === 'string' ? value.trim() : '');
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -202,6 +379,7 @@ const formatPhpIpamSubnet = (value) => {
 };
 
 const phpIpamFetch = async (ipam, endpoint, options = {}) => {
+  const fetchImpl = await resolveFetch();
   const baseUrl = normalisePhpIpamBaseUrl(ipam.baseUrl);
 
   if (!baseUrl) {
@@ -224,7 +402,7 @@ const phpIpamFetch = async (ipam, endpoint, options = {}) => {
   let response;
 
   try {
-    response = await fetch(url, {
+    response = await fetchImpl(url, {
       method: options.method || 'GET',
       headers: {
         Accept: 'application/json',

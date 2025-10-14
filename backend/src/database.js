@@ -176,146 +176,109 @@ const normalizeTags = (value) => {
   return [];
 };
 
-const allowedConnectivityStatuses = new Set(['unknown', 'online', 'offline', 'disabled']);
-const allowedAddressReferenceTypes = new Set(['mikrotik', 'group']);
-const allowedFirewallChains = new Set(['input', 'output', 'forward']);
-const allowedFirewallActions = new Set(['accept', 'drop']);
-const allowedFirewallStates = new Set(['new', 'established', 'related', 'invalid', 'syn']);
-
-const defaultConnectivityState = (routeros = defaultRouterosOptions()) => ({
-  api: {
-    status: routeros.apiEnabled ? 'unknown' : 'disabled',
-    lastCheckedAt: null,
-    lastError: null
-  },
-  ssh: {
-    status: routeros.sshEnabled ? 'unknown' : 'disabled',
-    lastCheckedAt: null,
-    fingerprint: null,
-    lastError: null
-  }
-});
-
-const sanitizeConnectivity = (connectivity = {}, routeros = defaultRouterosOptions()) => {
-  const baseline = defaultConnectivityState(routeros);
-  const normalized = { ...baseline };
-
-  const api = connectivity.api ?? {};
-  const apiStatus = typeof api.status === 'string' ? api.status.toLowerCase() : '';
-  normalized.api.status = allowedConnectivityStatuses.has(apiStatus) ? apiStatus : baseline.api.status;
-  if (!routeros.apiEnabled) {
-    normalized.api.status = 'disabled';
-  }
-  normalized.api.lastCheckedAt = typeof api.lastCheckedAt === 'string' ? api.lastCheckedAt : baseline.api.lastCheckedAt;
-  normalized.api.lastError = normalizeOptionalText(api.lastError ?? baseline.api.lastError ?? '') || null;
-
-  const ssh = connectivity.ssh ?? {};
-  const sshStatus = typeof ssh.status === 'string' ? ssh.status.toLowerCase() : '';
-  normalized.ssh.status = allowedConnectivityStatuses.has(sshStatus) ? sshStatus : baseline.ssh.status;
-  if (!routeros.sshEnabled) {
-    normalized.ssh.status = 'disabled';
-  }
-  normalized.ssh.lastCheckedAt = typeof ssh.lastCheckedAt === 'string' ? ssh.lastCheckedAt : baseline.ssh.lastCheckedAt;
-  normalized.ssh.lastError = normalizeOptionalText(ssh.lastError ?? baseline.ssh.lastError ?? '') || null;
-  normalized.ssh.fingerprint = normalizeOptionalText(ssh.fingerprint ?? baseline.ssh.fingerprint ?? '') || null;
-
-  return normalized;
-};
-
-const compareVersionSegments = (segmentsA, segmentsB) => {
-  const length = Math.max(segmentsA.length, segmentsB.length);
-  for (let index = 0; index < length; index += 1) {
-    const a = Number.parseInt(segmentsA[index] ?? '0', 10);
-    const b = Number.parseInt(segmentsB[index] ?? '0', 10);
-
-    if (Number.isNaN(a) && Number.isNaN(b)) {
-      continue;
-    }
-
-    if (Number.isNaN(a)) {
-      return -1;
-    }
-
-    if (Number.isNaN(b)) {
-      return 1;
-    }
-
-    if (a > b) {
-      return 1;
-    }
-
-    if (a < b) {
-      return -1;
-    }
-  }
-
-  return 0;
-};
-
-const compareRouterosVersions = (current, target) => {
-  if (!current || !target) {
-    return 0;
-  }
-
-  const currentSegments = String(current)
-    .split(/[^0-9]+/)
-    .filter(Boolean);
-  const targetSegments = String(target)
-    .split(/[^0-9]+/)
-    .filter(Boolean);
-
-  return compareVersionSegments(currentSegments, targetSegments);
-};
-
-const deriveDeviceStatus = (status = {}, routeros = defaultRouterosOptions()) => {
-  const normalized = { ...sanitizeDeviceStatus(status) };
-  const version = normalizeOptionalText(routeros.firmwareVersion ?? '');
-
-  if (!version) {
-    normalized.updateStatus = 'unknown';
-    return normalized;
-  }
-
-  const comparison = compareRouterosVersions(version, TARGET_ROUTEROS_VERSION);
-  normalized.updateStatus = comparison >= 0 ? 'updated' : 'pending';
-
-  if (!normalized.lastAuditAt) {
-    normalized.lastAuditAt = new Date().toISOString();
-  }
-
-  return normalized;
-};
-
-const sanitizePortExpression = (value) => {
+const normalizeUrl = (value) => {
   if (typeof value !== 'string') {
     return '';
   }
 
-  return value.replace(/[^0-9,:;-]/g, '').replace(/;+/g, ';').trim();
-};
+  const trimmed = value.trim();
 
-const sanitizeFirewallStatesList = (states) => {
-  if (!states) {
-    return [];
+  if (!trimmed) {
+    return '';
   }
 
-  const source = Array.isArray(states) ? states : String(states).split(',');
-
-  return [...new Set(source.map((entry) => entry.toString().toLowerCase().trim()).filter(Boolean))].filter((entry) =>
-    allowedFirewallStates.has(entry)
-  );
+  return trimmed.replace(/\s+/g, '').replace(/\/+$/, '');
 };
 
-const generateHostFingerprint = (host) => {
-  const normalized = normalizeOptionalText(host);
+const sanitizeIpamCollectionEntry = (entry = {}, fallbackPrefix) => {
+  const metadata =
+    entry && typeof entry.metadata === 'object' && entry.metadata !== null && !Array.isArray(entry.metadata)
+      ? { ...entry.metadata }
+      : {};
 
-  if (!normalized) {
-    return null;
-  }
+  Object.keys(metadata).forEach((key) => {
+    if (metadata[key] === undefined) {
+      delete metadata[key];
+    }
+  });
 
-  const digest = crypto.createHash('sha256').update(normalized).digest('hex');
-  return digest.match(/.{1,4}/g)?.join(':') ?? digest;
+  const position = typeof entry.index === 'number' ? entry.index + 1 : 1;
+  const fallbackName = fallbackPrefix ? `${fallbackPrefix} ${position}` : `Item ${position}`;
+
+  const idCandidate = Number.parseInt(entry.id, 10);
+  const id = Number.isInteger(idCandidate) && idCandidate > 0 ? idCandidate : null;
+
+  return {
+    id,
+    name: normalizeText(entry.name, fallbackName),
+    description: normalizeOptionalText(entry.description ?? ''),
+    metadata
+  };
 };
+
+const sanitizeIpamCollections = (collections = {}) => {
+  const mapList = (list, prefix) => {
+    if (!Array.isArray(list)) {
+      return [];
+    }
+
+    return list.map((entry, index) => sanitizeIpamCollectionEntry({ ...entry, index }, prefix));
+  };
+
+  return {
+    sections: mapList(collections.sections, 'Section'),
+    datacenters: mapList(collections.datacenters, 'Datacenter'),
+    ranges: mapList(collections.ranges, 'Range')
+  };
+};
+
+const allowedIpamStatuses = new Set(['connected', 'failed', 'unknown']);
+
+const sanitizeIpamRecord = (record = {}, { identifier, timestamp } = {}) => {
+  const id = Number.isInteger(identifier) && identifier > 0 ? identifier : Number.parseInt(record.id, 10);
+
+  const createdAt = normalizeIsoDate(record.createdAt) ?? normalizeIsoDate(record.created_at) ?? timestamp;
+  const updatedAt = normalizeIsoDate(record.updatedAt) ?? normalizeIsoDate(record.updated_at) ?? createdAt ?? timestamp;
+  const lastCheckedAt =
+    normalizeIsoDate(record.lastCheckedAt) ?? normalizeIsoDate(record.last_checkedAt) ?? normalizeIsoDate(record.last_checked_at);
+
+  const statusCandidate = normalizeOptionalText(record.lastStatus ?? record.last_status ?? 'unknown') || 'unknown';
+  const lastStatus = allowedIpamStatuses.has(statusCandidate.toLowerCase())
+    ? statusCandidate.toLowerCase()
+    : 'unknown';
+
+  return {
+    id: Number.isInteger(id) && id > 0 ? id : identifier,
+    name: normalizeText(record.name, `IPAM ${id || identifier || ''}`.trim()),
+    baseUrl: normalizeUrl(record.baseUrl ?? record.base_url ?? ''),
+    appId: normalizeText(record.appId ?? record.app_id ?? '', ''),
+    appCode: normalizeOptionalText(record.appCode ?? record.app_code ?? ''),
+    appPermissions: normalizeText(record.appPermissions ?? record.app_permissions ?? 'Read', 'Read'),
+    appSecurity: normalizeText(
+      record.appSecurity ?? record.app_security ?? 'SSL with App code token',
+      'SSL with App code token'
+    ),
+    createdAt: createdAt ?? timestamp,
+    updatedAt: updatedAt ?? createdAt ?? timestamp,
+    lastStatus,
+    lastCheckedAt,
+    collections: sanitizeIpamCollections(record.collections ?? record.cached ?? {})
+  };
+};
+
+const presentIpamForClient = (ipam) => ({
+  id: ipam.id,
+  name: ipam.name,
+  baseUrl: ipam.baseUrl,
+  appId: ipam.appId,
+  appPermissions: ipam.appPermissions,
+  appSecurity: ipam.appSecurity,
+  createdAt: ipam.createdAt,
+  updatedAt: ipam.updatedAt,
+  lastStatus: ipam.lastStatus,
+  lastCheckedAt: ipam.lastCheckedAt,
+  collections: sanitizeIpamCollections(ipam.collections)
+});
 
 const sanitizeRouteros = (options = {}, baseline = defaultRouterosOptions()) => {
   const normalized = { ...baseline };
@@ -3052,6 +3015,142 @@ const initializeDatabase = async (databasePath) => {
       await persist(state);
 
       return { success: true };
+    },
+
+    async listIpams() {
+      const state = await load();
+      return state.ipams.map((ipam) => presentIpamForClient(ipam));
+    },
+
+    async createIpam({ name, baseUrl, appId, appCode, appPermissions, appSecurity }) {
+      const state = await load();
+
+      const normalizedName = normalizeText(name);
+      const normalizedBaseUrl = normalizeUrl(baseUrl);
+      const normalizedAppId = normalizeText(appId);
+      const normalizedAppCode = normalizeOptionalText(appCode ?? '');
+      const normalizedPermissions = normalizeText(appPermissions ?? 'Read', 'Read');
+      const normalizedSecurity = normalizeText(
+        appSecurity ?? 'SSL with App code token',
+        'SSL with App code token'
+      );
+
+      if (!normalizedName) {
+        return { success: false, reason: 'name-required' };
+      }
+
+      if (!normalizedBaseUrl) {
+        return { success: false, reason: 'base-url-required' };
+      }
+
+      if (!normalizedAppId) {
+        return { success: false, reason: 'app-id-required' };
+      }
+
+      if (!normalizedAppCode) {
+        return { success: false, reason: 'app-code-required' };
+      }
+
+      const duplicate = state.ipams.find(
+        (ipam) => ipam.baseUrl === normalizedBaseUrl && ipam.appId.toLowerCase() === normalizedAppId.toLowerCase()
+      );
+
+      if (duplicate) {
+        return { success: false, reason: 'duplicate-integration' };
+      }
+
+      const nextId = (Number.isInteger(state.lastIpamId) ? state.lastIpamId : 0) + 1;
+      const timestamp = new Date().toISOString();
+
+      const record = {
+        id: nextId,
+        name: normalizedName,
+        baseUrl: normalizedBaseUrl,
+        appId: normalizedAppId,
+        appCode: normalizedAppCode,
+        appPermissions: normalizedPermissions,
+        appSecurity: normalizedSecurity,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        lastStatus: 'unknown',
+        lastCheckedAt: null,
+        collections: sanitizeIpamCollections()
+      };
+
+      state.ipams.push(record);
+      state.lastIpamId = nextId;
+      await persist(state);
+
+      return { success: true, ipam: presentIpamForClient(record) };
+    },
+
+    async getIpamById(id) {
+      const state = await load();
+      const ipam = state.ipams.find((entry) => entry.id === id);
+      return ipam ? { ...ipam, collections: sanitizeIpamCollections(ipam.collections) } : null;
+    },
+
+    async deleteIpam(id) {
+      const state = await load();
+      const index = state.ipams.findIndex((ipam) => ipam.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      state.ipams.splice(index, 1);
+      await persist(state);
+
+      return { success: true };
+    },
+
+    async updateIpamStatus(id, { status, checkedAt }) {
+      const state = await load();
+      const index = state.ipams.findIndex((ipam) => ipam.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      const ipam = state.ipams[index];
+      const timestamp = new Date().toISOString();
+      const loweredStatus = (status || '').toLowerCase();
+      const normalizedStatus = allowedIpamStatuses.has(loweredStatus) ? loweredStatus : 'unknown';
+      const normalizedCheckedAt = checkedAt ? normalizeIsoDate(checkedAt) ?? timestamp : timestamp;
+
+      state.ipams[index] = {
+        ...ipam,
+        lastStatus: normalizedStatus,
+        lastCheckedAt: normalizedCheckedAt,
+        updatedAt: timestamp
+      };
+
+      await persist(state);
+
+      return { success: true, ipam: presentIpamForClient(state.ipams[index]) };
+    },
+
+    async replaceIpamCollections(id, collections) {
+      const state = await load();
+      const index = state.ipams.findIndex((ipam) => ipam.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      const sanitizedCollections = sanitizeIpamCollections(collections);
+      const timestamp = new Date().toISOString();
+      const ipam = state.ipams[index];
+
+      state.ipams[index] = {
+        ...ipam,
+        collections: sanitizedCollections,
+        updatedAt: timestamp
+      };
+
+      await persist(state);
+
+      return { success: true, ipam: presentIpamForClient(state.ipams[index]) };
     },
 
     async listIpams() {
