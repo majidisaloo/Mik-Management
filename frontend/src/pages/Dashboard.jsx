@@ -46,7 +46,12 @@ const Dashboard = () => {
 
       const payload = await response.json();
       setMetrics(payload);
-      setLastUpdated(new Date());
+      if (payload?.lastUpdatedAt) {
+        const parsed = new Date(payload.lastUpdatedAt);
+        setLastUpdated(Number.isNaN(parsed.getTime()) ? null : parsed);
+      } else {
+        setLastUpdated(null);
+      }
       setStatus({ type: '', message: '' });
     } catch (error) {
       setStatus({ type: 'error', message: error.message || 'Unable to load dashboard metrics.' });
@@ -103,7 +108,7 @@ const Dashboard = () => {
           </button>
           {lastUpdated ? (
             <span className="dashboard-updated" aria-live="polite">
-              Updated {lastUpdated.toLocaleTimeString()}
+              Last synchronised {lastUpdated.toLocaleString()}
             </span>
           ) : null}
         </div>

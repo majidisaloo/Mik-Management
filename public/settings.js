@@ -1,9 +1,25 @@
 const toJson = async (response) => {
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || 'Request failed');
+    if (!text) {
+      throw new Error('Request failed');
+    }
+    try {
+      const payload = JSON.parse(text);
+      throw new Error(payload.error || payload.message || 'Request failed');
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(text);
+      }
+      throw error;
+    }
   }
-  return response.json();
+
+  try {
+    return await response.json();
+  } catch (error) {
+    return {};
+  }
 };
 
 function renderStatusIndicator(status, label = status) {
@@ -79,6 +95,7 @@ function renderIpamCard(ipam, collections) {
       </dl>
       ${renderIpamCollections(collections)}
       <footer class="card-actions">
+        <button class="button" type="button" data-sync-ipam data-ipam-id="${ipam.id}">Sync structure</button>
         <button class="button button--ghost" type="button" data-test-ipam data-ipam-id="${ipam.id}">Test connection</button>
         <button class="button button--danger" type="button" data-remove-ipam data-ipam-id="${ipam.id}">Remove</button>
       </footer>
@@ -219,6 +236,35 @@ function handleIpamActions() {
   container.addEventListener('click', async (event) => {
     const testButton = event.target.closest('[data-test-ipam]');
     const removeButton = event.target.closest('[data-remove-ipam]');
+    const syncButton = event.target.closest('[data-sync-ipam]');
+
+    if (syncButton) {
+      const id = syncButton.getAttribute('data-ipam-id');
+      if (!id) return;
+      const original = syncButton.textContent;
+      syncButton.disabled = true;
+      syncButton.textContent = 'Syncing…';
+      try {
+        const result = await fetch(`/api/ipams/${id}/sync`, { method: 'POST' }).then(toJson);
+        syncButton.textContent = 'Synced ✓';
+        await loadIpams();
+        if (result && typeof result === 'object') {
+          const { sections = 0, datacenters = 0, ranges = 0 } = result;
+          console.info(`phpIPAM sync complete: ${sections} sections, ${datacenters} datacenters, ${ranges} ranges.`);
+        }
+      } catch (error) {
+        console.error('Failed to synchronise phpIPAM', error);
+        alert(error.message || 'Unable to synchronise phpIPAM.');
+        syncButton.textContent = original;
+        syncButton.disabled = false;
+        return;
+      }
+      setTimeout(() => {
+        syncButton.textContent = original;
+        syncButton.disabled = false;
+      }, 1600);
+      return;
+    }
 
     if (testButton) {
       const id = testButton.getAttribute('data-ipam-id');
@@ -228,17 +274,22 @@ function handleIpamActions() {
       testButton.textContent = 'Testing…';
       try {
         const result = await fetch(`/api/ipams/${id}/test`, { method: 'POST' }).then(toJson);
+        if (result && result.message) {
+          testButton.title = result.message;
+        }
         testButton.textContent = result.ok === false ? 'Test failed' : 'Connected';
         await loadIpams();
         setTimeout(() => {
           testButton.textContent = original;
           testButton.disabled = false;
+          testButton.title = '';
         }, 1500);
       } catch (error) {
         console.error('Failed to test IPAM connection', error);
-        alert('Unable to reach the IPAM API. Please verify credentials.');
+        alert(error.message || 'Unable to reach the IPAM API. Please verify credentials.');
         testButton.textContent = original;
         testButton.disabled = false;
+        testButton.title = '';
       }
       return;
     }
@@ -344,20 +395,34 @@ function initIpamForm() {
     const payload = serialiseForm(form);
     submitButton.disabled = true;
     submitButton.textContent = 'Saving…';
+    let feedbackText = 'Add IPAM';
     try {
-      await fetch('/api/ipams', {
+      const result = await fetch('/api/ipams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       }).then(toJson);
       form.reset();
       await loadIpams();
+      if (result && result.test) {
+        if (result.test.status === 'connected') {
+          feedbackText = 'Saved & connected ✓';
+        } else if (result.test.status === 'failed') {
+          feedbackText = 'Saved – test failed';
+        }
+      } else {
+        feedbackText = 'Saved ✓';
+      }
     } catch (error) {
       console.error('Failed to add IPAM integration', error);
       alert('Unable to add IPAM integration. Check the form and try again.');
+      feedbackText = 'Try again';
     } finally {
       submitButton.disabled = false;
-      submitButton.textContent = 'Add IPAM';
+      submitButton.textContent = feedbackText;
+      setTimeout(() => {
+        submitButton.textContent = 'Add IPAM';
+      }, 2000);
     }
   });
 }
