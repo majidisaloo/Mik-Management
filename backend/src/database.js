@@ -492,10 +492,7 @@ const collectNormalizedIpAddresses = (value) => {
   return [...new Set(addresses)];
 };
 
-const normalizeIpAddress = (value) => {
-  const [address] = collectNormalizedIpAddresses(value);
-  return address ?? null;
-};
+// normalizeIpAddress is defined earlier; avoid duplicate declaration
 
 const pickField = (entry, keys) => {
   if (!entry || typeof entry !== 'object') {
@@ -1073,10 +1070,7 @@ export const resolveDatabaseFile = (databasePath = './data/app.db') => {
   return [...new Set(addresses)];
 };
 
-const normalizeIpAddress = (value) => {
-  const [address] = collectNormalizedIpAddresses(value);
-  return address ?? null;
-};
+// normalizeIpAddress is defined earlier; avoid duplicate declaration
 
 const pickField = (entry, keys) => {
   if (!entry || typeof entry !== 'object') {
