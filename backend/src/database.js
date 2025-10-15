@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
+import { isIP } from 'net';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -364,9 +365,17 @@ const sanitizeRouteros = (options = {}, baseline = defaultRouterosOptions()) => 
     options.firmwareVersion ?? baseline.firmwareVersion ?? ''
   );
 
-  const sshPortFallback = clampNumber(baseline.sshPort, { min: 1, max: 65535, fallback: 22 });
+  const baselineSshPortFallback = clampNumber(baseline.sshPort, {
+    min: 1,
+    max: 65535,
+    fallback: 22
+  });
   normalized.sshEnabled = normalizeBoolean(options.sshEnabled, baseline.sshEnabled);
-  normalized.sshPort = clampNumber(options.sshPort, { min: 1, max: 65535, fallback: sshPortFallback });
+  normalized.sshPort = clampNumber(options.sshPort, {
+    min: 1,
+    max: 65535,
+    fallback: baselineSshPortFallback
+  });
   normalized.sshUsername = normalizeOptionalText(options.sshUsername ?? baseline.sshUsername ?? '');
   normalized.sshPassword = normalizeOptionalText(options.sshPassword ?? baseline.sshPassword ?? '');
   normalized.sshAcceptNewHostKeys = normalizeBoolean(
@@ -433,6 +442,589 @@ const sanitizeTunnelMetrics = (metrics = {}) => ({
   packetLoss: parseOptionalNumber(metrics.packetLoss, { min: 0, max: 100 }),
   lastCheckedAt: normalizeIsoDate(metrics.lastCheckedAt)
 });
+
+const discoveryNotePattern = /\[discovery\]\s+local=([^\s]+)\s+remote=([^\s]+)/i;
+
+const collectNormalizedIpAddresses = (value) => {
+  if (value === null || value === undefined) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    const nested = value.flatMap((entry) => collectNormalizedIpAddresses(entry));
+    return [...new Set(nested.filter(Boolean))];
+  }
+
+  if (typeof value === 'object') {
+    const nested = Object.values(value).flatMap((entry) => collectNormalizedIpAddresses(entry));
+    return [...new Set(nested.filter(Boolean))];
+  }
+
+  const tokens = String(value)
+    .replace(/^[\[\(]+|[\]\)]+$/g, '')
+    .split(/[,;]/)
+    .flatMap((segment) => segment.split(/\s+/))
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  const addresses = tokens
+    .map((segment) => {
+      const withoutPrefix = segment.includes('=') ? segment.split('=').pop() : segment;
+      const slashIndex = withoutPrefix.indexOf('/');
+      const base = slashIndex >= 0 ? withoutPrefix.slice(0, slashIndex) : withoutPrefix;
+      const scopeIndex = base.indexOf('%');
+      const candidate = scopeIndex >= 0 ? base.slice(0, scopeIndex) : base;
+      return candidate && isIP(candidate) ? candidate : null;
+    })
+    .filter(Boolean);
+
+  return [...new Set(addresses)];
+};
+
+const normalizeIpAddress = (value) => {
+  const [address] = collectNormalizedIpAddresses(value);
+  return address ?? null;
+};
+
+const pickField = (entry, keys) => {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+
+  for (const key of keys) {
+    if (entry[key] !== undefined && entry[key] !== null && entry[key] !== '') {
+      return entry[key];
+    }
+  }
+
+  return null;
+};
+
+const canonicalizeConnectionType = (value) => {
+  const text = normalizeOptionalText(value ?? '');
+  if (!text) {
+    return null;
+  }
+
+  if (/wire\s*guard/i.test(text) || /^wg$/i.test(text)) {
+    return 'WireGuard';
+  }
+  if (/ipsec/i.test(text)) {
+    return 'IPsec';
+  }
+  if (/gre/i.test(text)) {
+    return 'GRE';
+  }
+  if (/l2tp/i.test(text)) {
+    return 'L2TP';
+  }
+  if (/pptp/i.test(text)) {
+    return 'PPTP';
+  }
+
+  return text.toUpperCase();
+};
+
+const normalizeDiscoveredStatus = (value) => {
+  const text = normalizeOptionalText(value ?? '').toLowerCase();
+
+  if (allowedTunnelStates.has(text)) {
+    return text;
+  }
+
+  if (['connected', 'running', 'established', 'active', 'up'].includes(text)) {
+    return 'up';
+  }
+
+  if (['maintenance', 'pending', 'syncing'].includes(text)) {
+    return 'maintenance';
+  }
+
+  if (['disabled', 'inactive', 'error', 'failed', 'offline', 'down', 'disconnected'].includes(text)) {
+    return 'down';
+  }
+
+  return 'down';
+};
+
+const parseNumericMetric = (value) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const parsed = parseNumericMetric(entry);
+      if (parsed !== null) {
+        return parsed;
+      }
+    }
+    return null;
+  }
+
+  if (typeof value === 'object') {
+    for (const entry of Object.values(value)) {
+      const parsed = parseNumericMetric(entry);
+      if (parsed !== null) {
+        return parsed;
+      }
+    }
+    return null;
+  }
+
+  const text = String(value).trim();
+  if (!text) {
+    return null;
+  }
+
+  const match = text.match(/-?\d+(?:\.\d+)?/);
+  if (!match) {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const combineLatency = (a, b) => {
+  const values = [a, b].filter((value) => typeof value === 'number' && Number.isFinite(value));
+  if (!values.length) {
+    return null;
+  }
+
+  const sanitized = values.map((value) => (value < 0 ? 0 : value));
+  return Math.min(...sanitized);
+};
+
+const combinePacketLoss = (a, b) => {
+  const values = [a, b].filter((value) => typeof value === 'number' && Number.isFinite(value));
+  if (!values.length) {
+    return null;
+  }
+
+  const clamped = values.map((value) => {
+    if (value < 0) {
+      return 0;
+    }
+    if (value > 100) {
+      return 100;
+    }
+    return value;
+  });
+
+  return Math.max(...clamped);
+};
+
+const deriveDiscoveredTunnelName = (sourceDevice, targetDevice, sourceCandidate, targetCandidate) => {
+  const sourceName = normalizeOptionalText(sourceDevice?.name ?? '') || `Device ${sourceCandidate.deviceId}`;
+  const targetName = normalizeOptionalText(targetDevice?.name ?? '') || `Device ${targetCandidate.deviceId}`;
+
+  const sourceInterface = normalizeOptionalText(sourceCandidate.interfaceName ?? '');
+  const targetInterface = normalizeOptionalText(targetCandidate.interfaceName ?? '');
+
+  const interfaceLabel =
+    sourceInterface && targetInterface ? ` (${sourceInterface} ↔ ${targetInterface})` : '';
+
+  return `Discovered ${sourceName} ↔ ${targetName}${interfaceLabel}`;
+};
+
+const buildDiscoveryNotes = (sourceDevice, targetDevice, sourceCandidate, targetCandidate) => {
+  const segments = [
+    'Discovered automatically from RouterOS inventory.',
+    `[discovery] local=${sourceCandidate.localAddress} remote=${targetCandidate.localAddress}`
+  ];
+
+  if (sourceCandidate.interfaceName) {
+    segments.push(`source-interface=${sourceCandidate.interfaceName}`);
+  }
+
+  if (targetCandidate.interfaceName) {
+    segments.push(`target-interface=${targetCandidate.interfaceName}`);
+  }
+
+  if (sourceCandidate.remoteDeviceName) {
+    segments.push(`source-remote=${sourceCandidate.remoteDeviceName}`);
+  }
+
+  if (targetCandidate.remoteDeviceName) {
+    segments.push(`target-remote=${targetCandidate.remoteDeviceName}`);
+  }
+
+  const unmatchedRemotes = sourceCandidate.remoteAddresses.filter(
+    (address) => address !== targetCandidate.localAddress
+  );
+
+  if (unmatchedRemotes.length > 0) {
+    segments.push(`source-additional-remotes=${unmatchedRemotes.join(',')}`);
+  }
+
+  return segments.join(' ');
+};
+
+const buildDevicePairKey = (deviceAId, deviceBId, addressA, addressB) => {
+  const parsedIds = [deviceAId, deviceBId]
+    .map((value) => Number.parseInt(value, 10))
+    .filter((value) => Number.isInteger(value));
+
+  if (parsedIds.length !== 2) {
+    return null;
+  }
+
+  parsedIds.sort((a, b) => a - b);
+
+  if (addressA && addressB) {
+    const normalizedA = normalizeIpAddress(addressA);
+    const normalizedB = normalizeIpAddress(addressB);
+
+    if (normalizedA && normalizedB) {
+      const addresses = [normalizedA, normalizedB].sort();
+      return `${parsedIds[0]}|${parsedIds[1]}|${addresses[0]}|${addresses[1]}`;
+    }
+  }
+
+  return `${parsedIds[0]}|${parsedIds[1]}`;
+};
+
+const extractTunnelInventoryCandidates = (device) => {
+  if (!device || typeof device !== 'object') {
+    return [];
+  }
+
+  const entries = [];
+
+  const enqueue = (collection) => {
+    if (!collection) {
+      return;
+    }
+
+    if (Array.isArray(collection)) {
+      collection.forEach((item) => {
+        if (item && typeof item === 'object') {
+          entries.push(item);
+        }
+      });
+      return;
+    }
+
+    if (typeof collection === 'object') {
+      Object.values(collection).forEach((value) => enqueue(value));
+    }
+  };
+
+  enqueue(device.status?.inventory?.tunnels);
+  enqueue(device.status?.inventory?.interfaces);
+  enqueue(device.status?.inventory?.peers);
+  enqueue(device.status?.inventory?.ipsec);
+  enqueue(device.status?.inventory?.wireguard);
+  enqueue(device.status?.tunnels);
+  enqueue(device.routeros?.tunnels);
+  enqueue(device.routeros?.peers);
+  enqueue(device.tunnels);
+
+  const candidates = [];
+
+  entries.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') {
+      return;
+    }
+
+    const localSource =
+      pickField(entry, ['localAddress', 'local', 'localIp', 'local_ip', 'address', 'cidr', 'localCidr']) ??
+      pickField(entry.local ?? {}, ['address', 'ip', 'ipAddress', 'cidr']) ??
+      pickField(entry.interface ?? {}, ['address', 'ip', 'ipAddress', 'cidr']);
+
+    const remoteSource =
+      pickField(entry, [
+        'remoteAddress',
+        'remote',
+        'remoteIp',
+        'remote_ip',
+        'peerAddress',
+        'endpointAddress',
+        'remoteCidr',
+        'peer',
+        'remotePeer'
+      ]) ??
+      pickField(entry.remote ?? {}, ['address', 'ip', 'ipAddress', 'cidr']) ??
+      pickField(entry.peer ?? {}, ['address', 'ip', 'ipAddress', 'cidr']) ??
+      pickField(entry.endpoint ?? {}, ['address', 'ip', 'ipAddress', 'cidr']);
+
+    const localAddresses = collectNormalizedIpAddresses(localSource);
+    const remoteAddresses = collectNormalizedIpAddresses(remoteSource);
+
+    if (!localAddresses.length || !remoteAddresses.length) {
+      return;
+    }
+
+    const interfaceName =
+      pickField(entry, ['interface', 'name', 'iface', 'identity', 'id']) ??
+      pickField(entry.interface ?? {}, ['name', 'id']) ??
+      pickField(entry.peer ?? {}, ['interface', 'name']);
+
+    const remoteDeviceName =
+      pickField(entry, ['remoteName', 'remoteIdentity', 'peerName', 'peerIdentity', 'remoteDevice']) ??
+      pickField(entry.remote ?? {}, ['name', 'identity']) ??
+      pickField(entry.peer ?? {}, ['name', 'identity']);
+
+    const connectionType =
+      canonicalizeConnectionType(
+        pickField(entry, ['connectionType', 'tunnelType', 'type', 'kind', 'mode', 'profile']) ??
+          pickField(entry.profile ?? {}, ['type', 'name'])
+      ) ?? null;
+
+    const status = normalizeDiscoveredStatus(
+      pickField(entry, ['status', 'state', 'operStatus', 'operState', 'running', 'enabled']) ??
+        pickField(entry.interface ?? {}, ['status', 'state'])
+    );
+
+    const latencyMs = parseNumericMetric(
+      pickField(entry, ['latencyMs', 'latency', 'avgLatency', 'averageLatency', 'latestLatency'])
+    );
+
+    const packetLoss = parseNumericMetric(
+      pickField(entry, ['packetLoss', 'loss', 'packetLossPercent', 'lossPercent'])
+    );
+
+    const uniqueRemoteAddresses = [...new Set(remoteAddresses.filter(Boolean))];
+
+    localAddresses.forEach((localAddress) => {
+      const filteredRemotes = uniqueRemoteAddresses.filter((remote) => remote && remote !== localAddress);
+      if (!filteredRemotes.length) {
+        return;
+      }
+
+      candidates.push({
+        deviceId: device.id,
+        deviceName: device.name ?? `Device ${device.id}`,
+        deviceGroupId: Number.isInteger(device.groupId) ? device.groupId : null,
+        interfaceName: interfaceName ? String(interfaceName) : null,
+        connectionType,
+        status,
+        localAddress,
+        remoteAddresses: filteredRemotes,
+        latencyMs,
+        packetLoss,
+        remoteDeviceName: remoteDeviceName ? String(remoteDeviceName) : null
+      });
+    });
+  });
+
+  return candidates;
+};
+
+const runTunnelDiscovery = (state) => {
+  if (!state || !Array.isArray(state.mikrotiks) || state.mikrotiks.length === 0) {
+    return { mutated: false, added: [] };
+  }
+
+  const deviceLookup = new Map();
+  state.mikrotiks.forEach((device) => {
+    if (Number.isInteger(device.id)) {
+      deviceLookup.set(device.id, device);
+    }
+  });
+
+  if (deviceLookup.size === 0) {
+    return { mutated: false, added: [] };
+  }
+
+  const candidates = [];
+  deviceLookup.forEach((device) => {
+    extractTunnelInventoryCandidates(device).forEach((candidate) => {
+      if (candidate.localAddress && Array.isArray(candidate.remoteAddresses) && candidate.remoteAddresses.length > 0) {
+        candidates.push(candidate);
+      }
+    });
+  });
+
+  if (!candidates.length) {
+    return { mutated: false, added: [] };
+  }
+
+  const localIndex = new Map();
+  candidates.forEach((candidate) => {
+    const list = localIndex.get(candidate.localAddress) ?? [];
+    list.push(candidate);
+    localIndex.set(candidate.localAddress, list);
+  });
+
+  const existingManualPairs = new Set();
+  const existingDiscoveredPairs = new Set();
+
+  state.tunnels.forEach((tunnel) => {
+    const sourceId = Number.parseInt(tunnel.sourceId, 10);
+    const targetId = Number.parseInt(tunnel.targetId, 10);
+
+    if (!Number.isInteger(sourceId) || !Number.isInteger(targetId)) {
+      return;
+    }
+
+    const baseKey = buildDevicePairKey(sourceId, targetId);
+    if (!baseKey) {
+      return;
+    }
+
+    const tags = Array.isArray(tunnel.tags)
+      ? tunnel.tags.map((tag) => normalizeOptionalText(tag).toLowerCase())
+      : [];
+
+    if (tags.includes('discovered')) {
+      const match = discoveryNotePattern.exec(tunnel.notes ?? '');
+      if (match) {
+        const addressKey = buildDevicePairKey(sourceId, targetId, match[1], match[2]);
+        if (addressKey) {
+          existingDiscoveredPairs.add(addressKey);
+          return;
+        }
+      }
+
+      existingDiscoveredPairs.add(baseKey);
+      return;
+    }
+
+    existingManualPairs.add(baseKey);
+  });
+
+  const createdPairs = new Set();
+  const added = [];
+  let mutated = false;
+  let nextId = Number.isInteger(state.lastTunnelId) ? state.lastTunnelId : 0;
+
+  const registerPair = (set, deviceAId, deviceBId, addressA, addressB) => {
+    const key = buildDevicePairKey(deviceAId, deviceBId, addressA, addressB);
+    if (key) {
+      set.add(key);
+    }
+  };
+
+  for (const candidate of candidates) {
+    for (const remoteAddress of candidate.remoteAddresses) {
+      const peers = localIndex.get(remoteAddress);
+      if (!peers) {
+        continue;
+      }
+
+      for (const peer of peers) {
+        if (peer.deviceId === candidate.deviceId) {
+          continue;
+        }
+
+        const baseKey = buildDevicePairKey(candidate.deviceId, peer.deviceId);
+        if (!baseKey) {
+          continue;
+        }
+
+        if (existingManualPairs.has(baseKey)) {
+          continue;
+        }
+
+        const addressKey = buildDevicePairKey(
+          candidate.deviceId,
+          peer.deviceId,
+          candidate.localAddress,
+          peer.localAddress
+        );
+
+        if (!addressKey) {
+          continue;
+        }
+
+        if (existingDiscoveredPairs.has(addressKey) || createdPairs.has(addressKey)) {
+          continue;
+        }
+
+        const [sourceCandidate, targetCandidate] =
+          candidate.deviceId < peer.deviceId ? [candidate, peer] : [peer, candidate];
+
+        const sourceDevice = deviceLookup.get(sourceCandidate.deviceId);
+        const targetDevice = deviceLookup.get(targetCandidate.deviceId);
+
+        if (!sourceDevice || !targetDevice) {
+          continue;
+        }
+
+        const connectionType =
+          canonicalizeConnectionType(sourceCandidate.connectionType) ??
+          canonicalizeConnectionType(targetCandidate.connectionType) ??
+          'GRE';
+
+        const combinedStatus = (() => {
+          const sourceStatus = normalizeDiscoveredStatus(sourceCandidate.status);
+          const targetStatus = normalizeDiscoveredStatus(targetCandidate.status);
+
+          if (sourceStatus === 'maintenance' || targetStatus === 'maintenance') {
+            return 'maintenance';
+          }
+
+          if (sourceStatus === 'up' && targetStatus === 'up') {
+            return 'up';
+          }
+
+          return 'down';
+        })();
+
+        const latencyMs = combineLatency(sourceCandidate.latencyMs, targetCandidate.latencyMs);
+        const packetLoss = combinePacketLoss(sourceCandidate.packetLoss, targetCandidate.packetLoss);
+
+        const timestamp = new Date().toISOString();
+        nextId += 1;
+
+        const groupId =
+          Number.isInteger(sourceDevice.groupId) && sourceDevice.groupId === targetDevice.groupId
+            ? sourceDevice.groupId
+            : null;
+
+        const name = deriveDiscoveredTunnelName(
+          sourceDevice,
+          targetDevice,
+          sourceCandidate,
+          targetCandidate
+        );
+
+        const metrics = sanitizeTunnelMetrics({
+          latencyMs,
+          packetLoss,
+          lastCheckedAt: null
+        });
+
+        const notes = buildDiscoveryNotes(
+          sourceDevice,
+          targetDevice,
+          sourceCandidate,
+          targetCandidate
+        );
+
+        const record = {
+          id: nextId,
+          name,
+          groupId,
+          sourceId: sourceCandidate.deviceId,
+          targetId: targetCandidate.deviceId,
+          connectionType,
+          status: combinedStatus,
+          enabled: false,
+          tags: ['discovered'],
+          notes,
+          metrics,
+          createdAt: timestamp,
+          updatedAt: timestamp
+        };
+
+        state.tunnels.push(record);
+        added.push(record);
+        registerPair(existingDiscoveredPairs, candidate.deviceId, peer.deviceId, candidate.localAddress, peer.localAddress);
+        createdPairs.add(addressKey);
+        mutated = true;
+      }
+    }
+  }
+
+  if (mutated) {
+    state.lastTunnelId = nextId;
+  }
+
+  return { mutated, added };
+};
 
 export const resolveDatabaseFile = (databasePath = './data/app.db') => {
   if (!databasePath) {
@@ -2142,6 +2734,17 @@ const initializeDatabase = async (databasePath) => {
       await persist(state);
 
       return { success: true };
+    },
+
+    async discoverTunnelsFromInventory() {
+      const state = await load();
+      const { mutated, added } = runTunnelDiscovery(state);
+
+      if (mutated) {
+        await persist(state);
+      }
+
+      return { success: true, mutated, added };
     },
 
     async listTunnels() {
