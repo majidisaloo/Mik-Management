@@ -496,120 +496,15 @@ const collectNormalizedIpAddresses = (value) => {
 
 // pickField is defined earlier; avoid duplicate declaration
 
-const canonicalizeConnectionType = (value) => {
-  const text = normalizeOptionalText(value ?? '');
-  if (!text) {
-    return null;
-  }
+// canonicalizeConnectionType is defined earlier; avoid duplicate declaration
 
-  if (/wire\s*guard/i.test(text) || /^wg$/i.test(text)) {
-    return 'WireGuard';
-  }
-  if (/ipsec/i.test(text)) {
-    return 'IPsec';
-  }
-  if (/gre/i.test(text)) {
-    return 'GRE';
-  }
-  if (/l2tp/i.test(text)) {
-    return 'L2TP';
-  }
-  if (/pptp/i.test(text)) {
-    return 'PPTP';
-  }
+// normalizeDiscoveredStatus is defined earlier; avoid duplicate declaration
 
-  return text.toUpperCase();
-};
+// parseNumericMetric is defined earlier; avoid duplicate declaration
 
-const normalizeDiscoveredStatus = (value) => {
-  const text = normalizeOptionalText(value ?? '').toLowerCase();
+// combineLatency is defined earlier; avoid duplicate declaration
 
-  if (allowedTunnelStates.has(text)) {
-    return text;
-  }
-
-  if (['connected', 'running', 'established', 'active', 'up'].includes(text)) {
-    return 'up';
-  }
-
-  if (['maintenance', 'pending', 'syncing'].includes(text)) {
-    return 'maintenance';
-  }
-
-  if (['disabled', 'inactive', 'error', 'failed', 'offline', 'down', 'disconnected'].includes(text)) {
-    return 'down';
-  }
-
-  return 'down';
-};
-
-const parseNumericMetric = (value) => {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  if (Array.isArray(value)) {
-    for (const entry of value) {
-      const parsed = parseNumericMetric(entry);
-      if (parsed !== null) {
-        return parsed;
-      }
-    }
-    return null;
-  }
-
-  if (typeof value === 'object') {
-    for (const entry of Object.values(value)) {
-      const parsed = parseNumericMetric(entry);
-      if (parsed !== null) {
-        return parsed;
-      }
-    }
-    return null;
-  }
-
-  const text = String(value).trim();
-  if (!text) {
-    return null;
-  }
-
-  const match = text.match(/-?\d+(?:\.\d+)?/);
-  if (!match) {
-    return null;
-  }
-
-  const parsed = Number.parseFloat(match[0]);
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
-const combineLatency = (a, b) => {
-  const values = [a, b].filter((value) => typeof value === 'number' && Number.isFinite(value));
-  if (!values.length) {
-    return null;
-  }
-
-  const sanitized = values.map((value) => (value < 0 ? 0 : value));
-  return Math.min(...sanitized);
-};
-
-const combinePacketLoss = (a, b) => {
-  const values = [a, b].filter((value) => typeof value === 'number' && Number.isFinite(value));
-  if (!values.length) {
-    return null;
-  }
-
-  const clamped = values.map((value) => {
-    if (value < 0) {
-      return 0;
-    }
-    if (value > 100) {
-      return 100;
-    }
-    return value;
-  });
-
-  return Math.max(...clamped);
-};
+// combinePacketLoss is defined earlier; avoid duplicate declaration
 
 const deriveDiscoveredTunnelName = (sourceDevice, targetDevice, sourceCandidate, targetCandidate) => {
   const sourceName = normalizeOptionalText(sourceDevice?.name ?? '') || `Device ${sourceCandidate.deviceId}`;
@@ -1062,120 +957,15 @@ export const resolveDatabaseFile = (databasePath = './data/app.db') => {
 
 // pickField is defined earlier; avoid duplicate declaration
 
-const canonicalizeConnectionType = (value) => {
-  const text = normalizeOptionalText(value ?? '');
-  if (!text) {
-    return null;
-  }
+// canonicalizeConnectionType is defined earlier; avoid duplicate declaration
 
-  if (/wire\s*guard/i.test(text) || /^wg$/i.test(text)) {
-    return 'WireGuard';
-  }
-  if (/ipsec/i.test(text)) {
-    return 'IPsec';
-  }
-  if (/gre/i.test(text)) {
-    return 'GRE';
-  }
-  if (/l2tp/i.test(text)) {
-    return 'L2TP';
-  }
-  if (/pptp/i.test(text)) {
-    return 'PPTP';
-  }
+// normalizeDiscoveredStatus is defined earlier; avoid duplicate declaration
 
-  return text.toUpperCase();
-};
+// parseNumericMetric is defined earlier; avoid duplicate declaration
 
-const normalizeDiscoveredStatus = (value) => {
-  const text = normalizeOptionalText(value ?? '').toLowerCase();
+// combineLatency is defined earlier; avoid duplicate declaration
 
-  if (allowedTunnelStates.has(text)) {
-    return text;
-  }
-
-  if (['connected', 'running', 'established', 'active', 'up'].includes(text)) {
-    return 'up';
-  }
-
-  if (['maintenance', 'pending', 'syncing'].includes(text)) {
-    return 'maintenance';
-  }
-
-  if (['disabled', 'inactive', 'error', 'failed', 'offline', 'down', 'disconnected'].includes(text)) {
-    return 'down';
-  }
-
-  return 'down';
-};
-
-const parseNumericMetric = (value) => {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  if (Array.isArray(value)) {
-    for (const entry of value) {
-      const parsed = parseNumericMetric(entry);
-      if (parsed !== null) {
-        return parsed;
-      }
-    }
-    return null;
-  }
-
-  if (typeof value === 'object') {
-    for (const entry of Object.values(value)) {
-      const parsed = parseNumericMetric(entry);
-      if (parsed !== null) {
-        return parsed;
-      }
-    }
-    return null;
-  }
-
-  const text = String(value).trim();
-  if (!text) {
-    return null;
-  }
-
-  const match = text.match(/-?\d+(?:\.\d+)?/);
-  if (!match) {
-    return null;
-  }
-
-  const parsed = Number.parseFloat(match[0]);
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
-const combineLatency = (a, b) => {
-  const values = [a, b].filter((value) => typeof value === 'number' && Number.isFinite(value));
-  if (!values.length) {
-    return null;
-  }
-
-  const sanitized = values.map((value) => (value < 0 ? 0 : value));
-  return Math.min(...sanitized);
-};
-
-const combinePacketLoss = (a, b) => {
-  const values = [a, b].filter((value) => typeof value === 'number' && Number.isFinite(value));
-  if (!values.length) {
-    return null;
-  }
-
-  const clamped = values.map((value) => {
-    if (value < 0) {
-      return 0;
-    }
-    if (value > 100) {
-      return 100;
-    }
-    return value;
-  });
-
-  return Math.max(...clamped);
-};
+// combinePacketLoss is defined earlier; avoid duplicate declaration
 
 const deriveDiscoveredTunnelName = (sourceDevice, targetDevice, sourceCandidate, targetCandidate) => {
   const sourceName = normalizeOptionalText(sourceDevice?.name ?? '') || `Device ${sourceCandidate.deviceId}`;
@@ -2495,120 +2285,15 @@ const normalizeIpAddress = (value) => {
 
 // pickField is defined earlier; avoid duplicate declaration
 
-const canonicalizeConnectionType = (value) => {
-  const text = normalizeOptionalText(value ?? '');
-  if (!text) {
-    return null;
-  }
+// canonicalizeConnectionType is defined earlier; avoid duplicate declaration
 
-  if (/wire\s*guard/i.test(text) || /^wg$/i.test(text)) {
-    return 'WireGuard';
-  }
-  if (/ipsec/i.test(text)) {
-    return 'IPsec';
-  }
-  if (/gre/i.test(text)) {
-    return 'GRE';
-  }
-  if (/l2tp/i.test(text)) {
-    return 'L2TP';
-  }
-  if (/pptp/i.test(text)) {
-    return 'PPTP';
-  }
+// normalizeDiscoveredStatus is defined earlier; avoid duplicate declaration
 
-  return text.toUpperCase();
-};
+// parseNumericMetric is defined earlier; avoid duplicate declaration
 
-const normalizeDiscoveredStatus = (value) => {
-  const text = normalizeOptionalText(value ?? '').toLowerCase();
+// combineLatency is defined earlier; avoid duplicate declaration
 
-  if (allowedTunnelStates.has(text)) {
-    return text;
-  }
-
-  if (['connected', 'running', 'established', 'active', 'up'].includes(text)) {
-    return 'up';
-  }
-
-  if (['maintenance', 'pending', 'syncing'].includes(text)) {
-    return 'maintenance';
-  }
-
-  if (['disabled', 'inactive', 'error', 'failed', 'offline', 'down', 'disconnected'].includes(text)) {
-    return 'down';
-  }
-
-  return 'down';
-};
-
-const parseNumericMetric = (value) => {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  if (Array.isArray(value)) {
-    for (const entry of value) {
-      const parsed = parseNumericMetric(entry);
-      if (parsed !== null) {
-        return parsed;
-      }
-    }
-    return null;
-  }
-
-  if (typeof value === 'object') {
-    for (const entry of Object.values(value)) {
-      const parsed = parseNumericMetric(entry);
-      if (parsed !== null) {
-        return parsed;
-      }
-    }
-    return null;
-  }
-
-  const text = String(value).trim();
-  if (!text) {
-    return null;
-  }
-
-  const match = text.match(/-?\d+(?:\.\d+)?/);
-  if (!match) {
-    return null;
-  }
-
-  const parsed = Number.parseFloat(match[0]);
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
-const combineLatency = (a, b) => {
-  const values = [a, b].filter((value) => typeof value === 'number' && Number.isFinite(value));
-  if (!values.length) {
-    return null;
-  }
-
-  const sanitized = values.map((value) => (value < 0 ? 0 : value));
-  return Math.min(...sanitized);
-};
-
-const combinePacketLoss = (a, b) => {
-  const values = [a, b].filter((value) => typeof value === 'number' && Number.isFinite(value));
-  if (!values.length) {
-    return null;
-  }
-
-  const clamped = values.map((value) => {
-    if (value < 0) {
-      return 0;
-    }
-    if (value > 100) {
-      return 100;
-    }
-    return value;
-  });
-
-  return Math.max(...clamped);
-};
+// combinePacketLoss is defined earlier; avoid duplicate declaration
 
 const deriveDiscoveredTunnelName = (sourceDevice, targetDevice, sourceCandidate, targetCandidate) => {
   const sourceName = normalizeOptionalText(sourceDevice?.name ?? '') || `Device ${sourceCandidate.deviceId}`;
