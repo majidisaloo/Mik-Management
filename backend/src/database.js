@@ -510,43 +510,10 @@ const collectNormalizedIpAddresses = (value) => {
 
 // buildDiscoveryNotes is defined earlier; avoid duplicate declaration
 
-// extractTunnelInventoryCandidates is defined earlier; avoid duplicate declaration
+// runTunnelDiscovery is defined earlier; avoid duplicate declaration
 
-const runTunnelDiscovery = (state) => {
-  if (!state || !Array.isArray(state.mikrotiks) || state.mikrotiks.length === 0) {
-    return { mutated: false, added: [] };
-  }
 
-  const deviceLookup = new Map();
-  state.mikrotiks.forEach((device) => {
-    if (Number.isInteger(device.id)) {
-      deviceLookup.set(device.id, device);
-    }
-  });
 
-  if (deviceLookup.size === 0) {
-    return { mutated: false, added: [] };
-  }
-
-  const candidates = [];
-  deviceLookup.forEach((device) => {
-    extractTunnelInventoryCandidates(device).forEach((candidate) => {
-      if (candidate.localAddress && Array.isArray(candidate.remoteAddresses) && candidate.remoteAddresses.length > 0) {
-        candidates.push(candidate);
-      }
-    });
-  });
-
-  if (!candidates.length) {
-    return { mutated: false, added: [] };
-  }
-
-  const localIndex = new Map();
-  candidates.forEach((candidate) => {
-    const list = localIndex.get(candidate.localAddress) ?? [];
-    list.push(candidate);
-    localIndex.set(candidate.localAddress, list);
-  });
 
   const existingManualPairs = new Set();
   const existingDiscoveredPairs = new Set();
@@ -585,63 +552,13 @@ const runTunnelDiscovery = (state) => {
     existingManualPairs.add(baseKey);
   });
 
-  const createdPairs = new Set();
-  const added = [];
-  let mutated = false;
-  let nextId = Number.isInteger(state.lastTunnelId) ? state.lastTunnelId : 0;
 
-  const registerPair = (set, deviceAId, deviceBId, addressA, addressB) => {
-    const key = buildDevicePairKey(deviceAId, deviceBId, addressA, addressB);
-    if (key) {
-      set.add(key);
-    }
-  };
 
-  for (const candidate of candidates) {
-    for (const remoteAddress of candidate.remoteAddresses) {
-      const peers = localIndex.get(remoteAddress);
-      if (!peers) {
-        continue;
-      }
-
-      for (const peer of peers) {
         if (peer.deviceId === candidate.deviceId) {
           continue;
         }
 
         const baseKey = buildDevicePairKey(candidate.deviceId, peer.deviceId);
-        if (!baseKey) {
-          continue;
-        }
-
-        if (existingManualPairs.has(baseKey)) {
-          continue;
-        }
-
-        const addressKey = buildDevicePairKey(
-          candidate.deviceId,
-          peer.deviceId,
-          candidate.localAddress,
-          peer.localAddress
-        );
-
-        if (!addressKey) {
-          continue;
-        }
-
-        if (existingDiscoveredPairs.has(addressKey) || createdPairs.has(addressKey)) {
-          continue;
-        }
-
-        const [sourceCandidate, targetCandidate] =
-          candidate.deviceId < peer.deviceId ? [candidate, peer] : [peer, candidate];
-
-        const sourceDevice = deviceLookup.get(sourceCandidate.deviceId);
-        const targetDevice = deviceLookup.get(targetCandidate.deviceId);
-
-        if (!sourceDevice || !targetDevice) {
-          continue;
-        }
 
         const connectionType =
           canonicalizeConnectionType(sourceCandidate.connectionType) ??
@@ -674,36 +591,6 @@ const runTunnelDiscovery = (state) => {
             ? sourceDevice.groupId
             : null;
 
-        const name = deriveDiscoveredTunnelName(
-          sourceDevice,
-          targetDevice,
-          sourceCandidate,
-          targetCandidate
-        );
-
-        const metrics = sanitizeTunnelMetrics({
-          latencyMs,
-          packetLoss,
-          lastCheckedAt: null
-        });
-
-        const notes = buildDiscoveryNotes(
-          sourceDevice,
-          targetDevice,
-          sourceCandidate,
-          targetCandidate
-        );
-
-        const record = {
-          id: nextId,
-          name,
-          groupId,
-          sourceId: sourceCandidate.deviceId,
-          targetId: targetCandidate.deviceId,
-          connectionType,
-          status: combinedStatus,
-          enabled: false,
-          tags: ['discovered'],
           notes,
           metrics,
           createdAt: timestamp,
@@ -719,12 +606,6 @@ const runTunnelDiscovery = (state) => {
     }
   }
 
-  if (mutated) {
-    state.lastTunnelId = nextId;
-  }
-
-  return { mutated, added };
-};
 
 export const resolveDatabaseFile = (databasePath = './data/app.db') => {
   if (!databasePath) {
@@ -780,43 +661,10 @@ export const resolveDatabaseFile = (databasePath = './data/app.db') => {
 
 // buildDiscoveryNotes is defined earlier; avoid duplicate declaration
 
-// extractTunnelInventoryCandidates is defined earlier; avoid duplicate declaration
+// runTunnelDiscovery is defined earlier; avoid duplicate declaration
 
-const runTunnelDiscovery = (state) => {
-  if (!state || !Array.isArray(state.mikrotiks) || state.mikrotiks.length === 0) {
-    return { mutated: false, added: [] };
-  }
 
-  const deviceLookup = new Map();
-  state.mikrotiks.forEach((device) => {
-    if (Number.isInteger(device.id)) {
-      deviceLookup.set(device.id, device);
-    }
-  });
 
-  if (deviceLookup.size === 0) {
-    return { mutated: false, added: [] };
-  }
-
-  const candidates = [];
-  deviceLookup.forEach((device) => {
-    extractTunnelInventoryCandidates(device).forEach((candidate) => {
-      if (candidate.localAddress && Array.isArray(candidate.remoteAddresses) && candidate.remoteAddresses.length > 0) {
-        candidates.push(candidate);
-      }
-    });
-  });
-
-  if (!candidates.length) {
-    return { mutated: false, added: [] };
-  }
-
-  const localIndex = new Map();
-  candidates.forEach((candidate) => {
-    const list = localIndex.get(candidate.localAddress) ?? [];
-    list.push(candidate);
-    localIndex.set(candidate.localAddress, list);
-  });
 
   const existingManualPairs = new Set();
   const existingDiscoveredPairs = new Set();
@@ -855,63 +703,13 @@ const runTunnelDiscovery = (state) => {
     existingManualPairs.add(baseKey);
   });
 
-  const createdPairs = new Set();
-  const added = [];
-  let mutated = false;
-  let nextId = Number.isInteger(state.lastTunnelId) ? state.lastTunnelId : 0;
 
-  const registerPair = (set, deviceAId, deviceBId, addressA, addressB) => {
-    const key = buildDevicePairKey(deviceAId, deviceBId, addressA, addressB);
-    if (key) {
-      set.add(key);
-    }
-  };
 
-  for (const candidate of candidates) {
-    for (const remoteAddress of candidate.remoteAddresses) {
-      const peers = localIndex.get(remoteAddress);
-      if (!peers) {
-        continue;
-      }
-
-      for (const peer of peers) {
         if (peer.deviceId === candidate.deviceId) {
           continue;
         }
 
         const baseKey = buildDevicePairKey(candidate.deviceId, peer.deviceId);
-        if (!baseKey) {
-          continue;
-        }
-
-        if (existingManualPairs.has(baseKey)) {
-          continue;
-        }
-
-        const addressKey = buildDevicePairKey(
-          candidate.deviceId,
-          peer.deviceId,
-          candidate.localAddress,
-          peer.localAddress
-        );
-
-        if (!addressKey) {
-          continue;
-        }
-
-        if (existingDiscoveredPairs.has(addressKey) || createdPairs.has(addressKey)) {
-          continue;
-        }
-
-        const [sourceCandidate, targetCandidate] =
-          candidate.deviceId < peer.deviceId ? [candidate, peer] : [peer, candidate];
-
-        const sourceDevice = deviceLookup.get(sourceCandidate.deviceId);
-        const targetDevice = deviceLookup.get(targetCandidate.deviceId);
-
-        if (!sourceDevice || !targetDevice) {
-          continue;
-        }
 
         const connectionType =
           canonicalizeConnectionType(sourceCandidate.connectionType) ??
@@ -944,36 +742,6 @@ const runTunnelDiscovery = (state) => {
             ? sourceDevice.groupId
             : null;
 
-        const name = deriveDiscoveredTunnelName(
-          sourceDevice,
-          targetDevice,
-          sourceCandidate,
-          targetCandidate
-        );
-
-        const metrics = sanitizeTunnelMetrics({
-          latencyMs,
-          packetLoss,
-          lastCheckedAt: null
-        });
-
-        const notes = buildDiscoveryNotes(
-          sourceDevice,
-          targetDevice,
-          sourceCandidate,
-          targetCandidate
-        );
-
-        const record = {
-          id: nextId,
-          name,
-          groupId,
-          sourceId: sourceCandidate.deviceId,
-          targetId: targetCandidate.deviceId,
-          connectionType,
-          status: combinedStatus,
-          enabled: false,
-          tags: ['discovered'],
           notes,
           metrics,
           createdAt: timestamp,
@@ -989,12 +757,6 @@ const runTunnelDiscovery = (state) => {
     }
   }
 
-  if (mutated) {
-    state.lastTunnelId = nextId;
-  }
-
-  return { mutated, added };
-};
 
 const sanitizeTunnelMetrics = (metrics = {}) => ({
   latencyMs: parseOptionalNumber(metrics.latencyMs, { min: 0, max: 1_000_000 }),
@@ -1917,43 +1679,10 @@ const normalizeIpAddress = (value) => {
 
 // buildDiscoveryNotes is defined earlier; avoid duplicate declaration
 
-// extractTunnelInventoryCandidates is defined earlier; avoid duplicate declaration
+// runTunnelDiscovery is defined earlier; avoid duplicate declaration
 
-const runTunnelDiscovery = (state) => {
-  if (!state || !Array.isArray(state.mikrotiks) || state.mikrotiks.length === 0) {
-    return { mutated: false, added: [] };
-  }
 
-  const deviceLookup = new Map();
-  state.mikrotiks.forEach((device) => {
-    if (Number.isInteger(device.id)) {
-      deviceLookup.set(device.id, device);
-    }
-  });
 
-  if (deviceLookup.size === 0) {
-    return { mutated: false, added: [] };
-  }
-
-  const candidates = [];
-  deviceLookup.forEach((device) => {
-    extractTunnelInventoryCandidates(device).forEach((candidate) => {
-      if (candidate.localAddress && Array.isArray(candidate.remoteAddresses) && candidate.remoteAddresses.length > 0) {
-        candidates.push(candidate);
-      }
-    });
-  });
-
-  if (!candidates.length) {
-    return { mutated: false, added: [] };
-  }
-
-  const localIndex = new Map();
-  candidates.forEach((candidate) => {
-    const list = localIndex.get(candidate.localAddress) ?? [];
-    list.push(candidate);
-    localIndex.set(candidate.localAddress, list);
-  });
 
   const existingManualPairs = new Set();
   const existingDiscoveredPairs = new Set();
@@ -1992,63 +1721,13 @@ const runTunnelDiscovery = (state) => {
     existingManualPairs.add(baseKey);
   });
 
-  const createdPairs = new Set();
-  const added = [];
-  let mutated = false;
-  let nextId = Number.isInteger(state.lastTunnelId) ? state.lastTunnelId : 0;
 
-  const registerPair = (set, deviceAId, deviceBId, addressA, addressB) => {
-    const key = buildDevicePairKey(deviceAId, deviceBId, addressA, addressB);
-    if (key) {
-      set.add(key);
-    }
-  };
 
-  for (const candidate of candidates) {
-    for (const remoteAddress of candidate.remoteAddresses) {
-      const peers = localIndex.get(remoteAddress);
-      if (!peers) {
-        continue;
-      }
-
-      for (const peer of peers) {
         if (peer.deviceId === candidate.deviceId) {
           continue;
         }
 
         const baseKey = buildDevicePairKey(candidate.deviceId, peer.deviceId);
-        if (!baseKey) {
-          continue;
-        }
-
-        if (existingManualPairs.has(baseKey)) {
-          continue;
-        }
-
-        const addressKey = buildDevicePairKey(
-          candidate.deviceId,
-          peer.deviceId,
-          candidate.localAddress,
-          peer.localAddress
-        );
-
-        if (!addressKey) {
-          continue;
-        }
-
-        if (existingDiscoveredPairs.has(addressKey) || createdPairs.has(addressKey)) {
-          continue;
-        }
-
-        const [sourceCandidate, targetCandidate] =
-          candidate.deviceId < peer.deviceId ? [candidate, peer] : [peer, candidate];
-
-        const sourceDevice = deviceLookup.get(sourceCandidate.deviceId);
-        const targetDevice = deviceLookup.get(targetCandidate.deviceId);
-
-        if (!sourceDevice || !targetDevice) {
-          continue;
-        }
 
         const connectionType =
           canonicalizeConnectionType(sourceCandidate.connectionType) ??
@@ -2081,36 +1760,6 @@ const runTunnelDiscovery = (state) => {
             ? sourceDevice.groupId
             : null;
 
-        const name = deriveDiscoveredTunnelName(
-          sourceDevice,
-          targetDevice,
-          sourceCandidate,
-          targetCandidate
-        );
-
-        const metrics = sanitizeTunnelMetrics({
-          latencyMs,
-          packetLoss,
-          lastCheckedAt: null
-        });
-
-        const notes = buildDiscoveryNotes(
-          sourceDevice,
-          targetDevice,
-          sourceCandidate,
-          targetCandidate
-        );
-
-        const record = {
-          id: nextId,
-          name,
-          groupId,
-          sourceId: sourceCandidate.deviceId,
-          targetId: targetCandidate.deviceId,
-          connectionType,
-          status: combinedStatus,
-          enabled: false,
-          tags: ['discovered'],
           notes,
           metrics,
           createdAt: timestamp,
@@ -2126,12 +1775,6 @@ const runTunnelDiscovery = (state) => {
     }
   }
 
-  if (mutated) {
-    state.lastTunnelId = nextId;
-  }
-
-  return { mutated, added };
-};
 
 export const resolveDatabaseFile = (databasePath = './data/app.db') => {
   if (!databasePath) {
