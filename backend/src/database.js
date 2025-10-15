@@ -1338,15 +1338,7 @@ const normalizeIpAddress = (value) => {
 
 
 
-export const resolveDatabaseFile = (databasePath = './data/app.db') => {
-  if (!databasePath) {
-    throw new Error('Database path must be provided.');
-  }
-
-  return path.isAbsolute(databasePath)
-    ? databasePath
-    : path.resolve(__dirname, '..', databasePath);
-};
+// resolveDatabaseFile is defined earlier; avoid duplicate declaration
 
 const ensureDirectory = async (databaseFile) => {
   const directory = path.dirname(databaseFile);
