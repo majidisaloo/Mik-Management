@@ -461,24 +461,6 @@ const collectNormalizedIpAddresses = (value) => {
     return [];
   }
 
-  if (Array.isArray(value)) {
-    const nested = value.flatMap((entry) => collectNormalizedIpAddresses(entry));
-    return [...new Set(nested.filter(Boolean))];
-  }
-
-  if (typeof value === 'object') {
-    const nested = Object.values(value).flatMap((entry) => collectNormalizedIpAddresses(entry));
-    return [...new Set(nested.filter(Boolean))];
-  }
-
-  const tokens = String(value)
-    .replace(/^[\[\(]+|[\]\)]+$/g, '')
-    .split(/[,;]/)
-    .flatMap((segment) => segment.split(/\s+/))
-    .map((segment) => segment.trim())
-    .filter(Boolean);
-
-  const addresses = tokens
     .map((segment) => {
       const withoutPrefix = segment.includes('=') ? segment.split('=').pop() : segment;
       const slashIndex = withoutPrefix.indexOf('/');
@@ -515,23 +497,7 @@ const collectNormalizedIpAddresses = (value) => {
 
 
 
-  const existingManualPairs = new Set();
-  const existingDiscoveredPairs = new Set();
 
-  state.tunnels.forEach((tunnel) => {
-    const sourceId = Number.parseInt(tunnel.sourceId, 10);
-    const targetId = Number.parseInt(tunnel.targetId, 10);
-
-    if (!Number.isInteger(sourceId) || !Number.isInteger(targetId)) {
-      return;
-    }
-
-    const baseKey = buildDevicePairKey(sourceId, targetId);
-    if (!baseKey) {
-      return;
-    }
-
-    const tags = Array.isArray(tunnel.tags)
       ? tunnel.tags.map((tag) => normalizeOptionalText(tag).toLowerCase())
       : [];
 
@@ -540,71 +506,14 @@ const collectNormalizedIpAddresses = (value) => {
       if (match) {
         const addressKey = buildDevicePairKey(sourceId, targetId, match[1], match[2]);
         if (addressKey) {
-          existingDiscoveredPairs.add(addressKey);
-          return;
-        }
-      }
-
-      existingDiscoveredPairs.add(baseKey);
-      return;
-    }
-
-    existingManualPairs.add(baseKey);
-  });
 
 
 
-        if (peer.deviceId === candidate.deviceId) {
-          continue;
-        }
 
-        const baseKey = buildDevicePairKey(candidate.deviceId, peer.deviceId);
 
-        const connectionType =
-          canonicalizeConnectionType(sourceCandidate.connectionType) ??
-          canonicalizeConnectionType(targetCandidate.connectionType) ??
-          'GRE';
 
-        const combinedStatus = (() => {
-          const sourceStatus = normalizeDiscoveredStatus(sourceCandidate.status);
-          const targetStatus = normalizeDiscoveredStatus(targetCandidate.status);
 
-          if (sourceStatus === 'maintenance' || targetStatus === 'maintenance') {
-            return 'maintenance';
-          }
 
-          if (sourceStatus === 'up' && targetStatus === 'up') {
-            return 'up';
-          }
-
-          return 'down';
-        })();
-
-        const latencyMs = combineLatency(sourceCandidate.latencyMs, targetCandidate.latencyMs);
-        const packetLoss = combinePacketLoss(sourceCandidate.packetLoss, targetCandidate.packetLoss);
-
-        const timestamp = new Date().toISOString();
-        nextId += 1;
-
-        const groupId =
-          Number.isInteger(sourceDevice.groupId) && sourceDevice.groupId === targetDevice.groupId
-            ? sourceDevice.groupId
-            : null;
-
-          notes,
-          metrics,
-          createdAt: timestamp,
-          updatedAt: timestamp
-        };
-
-        state.tunnels.push(record);
-        added.push(record);
-        registerPair(existingDiscoveredPairs, candidate.deviceId, peer.deviceId, candidate.localAddress, peer.localAddress);
-        createdPairs.add(addressKey);
-        mutated = true;
-      }
-    }
-  }
 
 
 export const resolveDatabaseFile = (databasePath = './data/app.db') => {
@@ -612,24 +521,6 @@ export const resolveDatabaseFile = (databasePath = './data/app.db') => {
     throw new Error('Database path must be provided.');
   }
 
-  if (Array.isArray(value)) {
-    const nested = value.flatMap((entry) => collectNormalizedIpAddresses(entry));
-    return [...new Set(nested.filter(Boolean))];
-  }
-
-  if (typeof value === 'object') {
-    const nested = Object.values(value).flatMap((entry) => collectNormalizedIpAddresses(entry));
-    return [...new Set(nested.filter(Boolean))];
-  }
-
-  const tokens = String(value)
-    .replace(/^[\[\(]+|[\]\)]+$/g, '')
-    .split(/[,;]/)
-    .flatMap((segment) => segment.split(/\s+/))
-    .map((segment) => segment.trim())
-    .filter(Boolean);
-
-  const addresses = tokens
     .map((segment) => {
       const withoutPrefix = segment.includes('=') ? segment.split('=').pop() : segment;
       const slashIndex = withoutPrefix.indexOf('/');
@@ -666,23 +557,7 @@ export const resolveDatabaseFile = (databasePath = './data/app.db') => {
 
 
 
-  const existingManualPairs = new Set();
-  const existingDiscoveredPairs = new Set();
 
-  state.tunnels.forEach((tunnel) => {
-    const sourceId = Number.parseInt(tunnel.sourceId, 10);
-    const targetId = Number.parseInt(tunnel.targetId, 10);
-
-    if (!Number.isInteger(sourceId) || !Number.isInteger(targetId)) {
-      return;
-    }
-
-    const baseKey = buildDevicePairKey(sourceId, targetId);
-    if (!baseKey) {
-      return;
-    }
-
-    const tags = Array.isArray(tunnel.tags)
       ? tunnel.tags.map((tag) => normalizeOptionalText(tag).toLowerCase())
       : [];
 
@@ -691,71 +566,14 @@ export const resolveDatabaseFile = (databasePath = './data/app.db') => {
       if (match) {
         const addressKey = buildDevicePairKey(sourceId, targetId, match[1], match[2]);
         if (addressKey) {
-          existingDiscoveredPairs.add(addressKey);
-          return;
-        }
-      }
-
-      existingDiscoveredPairs.add(baseKey);
-      return;
-    }
-
-    existingManualPairs.add(baseKey);
-  });
 
 
 
-        if (peer.deviceId === candidate.deviceId) {
-          continue;
-        }
 
-        const baseKey = buildDevicePairKey(candidate.deviceId, peer.deviceId);
 
-        const connectionType =
-          canonicalizeConnectionType(sourceCandidate.connectionType) ??
-          canonicalizeConnectionType(targetCandidate.connectionType) ??
-          'GRE';
 
-        const combinedStatus = (() => {
-          const sourceStatus = normalizeDiscoveredStatus(sourceCandidate.status);
-          const targetStatus = normalizeDiscoveredStatus(targetCandidate.status);
 
-          if (sourceStatus === 'maintenance' || targetStatus === 'maintenance') {
-            return 'maintenance';
-          }
 
-          if (sourceStatus === 'up' && targetStatus === 'up') {
-            return 'up';
-          }
-
-          return 'down';
-        })();
-
-        const latencyMs = combineLatency(sourceCandidate.latencyMs, targetCandidate.latencyMs);
-        const packetLoss = combinePacketLoss(sourceCandidate.packetLoss, targetCandidate.packetLoss);
-
-        const timestamp = new Date().toISOString();
-        nextId += 1;
-
-        const groupId =
-          Number.isInteger(sourceDevice.groupId) && sourceDevice.groupId === targetDevice.groupId
-            ? sourceDevice.groupId
-            : null;
-
-          notes,
-          metrics,
-          createdAt: timestamp,
-          updatedAt: timestamp
-        };
-
-        state.tunnels.push(record);
-        added.push(record);
-        registerPair(existingDiscoveredPairs, candidate.deviceId, peer.deviceId, candidate.localAddress, peer.localAddress);
-        createdPairs.add(addressKey);
-        mutated = true;
-      }
-    }
-  }
 
 
 const sanitizeTunnelMetrics = (metrics = {}) => ({
@@ -1627,24 +1445,6 @@ const collectNormalizedIpAddresses = (value) => {
     return [];
   }
 
-  if (Array.isArray(value)) {
-    const nested = value.flatMap((entry) => collectNormalizedIpAddresses(entry));
-    return [...new Set(nested.filter(Boolean))];
-  }
-
-  if (typeof value === 'object') {
-    const nested = Object.values(value).flatMap((entry) => collectNormalizedIpAddresses(entry));
-    return [...new Set(nested.filter(Boolean))];
-  }
-
-  const tokens = String(value)
-    .replace(/^[\[\(]+|[\]\)]+$/g, '')
-    .split(/[,;]/)
-    .flatMap((segment) => segment.split(/\s+/))
-    .map((segment) => segment.trim())
-    .filter(Boolean);
-
-  const addresses = tokens
     .map((segment) => {
       const withoutPrefix = segment.includes('=') ? segment.split('=').pop() : segment;
       const slashIndex = withoutPrefix.indexOf('/');
@@ -1684,23 +1484,7 @@ const normalizeIpAddress = (value) => {
 
 
 
-  const existingManualPairs = new Set();
-  const existingDiscoveredPairs = new Set();
 
-  state.tunnels.forEach((tunnel) => {
-    const sourceId = Number.parseInt(tunnel.sourceId, 10);
-    const targetId = Number.parseInt(tunnel.targetId, 10);
-
-    if (!Number.isInteger(sourceId) || !Number.isInteger(targetId)) {
-      return;
-    }
-
-    const baseKey = buildDevicePairKey(sourceId, targetId);
-    if (!baseKey) {
-      return;
-    }
-
-    const tags = Array.isArray(tunnel.tags)
       ? tunnel.tags.map((tag) => normalizeOptionalText(tag).toLowerCase())
       : [];
 
@@ -1709,71 +1493,14 @@ const normalizeIpAddress = (value) => {
       if (match) {
         const addressKey = buildDevicePairKey(sourceId, targetId, match[1], match[2]);
         if (addressKey) {
-          existingDiscoveredPairs.add(addressKey);
-          return;
-        }
-      }
-
-      existingDiscoveredPairs.add(baseKey);
-      return;
-    }
-
-    existingManualPairs.add(baseKey);
-  });
 
 
 
-        if (peer.deviceId === candidate.deviceId) {
-          continue;
-        }
 
-        const baseKey = buildDevicePairKey(candidate.deviceId, peer.deviceId);
 
-        const connectionType =
-          canonicalizeConnectionType(sourceCandidate.connectionType) ??
-          canonicalizeConnectionType(targetCandidate.connectionType) ??
-          'GRE';
 
-        const combinedStatus = (() => {
-          const sourceStatus = normalizeDiscoveredStatus(sourceCandidate.status);
-          const targetStatus = normalizeDiscoveredStatus(targetCandidate.status);
 
-          if (sourceStatus === 'maintenance' || targetStatus === 'maintenance') {
-            return 'maintenance';
-          }
 
-          if (sourceStatus === 'up' && targetStatus === 'up') {
-            return 'up';
-          }
-
-          return 'down';
-        })();
-
-        const latencyMs = combineLatency(sourceCandidate.latencyMs, targetCandidate.latencyMs);
-        const packetLoss = combinePacketLoss(sourceCandidate.packetLoss, targetCandidate.packetLoss);
-
-        const timestamp = new Date().toISOString();
-        nextId += 1;
-
-        const groupId =
-          Number.isInteger(sourceDevice.groupId) && sourceDevice.groupId === targetDevice.groupId
-            ? sourceDevice.groupId
-            : null;
-
-          notes,
-          metrics,
-          createdAt: timestamp,
-          updatedAt: timestamp
-        };
-
-        state.tunnels.push(record);
-        added.push(record);
-        registerPair(existingDiscoveredPairs, candidate.deviceId, peer.deviceId, candidate.localAddress, peer.localAddress);
-        createdPairs.add(addressKey);
-        mutated = true;
-      }
-    }
-  }
 
 
 export const resolveDatabaseFile = (databasePath = './data/app.db') => {
