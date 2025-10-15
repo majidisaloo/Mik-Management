@@ -11,6 +11,7 @@ external database services.
 - [Getting Started](#getting-started)
 - [Ubuntu Deployment Quick Start](#ubuntu-deployment-quick-start)
 - [Production Deployment on Ubuntu with Nginx](#production-deployment-on-ubuntu-with-nginx)
+- [Systemd + Nginx Deployment (example configs)](#systemd--nginx-deployment-example-configs)
 - [Updating an Existing Installation](#updating-an-existing-installation)
 - [Operational Notes](#operational-notes)
 
@@ -187,6 +188,63 @@ To refresh the Nginx content:
 sudo systemctl start nginx
 sudo nginx -t && sudo systemctl reload nginx
 ```
+
+## Systemd + Nginx Deployment (example configs)
+
+This repo includes example configs to run the backend as a systemd service and proxy `/api` via Nginx.
+
+### Backend service (systemd)
+
+1) Copy the unit and adjust paths if needed:
+
+```bash
+sudo cp deploy/mik-management-backend.service /etc/systemd/system/mik-management-backend.service
+```
+
+2) Reload, enable and start:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now mik-management-backend
+sudo systemctl status mik-management-backend --no-pager
+```
+
+3) Health checks (local):
+
+```bash
+curl -sS -i http://127.0.0.1:4000/api/meta
+curl -sS -i http://127.0.0.1:4000/api/groups
+curl -sS -i http://127.0.0.1:4000/api/users
+```
+
+### Nginx
+
+1) Copy the example config and set your domain and frontend build path:
+
+```bash
+sudo cp deploy/nginx.conf.example /etc/nginx/sites-available/mik-management
+sudo ln -sf /etc/nginx/sites-available/mik-management /etc/nginx/sites-enabled/mik-management
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+2) Verify reverse proxy:
+
+```bash
+curl -sS -i http://YOUR_DOMAIN/api/meta
+```
+
+### Frontend build
+
+```bash
+cd frontend
+npm ci
+npm run build
+```
+
+If the Dashboard shows “Metrics service is unavailable (502)”, confirm:
+- Backend is listening on port 4000
+- Nginx `location /api/` proxies to `http://127.0.0.1:4000/api/`
+- You are authenticated (cookies forwarded)
 
 ### Handling `npm audit fix --force`
 

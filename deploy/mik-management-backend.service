@@ -1,0 +1,18 @@
+[Unit]
+Description=Mik-Management backend (Node.js)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/mik-management/backend
+Environment=NODE_ENV=production
+Environment=PORT=4000
+ExecStart=/usr/bin/node src/server.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+
+
