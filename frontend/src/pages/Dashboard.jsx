@@ -143,13 +143,35 @@ const Dashboard = () => {
       }
 
       const payload = await response.json();
-      setMetrics(payload);
-      if (payload?.lastUpdatedAt) {
-        const parsed = new Date(payload.lastUpdatedAt);
+      
+      // Ensure all required fields have default values
+      const safeMetrics = {
+        deviceCount: payload.deviceCount || 0,
+        tunnelCount: payload.tunnelCount || 0,
+        groupCount: payload.groupCount || 0,
+        userCount: payload.userCount || 0,
+        tunnels: Array.isArray(payload.tunnels) ? payload.tunnels : [],
+        mikrotiks: Array.isArray(payload.mikrotiks) ? payload.mikrotiks : [],
+        lastUpdatedAt: payload.lastUpdatedAt || new Date().toISOString()
+      };
+      
+      setMetrics(safeMetrics);
+      if (safeMetrics.lastUpdatedAt) {
+        const parsed = new Date(safeMetrics.lastUpdatedAt);
         setLastUpdated(parsed);
       }
       setStatus({ type: '', message: '' });
     } catch (error) {
+      // Set default metrics when API fails
+      setMetrics({
+        deviceCount: 0,
+        tunnelCount: 0,
+        groupCount: 0,
+        userCount: 0,
+        tunnels: [],
+        mikrotiks: [],
+        lastUpdatedAt: new Date().toISOString()
+      });
       setStatus({
         type: 'error',
         message: error.message || 'Unable to load dashboard metrics.'
@@ -178,28 +200,28 @@ const Dashboard = () => {
     return [
       {
         title: 'Total Devices',
-        value: formatNumber(metrics.deviceCount),
+        value: formatNumber(metrics.deviceCount || 0),
         subtitle: 'MikroTik routers',
         icon: <DeviceIcon />,
         status: 'info'
       },
       {
         title: 'Active Tunnels',
-        value: formatNumber(metrics.tunnelCount),
+        value: formatNumber(metrics.tunnelCount || 0),
         subtitle: 'Inter-site connections',
         icon: <TunnelIcon />,
         status: 'success'
       },
       {
         title: 'Groups',
-        value: formatNumber(metrics.groupCount),
+        value: formatNumber(metrics.groupCount || 0),
         subtitle: 'Organizational units',
         icon: <GroupIcon />,
         status: 'info'
       },
       {
         title: 'Users',
-        value: formatNumber(metrics.userCount),
+        value: formatNumber(metrics.userCount || 0),
         subtitle: 'System operators',
         icon: <UserIcon />,
         status: 'info'
@@ -208,7 +230,7 @@ const Dashboard = () => {
   }, [metrics]);
 
   const tunnelMetrics = useMemo(() => {
-    if (!metrics?.tunnels) return [];
+    if (!metrics?.tunnels || !Array.isArray(metrics.tunnels)) return [];
 
     return metrics.tunnels.map((tunnel) => ({
       id: tunnel.id,
