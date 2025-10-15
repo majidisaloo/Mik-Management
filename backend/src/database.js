@@ -508,37 +508,7 @@ const collectNormalizedIpAddresses = (value) => {
 
 // deriveDiscoveredTunnelName is defined earlier; avoid duplicate declaration
 
-const buildDiscoveryNotes = (sourceDevice, targetDevice, sourceCandidate, targetCandidate) => {
-  const segments = [
-    'Discovered automatically from RouterOS inventory.',
-    `[discovery] local=${sourceCandidate.localAddress} remote=${targetCandidate.localAddress}`
-  ];
-
-  if (sourceCandidate.interfaceName) {
-    segments.push(`source-interface=${sourceCandidate.interfaceName}`);
-  }
-
-  if (targetCandidate.interfaceName) {
-    segments.push(`target-interface=${targetCandidate.interfaceName}`);
-  }
-
-  if (sourceCandidate.remoteDeviceName) {
-    segments.push(`source-remote=${sourceCandidate.remoteDeviceName}`);
-  }
-
-  if (targetCandidate.remoteDeviceName) {
-    segments.push(`target-remote=${targetCandidate.remoteDeviceName}`);
-  }
-
-  const unmatchedRemotes = sourceCandidate.remoteAddresses.filter(
-    (address) => address !== targetCandidate.localAddress
-  );
-
-  if (unmatchedRemotes.length > 0) {
-    segments.push(`source-additional-remotes=${unmatchedRemotes.join(',')}`);
-  }
-
-  return segments.join(' ');
+// buildDiscoveryNotes is defined earlier; avoid duplicate declaration
 };
 
 const buildDevicePairKey = (deviceAId, deviceBId, addressA, addressB) => {
@@ -958,37 +928,7 @@ export const resolveDatabaseFile = (databasePath = './data/app.db') => {
 
 // deriveDiscoveredTunnelName is defined earlier; avoid duplicate declaration
 
-const buildDiscoveryNotes = (sourceDevice, targetDevice, sourceCandidate, targetCandidate) => {
-  const segments = [
-    'Discovered automatically from RouterOS inventory.',
-    `[discovery] local=${sourceCandidate.localAddress} remote=${targetCandidate.localAddress}`
-  ];
-
-  if (sourceCandidate.interfaceName) {
-    segments.push(`source-interface=${sourceCandidate.interfaceName}`);
-  }
-
-  if (targetCandidate.interfaceName) {
-    segments.push(`target-interface=${targetCandidate.interfaceName}`);
-  }
-
-  if (sourceCandidate.remoteDeviceName) {
-    segments.push(`source-remote=${sourceCandidate.remoteDeviceName}`);
-  }
-
-  if (targetCandidate.remoteDeviceName) {
-    segments.push(`target-remote=${targetCandidate.remoteDeviceName}`);
-  }
-
-  const unmatchedRemotes = sourceCandidate.remoteAddresses.filter(
-    (address) => address !== targetCandidate.localAddress
-  );
-
-  if (unmatchedRemotes.length > 0) {
-    segments.push(`source-additional-remotes=${unmatchedRemotes.join(',')}`);
-  }
-
-  return segments.join(' ');
+// buildDiscoveryNotes is defined earlier; avoid duplicate declaration
 };
 
 const buildDevicePairKey = (deviceAId, deviceBId, addressA, addressB) => {
@@ -2275,37 +2215,7 @@ const normalizeIpAddress = (value) => {
 
 // deriveDiscoveredTunnelName is defined earlier; avoid duplicate declaration
 
-const buildDiscoveryNotes = (sourceDevice, targetDevice, sourceCandidate, targetCandidate) => {
-  const segments = [
-    'Discovered automatically from RouterOS inventory.',
-    `[discovery] local=${sourceCandidate.localAddress} remote=${targetCandidate.localAddress}`
-  ];
-
-  if (sourceCandidate.interfaceName) {
-    segments.push(`source-interface=${sourceCandidate.interfaceName}`);
-  }
-
-  if (targetCandidate.interfaceName) {
-    segments.push(`target-interface=${targetCandidate.interfaceName}`);
-  }
-
-  if (sourceCandidate.remoteDeviceName) {
-    segments.push(`source-remote=${sourceCandidate.remoteDeviceName}`);
-  }
-
-  if (targetCandidate.remoteDeviceName) {
-    segments.push(`target-remote=${targetCandidate.remoteDeviceName}`);
-  }
-
-  const unmatchedRemotes = sourceCandidate.remoteAddresses.filter(
-    (address) => address !== targetCandidate.localAddress
-  );
-
-  if (unmatchedRemotes.length > 0) {
-    segments.push(`source-additional-remotes=${unmatchedRemotes.join(',')}`);
-  }
-
-  return segments.join(' ');
+// buildDiscoveryNotes is defined earlier; avoid duplicate declaration
 };
 
 const buildDevicePairKey = (deviceAId, deviceBId, addressA, addressB) => {
