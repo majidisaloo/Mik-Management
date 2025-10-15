@@ -3,6 +3,34 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
+// Modern Icons
+const PlusIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+const EditIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const TrashIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <polyline points="3,6 5,6 21,6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const FolderIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const emptyGroupForm = {
   name: '',
   parentId: ''
@@ -14,7 +42,6 @@ const formatDateTime = (value) => {
   }
 
   const date = new Date(value);
-
   if (Number.isNaN(date.getTime())) {
     return '—';
   }
@@ -51,135 +78,128 @@ const findNodeById = (nodes, targetId) => {
   return null;
 };
 
-const collectDescendantIds = (node) => {
-  const ids = new Set();
-
-  if (!node || !Array.isArray(node.children) || node.children.length === 0) {
-    return ids;
-  }
-
-  const stack = [...node.children];
-
-  while (stack.length > 0) {
-    const current = stack.pop();
-
-    if (!current) {
-      continue;
-    }
-
-    ids.add(current.id);
-
-    if (Array.isArray(current.children) && current.children.length > 0) {
-      stack.push(...current.children);
-    }
-  }
-
-  return ids;
-};
-
-const filterTreeByQuery = (nodes, query) => {
-  if (!Array.isArray(nodes)) {
-    return [];
-  }
-
-  const trimmed = query.trim().toLowerCase();
-
-  if (!trimmed) {
-    return nodes;
-  }
-
-  return nodes
-    .map((node) => {
-      if (!node) {
-        return null;
-      }
-
-      const children = filterTreeByQuery(node.children ?? [], query);
-      const name = (node.name ?? '').toLowerCase();
-
-      if (name.includes(trimmed) || children.length > 0) {
-        return { ...node, children };
-      }
-
-      return null;
-    })
-    .filter(Boolean);
-};
-
-const countDescendants = (node) => {
-  if (!node || !Array.isArray(node.children) || node.children.length === 0) {
-    return 0;
-  }
-
-  return node.children.reduce((total, child) => total + 1 + countDescendants(child), 0);
-};
-
-const indentLabel = (name, depth) => {
-  if (!depth) {
-    return name;
-  }
-
-  const prefix = `${' '.repeat(depth * 2)}↳ `;
-  return `${prefix}${name}`;
-};
-
 const Groups = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [groups, setGroups] = useState([]);
-  const [tree, setTree] = useState([]);
-  const [ordered, setOrdered] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', message: '' });
-  const [filter, setFilter] = useState('');
   const [selectedId, setSelectedId] = useState(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState(emptyGroupForm);
-  const [createBusy, setCreateBusy] = useState(false);
-  const [manageState, setManageState] = useState({ open: false, groupId: null, form: emptyGroupForm });
-  const [manageBusy, setManageBusy] = useState(false);
-  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [form, setForm] = useState(emptyGroupForm);
+  const [showModal, setShowModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const applyPayload = (payload) => {
-    const nextGroups = Array.isArray(payload?.groups) ? payload.groups : [];
-    const nextTree = Array.isArray(payload?.tree) ? payload.tree : [];
-    const nextOrdered = Array.isArray(payload?.ordered) ? payload.ordered : [];
-
-    setGroups(nextGroups);
-    setTree(nextTree);
-    setOrdered(nextOrdered);
-    setSelectedId((current) => {
-      if (current && nextOrdered.some((entry) => entry.id === current)) {
-        return current;
-      }
-
-      const rootEntry = nextOrdered.find((entry) => entry.name === 'Mik-Group Root');
-      if (rootEntry) {
-        return rootEntry.id;
-      }
-
-      return nextOrdered.length > 0 ? nextOrdered[0].id : null;
+  const groupLookup = useMemo(() => {
+    const lookup = new Map();
+    groups.forEach((group) => {
+      lookup.set(group.id, group);
     });
-  };
+    return lookup;
+  }, [groups]);
 
-  const fetchGroups = async (signal) => {
-    const response = await fetch('/api/groups', signal ? { signal } : undefined);
-    if (!response.ok) {
-      throw new Error('Unable to load groups.');
+  const selectedGroup = useMemo(
+    () => (selectedId ? groupLookup.get(selectedId) ?? null : null),
+    [groupLookup, selectedId]
+  );
+
+  const selectedGroupMemo = useMemo(() => (selectedGroupId ? groupLookup.get(selectedGroupId) ?? null : null), [
+    selectedGroupId,
+    groupLookup
+  ]);
+
+  const groupTree = useMemo(() => {
+    const nodeLookup = new Map();
+    const roots = [];
+
+    groups.forEach((group) => {
+      const node = {
+        ...group,
+        children: []
+      };
+      nodeLookup.set(group.id, node);
+    });
+
+    groups.forEach((group) => {
+      const node = nodeLookup.get(group.id);
+      if (group.parentId) {
+        const parent = nodeLookup.get(group.parentId);
+        if (parent) {
+          parent.children.push(node);
+        } else {
+          roots.push(node);
+        }
+      } else {
+        roots.push(node);
+      }
+    });
+
+    const sortNodes = (entries) => {
+      entries.sort((a, b) => {
+        const nameA = a.name?.toLowerCase() ?? '';
+        const nameB = b.name?.toLowerCase() ?? '';
+        return nameA.localeCompare(nameB);
+      });
+
+      entries.forEach((entry) => {
+        if (entry.children?.length > 0) {
+          sortNodes(entry.children);
+        }
+      });
+    };
+
+    sortNodes(roots);
+    return roots;
+  }, [groups]);
+
+  const filteredGroups = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return groupTree;
     }
 
-    return response.json();
-  };
+    const searchLower = searchTerm.toLowerCase();
+    const filterNodes = (nodes) => {
+      return nodes.filter((node) => {
+        const matchesSearch = node.name?.toLowerCase().includes(searchLower);
+        const children = filterNodes(node.children || []);
+        
+        if (matchesSearch || children.length > 0) {
+          return {
+            ...node,
+            children: children
+          };
+        }
+        return false;
+      });
+    };
 
-  const refreshGroups = async () => {
+    return filterNodes(groupTree);
+  }, [groupTree, searchTerm]);
+
+  const directChildren = useMemo(
+    () => groups.filter((group) => group.parentId === (selectedGroupMemo ? selectedGroupMemo.id : null)),
+    [groups, selectedGroupMemo]
+  );
+
+  const loadGroups = async () => {
     try {
-      const payload = await fetchGroups();
-      applyPayload(payload);
+      setLoading(true);
+      const response = await fetch('/api/groups');
+
+      if (!response.ok) {
+        throw new Error('Unable to load groups.');
+      }
+
+      const payload = await response.json();
+      setGroups(payload);
+      setStatus({ type: '', message: '' });
     } catch (error) {
       setStatus({
         type: 'error',
-        message: error.message || 'Unable to refresh groups right now.'
+        message: error.message || 'Unable to load groups.'
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -189,596 +209,397 @@ const Groups = () => {
       return;
     }
 
-    if (!user.permissions?.groups) {
-      navigate('/dashboard', { replace: true });
-      return;
-    }
-
-    const controller = new AbortController();
-
-    const load = async () => {
-      try {
-        setLoading(true);
-        const payload = await fetchGroups(controller.signal);
-        applyPayload(payload);
-        setStatus({ type: '', message: '' });
-      } catch (error) {
-        if (error.name === 'AbortError') {
-          return;
-        }
-
-        setStatus({
-          type: 'error',
-          message:
-            error.message ||
-            'Group management is unavailable right now. Confirm the API is reachable and refresh the page.'
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
-
-    return () => controller.abort();
+    loadGroups();
   }, [navigate, user]);
 
-  const groupLookup = useMemo(() => {
-    const map = new Map();
-    groups.forEach((group) => {
-      if (group) {
-        map.set(group.id, group);
-      }
-    });
-    return map;
-  }, [groups]);
-
-  const selectedGroup = useMemo(
-    () => (selectedId ? groupLookup.get(selectedId) ?? null : null),
-    [groupLookup, selectedId]
-  );
-  const selectedNode = useMemo(() => findNodeById(tree, selectedId), [tree, selectedId]);
-  const filteredTree = useMemo(() => filterTreeByQuery(tree, filter), [tree, filter]);
-  const selectedDescendants = useMemo(() => countDescendants(selectedNode), [selectedNode]);
-  const selectedChildrenCount = selectedNode?.children?.length ?? 0;
-  const canDeleteSelectedGroup = useMemo(() => {
-    if (!selectedGroup) {
-      return false;
-    }
-
-    if (selectedGroup.name === 'Mik-Group Root') {
-      return false;
-    }
-
-    return selectedChildrenCount === 0;
-  }, [selectedChildrenCount, selectedGroup]);
-
-  const managedNode = useMemo(
-    () => (manageState.open ? findNodeById(tree, manageState.groupId) : null),
-    [manageState.groupId, manageState.open, tree]
-  );
-
-  const invalidParentIds = useMemo(() => {
-    if (!manageState.open || !manageState.groupId) {
-      return new Set();
-    }
-
-    const ids = collectDescendantIds(managedNode);
-    ids.add(manageState.groupId);
-    return ids;
-  }, [manageState.groupId, manageState.open, managedNode]);
-
-  const parentOptionsForManage = useMemo(() => {
-    if (!Array.isArray(ordered)) {
-      return [];
-    }
-
-    if (!manageState.open || !manageState.groupId) {
-      return ordered;
-    }
-
-    return ordered.filter((entry) => !invalidParentIds.has(entry.id));
-  }, [invalidParentIds, manageState.groupId, manageState.open, ordered]);
-
-  const parentOptionsForCreate = useMemo(() => (Array.isArray(ordered) ? ordered : []), [ordered]);
-
-  const selectedParentName = selectedGroup?.parentId
-    ? groupLookup.get(selectedGroup.parentId)?.name ?? '—'
-    : 'Root level';
-
-  const canDeleteManagedGroup = useMemo(() => {
-    if (!manageState.groupId) {
-      return false;
-    }
-
-    const group = groupLookup.get(manageState.groupId);
-    if (!group || group.name === 'Mik-Group Root') {
-      return false;
-    }
-
-    return (managedNode?.children?.length ?? 0) === 0;
-  }, [groupLookup, manageState.groupId, managedNode]);
-
-  const handleSelectGroup = (groupId) => {
-    setSelectedId(groupId);
-  };
-
-  const openCreateModal = (parentId = '') => {
-    setCreateForm({ name: '', parentId: parentId ? String(parentId) : '' });
-    setCreateOpen(true);
-    setStatus({ type: '', message: '' });
-  };
-
-  const openManageModal = (group) => {
-    setManageState({
-      open: true,
-      groupId: group.id,
-      form: {
-        name: group.name ?? '',
-        parentId: group.parentId ? String(group.parentId) : ''
-      }
-    });
-    setStatus({ type: '', message: '' });
-  };
-
-  const closeManageModal = () => {
-    setManageState({ open: false, groupId: null, form: emptyGroupForm });
-    setManageBusy(false);
-    setDeleteBusy(false);
-  };
-
-  const handleCreateFieldChange = (event) => {
-    const { name, value } = event.target;
-    setCreateForm((current) => ({ ...current, [name]: value }));
-  };
-
-  const handleManageFieldChange = (event) => {
-    const { name, value } = event.target;
-    setManageState((current) => ({
-      ...current,
-      form: {
-        ...current.form,
-        [name]: value
-      }
-    }));
-  };
-
-  useEffect(() => {
-    if (!selectedGroupId && rootGroupId) {
-      setSelectedGroupId(rootGroupId);
-    }
-  }, [rootGroupId, selectedGroupId]);
-
-  useEffect(() => {
-    if (selectedGroupId && !groupLookup.has(selectedGroupId)) {
-      if (rootGroupId) {
-        setSelectedGroupId(rootGroupId);
-      } else if (orderedGroups.length > 0) {
-        setSelectedGroupId(orderedGroups[0].id);
-      } else {
-        setSelectedGroupId(null);
-      }
-    }
-  }, [groupLookup, orderedGroups, rootGroupId, selectedGroupId]);
-
-  useEffect(() => {
-    if (!filteredTreeIds.length) {
-      return;
-    }
-
-    if (!selectedGroupId || !filteredTreeIds.includes(selectedGroupId)) {
-      setSelectedGroupId(filteredTreeIds[0]);
-    }
-  }, [filteredTreeIds, selectedGroupId]);
-
-  useEffect(() => {
-    if (!loading && filteredTreeIds.length === 0) {
-      setSelectedGroupId(null);
-    }
-  }, [filteredTreeIds, loading]);
-
-  const selectedGroupMemo = useMemo(() => (selectedGroupId ? groupLookup.get(selectedGroupId) ?? null : null), [
-    selectedGroupId,
-    groupLookup
-  ]);
-
-  const selectedTreeNode = useMemo(() => findNodeById(tree, selectedGroupId), [tree, selectedGroupId]);
-
-  const descendantCount = useMemo(() => {
-    if (!selectedTreeNode) {
-      return 0;
-    }
-
-    return collectDescendantIds(selectedTreeNode).size;
-  }, [selectedTreeNode]);
-
-  const directChildren = useMemo(
-    () => groups.filter((group) => group.parentId === (selectedGroupMemo ? selectedGroupMemo.id : null)),
-    [groups, selectedGroupMemo]
-  );
-
-  const selectedBreadcrumb = useMemo(() => {
-    if (!selectedGroupMemo) {
-      return [];
-    }
-
-    const chain = [];
-    let current = selectedGroupMemo;
-    const guard = new Set();
-
-    while (current && !guard.has(current.id)) {
-      chain.unshift(current.name);
-      guard.add(current.id);
-
-      if (!current.parentId) {
-        break;
-      }
-
-      current = groupLookup.get(current.parentId) ?? null;
-    }
-
-    return chain;
-  }, [groupLookup, selectedGroupMemo]);
-
-  const hasTreeResults = filteredTree.length > 0;
-
-  const handleCreateGroup = async (event) => {
-    event.preventDefault();
-    setCreateBusy(true);
-    setStatus({ type: '', message: '' });
-
+  const handleCreateGroup = async () => {
     try {
       const response = await fetch('/api/groups', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          name: createForm.name,
-          parentId: createForm.parentId !== '' ? createForm.parentId : null
-        })
+        body: JSON.stringify(form)
       });
 
-      const payload = await response.json().catch(() => ({}));
-
       if (!response.ok) {
-        const message = payload?.message || 'Unable to create the group.';
-        throw new Error(message);
+        const payload = await response.json();
+        throw new Error(payload.message || 'Unable to create group.');
       }
 
-      setStatus({ type: 'success', message: payload?.message || 'Group created successfully.' });
-      setCreateOpen(false);
-      setCreateForm(emptyGroupForm);
-      if (payload?.group?.id) {
-        setSelectedId(payload.group.id);
-      }
-      await refreshGroups();
+      setForm(emptyGroupForm);
+      setShowModal(false);
+      await loadGroups();
+      setStatus({
+        type: 'success',
+        message: 'Group created successfully.'
+      });
     } catch (error) {
-      setStatus({ type: 'error', message: error.message });
-    } finally {
-      setCreateBusy(false);
+      setStatus({
+        type: 'error',
+        message: error.message || 'Unable to create group.'
+      });
     }
   };
 
-  const handleUpdateGroup = async (event) => {
-    event.preventDefault();
-
-    if (!manageState.groupId) {
-      return;
-    }
-
-    setManageBusy(true);
-    setStatus({ type: '', message: '' });
-
+  const handleUpdateGroup = async () => {
     try {
-      const response = await fetch(`/api/groups/${manageState.groupId}`, {
+      const response = await fetch(`/api/groups/${selectedId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          name: manageState.form.name,
-          parentId: manageState.form.parentId !== '' ? manageState.form.parentId : null
-        })
+        body: JSON.stringify(form)
       });
 
-      const payload = await response.json().catch(() => ({}));
-
       if (!response.ok) {
-        const message = payload?.message || 'Unable to update the group.';
-        throw new Error(message);
+        const payload = await response.json();
+        throw new Error(payload.message || 'Unable to update group.');
       }
 
-      setStatus({ type: 'success', message: payload?.message || 'Group updated successfully.' });
-      closeManageModal();
-      await refreshGroups();
+      setForm(emptyGroupForm);
+      setShowModal(false);
+      setIsEditing(false);
+      setSelectedId(null);
+      await loadGroups();
+      setStatus({
+        type: 'success',
+        message: 'Group updated successfully.'
+      });
     } catch (error) {
-      setStatus({ type: 'error', message: error.message });
-    } finally {
-      setManageBusy(false);
+      setStatus({
+        type: 'error',
+        message: error.message || 'Unable to update group.'
+      });
     }
   };
 
   const handleDeleteGroup = async () => {
-    if (!manageState.groupId) {
-      return;
-    }
-
-    const targetId = manageState.groupId;
-    const fallbackParentId = groupLookup.get(targetId)?.parentId ?? null;
-
-    setDeleteBusy(true);
-    setStatus({ type: '', message: '' });
-
     try {
-      const response = await fetch(`/api/groups/${targetId}`, {
+      const response = await fetch(`/api/groups/${selectedId}`, {
         method: 'DELETE'
       });
 
-      let payload = {};
-      if (response.status !== 204) {
-        payload = await response.json().catch(() => ({}));
-      }
-
       if (!response.ok) {
-        const message = payload?.message || 'Unable to delete the group.';
-        throw new Error(message);
+        const payload = await response.json();
+        throw new Error(payload.message || 'Unable to delete group.');
       }
 
-      setStatus({ type: 'success', message: payload?.message || 'Group removed successfully.' });
-      setSelectedId((current) => (current === targetId ? fallbackParentId : current));
-      closeManageModal();
-      await refreshGroups();
+      setSelectedId(null);
+      await loadGroups();
+      setStatus({
+        type: 'success',
+        message: 'Group deleted successfully.'
+      });
     } catch (error) {
-      setStatus({ type: 'error', message: error.message });
-    } finally {
-      setDeleteBusy(false);
+      setStatus({
+        type: 'error',
+        message: error.message || 'Unable to delete group.'
+      });
     }
   };
 
-  const renderTree = (nodes, depth = 0) => {
-    if (!Array.isArray(nodes) || nodes.length === 0) {
-      return null;
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (isEditing) {
+      handleUpdateGroup();
+    } else {
+      handleCreateGroup();
     }
+  };
 
+  const handleEdit = (group) => {
+    setForm({
+      name: group.name || '',
+      parentId: group.parentId || ''
+    });
+    setSelectedId(group.id);
+    setIsEditing(true);
+    setShowModal(true);
+  };
+
+  const handleDelete = (group) => {
+    setSelectedId(group.id);
+    handleDeleteGroup();
+  };
+
+  const handleNewGroup = () => {
+    setForm(emptyGroupForm);
+    setSelectedId(null);
+    setIsEditing(false);
+    setShowModal(true);
+  };
+
+  const renderGroupNode = (node, depth = 0) => {
+    const indent = depth * 24;
+    
     return (
-      <ul className="group-tree__list">
-        {nodes.map((node) => (
-          <li key={node.id} className="group-tree__item">
-            <button
-              type="button"
-              className={`group-tree__button${selectedId === node.id ? ' is-active' : ''}`}
-              onClick={() => handleSelectGroup(node.id)}
-              style={{ '--depth': depth }}
-            >
-              <span className="group-tree__name">{node.name}</span>
-              {Array.isArray(node.children) && node.children.length > 0 ? (
-                <span className="group-tree__badge" aria-label={`${node.children.length} child groups`}>
-                  {node.children.length}
-                </span>
-              ) : null}
-            </button>
-            {renderTree(node.children ?? [], depth + 1)}
-          </li>
-        ))}
-      </ul>
-    );
-  };
-
-  return (
-    <div>
-      <div className="page-header">
-        <h1>Mik-Group management</h1>
-        <p className="page-header__subtitle">
-          Organise MikroTik devices into clear, hierarchical groups and keep the structure easy to scan.
-        </p>
-      </div>
-
-      {status.message ? <div className={`page-status page-status--${status.type}`}>{status.message}</div> : null}
-
-      {loading ? (
-        <p>Loading groups…</p>
-      ) : (
-        <div className="group-layout">
-          <section className="group-tree" aria-label="Group hierarchy">
-            <div className="group-tree__header">
-              <h2>Hierarchy</h2>
-              <button type="button" className="secondary-button" onClick={() => openCreateModal('')}>
-                Add root group
-              </button>
-            </div>
-            <input
-              type="search"
-              className="group-tree__filter"
-              value={filter}
-              onChange={(event) => setFilter(event.target.value)}
-              placeholder="Search groups"
-              aria-label="Search groups"
-            />
-            <div className="group-tree__body" role="tree">
-              {filteredTree.length > 0 ? (
-                renderTree(filteredTree)
-              ) : (
-                <p className="empty-hint">No groups match your search.</p>
-              )}
-            </div>
-          </section>
-
-          <section className="group-details" aria-live="polite">
-            {selectedGroupMemo ? (
-              <>
-                <header className="group-details__header">
-                  <div>
-                    <h2>{selectedGroupMemo.name}</h2>
-                    <p className="muted">{selectedParentName}</p>
-                  </div>
-                  <div className="group-details__actions">
-                    <button
-                      type="button"
-                      className="action-button"
-                      onClick={() => openManageModal(selectedGroupMemo)}
-                    >
-                      Edit group
-                    </button>
-                    <button
-                      type="button"
-                      className="action-button action-button--primary"
-                      onClick={() => openCreateModal(selectedGroupMemo.id)}
-                    >
-                      Add subgroup
-                    </button>
-                  </div>
-                </header>
-
-                <dl className="group-details__stats">
-                  <div>
-                    <dt>Direct children</dt>
-                    <dd>{selectedChildrenCount}</dd>
-                  </div>
-                  <div>
-                    <dt>Total descendants</dt>
-                    <dd>{selectedDescendants}</dd>
-                  </div>
-                  <div>
-                    <dt>Created</dt>
-                    <dd>{formatDateTime(selectedGroupMemo.createdAt)}</dd>
-                  </div>
-                  <div>
-                    <dt>Last updated</dt>
-                    <dd>{formatDateTime(selectedGroupMemo.updatedAt)}</dd>
-                  </div>
-                </dl>
-
-                <p className="group-details__hint">
-                  Use subgroups to mirror your MikroTik topology or customer boundaries. Keep group names short
-                  so they remain scannable in the hierarchy panel.
-                </p>
-
-                {!canDeleteSelectedGroup && selectedGroupMemo.name !== 'Mik-Group Root' && selectedChildrenCount > 0 ? (
-                  <p className="group-details__warning">
-                    Remove or move the {selectedChildrenCount === 1 ? 'child group' : 'child groups'} before deleting
-                    this group.
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <div className="group-details__empty">
-                <h2>Select a group</h2>
-                <p className="muted">Choose a group from the hierarchy to see its details and available actions.</p>
-              </div>
-            )}
-          </section>
-        </div>
-      )}
-
-      {createOpen ? (
-        <Modal
-          title="Add group"
-          description="Create a Mik-Group to organise your MikroTik inventory."
-          onClose={() => {
-            setCreateOpen(false);
-            setCreateBusy(false);
-          }}
-          actions={
-            <>
-              <button type="button" className="action-button" onClick={() => setCreateOpen(false)}>
-                Cancel
-              </button>
-              <button
-                type="submit"
-                form="create-group-form"
-                className="action-button action-button--primary"
-                disabled={createBusy}
-              >
-                {createBusy ? 'Saving…' : 'Save group'}
-              </button>
-            </>
-          }
+      <div key={node.id} className="group-node">
+        <div 
+          className={`group-item ${selectedId === node.id ? 'group-item--selected' : ''}`}
+          style={{ paddingLeft: `${indent + 16}px` }}
+          onClick={() => setSelectedId(node.id)}
         >
-          <form id="create-group-form" onSubmit={handleCreateGroup} className="form-grid">
-            <label className="wide">
-              <span>Group name</span>
-              <input
-                name="name"
-                value={createForm.name}
-                onChange={handleCreateFieldChange}
-                placeholder="e.g. Data centre, Customer, Region"
-                required
-              />
-            </label>
-            <label className="wide">
-              <span>Parent group</span>
-              <select name="parentId" value={createForm.parentId} onChange={handleCreateFieldChange}>
-                <option value="">No parent (root level)</option>
-                {parentOptionsForCreate.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {indentLabel(option.name, option.depth)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </form>
-        </Modal>
-      ) : null}
-
-      {manageState.open ? (
-        <Modal
-          title="Edit group"
-          description="Rename the group or move it to a different parent."
-          onClose={closeManageModal}
-          actions={
-            <>
-              <button type="button" className="action-button" onClick={closeManageModal}>
-                Close
+          <div className="flex items-center gap-3">
+            <FolderIcon />
+            <div className="flex-1">
+              <h3 className="font-medium text-primary">{node.name}</h3>
+              <p className="text-sm text-tertiary">
+                {node.children?.length || 0} sub-groups • Created {formatDateTime(node.createdAt)}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEdit(node);
+                }}
+                aria-label={`Edit ${node.name}`}
+              >
+                <EditIcon />
               </button>
               <button
                 type="button"
-                className="action-button action-button--danger"
-                onClick={handleDeleteGroup}
-                disabled={!canDeleteManagedGroup || deleteBusy}
+                className="btn btn--ghost btn--sm text-error"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(node);
+                }}
+                aria-label={`Delete ${node.name}`}
               >
-                {deleteBusy ? 'Removing…' : 'Delete group'}
+                <TrashIcon />
               </button>
-              <button
-                type="submit"
-                form="manage-group-form"
-                className="action-button action-button--primary"
-                disabled={manageBusy}
-              >
-                {manageBusy ? 'Saving…' : 'Save changes'}
-              </button>
-            </>
-          }
+            </div>
+          </div>
+        </div>
+        {node.children?.map((child) => renderGroupNode(child, depth + 1))}
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-primary">Mik-Groups</h1>
+            <p className="text-tertiary mt-2">Organize your MikroTik devices into hierarchical groups.</p>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card__body">
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-16 bg-tertiary bg-opacity-20 rounded-lg animate-pulse"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-primary">Mik-Groups</h1>
+          <p className="text-tertiary mt-2">Organize your MikroTik devices into hierarchical groups.</p>
+        </div>
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={handleNewGroup}
         >
-          <form id="manage-group-form" onSubmit={handleUpdateGroup} className="form-grid">
-            <label className="wide">
-              <span>Group name</span>
-              <input
-                name="name"
-                value={manageState.form.name}
-                onChange={handleManageFieldChange}
-                required
-              />
+          <PlusIcon />
+          New Group
+        </button>
+      </div>
+
+      {/* Status Message */}
+      {status.message && (
+        <div className={`p-4 rounded-xl border ${
+          status.type === 'error' 
+            ? 'bg-error-50 border-error-200 text-error-700' 
+            : 'bg-success-50 border-success-200 text-success-700'
+        }`}>
+          {status.message}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Groups Tree */}
+        <div className="lg:col-span-2">
+          <div className="card">
+            <div className="card__header">
+              <h2 className="card__title">Groups Hierarchy</h2>
+              <p className="card__subtitle">Click on a group to view details</p>
+            </div>
+            <div className="card__body">
+              <div className="mb-4">
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Search groups..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                {filteredGroups.length > 0 ? (
+                  filteredGroups.map((node) => renderGroupNode(node))
+                ) : (
+                  <div className="text-center py-8 text-tertiary">
+                    {searchTerm ? 'No groups found matching your search.' : 'No groups created yet.'}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Group Details */}
+        <div className="lg:col-span-1">
+          <div className="card">
+            <div className="card__header">
+              <h2 className="card__title">Group Details</h2>
+            </div>
+            <div className="card__body">
+              {selectedGroup ? (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold text-primary">{selectedGroup.name}</h3>
+                    <p className="text-sm text-tertiary">Group Information</p>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-secondary">Created</label>
+                      <p className="text-sm text-tertiary">{formatDateTime(selectedGroup.createdAt)}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-secondary">Sub-groups</label>
+                      <p className="text-sm text-tertiary">{directChildren.length}</p>
+                    </div>
+                    
+                    {selectedGroup.parentId && (
+                      <div>
+                        <label className="text-sm font-medium text-secondary">Parent Group</label>
+                        <p className="text-sm text-tertiary">
+                          {groupLookup.get(selectedGroup.parentId)?.name || 'Unknown'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <button
+                      type="button"
+                      className="btn btn--secondary btn--sm flex-1"
+                      onClick={() => handleEdit(selectedGroup)}
+                    >
+                      <EditIcon />
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--danger btn--sm flex-1"
+                      onClick={() => handleDelete(selectedGroup)}
+                    >
+                      <TrashIcon />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-tertiary">
+                  <FolderIcon />
+                  <p className="mt-2">Select a group to view details</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Create/Edit Modal */}
+      <Modal
+        title={isEditing ? 'Edit Group' : 'Create New Group'}
+        description={isEditing ? 'Update the group information below.' : 'Create a new group to organize your MikroTik devices.'}
+        open={showModal}
+        onClose={() => {
+          setShowModal(false);
+          setForm(emptyGroupForm);
+          setIsEditing(false);
+          setSelectedId(null);
+        }}
+        actions={[
+          <button
+            key="cancel"
+            type="button"
+            className="btn btn--ghost"
+            onClick={() => {
+              setShowModal(false);
+              setForm(emptyGroupForm);
+              setIsEditing(false);
+              setSelectedId(null);
+            }}
+          >
+            Cancel
+          </button>,
+          <button
+            key="submit"
+            type="submit"
+            form="group-form"
+            className="btn btn--primary"
+            disabled={!form.name.trim()}
+          >
+            {isEditing ? 'Update Group' : 'Create Group'}
+          </button>
+        ]}
+      >
+        <form id="group-form" onSubmit={handleSubmit} className="space-y-4">
+          <div className="form-group">
+            <label htmlFor="group-name" className="form-label">
+              Group Name *
             </label>
-            <label className="wide">
-              <span>Parent group</span>
-              <select name="parentId" value={manageState.form.parentId} onChange={handleManageFieldChange}>
-                <option value="">No parent (root level)</option>
-                {parentOptionsForManage.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {indentLabel(option.name, option.depth)}
+            <input
+              id="group-name"
+              type="text"
+              className="form-input"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Enter group name"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="group-parent" className="form-label">
+              Parent Group
+            </label>
+            <select
+              id="group-parent"
+              className="form-input form-select"
+              value={form.parentId}
+              onChange={(e) => setForm({ ...form, parentId: e.target.value })}
+            >
+              <option value="">No parent (root group)</option>
+              {groups
+                .filter((group) => group.id !== selectedId)
+                .map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
                   </option>
                 ))}
-              </select>
-            </label>
-            {!canDeleteManagedGroup ? (
-              <p className="group-details__warning">
-                Move child groups elsewhere before deleting, and note that Mik-Group Root cannot be removed.
-              </p>
-            ) : null}
-          </form>
-        </Modal>
-      ) : null}
+            </select>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

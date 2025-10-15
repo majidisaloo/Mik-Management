@@ -3,6 +3,52 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
+// Modern Icons
+const PlusIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+const EditIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const TrashIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <polyline points="3,6 5,6 21,6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const DeviceIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" strokeWidth="2" />
+    <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2" />
+    <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2" />
+  </svg>
+);
+
+const TestIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c1.3 0 2.52.28 3.64.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const RefreshIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M21 3v5h-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M3 21v-5h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const defaultRouterForm = () => ({
   apiEnabled: false,
   apiSSL: false,
@@ -37,7 +83,6 @@ const formatDateTime = (value) => {
   }
 
   const date = new Date(value);
-
   if (Number.isNaN(date.getTime())) {
     return '—';
   }
@@ -51,118 +96,6 @@ const formatDateTime = (value) => {
   });
 };
 
-const formatConnectivityLabel = (status) => {
-  if (!status) {
-    return 'Unknown';
-  }
-
-  const normalized = status.toLowerCase();
-  if (normalized === 'online') {
-    return 'Online';
-  }
-  if (normalized === 'offline') {
-    return 'Offline';
-  }
-  if (normalized === 'disabled') {
-    return 'Disabled';
-  }
-  return 'Unknown';
-};
-
-function getConnectivityStatusClass(status) {
-  if (!status) {
-    return 'unknown';
-  }
-
-  const normalized = status.toLowerCase();
-  if (normalized === 'online') {
-    return 'success';
-  }
-  if (normalized === 'offline') {
-    return 'danger';
-  }
-  if (normalized === 'disabled') {
-    return 'info';
-  }
-  return 'unknown';
-}
-
-const toFormState = (device) => {
-  if (!device) {
-    return emptyDeviceForm();
-  }
-
-  const tags = Array.isArray(device.tags) ? device.tags.join(', ') : '';
-  const router = device.routeros ?? {};
-  const sslEnabled = Boolean(router.apiSSL);
-
-  return {
-    name: device.name ?? '',
-    host: device.host ?? '',
-    groupId: device.groupId ? String(device.groupId) : '',
-    tags,
-    notes: device.notes ?? '',
-    routeros: {
-      apiEnabled: Boolean(router.apiEnabled),
-      apiSSL: sslEnabled,
-      apiPort: router.apiPort ? String(router.apiPort) : sslEnabled ? '8729' : '8728',
-      apiUsername: router.apiUsername ?? '',
-      apiPassword: router.apiPassword ?? '',
-      verifyTLS: router.verifyTLS !== undefined ? Boolean(router.verifyTLS) : true,
-      apiTimeout: router.apiTimeout ? String(router.apiTimeout) : '5000',
-      apiRetries: router.apiRetries ? String(router.apiRetries) : '1',
-      allowInsecureCiphers:
-        router.allowInsecureCiphers !== undefined ? Boolean(router.allowInsecureCiphers) : false,
-      preferredApiFirst:
-        router.preferredApiFirst !== undefined ? Boolean(router.preferredApiFirst) : true,
-      firmwareVersion: router.firmwareVersion ?? '',
-      sshEnabled: router.sshEnabled !== undefined ? Boolean(router.sshEnabled) : false,
-      sshPort: router.sshPort ? String(router.sshPort) : '22',
-      sshUsername: router.sshUsername ?? '',
-      sshPassword: router.sshPassword ?? '',
-      sshAcceptNewHostKeys:
-        router.sshAcceptNewHostKeys !== undefined ? Boolean(router.sshAcceptNewHostKeys) : true
-    }
-  };
-};
-
-const parseTags = (value) => {
-  if (!value) {
-    return [];
-  }
-
-  return value
-    .split(',')
-    .map((tag) => tag.trim())
-    .filter(Boolean);
-};
-
-const toPayload = (form) => ({
-  name: form.name,
-  host: form.host,
-  groupId: form.groupId ? Number.parseInt(form.groupId, 10) : null,
-  tags: parseTags(form.tags),
-  notes: form.notes,
-  routeros: {
-    apiEnabled: Boolean(form.routeros.apiEnabled),
-    apiSSL: Boolean(form.routeros.apiSSL),
-    apiPort: form.routeros.apiPort ? Number.parseInt(form.routeros.apiPort, 10) : undefined,
-    apiUsername: form.routeros.apiUsername,
-    apiPassword: form.routeros.apiPassword,
-    verifyTLS: Boolean(form.routeros.verifyTLS),
-    apiTimeout: form.routeros.apiTimeout ? Number.parseInt(form.routeros.apiTimeout, 10) : undefined,
-    apiRetries: form.routeros.apiRetries ? Number.parseInt(form.routeros.apiRetries, 10) : undefined,
-    allowInsecureCiphers: Boolean(form.routeros.allowInsecureCiphers),
-    preferredApiFirst: Boolean(form.routeros.preferredApiFirst),
-    firmwareVersion: form.routeros.firmwareVersion,
-    sshEnabled: Boolean(form.routeros.sshEnabled),
-    sshPort: form.routeros.sshPort ? Number.parseInt(form.routeros.sshPort, 10) : undefined,
-    sshUsername: form.routeros.sshUsername,
-    sshPassword: form.routeros.sshPassword,
-    sshAcceptNewHostKeys: Boolean(form.routeros.sshAcceptNewHostKeys)
-  }
-});
-
 const Mikrotiks = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -170,20 +103,82 @@ const Mikrotiks = () => {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', message: '' });
-  const [filter, setFilter] = useState('');
-  const [targetVersion, setTargetVersion] = useState('');
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState(emptyDeviceForm());
-  const [createBusy, setCreateBusy] = useState(false);
-  const [manageState, setManageState] = useState({
-    open: false,
-    deviceId: null,
-    form: emptyDeviceForm(),
-    details: null
-  });
-  const [manageBusy, setManageBusy] = useState(false);
-  const [deleteBusy, setDeleteBusy] = useState(false);
-  const [testBusy, setTestBusy] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
+  const [form, setForm] = useState(emptyDeviceForm());
+  const [showModal, setShowModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterGroup, setFilterGroup] = useState('');
+  const [testingDevice, setTestingDevice] = useState(null);
+
+  const groupLookup = useMemo(() => {
+    const lookup = new Map();
+    groups.forEach((group) => {
+      lookup.set(group.id, group);
+    });
+    return lookup;
+  }, [groups]);
+
+  const selectedDevice = useMemo(
+    () => (selectedId ? devices.find((device) => device.id === selectedId) : null),
+    [devices, selectedId]
+  );
+
+  const filteredDevices = useMemo(() => {
+    let filtered = devices;
+
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter((device) =>
+        device.name?.toLowerCase().includes(searchLower) ||
+        device.host?.toLowerCase().includes(searchLower) ||
+        device.tags?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    if (filterGroup) {
+      filtered = filtered.filter((device) => device.groupId === Number.parseInt(filterGroup, 10));
+    }
+
+    return filtered;
+  }, [devices, searchTerm, filterGroup]);
+
+  const loadDevices = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/mikrotiks');
+
+      if (!response.ok) {
+        throw new Error('Unable to load MikroTik devices.');
+      }
+
+      const payload = await response.json();
+      setDevices(payload);
+      setStatus({ type: '', message: '' });
+    } catch (error) {
+      setStatus({
+        type: 'error',
+        message: error.message || 'Unable to load MikroTik devices.'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadGroups = async () => {
+    try {
+      const response = await fetch('/api/groups');
+
+      if (!response.ok) {
+        throw new Error('Unable to load groups.');
+      }
+
+      const payload = await response.json();
+      setGroups(payload);
+    } catch (error) {
+      console.error('Failed to load groups:', error);
+    }
+  };
 
   useEffect(() => {
     if (!user) {
@@ -191,903 +186,451 @@ const Mikrotiks = () => {
       return;
     }
 
-    if (!user.permissions?.mikrotiks) {
-      navigate('/dashboard', { replace: true });
-      return;
-    }
-
-    const controller = new AbortController();
-
-    const load = async () => {
-      try {
-        setLoading(true);
-        const [deviceResponse, groupResponse] = await Promise.all([
-          fetch('/api/mikrotiks', { signal: controller.signal }),
-          fetch('/api/groups', { signal: controller.signal })
-        ]);
-
-        if (!deviceResponse.ok) {
-          throw new Error('Unable to load Mikrotik devices.');
-        }
-
-        if (!groupResponse.ok) {
-          throw new Error('Unable to load Mik-Groups.');
-        }
-
-        const devicePayload = await deviceResponse.json();
-        const groupPayload = await groupResponse.json();
-
-        setDevices(Array.isArray(devicePayload?.mikrotiks) ? devicePayload.mikrotiks : []);
-        setGroups(Array.isArray(groupPayload?.groups) ? groupPayload.groups : []);
-        setTargetVersion(
-          typeof devicePayload?.targetRouterOs === 'string' ? devicePayload.targetRouterOs : ''
-        );
-        setStatus({ type: '', message: '' });
-      } catch (error) {
-        if (error.name === 'AbortError') {
-          return;
-        }
-
-        setStatus({
-          type: 'error',
-          message:
-            error.message ||
-            'Device management is unavailable right now. Confirm the API is reachable and refresh the page.'
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
-
-    return () => controller.abort();
+    loadDevices();
+    loadGroups();
   }, [navigate, user]);
 
-  const filteredDevices = useMemo(() => {
-    const query = filter.trim().toLowerCase();
-    if (!query) {
-      return devices;
-    }
-
-    return devices.filter((device) => {
-      const nameMatch = device.name?.toLowerCase().includes(query);
-      const hostMatch = device.host?.toLowerCase().includes(query);
-      const groupMatch = device.groupName?.toLowerCase().includes(query);
-      const tagMatch = Array.isArray(device.tags)
-        ? device.tags.some((tag) => tag.toLowerCase().includes(query))
-        : false;
-      const statusMatch = device.status?.updateStatus?.toLowerCase().includes(query);
-      return nameMatch || hostMatch || groupMatch || tagMatch || statusMatch;
-    });
-  }, [devices, filter]);
-
-  const sortedDevices = useMemo(() => {
-    return [...filteredDevices].sort((a, b) => a.name.localeCompare(b.name));
-  }, [filteredDevices]);
-
-  const openCreateModal = () => {
-    setCreateForm(emptyDeviceForm());
-    setCreateOpen(true);
-    setStatus({ type: '', message: '' });
-  };
-
-  const openManageModal = (device) => {
-    setManageState({ open: true, deviceId: device.id, form: toFormState(device), details: device });
-    setStatus({ type: '', message: '' });
-  };
-
-  const closeManageModal = () => {
-    setManageState({ open: false, deviceId: null, form: emptyDeviceForm(), details: null });
-    setManageBusy(false);
-    setDeleteBusy(false);
-    setTestBusy(false);
-  };
-
-  const refreshDevices = async () => {
-    try {
-      const response = await fetch('/api/mikrotiks');
-      if (!response.ok) {
-        throw new Error('Unable to refresh the Mikrotik inventory.');
-      }
-
-      const payload = await response.json();
-      setDevices(Array.isArray(payload?.mikrotiks) ? payload.mikrotiks : []);
-      setTargetVersion(typeof payload?.targetRouterOs === 'string' ? payload.targetRouterOs : '');
-      if (manageState.open && manageState.deviceId && Array.isArray(payload?.mikrotiks)) {
-        const updated = payload.mikrotiks.find((item) => item.id === manageState.deviceId);
-        if (updated) {
-          setManageState((current) => ({
-            ...current,
-            form: toFormState(updated),
-            details: updated
-          }));
-        }
-      }
-    } catch (error) {
-      setStatus({ type: 'error', message: error.message || 'Unable to refresh the Mikrotik inventory.' });
-    }
-  };
-
-  const handleCreateFieldChange = (event) => {
-    const { name, value } = event.target;
-    setCreateForm((current) => ({
-      ...current,
-      [name]: name === 'groupId' ? value : value
-    }));
-  };
-
-  const handleCreateRouterToggle = (key) => {
-    setCreateForm((current) => {
-      const nextValue = !current.routeros[key];
-      let nextPort = current.routeros.apiPort;
-
-      if (key === 'apiSSL') {
-        if (nextValue && (!nextPort || nextPort === '8728')) {
-          nextPort = '8729';
-        }
-
-        if (!nextValue && nextPort === '8729') {
-          nextPort = '8728';
-        }
-      }
-
-      return {
-        ...current,
-        routeros: {
-          ...current.routeros,
-          [key]: nextValue,
-          apiPort: nextPort
-        }
-      };
-    });
-  };
-
-  const handleCreateRouterField = (event) => {
-    const { name, value } = event.target;
-    setCreateForm((current) => ({
-      ...current,
-      routeros: {
-        ...current.routeros,
-        [name]: value
-      }
-    }));
-  };
-
-  const handleManageFieldChange = (event) => {
-    const { name, value } = event.target;
-    setManageState((current) => ({
-      ...current,
-      form: {
-        ...current.form,
-        [name]: name === 'groupId' ? value : value
-      }
-    }));
-  };
-
-  const handleManageRouterToggle = (key) => {
-    setManageState((current) => {
-      const nextValue = !current.form.routeros[key];
-      let nextPort = current.form.routeros.apiPort;
-
-      if (key === 'apiSSL') {
-        if (nextValue && (!nextPort || nextPort === '8728')) {
-          nextPort = '8729';
-        }
-
-        if (!nextValue && nextPort === '8729') {
-          nextPort = '8728';
-        }
-      }
-
-      return {
-        ...current,
-        form: {
-          ...current.form,
-          routeros: {
-            ...current.form.routeros,
-            [key]: nextValue,
-            apiPort: nextPort
-          }
-        }
-      };
-    });
-  };
-
-  const handleManageRouterField = (event) => {
-    const { name, value } = event.target;
-    setManageState((current) => ({
-      ...current,
-      form: {
-        ...current.form,
-        routeros: {
-          ...current.form.routeros,
-          [name]: value
-        }
-      }
-    }));
-  };
-
-  const handleCreateDevice = async (event) => {
-    event.preventDefault();
-    setCreateBusy(true);
-    setStatus({ type: '', message: '' });
-
+  const handleCreateDevice = async () => {
     try {
       const response = await fetch('/api/mikrotiks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(toPayload(createForm))
+        body: JSON.stringify(form)
       });
 
-      const payload = await response.json().catch(() => ({}));
-
       if (!response.ok) {
-        const message = payload?.message || 'Unable to register the Mikrotik device.';
-        throw new Error(message);
+        const payload = await response.json();
+        throw new Error(payload.message || 'Unable to create device.');
       }
 
-      setStatus({ type: 'success', message: 'Mikrotik added successfully.' });
-      setCreateOpen(false);
-      setCreateForm(emptyDeviceForm());
-      await refreshDevices();
+      setForm(emptyDeviceForm());
+      setShowModal(false);
+      await loadDevices();
+      setStatus({
+        type: 'success',
+        message: 'Device created successfully.'
+      });
     } catch (error) {
-      setStatus({ type: 'error', message: error.message });
-    } finally {
-      setCreateBusy(false);
+      setStatus({
+        type: 'error',
+        message: error.message || 'Unable to create device.'
+      });
     }
   };
 
-  const handleUpdateDevice = async (event) => {
-    event.preventDefault();
-
-    if (!manageState.deviceId) {
-      return;
-    }
-
-    setManageBusy(true);
-    setStatus({ type: '', message: '' });
-
+  const handleUpdateDevice = async () => {
     try {
-      const response = await fetch(`/api/mikrotiks/${manageState.deviceId}`, {
+      const response = await fetch(`/api/mikrotiks/${selectedId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(toPayload(manageState.form))
+        body: JSON.stringify(form)
       });
 
-      const payload = await response.json().catch(() => ({}));
-
       if (!response.ok) {
-        const message = payload?.message || 'Unable to update the Mikrotik device.';
-        throw new Error(message);
+        const payload = await response.json();
+        throw new Error(payload.message || 'Unable to update device.');
       }
 
-      setStatus({ type: 'success', message: 'Mikrotik updated successfully.' });
-      closeManageModal();
-      await refreshDevices();
+      setForm(emptyDeviceForm());
+      setShowModal(false);
+      setIsEditing(false);
+      setSelectedId(null);
+      await loadDevices();
+      setStatus({
+        type: 'success',
+        message: 'Device updated successfully.'
+      });
     } catch (error) {
-      setStatus({ type: 'error', message: error.message });
-    } finally {
-      setManageBusy(false);
+      setStatus({
+        type: 'error',
+        message: error.message || 'Unable to update device.'
+      });
     }
   };
 
   const handleDeleteDevice = async () => {
-    if (!manageState.deviceId) {
-      return;
-    }
-
-    setDeleteBusy(true);
-    setStatus({ type: '', message: '' });
-
     try {
-      const response = await fetch(`/api/mikrotiks/${manageState.deviceId}`, {
+      const response = await fetch(`/api/mikrotiks/${selectedId}`, {
         method: 'DELETE'
       });
 
       if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        const message = payload?.message || 'Unable to delete the Mikrotik device.';
-        throw new Error(message);
+        const payload = await response.json();
+        throw new Error(payload.message || 'Unable to delete device.');
       }
 
-      setStatus({ type: 'success', message: 'Mikrotik removed successfully.' });
-      closeManageModal();
-      await refreshDevices();
+      setSelectedId(null);
+      await loadDevices();
+      setStatus({
+        type: 'success',
+        message: 'Device deleted successfully.'
+      });
     } catch (error) {
-      setStatus({ type: 'error', message: error.message });
-    } finally {
-      setDeleteBusy(false);
+      setStatus({
+        type: 'error',
+        message: error.message || 'Unable to delete device.'
+      });
     }
   };
 
-  const handleTestConnectivity = async () => {
-    if (!manageState.deviceId) {
-      return;
-    }
-
-    setTestBusy(true);
-    setStatus({ type: '', message: '' });
-
+  const handleTestConnectivity = async (device) => {
     try {
-      const response = await fetch(`/api/mikrotiks/${manageState.deviceId}/test-connectivity`, {
+      setTestingDevice(device.id);
+      const response = await fetch(`/api/mikrotiks/${device.id}/test`, {
         method: 'POST'
       });
 
-      const payload = await response.json().catch(() => ({}));
-
       if (!response.ok) {
-        const message = payload?.message || 'Unable to verify connectivity.';
-        throw new Error(message);
+        const payload = await response.json();
+        throw new Error(payload.message || 'Connection test failed.');
       }
 
-      if (payload?.mikrotik) {
-        setManageState((current) => ({
-          ...current,
-          form: toFormState(payload.mikrotik),
-          details: payload.mikrotik
-        }));
-      }
-
-      setStatus({ type: 'success', message: payload?.message || 'Connectivity refreshed.' });
-      await refreshDevices();
+      const result = await response.json();
+      setStatus({
+        type: result.success ? 'success' : 'error',
+        message: result.message || (result.success ? 'Connection successful!' : 'Connection failed.')
+      });
     } catch (error) {
-      setStatus({ type: 'error', message: error.message });
+      setStatus({
+        type: 'error',
+        message: error.message || 'Connection test failed.'
+      });
     } finally {
-      setTestBusy(false);
+      setTestingDevice(null);
     }
   };
 
-  const renderRouterFields = (formState, onToggle, onFieldChange) => {
-    const apiActive = formState.routeros.apiEnabled;
-    const tlsActive = apiActive && formState.routeros.apiSSL;
-    const sshActive = formState.routeros.sshEnabled;
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (isEditing) {
+      handleUpdateDevice();
+    } else {
+      handleCreateDevice();
+    }
+  };
 
+  const handleEdit = (device) => {
+    setForm({
+      name: device.name || '',
+      host: device.host || '',
+      groupId: device.groupId || '',
+      tags: device.tags || '',
+      notes: device.notes || '',
+      routeros: { ...defaultRouterForm(), ...device.routeros }
+    });
+    setSelectedId(device.id);
+    setIsEditing(true);
+    setShowModal(true);
+  };
+
+  const handleDelete = (device) => {
+    setSelectedId(device.id);
+    handleDeleteDevice();
+  };
+
+  const handleNewDevice = () => {
+    setForm(emptyDeviceForm());
+    setSelectedId(null);
+    setIsEditing(false);
+    setShowModal(true);
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'up': return 'status-badge--success';
+      case 'down': return 'status-badge--error';
+      case 'maintenance': return 'status-badge--warning';
+      default: return 'status-badge--info';
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="routeros-panel routeros-config">
-        <div className="routeros-config__header">
-          <h3>Access channels</h3>
-          <p className="routeros-config__intro">
-            Choose which management paths MikroManage should use and configure their credentials.
-          </p>
-        </div>
-
-        <div className="routeros-config__toggles">
-          <label className={`toggle-chip${sshActive ? ' toggle-chip--active' : ''}`}>
-            <input type="checkbox" checked={sshActive} onChange={() => onToggle('sshEnabled')} />
-            <span>SSH access</span>
-          </label>
-          <label className={`toggle-chip${apiActive ? ' toggle-chip--active' : ''}`}>
-            <input type="checkbox" checked={apiActive} onChange={() => onToggle('apiEnabled')} />
-            <span>RouterOS API</span>
-          </label>
-          <label className={`toggle-chip${tlsActive ? ' toggle-chip--active' : ''}`} aria-disabled={!apiActive}>
-            <input
-              type="checkbox"
-              checked={formState.routeros.apiSSL}
-              onChange={() => onToggle('apiSSL')}
-              disabled={!apiActive}
-            />
-            <span>Use TLS (8729)</span>
-          </label>
-          <label className={`toggle-chip${formState.routeros.preferredApiFirst ? ' toggle-chip--active' : ''}`}>
-            <input
-              type="checkbox"
-              checked={formState.routeros.preferredApiFirst}
-              onChange={() => onToggle('preferredApiFirst')}
-            />
-            <span>Prefer API before SSH</span>
-          </label>
-          <label className={`toggle-chip${sshActive ? ' toggle-chip--active' : ''}`}>
-            <input type="checkbox" checked={sshActive} onChange={() => onToggle('sshEnabled')} />
-            <span>SSH access</span>
-          </label>
-          <label
-            className={`toggle-chip${formState.routeros.sshAcceptNewHostKeys ? ' toggle-chip--active' : ''}`}
-            aria-disabled={!sshActive}
-          >
-            <input
-              type="checkbox"
-              checked={formState.routeros.sshAcceptNewHostKeys}
-              onChange={() => onToggle('sshAcceptNewHostKeys')}
-              disabled={!sshActive}
-            />
-            <span>Auto-accept fingerprints</span>
-          </label>
-        </div>
-
-        <div className="routeros-config__layout">
-          <section className="routeros-config__column">
-            <header className="routeros-config__column-header">
-              <h4>SSH settings</h4>
-              <p>Used for CLI automations, diagnostics, and failover commands.</p>
-            </header>
-            {sshActive ? (
-              <>
-                <div className="form-grid routeros-config__grid routeros-config__grid--compact">
-                  <label>
-                    <span>SSH port</span>
-                    <input
-                      name="sshPort"
-                      type="number"
-                      min="1"
-                      value={formState.routeros.sshPort}
-                      onChange={onFieldChange}
-                    />
-                  </label>
-                  <label>
-                    <span>Username</span>
-                    <input name="sshUsername" value={formState.routeros.sshUsername} onChange={onFieldChange} />
-                  </label>
-                  <label>
-                    <span>Password / key</span>
-                    <input
-                      name="sshPassword"
-                      type="password"
-                      autoComplete="off"
-                      value={formState.routeros.sshPassword}
-                      onChange={onFieldChange}
-                    />
-                  </label>
-                </div>
-                <label className="toggle-field toggle-field--soft">
-                  <input
-                    type="checkbox"
-                    checked={formState.routeros.autoAcceptFingerprints}
-                    onChange={() => onToggle('autoAcceptFingerprints')}
-                  />
-                  <span>Auto-accept fingerprints</span>
-                </label>
-              </>
-            ) : (
-              <p className="empty-hint">
-                Enable SSH access to fall back to RouterOS CLI automation when the API is unavailable.
-              </p>
-            )}
-          </section>
-
-          <section className="routeros-config__column">
-            <header className="routeros-config__column-header">
-              <h4>API settings</h4>
-              <p>Configure the RouterOS API listener and authentication details.</p>
-            </header>
-            {apiActive ? (
-              <>
-                <label className="toggle-field toggle-field--soft">
-                  <input
-                    type="checkbox"
-                    checked={formState.routeros.apiSSL}
-                    onChange={() => onToggle('apiSSL')}
-                  />
-                  <span>Use TLS (8729)</span>
-                </label>
-                <div className="form-grid routeros-config__grid routeros-config__grid--compact">
-                  <label>
-                    <span>API port</span>
-                    <input
-                      name="apiPort"
-                      type="number"
-                      min="1"
-                      value={formState.routeros.apiPort}
-                      onChange={onFieldChange}
-                    />
-                  </label>
-                  <label>
-                    <span>Username</span>
-                    <input name="apiUsername" value={formState.routeros.apiUsername} onChange={onFieldChange} />
-                  </label>
-                  <label>
-                    <span>Password / token</span>
-                    <input
-                      name="apiPassword"
-                      type="password"
-                      autoComplete="off"
-                      value={formState.routeros.apiPassword}
-                      onChange={onFieldChange}
-                    />
-                  </label>
-                  <label>
-                    <span>Timeout (ms)</span>
-                    <input
-                      name="apiTimeout"
-                      type="number"
-                      min="100"
-                      step="100"
-                      value={formState.routeros.apiTimeout}
-                      onChange={onFieldChange}
-                    />
-                  </label>
-                  <label>
-                    <span>Retries</span>
-                    <input
-                      name="apiRetries"
-                      type="number"
-                      min="0"
-                      max="5"
-                      value={formState.routeros.apiRetries}
-                      onChange={onFieldChange}
-                    />
-                  </label>
-                </div>
-                {tlsActive ? (
-                  <div className="routeros-config__subtoggles">
-                    <label className="toggle-field toggle-field--soft">
-                      <input
-                        type="checkbox"
-                        checked={formState.routeros.verifyTLS}
-                        onChange={() => onToggle('verifyTLS')}
-                      />
-                      <span>Verify TLS certificates</span>
-                    </label>
-                    <label className="toggle-field toggle-field--soft">
-                      <input
-                        type="checkbox"
-                        checked={formState.routeros.allowInsecureCiphers}
-                        onChange={() => onToggle('allowInsecureCiphers')}
-                      />
-                      <span>Allow legacy ciphers</span>
-                    </label>
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <p className="empty-hint">Enable the RouterOS API to configure ports and credentials.</p>
-            )}
-          </section>
-        </div>
-
-        <div className="routeros-config__version">
-          <label>
-            <span>Detected RouterOS version</span>
-            <input
-              name="firmwareVersion"
-              value={formState.routeros.firmwareVersion}
-              onChange={onFieldChange}
-              placeholder="Detected after connectivity test"
-              readOnly
-            />
-          </label>
-          <p className="muted">Target version: {targetVersion || '—'}</p>
-        </div>
-
-        {sshActive ? (
-          <div className="form-grid routeros-config__grid">
-            <label>
-              <span>SSH port</span>
-              <input
-                name="sshPort"
-                type="number"
-                min="1"
-                value={formState.routeros.sshPort}
-                onChange={onFieldChange}
-              />
-            </label>
-            <label>
-              <span>SSH username</span>
-              <input name="sshUsername" value={formState.routeros.sshUsername} onChange={onFieldChange} />
-            </label>
-            <label>
-              <span>SSH password</span>
-              <input
-                name="sshPassword"
-                type="password"
-                autoComplete="off"
-                value={formState.routeros.sshPassword}
-                onChange={onFieldChange}
-              />
-            </label>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-primary">MikroTik Devices</h1>
+            <p className="text-tertiary mt-2">Manage and monitor your MikroTik router infrastructure.</p>
           </div>
-        ) : (
-          <p className="empty-hint">Enable SSH to configure fallback credentials.</p>
-        )}
-
-        <div className="routeros-config__version">
-          <label>
-            <span>Detected RouterOS version</span>
-            <input
-              name="firmwareVersion"
-              value={formState.routeros.firmwareVersion}
-              onChange={onFieldChange}
-              placeholder="Detected after connectivity test"
-              readOnly
-            />
-          </label>
-          <p className="muted">Target version: {targetVersion || '—'}</p>
         </div>
-
-        {sshActive ? (
-          <div className="form-grid routeros-config__grid">
-            <label>
-              <span>SSH port</span>
-              <input
-                name="sshPort"
-                type="number"
-                min="1"
-                value={formState.routeros.sshPort}
-                onChange={onFieldChange}
-              />
-            </label>
-            <label>
-              <span>SSH username</span>
-              <input name="sshUsername" value={formState.routeros.sshUsername} onChange={onFieldChange} />
-            </label>
-            <label>
-              <span>SSH password</span>
-              <input
-                name="sshPassword"
-                type="password"
-                autoComplete="off"
-                value={formState.routeros.sshPassword}
-                onChange={onFieldChange}
-              />
-            </label>
+        <div className="card">
+          <div className="card__body">
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-20 bg-tertiary bg-opacity-20 rounded-lg animate-pulse"></div>
+              ))}
+            </div>
           </div>
-        ) : (
-          <p className="empty-hint">Enable SSH to configure fallback credentials.</p>
-        )}
+        </div>
       </div>
     );
-  };
-
-  const renderConnectivityPanel = (device) => {
-    if (!device) {
-      return null;
-    }
-
-    const connectivity = device.routeros?.connectivity ?? {};
-    const channels = [
-      {
-        key: 'api',
-        label: 'RouterOS API',
-        endpoint:
-          connectivity.api?.endpoint ||
-          (device.routeros?.apiEnabled ? `${device.host}:${device.routeros?.apiPort ?? 8728}` : 'Disabled'),
-        status: connectivity.api?.status || (device.routeros?.apiEnabled ? 'unknown' : 'disabled'),
-        latency: connectivity.api?.latencyMs ?? null,
-        lastCheckedAt: connectivity.api?.lastCheckedAt ?? null
-      },
-      {
-        key: 'ssh',
-        label: 'SSH',
-        endpoint:
-          connectivity.ssh?.endpoint ||
-          (device.routeros?.sshEnabled ? `${device.host}:${device.routeros?.sshPort ?? 22}` : 'Disabled'),
-        status: connectivity.ssh?.status || (device.routeros?.sshEnabled ? 'unknown' : 'disabled'),
-        latency: connectivity.ssh?.latencyMs ?? null,
-        lastCheckedAt: connectivity.ssh?.lastCheckedAt ?? null
-      }
-    ];
-
-    return (
-      <section className="connectivity-panel" aria-labelledby="connectivity-status-heading">
-        <div className="connectivity-panel__header">
-          <div>
-            <h3 id="connectivity-status-heading">Connectivity status</h3>
-            <p>Latest health checks for MikroTik access channels.</p>
-          </div>
-        </div>
-        <div className="connectivity-panel__grid">
-          {channels.map((channel) => {
-            const variant = normalizeStatusVariant(channel.status);
-            const statusLabel = channel.status === 'disabled' ? 'Disabled' : formatConnectivityStatus(channel.status);
-
-            return (
-              <article key={channel.key} className={`connectivity-card connectivity-card--${variant}`}>
-                <header className="connectivity-card__header">
-                  <span className="connectivity-card__title">{channel.label}</span>
-                  <span className={`status-pill status-pill--${variant}`}>{statusLabel}</span>
-                </header>
-                <dl className="connectivity-card__meta">
-                  <div>
-                    <dt>Endpoint</dt>
-                    <dd>{channel.endpoint || '—'}</dd>
-                  </div>
-                  <div>
-                    <dt>Latest latency</dt>
-                    <dd>{formatLatency(channel.latency)}</dd>
-                  </div>
-                  <div>
-                    <dt>Last check</dt>
-                    <dd>{formatDateTime(channel.lastCheckedAt)}</dd>
-                  </div>
-                </dl>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-    );
-  };
-
-  const connectivityPanel = renderConnectivityPanel(managedDevice);
+  }
 
   return (
-    <div>
-      <div className="management-toolbar management-toolbar--stacked">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1>Mikrotik inventory</h1>
-          <p className="management-description">
-            Track RouterOS devices, API credentials, and firmware status across your MikroTik footprint.
-          </p>
+          <h1 className="text-3xl font-bold text-primary">MikroTik Devices</h1>
+          <p className="text-tertiary mt-2">Manage and monitor your MikroTik router infrastructure.</p>
         </div>
-        <div className="toolbar-actions">
-          <input
-            type="search"
-            value={filter}
-            onChange={(event) => setFilter(event.target.value)}
-            placeholder="Filter by name, host, group, status, or tag"
-            className="toolbar-filter"
-          />
-          <button type="button" className="action-button action-button--primary" onClick={openCreateModal}>
-            Add Mikrotik
-          </button>
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={handleNewDevice}
+        >
+          <PlusIcon />
+          Add Device
+        </button>
+      </div>
+
+      {/* Status Message */}
+      {status.message && (
+        <div className={`p-4 rounded-xl border ${
+          status.type === 'error' 
+            ? 'bg-error-50 border-error-200 text-error-700' 
+            : 'bg-success-50 border-success-200 text-success-700'
+        }`}>
+          {status.message}
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="card">
+        <div className="card__body">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="search" className="form-label">Search Devices</label>
+              <input
+                id="search"
+                type="text"
+                className="form-input"
+                placeholder="Search by name, host, or tags..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="group-filter" className="form-label">Filter by Group</label>
+              <select
+                id="group-filter"
+                className="form-input form-select"
+                value={filterGroup}
+                onChange={(e) => setFilterGroup(e.target.value)}
+              >
+                <option value="">All Groups</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
-      {status.message ? <div className={`page-status page-status--${status.type}`}>{status.message}</div> : null}
+      {/* Devices Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredDevices.map((device) => (
+          <div key={device.id} className="card">
+            <div className="card__body">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary-50 rounded-lg">
+                    <DeviceIcon />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-primary">{device.name}</h3>
+                    <p className="text-sm text-tertiary">{device.host}</p>
+                  </div>
+                </div>
+                <span className={`status-badge ${getStatusColor(device.status)}`}>
+                  {device.status || 'Unknown'}
+                </span>
+              </div>
 
-      {loading ? (
-        <p>Loading Mikrotik devices…</p>
-      ) : sortedDevices.length === 0 ? (
-        <p>No Mikrotik devices have been added yet.</p>
-      ) : (
-        <ul className="management-list" aria-live="polite">
-          {sortedDevices.map((entry) => (
-            <li key={entry.id} className="management-list__item">
-              <div className="management-list__summary">
-                <span className="management-list__title">{entry.name}</span>
-                <div className="management-list__meta">
-                  <span>{entry.host}</span>
-                  <span>{entry.groupName ? `Group: ${entry.groupName}` : 'No group assigned'}</span>
-                  <span
-                    className={`status-pill status-pill--${(entry.status?.updateStatus || 'unknown').toLowerCase()}`}
-                  >
-                    {entry.status?.updateStatus ?? 'unknown'}
+              <div className="space-y-2 mb-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-tertiary">Group:</span>
+                  <span className="text-secondary">
+                    {device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}
                   </span>
-                  <span
-                    className={`status-pill status-pill--${getConnectivityStatusClass(
-                      entry.connectivity?.api?.status
-                    )}`}
-                  >
-                    API {formatConnectivityLabel(entry.connectivity?.api?.status)}
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-tertiary">Firmware:</span>
+                  <span className="text-secondary">{device.routeros?.firmwareVersion || 'Unknown'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-tertiary">API:</span>
+                  <span className="text-secondary">
+                    {device.routeros?.apiEnabled ? 'Enabled' : 'Disabled'}
                   </span>
-                  <span
-                    className={`status-pill status-pill--${getConnectivityStatusClass(
-                      entry.connectivity?.ssh?.status
-                    )}`}
-                  >
-                    SSH {formatConnectivityLabel(entry.connectivity?.ssh?.status)}
-                  </span>
-                  <span>
-                    Version {entry.routeros?.firmwareVersion || '—'} · Target{' '}
-                    {entry.status?.targetVersion || targetVersion || '—'}
-                  </span>
-                  <span>Created {formatDateTime(entry.createdAt)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-tertiary">Created:</span>
+                  <span className="text-secondary">{formatDateTime(device.createdAt)}</span>
                 </div>
               </div>
-              <div className="management-list__actions">
-                <button type="button" className="action-button" onClick={() => openManageModal(entry)}>
-                  Manage
+
+              {device.tags && (
+                <div className="mb-4">
+                  <div className="flex flex-wrap gap-1">
+                    {device.tags.split(',').map((tag, index) => (
+                      <span key={index} className="px-2 py-1 bg-tertiary bg-opacity-20 text-xs rounded-full">
+                        {tag.trim()}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm flex-1"
+                  onClick={() => handleEdit(device)}
+                >
+                  <EditIcon />
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => handleTestConnectivity(device)}
+                  disabled={testingDevice === device.id}
+                >
+                  {testingDevice === device.id ? (
+                    <RefreshIcon />
+                  ) : (
+                    <TestIcon />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--danger btn--sm"
+                  onClick={() => handleDelete(device)}
+                >
+                  <TrashIcon />
                 </button>
               </div>
-            </li>
-          ))}
-        </ul>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {filteredDevices.length === 0 && (
+        <div className="card">
+          <div className="card__body text-center py-12">
+            <DeviceIcon />
+            <h3 className="text-lg font-semibold text-primary mt-4">No devices found</h3>
+            <p className="text-tertiary mt-2">
+              {searchTerm || filterGroup 
+                ? 'No devices match your current filters.' 
+                : 'Get started by adding your first MikroTik device.'
+              }
+            </p>
+            {!searchTerm && !filterGroup && (
+              <button
+                type="button"
+                className="btn btn--primary mt-4"
+                onClick={handleNewDevice}
+              >
+                <PlusIcon />
+                Add Your First Device
+              </button>
+            )}
+          </div>
+        </div>
       )}
 
-      {createOpen ? (
-        <Modal
-          title="Add Mikrotik"
-          description="Register a RouterOS device so MikroManage can organise credentials and metadata."
-          onClose={() => {
-            setCreateOpen(false);
-            setCreateBusy(false);
-          }}
-          actions={
-            <>
-              <button type="button" className="action-button" onClick={() => setCreateOpen(false)}>
-                Cancel
-              </button>
-              <button
-                type="submit"
-                form="create-device-form"
-                className="action-button action-button--primary"
-                disabled={createBusy}
-              >
-                {createBusy ? 'Saving…' : 'Create device'}
-              </button>
-            </>
-          }
-        >
-          <form id="create-device-form" onSubmit={handleCreateDevice} className="form-grid">
-            <label>
-              <span>Display name</span>
-              <input name="name" value={createForm.name} onChange={handleCreateFieldChange} required />
-            </label>
-            <label>
-              <span>Host / IP</span>
-              <input name="host" value={createForm.host} onChange={handleCreateFieldChange} required />
-            </label>
-            <label>
-              <span>Group</span>
-              <select name="groupId" value={createForm.groupId} onChange={handleCreateFieldChange}>
-                <option value="">No group</option>
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Tags</span>
-              <input
-                name="tags"
-                value={createForm.tags}
-                onChange={handleCreateFieldChange}
-                placeholder="Comma separated"
-              />
-            </label>
-            <label className="wide">
-              <span>Notes</span>
-              <textarea
-                name="notes"
-                rows="3"
-                value={createForm.notes}
-                onChange={handleCreateFieldChange}
-                placeholder="Deployment notes, on-call hints, or maintenance reminders"
-              />
-            </label>
-            {renderRouterFields(createForm, handleCreateRouterToggle, handleCreateRouterField)}
-          </form>
-        </Modal>
-      ) : null}
+      {/* Create/Edit Modal */}
+      <Modal
+        title={isEditing ? 'Edit Device' : 'Add New Device'}
+        description={isEditing ? 'Update the device configuration below.' : 'Add a new MikroTik device to your network.'}
+        open={showModal}
+        onClose={() => {
+          setShowModal(false);
+          setForm(emptyDeviceForm());
+          setIsEditing(false);
+          setSelectedId(null);
+        }}
+        actions={[
+          <button
+            key="cancel"
+            type="button"
+            className="btn btn--ghost"
+            onClick={() => {
+              setShowModal(false);
+              setForm(emptyDeviceForm());
+              setIsEditing(false);
+              setSelectedId(null);
+            }}
+          >
+            Cancel
+          </button>,
+          <button
+            key="submit"
+            type="submit"
+            form="device-form"
+            className="btn btn--primary"
+            disabled={!form.name.trim() || !form.host.trim()}
+          >
+            {isEditing ? 'Update Device' : 'Add Device'}
+          </button>
+        ]}
+      >
+        <form id="device-form" onSubmit={handleSubmit} className="space-y-6">
+          {/* Basic Information */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-primary">Basic Information</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="form-group">
+                <label htmlFor="device-name" className="form-label">
+                  Device Name *
+                </label>
+                <input
+                  id="device-name"
+                  type="text"
+                  className="form-input"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="e.g., Router-01"
+                  required
+                />
+              </div>
 
-      {manageState.open ? (
-        <Modal
-          title="Manage Mikrotik"
-          description="Update connection settings or remove devices that are no longer part of this network."
-          onClose={closeManageModal}
-          actions={
-            <>
-              <button type="button" className="action-button" onClick={closeManageModal}>
-                Close
-              </button>
-              <button
-                type="button"
-                className="action-button action-button--danger"
-                onClick={handleDeleteDevice}
-                disabled={deleteBusy}
+              <div className="form-group">
+                <label htmlFor="device-host" className="form-label">
+                  Host Address *
+                </label>
+                <input
+                  id="device-host"
+                  type="text"
+                  className="form-input"
+                  value={form.host}
+                  onChange={(e) => setForm({ ...form, host: e.target.value })}
+                  placeholder="e.g., 192.168.1.1"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="device-group" className="form-label">
+                Group
+              </label>
+              <select
+                id="device-group"
+                className="form-input form-select"
+                value={form.groupId}
+                onChange={(e) => setForm({ ...form, groupId: e.target.value })}
               >
-                {deleteBusy ? 'Removing…' : 'Delete'}
-              </button>
-              <button
-                type="submit"
-                form="manage-device-form"
-                className="action-button action-button--primary"
-                disabled={manageBusy}
-              >
-                {manageBusy ? 'Saving…' : 'Save changes'}
-              </button>
-            </>
-          }
-        >
-          <form id="manage-device-form" onSubmit={handleUpdateDevice} className="form-grid">
-            <label>
-              <span>Display name</span>
-              <input name="name" value={manageState.form.name} onChange={handleManageFieldChange} required />
-            </label>
-            <label>
-              <span>Host / IP</span>
-              <input name="host" value={manageState.form.host} onChange={handleManageFieldChange} required />
-            </label>
-            <label>
-              <span>Group</span>
-              <select name="groupId" value={manageState.form.groupId} onChange={handleManageFieldChange}>
                 <option value="">No group</option>
                 {groups.map((group) => (
                   <option key={group.id} value={group.id}>
@@ -1095,69 +638,129 @@ const Mikrotiks = () => {
                   </option>
                 ))}
               </select>
-            </label>
-            <label>
-              <span>Tags</span>
-              <input
-                name="tags"
-                value={manageState.form.tags}
-                onChange={handleManageFieldChange}
-                placeholder="Comma separated"
-              />
-            </label>
-            <label className="wide">
-              <span>Notes</span>
-              <textarea
-                name="notes"
-                rows="3"
-                value={manageState.form.notes}
-                onChange={handleManageFieldChange}
-                placeholder="Deployment notes, on-call hints, or maintenance reminders"
-              />
-            </label>
-            <div className="connectivity-summary">
-              <h3 className="connectivity-summary__title">Connectivity status</h3>
-              <ul className="connectivity-summary__list">
-                <li>
-                  <span
-                    className={`status-pill status-pill--${getConnectivityStatusClass(
-                      manageState.details?.connectivity?.api?.status
-                    )}`}
-                  >
-                    API {formatConnectivityLabel(manageState.details?.connectivity?.api?.status)}
-                  </span>
-                  <span className="muted">
-                    Last check: {formatDateTime(manageState.details?.connectivity?.api?.lastCheckedAt)}
-                  </span>
-                </li>
-                <li>
-                  <span
-                    className={`status-pill status-pill--${getConnectivityStatusClass(
-                      manageState.details?.connectivity?.ssh?.status
-                    )}`}
-                  >
-                    SSH {formatConnectivityLabel(manageState.details?.connectivity?.ssh?.status)}
-                  </span>
-                  <span className="muted">
-                    Last check: {formatDateTime(manageState.details?.connectivity?.ssh?.lastCheckedAt)}
-                  </span>
-                </li>
-              </ul>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={handleTestConnectivity}
-                disabled={testBusy}
-              >
-                {testBusy ? 'Testing…' : 'Test connectivity'}
-              </button>
             </div>
-            {renderRouterFields(manageState.form, handleManageRouterToggle, handleManageRouterField)}
-            {connectivityPanel ? <div className="form-grid__full">{connectivityPanel}</div> : null}
-            <p className="field-hint">Created {formatDateTime(devices.find((d) => d.id === manageState.deviceId)?.createdAt)}</p>
-          </form>
-        </Modal>
-      ) : null}
+
+            <div className="form-group">
+              <label htmlFor="device-tags" className="form-label">
+                Tags
+              </label>
+              <input
+                id="device-tags"
+                type="text"
+                className="form-input"
+                value={form.tags}
+                onChange={(e) => setForm({ ...form, tags: e.target.value })}
+                placeholder="e.g., production, core, backup"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="device-notes" className="form-label">
+                Notes
+              </label>
+              <textarea
+                id="device-notes"
+                className="form-input form-textarea"
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                placeholder="Additional notes about this device..."
+                rows={3}
+              />
+            </div>
+          </div>
+
+          {/* RouterOS API Configuration */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-primary">RouterOS API Configuration</h3>
+            
+            <div className="form-group">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.routeros.apiEnabled}
+                  onChange={(e) => setForm({
+                    ...form,
+                    routeros: { ...form.routeros, apiEnabled: e.target.checked }
+                  })}
+                />
+                <span className="form-label mb-0">Enable RouterOS API</span>
+              </label>
+            </div>
+
+            {form.routeros.apiEnabled && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label htmlFor="api-port" className="form-label">
+                    API Port
+                  </label>
+                  <input
+                    id="api-port"
+                    type="number"
+                    className="form-input"
+                    value={form.routeros.apiPort}
+                    onChange={(e) => setForm({
+                      ...form,
+                      routeros: { ...form.routeros, apiPort: e.target.value }
+                    })}
+                    placeholder="8728"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="api-username" className="form-label">
+                    Username
+                  </label>
+                  <input
+                    id="api-username"
+                    type="text"
+                    className="form-input"
+                    value={form.routeros.apiUsername}
+                    onChange={(e) => setForm({
+                      ...form,
+                      routeros: { ...form.routeros, apiUsername: e.target.value }
+                    })}
+                    placeholder="admin"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="api-password" className="form-label">
+                    Password
+                  </label>
+                  <input
+                    id="api-password"
+                    type="password"
+                    className="form-input"
+                    value={form.routeros.apiPassword}
+                    onChange={(e) => setForm({
+                      ...form,
+                      routeros: { ...form.routeros, apiPassword: e.target.value }
+                    })}
+                    placeholder="Enter password"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="api-timeout" className="form-label">
+                    Timeout (ms)
+                  </label>
+                  <input
+                    id="api-timeout"
+                    type="number"
+                    className="form-input"
+                    value={form.routeros.apiTimeout}
+                    onChange={(e) => setForm({
+                      ...form,
+                      routeros: { ...form.routeros, apiTimeout: e.target.value }
+                    })}
+                    placeholder="5000"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

@@ -1,8 +1,11 @@
 import { useEffect, useRef } from 'react';
 
-const buildActionClassName = (variant = 'ghost') => {
-  return ['modal__action', variant ? `modal__action--${variant}` : ''].filter(Boolean).join(' ');
-};
+const CloseIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
 
 const renderActions = (actions) => {
   if (!actions) {
@@ -10,33 +13,7 @@ const renderActions = (actions) => {
   }
 
   if (Array.isArray(actions)) {
-    const entries = actions.filter(Boolean).map((action, index) => {
-      const {
-        label,
-        variant = 'ghost',
-        type = 'button',
-        form,
-        onClick,
-        disabled,
-        autoFocus,
-        key
-      } = action;
-
-      return (
-        <button
-          key={key ?? `${variant}-${label ?? 'action'}-${index}`}
-          type={type}
-          form={form}
-          onClick={onClick}
-          disabled={disabled}
-          autoFocus={autoFocus}
-          className={buildActionClassName(variant)}
-        >
-          {label}
-        </button>
-      );
-    });
-
+    const entries = actions.filter(Boolean);
     return entries.length ? entries : null;
   }
 
@@ -102,14 +79,25 @@ const Modal = ({ title, description, children, actions, onClose, open = true }) 
     <div className="modal" role="dialog" aria-modal="true" aria-labelledby={labelId} onClick={handleBackdropClick}>
       <div className="modal__dialog" ref={dialogRef} tabIndex={-1}>
         <div className="modal__header">
-          <h2 id={labelId}>{title}</h2>
-          <button type="button" className="modal__close" onClick={onClose} aria-label="Close">
-            ×
+          <div>
+            <h2 id={labelId} className="modal__title">{title}</h2>
+            {description && (
+              <p className="modal__description text-tertiary text-sm mt-1">{description}</p>
+            )}
+          </div>
+          <button 
+            type="button" 
+            className="modal__close" 
+            onClick={onClose} 
+            aria-label="Close modal"
+          >
+            <CloseIcon />
           </button>
         </div>
-        {description ? <p className="modal__description">{description}</p> : null}
         <div className="modal__body">{children}</div>
-        {renderedActions ? <div className="modal__actions">{renderedActions}</div> : null}
+        {renderedActions && (
+          <div className="modal__footer">{renderedActions}</div>
+        )}
       </div>
     </div>
   );

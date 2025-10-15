@@ -2,6 +2,59 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
+// Modern Icons
+const PlusIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+const EditIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const TrashIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <polyline points="3,6 5,6 21,6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const TestIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c1.3 0 2.52.28 3.64.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const SyncIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M21 3v5h-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M3 21v-5h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const DatabaseIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="12" cy="5" rx="9" ry="3" stroke="currentColor" strokeWidth="2" />
+    <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5" stroke="currentColor" strokeWidth="2" />
+    <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3" stroke="currentColor" strokeWidth="2" />
+  </svg>
+);
+
+const NetworkIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+    <path d="M8 12h8M12 8v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
 const emptyIpamForm = {
   name: '',
   baseUrl: '',
@@ -13,20 +66,20 @@ const emptyIpamForm = {
 
 const statusVariant = (status) => {
   if (!status) {
-    return 'status-pill--unknown';
+    return 'status-badge--info';
   }
 
   const value = status.toLowerCase();
 
   if (value === 'connected') {
-    return 'status-pill--success';
+    return 'status-badge--success';
   }
 
   if (value === 'failed') {
-    return 'status-pill--danger';
+    return 'status-badge--error';
   }
 
-  return 'status-pill--unknown';
+  return 'status-badge--warning';
 };
 
 const formatTimestamp = (value) => {
@@ -35,7 +88,6 @@ const formatTimestamp = (value) => {
   }
 
   const parsed = new Date(value);
-
   if (Number.isNaN(parsed.getTime())) {
     return 'Never';
   }
@@ -48,10 +100,51 @@ const Settings = () => {
   const navigate = useNavigate();
   const [ipams, setIpams] = useState([]);
   const [ipamLoading, setIpamLoading] = useState(true);
-  const [ipamNotice, setIpamNotice] = useState({ type: '', message: '' });
+  const [ipamStatus, setIpamStatus] = useState({ type: '', message: '' });
   const [ipamForm, setIpamForm] = useState(emptyIpamForm);
-  const [ipamBusy, setIpamBusy] = useState(false);
-  const [actionState, setActionState] = useState({});
+  const [showIpamModal, setShowIpamModal] = useState(false);
+  const [isEditingIpam, setIsEditingIpam] = useState(false);
+  const [selectedIpamId, setSelectedIpamId] = useState(null);
+  const [testingIpam, setTestingIpam] = useState(null);
+  const [syncingIpam, setSyncingIpam] = useState(null);
+  const [configInfo, setConfigInfo] = useState(null);
+
+  const loadIpams = async () => {
+    try {
+      setIpamLoading(true);
+      const response = await fetch('/api/ipams');
+
+      if (!response.ok) {
+        throw new Error('Unable to load IPAM configurations.');
+      }
+
+      const payload = await response.json();
+      setIpams(payload);
+      setIpamStatus({ type: '', message: '' });
+    } catch (error) {
+      setIpamStatus({
+        type: 'error',
+        message: error.message || 'Unable to load IPAM configurations.'
+      });
+    } finally {
+      setIpamLoading(false);
+    }
+  };
+
+  const loadConfigInfo = async () => {
+    try {
+      const response = await fetch('/api/config-info');
+
+      if (!response.ok) {
+        throw new Error('Unable to load configuration information.');
+      }
+
+      const payload = await response.json();
+      setConfigInfo(payload);
+    } catch (error) {
+      console.error('Failed to load config info:', error);
+    }
+  };
 
   useEffect(() => {
     if (!user) {
@@ -59,403 +152,545 @@ const Settings = () => {
       return;
     }
 
-    if (!user.permissions?.settings) {
-      navigate('/dashboard', { replace: true });
-    }
+    loadIpams();
+    loadConfigInfo();
   }, [navigate, user]);
 
-  const loadIpams = useCallback(async () => {
-    try {
-      setIpamLoading(true);
-      const response = await fetch('/api/ipams');
-
-      if (!response.ok) {
-        throw new Error('Unable to load phpIPAM integrations.');
-      }
-
-      const payload = await response.json();
-      setIpams(Array.isArray(payload?.ipams) ? payload.ipams : []);
-      setIpamNotice({ type: '', message: '' });
-    } catch (error) {
-      setIpamNotice({ type: 'error', message: error.message });
-    } finally {
-      setIpamLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (user?.permissions?.settings) {
-      loadIpams();
-    }
-  }, [loadIpams, user]);
-
-  if (!user?.permissions?.settings) {
-    return null;
-  }
-
-  const updateActionState = (id, patch) => {
-    setActionState((current) => ({
-      ...current,
-      [id]: {
-        ...(current[id] ?? {}),
-        ...patch
-      }
-    }));
-  };
-
-  const handleFormChange = (event) => {
-    const { name, value } = event.target;
-    setIpamForm((current) => ({ ...current, [name]: value }));
-  };
-
-  const handleCreateIpam = async (event) => {
-    event.preventDefault();
-    setIpamBusy(true);
-    setIpamNotice({ type: '', message: '' });
-
+  const handleCreateIpam = async () => {
     try {
       const response = await fetch('/api/ipams', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(ipamForm)
       });
 
-      const payload = await response.json().catch(() => ({}));
-
       if (!response.ok) {
-        const message = payload?.message || 'Unable to add the phpIPAM integration.';
-        throw new Error(message);
+        const payload = await response.json();
+        throw new Error(payload.message || 'Unable to create IPAM configuration.');
       }
 
-      const testStatus = payload?.test?.status;
-      const testMessage = payload?.test?.message;
-      const noticeType = testStatus === 'failed' ? 'error' : 'success';
-      const noticeMessage = payload?.test
-        ? testStatus === 'connected'
-          ? `phpIPAM integration saved and authenticated (${testMessage || 'Connected successfully.'}).`
-          : `Integration saved but the connectivity check failed: ${testMessage || 'verify credentials and API access.'}`
-        : 'phpIPAM integration added successfully.';
-
-      setIpamNotice({ type: noticeType, message: noticeMessage });
       setIpamForm(emptyIpamForm);
+      setShowIpamModal(false);
       await loadIpams();
-    } catch (error) {
-      setIpamNotice({ type: 'error', message: error.message });
-    } finally {
-      setIpamBusy(false);
-    }
-  };
-
-  const handleRemoveIpam = async (ipamId) => {
-    if (!window.confirm('Remove this phpIPAM integration?')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/ipams/${ipamId}`, { method: 'DELETE' });
-
-      if (!response.ok) {
-        throw new Error('Unable to remove the integration.');
-      }
-
-      setIpamNotice({ type: 'success', message: 'phpIPAM integration removed.' });
-      await loadIpams();
-    } catch (error) {
-      setIpamNotice({ type: 'error', message: error.message || 'Unable to remove the integration.' });
-    }
-  };
-
-  const handleTestIpam = async (ipamId) => {
-    updateActionState(ipamId, { testing: true });
-    setIpamNotice({ type: '', message: '' });
-
-    try {
-      const response = await fetch(`/api/ipams/${ipamId}/test`, { method: 'POST' });
-      const payload = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        const message = payload?.message || 'Unable to test the phpIPAM integration.';
-        throw new Error(message);
-      }
-
-      setIpamNotice({
-        type: payload?.ok === false ? 'error' : 'success',
-        message: payload?.message || 'phpIPAM connectivity test completed.'
-      });
-      await loadIpams();
-    } catch (error) {
-      setIpamNotice({ type: 'error', message: error.message });
-    } finally {
-      updateActionState(ipamId, { testing: false });
-    }
-  };
-
-  const handleSyncIpam = async (ipamId) => {
-    updateActionState(ipamId, { syncing: true });
-    setIpamNotice({ type: '', message: '' });
-
-    try {
-      const response = await fetch(`/api/ipams/${ipamId}/sync`, { method: 'POST' });
-      const payload = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        const message = payload?.message || 'Unable to synchronise phpIPAM structure.';
-        throw new Error(message);
-      }
-
-      const { sections = 0, datacenters = 0, ranges = 0 } = payload ?? {};
-      setIpamNotice({
+      setIpamStatus({
         type: 'success',
-        message: `Structure synchronised (${sections} sections, ${datacenters} datacenters, ${ranges} ranges).`
+        message: 'IPAM configuration created successfully.'
       });
-      await loadIpams();
     } catch (error) {
-      setIpamNotice({ type: 'error', message: error.message });
+      setIpamStatus({
+        type: 'error',
+        message: error.message || 'Unable to create IPAM configuration.'
+      });
+    }
+  };
+
+  const handleUpdateIpam = async () => {
+    try {
+      const response = await fetch(`/api/ipams/${selectedIpamId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(ipamForm)
+      });
+
+      if (!response.ok) {
+        const payload = await response.json();
+        throw new Error(payload.message || 'Unable to update IPAM configuration.');
+      }
+
+      setIpamForm(emptyIpamForm);
+      setShowIpamModal(false);
+      setIsEditingIpam(false);
+      setSelectedIpamId(null);
+      await loadIpams();
+      setIpamStatus({
+        type: 'success',
+        message: 'IPAM configuration updated successfully.'
+      });
+    } catch (error) {
+      setIpamStatus({
+        type: 'error',
+        message: error.message || 'Unable to update IPAM configuration.'
+      });
+    }
+  };
+
+  const handleDeleteIpam = async () => {
+    try {
+      const response = await fetch(`/api/ipams/${selectedIpamId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const payload = await response.json();
+        throw new Error(payload.message || 'Unable to delete IPAM configuration.');
+      }
+
+      setSelectedIpamId(null);
+      await loadIpams();
+      setIpamStatus({
+        type: 'success',
+        message: 'IPAM configuration deleted successfully.'
+      });
+    } catch (error) {
+      setIpamStatus({
+        type: 'error',
+        message: error.message || 'Unable to delete IPAM configuration.'
+      });
+    }
+  };
+
+  const handleTestIpam = async (ipam) => {
+    try {
+      setTestingIpam(ipam.id);
+      const response = await fetch(`/api/ipams/${ipam.id}/test`, {
+        method: 'POST'
+      });
+
+      if (!response.ok) {
+        const payload = await response.json();
+        throw new Error(payload.message || 'IPAM test failed.');
+      }
+
+      const result = await response.json();
+      setIpamStatus({
+        type: result.success ? 'success' : 'error',
+        message: result.message || (result.success ? 'IPAM connection successful!' : 'IPAM connection failed.')
+      });
+    } catch (error) {
+      setIpamStatus({
+        type: 'error',
+        message: error.message || 'IPAM test failed.'
+      });
     } finally {
-      updateActionState(ipamId, { syncing: false });
+      setTestingIpam(null);
     }
   };
 
-  const renderCollectionList = (items, emptyMessage) => {
-    if (!items?.length) {
-      return <li className="ipam-collection__empty">{emptyMessage}</li>;
-    }
+  const handleSyncIpam = async (ipam) => {
+    try {
+      setSyncingIpam(ipam.id);
+      const response = await fetch(`/api/ipams/${ipam.id}/sync`, {
+        method: 'POST'
+      });
 
-    return items.slice(0, 6).map((item) => (
-      <li key={`${item.id ?? item.name}`}
-        className="ipam-collection__item"
-      >
-        <span className="ipam-collection__name">{item.name}</span>
-        {item.metadata?.cidr ? <span className="ipam-collection__meta">{item.metadata.cidr}</span> : null}
-        {!item.metadata?.cidr && item.description ? (
-          <span className="ipam-collection__meta">{item.description}</span>
-        ) : null}
-      </li>
-    ));
+      if (!response.ok) {
+        const payload = await response.json();
+        throw new Error(payload.message || 'IPAM sync failed.');
+      }
+
+      const result = await response.json();
+      setIpamStatus({
+        type: result.success ? 'success' : 'error',
+        message: result.message || (result.success ? 'IPAM sync completed!' : 'IPAM sync failed.')
+      });
+    } catch (error) {
+      setIpamStatus({
+        type: 'error',
+        message: error.message || 'IPAM sync failed.'
+      });
+    } finally {
+      setSyncingIpam(null);
+    }
   };
+
+  const handleIpamSubmit = (event) => {
+    event.preventDefault();
+    if (isEditingIpam) {
+      handleUpdateIpam();
+    } else {
+      handleCreateIpam();
+    }
+  };
+
+  const handleEditIpam = (ipam) => {
+    setIpamForm({
+      name: ipam.name || '',
+      baseUrl: ipam.baseUrl || '',
+      appId: ipam.appId || '',
+      appCode: ipam.appCode || '',
+      appPermissions: ipam.appPermissions || 'Read',
+      appSecurity: ipam.appSecurity || 'SSL with App code token'
+    });
+    setSelectedIpamId(ipam.id);
+    setIsEditingIpam(true);
+    setShowIpamModal(true);
+  };
+
+  const handleDeleteIpamClick = (ipam) => {
+    setSelectedIpamId(ipam.id);
+    handleDeleteIpam();
+  };
+
+  const handleNewIpam = () => {
+    setIpamForm(emptyIpamForm);
+    setSelectedIpamId(null);
+    setIsEditingIpam(false);
+    setShowIpamModal(true);
+  };
+
+  if (ipamLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-primary">Settings</h1>
+            <p className="text-tertiary mt-2">Configure system settings and integrations.</p>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card__body">
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-20 bg-tertiary bg-opacity-20 rounded-lg animate-pulse"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <section className="settings-page">
-      <header className="settings-page__header">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1>Settings & integrations</h1>
-          <p className="settings-page__intro">
-            Manage phpIPAM connectors, keep MikroTik onboarding details aligned, and prepare DNS helpers for PTR automation.
-          </p>
+          <h1 className="text-3xl font-bold text-primary">Settings</h1>
+          <p className="text-tertiary mt-2">Configure system settings and integrations.</p>
         </div>
-      </header>
+      </div>
 
-      {ipamNotice.message ? (
-        <p className={`page-status page-status--${ipamNotice.type || 'info'}`}>{ipamNotice.message}</p>
-      ) : null}
+      {/* Status Message */}
+      {ipamStatus.message && (
+        <div className={`p-4 rounded-xl border ${
+          ipamStatus.type === 'error' 
+            ? 'bg-error-50 border-error-200 text-error-700' 
+            : 'bg-success-50 border-success-200 text-success-700'
+        }`}>
+          {ipamStatus.message}
+        </div>
+      )}
 
-      <div className="settings-grid">
-        <section className="settings-panel">
-          <header className="settings-panel__header">
+      {/* System Information */}
+      {configInfo && (
+        <div className="card">
+          <div className="card__header">
+            <h2 className="card__title">System Information</h2>
+            <p className="card__subtitle">Current system configuration</p>
+          </div>
+          <div className="card__body">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary-50 rounded-lg">
+                    <DatabaseIcon />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-primary">Database</h3>
+                    <p className="text-sm text-tertiary">Storage configuration</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-tertiary">Driver:</span>
+                    <span className="text-secondary">{configInfo.database?.driver || 'Unknown'}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-tertiary">File:</span>
+                    <span className="text-secondary font-mono text-xs">
+                      {configInfo.database?.file || 'Unknown'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary-50 rounded-lg">
+                    <NetworkIcon />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-primary">Configuration</h3>
+                    <p className="text-sm text-tertiary">System settings</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-tertiary">Config File:</span>
+                    <span className="text-secondary font-mono text-xs">
+                      {configInfo.database?.configFile || 'Unknown'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* IPAM Configurations */}
+      <div className="card">
+        <div className="card__header">
+          <div className="flex items-center justify-between">
             <div>
-              <h2>phpIPAM connectors</h2>
-              <p className="settings-panel__subtitle">
-                Store App credentials, verify connectivity, and cache sections, datacenters, and allocation ranges for automation.
+              <h2 className="card__title">IPAM Integrations</h2>
+              <p className="card__subtitle">Manage phpIPAM connections</p>
+            </div>
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={handleNewIpam}
+            >
+              <PlusIcon />
+              Add IPAM
+            </button>
+          </div>
+        </div>
+        <div className="card__body">
+          {ipams.length > 0 ? (
+            <div className="space-y-4">
+              {ipams.map((ipam) => (
+                <div key={ipam.id} className="p-4 border border-primary rounded-lg">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary-50 rounded-lg">
+                        <NetworkIcon />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-primary">{ipam.name}</h3>
+                        <p className="text-sm text-tertiary">{ipam.baseUrl}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`status-badge ${statusVariant(ipam.status)}`}>
+                        {ipam.status || 'Unknown'}
+                      </span>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm"
+                          onClick={() => handleTestIpam(ipam)}
+                          disabled={testingIpam === ipam.id}
+                        >
+                          {testingIpam === ipam.id ? (
+                            <SyncIcon />
+                          ) : (
+                            <TestIcon />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm"
+                          onClick={() => handleSyncIpam(ipam)}
+                          disabled={syncingIpam === ipam.id}
+                        >
+                          <SyncIcon />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm"
+                          onClick={() => handleEditIpam(ipam)}
+                        >
+                          <EditIcon />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm text-error"
+                          onClick={() => handleDeleteIpamClick(ipam)}
+                        >
+                          <TrashIcon />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="text-tertiary">App ID:</span>
+                      <span className="text-secondary ml-2">{ipam.appId || '—'}</span>
+                    </div>
+                    <div>
+                      <span className="text-tertiary">Permissions:</span>
+                      <span className="text-secondary ml-2">{ipam.appPermissions || '—'}</span>
+                    </div>
+                    <div>
+                      <span className="text-tertiary">Last Sync:</span>
+                      <span className="text-secondary ml-2">{formatTimestamp(ipam.lastSyncAt)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <NetworkIcon />
+              <h3 className="text-lg font-semibold text-primary mt-4">No IPAM configurations</h3>
+              <p className="text-tertiary mt-2">Get started by adding your first phpIPAM integration.</p>
+              <button
+                type="button"
+                className="btn btn--primary mt-4"
+                onClick={handleNewIpam}
+              >
+                <PlusIcon />
+                Add Your First IPAM
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Create/Edit IPAM Modal */}
+      <div className={`modal ${showIpamModal ? 'modal--open' : ''}`}>
+        <div className="modal__dialog">
+          <div className="modal__header">
+            <div>
+              <h2 className="modal__title">
+                {isEditingIpam ? 'Edit IPAM Configuration' : 'Add New IPAM Configuration'}
+              </h2>
+              <p className="modal__description text-tertiary text-sm mt-1">
+                {isEditingIpam ? 'Update the IPAM configuration below.' : 'Configure a new phpIPAM integration.'}
               </p>
             </div>
-          </header>
-          <div className="settings-panel__content">
-            <form className="ipam-form" onSubmit={handleCreateIpam}>
-              <div className="form-grid">
-                <label className="form-grid__field">
-                  <span className="form-field-label">Display name</span>
-                  <input
-                    type="text"
-                    name="name"
-                    value={ipamForm.name}
-                    onChange={handleFormChange}
-                    required
-                  />
+            <button
+              type="button"
+              className="modal__close"
+              onClick={() => {
+                setShowIpamModal(false);
+                setIpamForm(emptyIpamForm);
+                setIsEditingIpam(false);
+                setSelectedIpamId(null);
+              }}
+            >
+              ×
+            </button>
+          </div>
+          <div className="modal__body">
+            <form id="ipam-form" onSubmit={handleIpamSubmit} className="space-y-4">
+              <div className="form-group">
+                <label htmlFor="ipam-name" className="form-label">
+                  Configuration Name *
                 </label>
-                <label className="form-grid__field wide">
-                  <span className="form-field-label">Base API URL</span>
-                  <input
-                    type="url"
-                    name="baseUrl"
-                    placeholder="https://phpipam.example/api"
-                    value={ipamForm.baseUrl}
-                    onChange={handleFormChange}
-                    required
-                  />
+                <input
+                  id="ipam-name"
+                  type="text"
+                  className="form-input"
+                  value={ipamForm.name}
+                  onChange={(e) => setIpamForm({ ...ipamForm, name: e.target.value })}
+                  placeholder="e.g., Production IPAM"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="ipam-base-url" className="form-label">
+                  Base URL *
                 </label>
-                <label className="form-grid__field">
-                  <span className="form-field-label">App ID</span>
+                <input
+                  id="ipam-base-url"
+                  type="url"
+                  className="form-input"
+                  value={ipamForm.baseUrl}
+                  onChange={(e) => setIpamForm({ ...ipamForm, baseUrl: e.target.value })}
+                  placeholder="https://ipam.example.com"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label htmlFor="ipam-app-id" className="form-label">
+                    App ID *
+                  </label>
                   <input
+                    id="ipam-app-id"
                     type="text"
-                    name="appId"
+                    className="form-input"
                     value={ipamForm.appId}
-                    onChange={handleFormChange}
+                    onChange={(e) => setIpamForm({ ...ipamForm, appId: e.target.value })}
+                    placeholder="Enter App ID"
                     required
                   />
-                </label>
-                <label className="form-grid__field">
-                  <span className="form-field-label">App code</span>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="ipam-app-code" className="form-label">
+                    App Code *
+                  </label>
                   <input
-                    type="text"
-                    name="appCode"
+                    id="ipam-app-code"
+                    type="password"
+                    className="form-input"
                     value={ipamForm.appCode}
-                    onChange={handleFormChange}
+                    onChange={(e) => setIpamForm({ ...ipamForm, appCode: e.target.value })}
+                    placeholder="Enter App Code"
                     required
                   />
-                </label>
-                <label className="form-grid__field">
-                  <span className="form-field-label">Permissions</span>
-                  <select name="appPermissions" value={ipamForm.appPermissions} onChange={handleFormChange}>
-                    <option value="Read">Read</option>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label htmlFor="ipam-permissions" className="form-label">
+                    Permissions
+                  </label>
+                  <select
+                    id="ipam-permissions"
+                    className="form-input form-select"
+                    value={ipamForm.appPermissions}
+                    onChange={(e) => setIpamForm({ ...ipamForm, appPermissions: e.target.value })}
+                  >
+                    <option value="Read">Read Only</option>
                     <option value="Read/Write">Read/Write</option>
-                    <option value="Full">Full</option>
                   </select>
-                </label>
-                <label className="form-grid__field">
-                  <span className="form-field-label">Security</span>
-                  <select name="appSecurity" value={ipamForm.appSecurity} onChange={handleFormChange}>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="ipam-security" className="form-label">
+                    Security
+                  </label>
+                  <select
+                    id="ipam-security"
+                    className="form-input form-select"
+                    value={ipamForm.appSecurity}
+                    onChange={(e) => setIpamForm({ ...ipamForm, appSecurity: e.target.value })}
+                  >
                     <option value="SSL with App code token">SSL with App code token</option>
-                    <option value="SSL with SSL certificate">SSL with SSL certificate</option>
-                    <option value="Token only">Token only</option>
+                    <option value="SSL with User token">SSL with User token</option>
+                    <option value="SSL with User credentials">SSL with User credentials</option>
                   </select>
-                </label>
-                <button type="submit" className="primary-button" disabled={ipamBusy}>
-                  {ipamBusy ? 'Saving…' : 'Add phpIPAM integration'}
-                </button>
+                </div>
               </div>
             </form>
-
-            <div className="ipam-list" role="region" aria-live="polite">
-              {ipamLoading ? (
-                <p className="muted">Loading integrations…</p>
-              ) : ipams.length === 0 ? (
-                <p className="muted">
-                  No phpIPAM integrations yet. Add an App ID and App Code to begin synchronising structure.
-                </p>
-              ) : (
-                ipams.map((ipam) => (
-                  <article key={ipam.id} className="ipam-card">
-                    <header className="ipam-card__header">
-                      <div>
-                        <h3>{ipam.name}</h3>
-                        <p className="ipam-card__url">{ipam.baseUrl}</p>
-                      </div>
-                      <span className={`status-pill ${statusVariant(ipam.lastStatus)}`}>
-                        <span className="status-pill__dot" aria-hidden="true" />
-                        {ipam.lastStatus || 'unknown'}
-                      </span>
-                    </header>
-                    <dl className="ipam-card__meta">
-                      <div>
-                        <dt>App ID</dt>
-                        <dd>{ipam.appId}</dd>
-                      </div>
-                      <div>
-                        <dt>Permissions</dt>
-                        <dd>{ipam.appPermissions}</dd>
-                      </div>
-                      <div>
-                        <dt>Security</dt>
-                        <dd>{ipam.appSecurity}</dd>
-                      </div>
-                      <div>
-                        <dt>Last check</dt>
-                        <dd>{formatTimestamp(ipam.lastCheckedAt)}</dd>
-                      </div>
-                    </dl>
-                    <div className="ipam-card__collections">
-                      <h4>Cached structure</h4>
-                      <div className="ipam-collection-grid">
-                        <div>
-                          <h5>Sections</h5>
-                          <ul>{renderCollectionList(ipam.collections?.sections, 'No sections cached.')}</ul>
-                        </div>
-                        <div>
-                          <h5>Datacenters</h5>
-                          <ul>{renderCollectionList(ipam.collections?.datacenters, 'No datacenters cached.')}</ul>
-                        </div>
-                        <div>
-                          <h5>Ranges</h5>
-                          <ul>{renderCollectionList(ipam.collections?.ranges, 'No ranges cached.')}</ul>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="ipam-card__actions">
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        onClick={() => handleSyncIpam(ipam.id)}
-                        disabled={Boolean(actionState[ipam.id]?.syncing)}
-                      >
-                        {actionState[ipam.id]?.syncing ? 'Synchronising…' : 'Sync structure'}
-                      </button>
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        onClick={() => handleTestIpam(ipam.id)}
-                        disabled={Boolean(actionState[ipam.id]?.testing)}
-                      >
-                        {actionState[ipam.id]?.testing ? 'Testing…' : 'Test connection'}
-                      </button>
-                      <button
-                        type="button"
-                        className="danger-button"
-                        onClick={() => handleRemoveIpam(ipam.id)}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </article>
-                ))
-              )}
-            </div>
           </div>
-        </section>
-
-        <section className="settings-panel">
-          <header className="settings-panel__header">
-            <div>
-              <h2>MikroTik onboarding defaults</h2>
-              <p className="settings-panel__subtitle">
-                Capture API and SSH preferences once and apply them whenever a new MikroTik joins the inventory.
-              </p>
-            </div>
-          </header>
-          <div className="settings-panel__content">
-            <p className="muted">
-              Set RouterOS targets, API timeouts, and encryption policies from the Mikrotiks workspace. This dashboard will soon
-              centralise those defaults and surface live API/SSH diagnostics.
-            </p>
-            <ul className="settings-hint-list">
-              <li>Ensure API services are enabled on the router before triggering connection tests.</li>
-              <li>Keep SSH keys enrolled so tunnels and provisioning tasks remain seamless.</li>
-              <li>Monitor latency and packet loss from the Dashboard to validate tunnel health after onboarding.</li>
-            </ul>
+          <div className="modal__footer">
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => {
+                setShowIpamModal(false);
+                setIpamForm(emptyIpamForm);
+                setIsEditingIpam(false);
+                setSelectedIpamId(null);
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="ipam-form"
+              className="btn btn--primary"
+              disabled={!ipamForm.name.trim() || !ipamForm.baseUrl.trim() || !ipamForm.appId.trim() || !ipamForm.appCode.trim()}
+            >
+              {isEditingIpam ? 'Update Configuration' : 'Add Configuration'}
+            </button>
           </div>
-        </section>
-
-        <section className="settings-panel">
-          <header className="settings-panel__header">
-            <div>
-              <h2>DNS authorities</h2>
-              <p className="settings-panel__subtitle">
-                Register DNS servers to automate forward and reverse records for MikroTik WAN and tunnel interfaces.
-              </p>
-            </div>
-          </header>
-          <div className="settings-panel__content">
-            <p className="muted">
-              DNS integrations are under active development. Soon you will be able to push PTR updates directly from tunnel and
-              MikroTik management views.
-            </p>
-            <p className="muted">
-              Prepare hostname conventions now so that synchronisation can stamp consistent records across all environments when
-              the feature lands.
-            </p>
-          </div>
-        </section>
+        </div>
       </div>
-    </section>
+    </div>
   );
 };
 

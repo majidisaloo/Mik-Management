@@ -4,49 +4,84 @@ import BrandMark from './BrandMark.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
 
+// Modern SVG Icons
 const MoonIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-    <path d="M21 14.15A8.5 8.5 0 0 1 11.85 5 6.5 6.5 0 1 0 21 14.15Z" fill="#0f172a" opacity="0.75" />
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" fill="currentColor" />
   </svg>
 );
 
 const SunIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-    <circle cx="12" cy="12" r="5.5" fill="#facc15" stroke="#f59e0b" strokeWidth="1.25" />
-    <g stroke="#f59e0b" strokeWidth="1.4" strokeLinecap="round">
-      <line x1="12" y1="2.75" x2="12" y2="5.25" />
-      <line x1="12" y1="18.75" x2="12" y2="21.25" />
-      <line x1="4.22" y1="4.22" x2="6" y2="6" />
-      <line x1="18" y1="18" x2="19.78" y2="19.78" />
-      <line x1="2.75" y1="12" x2="5.25" y2="12" />
-      <line x1="18.75" y1="12" x2="21.25" y2="12" />
-      <line x1="4.22" y1="19.78" x2="6" y2="18" />
-      <line x1="18" y1="6" x2="19.78" y2="4.22" />
-    </g>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="5" fill="currentColor" />
+    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
   </svg>
 );
 
 const LogoutIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-    <path
-      d="M14.5 5.25a.75.75 0 0 0-1.5 0v2.25h-4a1.75 1.75 0 0 0-1.75 1.75v5.5A1.75 1.75 0 0 0 9 16.5h4v2.25a.75.75 0 1 0 1.5 0V5.25Z"
-      fill="currentColor"
-      opacity="0.65"
-    />
-    <path
-      d="M18.53 12.53a.75.75 0 0 0 0-1.06l-2-2a.75.75 0 1 0-1.06 1.06l.72.72H11a.75.75 0 0 0 0 1.5h5.19l-.72.72a.75.75 0 1 0 1.06 1.06l2-2Z"
-      fill="currentColor"
-    />
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <polyline points="16,17 21,12 16,7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+const MenuIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <line x1="3" y1="6" x2="21" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <line x1="3" y1="18" x2="21" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+const CloseIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
   </svg>
 );
 
 const navigationIcons = {
-  dashboard: '📊',
-  users: '👥',
-  groups: '🗂️',
-  mikrotiks: '📡',
-  tunnels: '🔗',
-  settings: '⚙️'
+  dashboard: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2" />
+      <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2" />
+      <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2" />
+      <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  ),
+  users: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="2" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  groups: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="2" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  mikrotiks: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" strokeWidth="2" />
+      <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2" />
+      <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  ),
+  tunnels: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  settings: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  )
 };
 
 const Layout = () => {
@@ -56,6 +91,7 @@ const Layout = () => {
   const { theme, toggleTheme } = useTheme();
   const [meta, setMeta] = useState({ version: '0.0', registrationOpen: true });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -98,196 +134,174 @@ const Layout = () => {
     navigate('/login', { replace: true });
   };
 
+  const toggleSidebar = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  };
+
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(!mobileMenuOpen);
+  };
+
   const renderThemeToggle = (placement) => {
-    const variant = placement === 'sidebar' ? 'sidebar' : 'header';
-    const modeLabel = theme === 'dark' ? 'Dark mode' : 'Light mode';
-
     return (
       <button
         type="button"
-        className={`theme-toggle theme-toggle--${variant} theme-toggle--${theme}`}
+        className={`btn btn--ghost btn--sm ${placement === 'sidebar' ? 'w-full' : ''}`}
         onClick={toggleTheme}
-        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        role="switch"
-        aria-checked={theme === 'dark'}
+        aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
       >
-        <span className="theme-toggle__track" aria-hidden="true">
-          <span className="theme-toggle__thumb">{theme === 'dark' ? <SunIcon /> : <MoonIcon />}</span>
-        </span>
-        <span className="theme-toggle__caption">{modeLabel}</span>
+        {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+        {placement === 'sidebar' && !sidebarCollapsed && (
+          <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
+        )}
       </button>
     );
   };
 
-  const renderLogoutButton = (placement = 'header') => {
-    const variant = placement === 'sidebar' ? 'sidebar' : 'header';
-
+  const renderLogoutButton = (placement) => {
     return (
       <button
         type="button"
+        className={`btn btn--ghost btn--sm ${placement === 'sidebar' ? 'w-full text-error' : 'text-error'}`}
         onClick={handleSignOut}
-        className={`logout-button logout-button--${variant}`}
+        aria-label="Sign out"
       >
-        <span className="logout-button__icon" aria-hidden="true">
-          <LogoutIcon />
-        </span>
-        <span className="logout-button__label">Logout</span>
+        <LogoutIcon />
+        {placement === 'sidebar' && !sidebarCollapsed && <span>Sign out</span>}
       </button>
     );
   };
 
-  const navigation = useMemo(
-    () => [
+  const navigation = useMemo(() => {
+    if (!user) return [];
+
+    const baseNav = [
       {
-        label: null,
         items: [
           {
-            to: '/dashboard',
+            to: '/',
             label: 'Dashboard',
-            iconKey: 'dashboard',
-            permissionKey: 'dashboard',
-            match: ['/dashboard']
-          }
-        ]
-      },
-      {
-        label: 'Management',
-        items: [
-          {
-            to: '/users',
-            label: "Users & Roles",
-            iconKey: 'users',
-            permissionsAny: ['users', 'roles'],
-            match: ['/users', '/roles']
-          },
-          {
-            to: '/groups',
-            label: 'Mik-Groups',
-            iconKey: 'groups',
-            permissionKey: 'groups',
-            match: ['/groups']
-          },
-          {
-            to: '/mikrotiks',
-            label: 'Mikrotiks',
-            iconKey: 'mikrotiks',
-            permissionKey: 'mikrotiks',
-            match: ['/mikrotiks']
-          },
-          {
-            to: '/tunnels',
-            label: 'Tunnels',
-            iconKey: 'tunnels',
-            permissionKey: 'tunnels',
-            match: ['/tunnels']
-          },
-          {
-            to: '/settings',
-            label: 'Settings',
-            iconKey: 'settings',
-            permissionKey: 'settings',
-            match: ['/settings']
+            icon: navigationIcons.dashboard
           }
         ]
       }
-    ],
-    []
-  );
+    ];
 
-  const hasAccess = (item) => {
-    if (!user) {
-      return false;
+    if (user.permissions?.users) {
+      baseNav[0].items.push({
+        to: '/users',
+        label: 'Users & Roles',
+        icon: navigationIcons.users
+      });
     }
 
-    if (item.permissionsAny) {
-      return item.permissionsAny.some((key) => Boolean(user.permissions?.[key]));
+    if (user.permissions?.groups) {
+      baseNav[0].items.push({
+        to: '/groups',
+        label: 'Mik-Groups',
+        icon: navigationIcons.groups
+      });
     }
 
-    return item.permissionKey ? Boolean(user.permissions?.[item.permissionKey]) : true;
-  };
+    if (user.permissions?.mikrotiks) {
+      baseNav[0].items.push({
+        to: '/mikrotiks',
+        label: 'Mikrotiks',
+        icon: navigationIcons.mikrotiks
+      });
+    }
+
+    if (user.permissions?.tunnels) {
+      baseNav[0].items.push({
+        to: '/tunnels',
+        label: 'Tunnels',
+        icon: navigationIcons.tunnels
+      });
+    }
+
+    baseNav[0].items.push({
+      to: '/settings',
+      label: 'Settings',
+      icon: navigationIcons.settings
+    });
+
+    return baseNav;
+  }, [user]);
 
   const renderNavEntry = (item) => {
-    const activeMatch = item.match || [item.to];
-
-    if (hasAccess(item)) {
-      return (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          className={({ isActive }) => {
-            const locationMatch = activeMatch.some((path) => location.pathname.startsWith(path));
-            const active = isActive || locationMatch;
-            return `sidebar-link${active ? ' active' : ''}${sidebarCollapsed ? ' sidebar-link--compact' : ''}`;
-          }}
-        >
-          <span className="sidebar-link__icon" aria-hidden="true">
-            {navigationIcons[item.iconKey] ?? '•'}
-          </span>
-          <span className="sidebar-link__label">{item.label}</span>
-        </NavLink>
-      );
-    }
+    const isActive = location.pathname === item.to || (item.to !== '/' && location.pathname.startsWith(item.to));
 
     return (
-      <span
-        key={`${item.to}-disabled`}
-        className={`sidebar-link sidebar-link--disabled${sidebarCollapsed ? ' sidebar-link--compact' : ''}`}
-        role="link"
-        aria-disabled="true"
+      <NavLink
+        key={item.to}
+        to={item.to}
+        className={`sidebar-link ${isActive ? 'sidebar-link--active' : ''}`}
+        onClick={() => setMobileMenuOpen(false)}
       >
-        <span className="sidebar-link__icon" aria-hidden="true">
-          {navigationIcons[item.iconKey] ?? '•'}
-        </span>
-        <span className="sidebar-link__label">{item.label}</span>
-      </span>
+        <span className="sidebar-link__icon">{item.icon}</span>
+        {!sidebarCollapsed && <span>{item.label}</span>}
+      </NavLink>
     );
   };
-
-  const toggleSidebar = () => setSidebarCollapsed((current) => !current);
 
   return (
     <div
       className={`app-shell${user ? ' app-shell--authed' : ''}${sidebarCollapsed ? ' app-shell--collapsed' : ''}`}
     >
       <header className="app-header">
-        <Link to="/" className="logo" aria-label="MikroManage home">
-          <BrandMark />
-        </Link>
+        <div className="flex items-center gap-4">
+          {user && (
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm md:hidden"
+              onClick={toggleMobileMenu}
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
+            </button>
+          )}
+          <Link to="/" className="logo" aria-label="MikroManage home">
+            <BrandMark />
+          </Link>
+        </div>
         <div className={`header-actions${user ? ' header-actions--authed' : ''}`}>
           {!user && renderThemeToggle('header')}
-          {user ? null : (
-            <nav>
-              {meta.registrationOpen ? <NavLink to="/register">Register</NavLink> : null}
-              <NavLink to="/" end>
+          {user ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-tertiary">v{meta.version}</span>
+              {renderLogoutButton('header')}
+            </div>
+          ) : (
+            <nav className="flex items-center gap-4">
+              {meta.registrationOpen && (
+                <Link to="/register" className="btn btn--ghost btn--sm">
+                  Register
+                </Link>
+              )}
+              <Link to="/" className="btn btn--primary btn--sm">
                 Login
-              </NavLink>
+              </Link>
             </nav>
           )}
         </div>
       </header>
+
       {user ? (
         <div className="app-content">
-          <aside className="app-sidebar" aria-label="Primary navigation">
-            <button
-              type="button"
-              className="sidebar-collapse"
-              onClick={toggleSidebar}
-              aria-expanded={!sidebarCollapsed}
-            >
-              {sidebarCollapsed ? '➤' : '◀'}
-              <span className="sidebar-collapse__label">{sidebarCollapsed ? 'Expand menu' : 'Collapse menu'}</span>
-            </button>
-            <nav className="sidebar-nav">
+          <aside className={`app-sidebar ${mobileMenuOpen ? 'app-sidebar--open' : ''}`} aria-label="Primary navigation">
+            <div className="sidebar-nav">
               {navigation.map((section) => (
                 <div className="sidebar-group" key={section.label ?? 'primary'}>
-                  {section.label ? <p className="sidebar-group__label">{section.label}</p> : null}
+                  {section.label && !sidebarCollapsed && (
+                    <p className="sidebar-group__label">{section.label}</p>
+                  )}
                   {section.items.map((item) => renderNavEntry(item))}
                 </div>
               ))}
-            </nav>
-            <div className="sidebar-footer">
+            </div>
+            <div className="sidebar-footer p-4 border-t border-primary">
               {renderThemeToggle('sidebar')}
-              <div className="sidebar-footer__actions">{renderLogoutButton('sidebar')}</div>
+              <div className="mt-4">{renderLogoutButton('sidebar')}</div>
             </div>
           </aside>
           <main className="app-main">
@@ -299,12 +313,14 @@ const Layout = () => {
           <Outlet />
         </main>
       )}
-      <footer className="app-footer">
-        <p>© {new Date().getFullYear()} MikroManage. All rights reserved.</p>
-        <p className="app-footer__version" aria-live="polite">
-          Version {meta.version}
-        </p>
-      </footer>
+
+      {/* Mobile overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-overlay z-modal-backdrop md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
     </div>
   );
 };
