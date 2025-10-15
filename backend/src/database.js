@@ -448,9 +448,7 @@ const normalizeIsoDate = (value) => {
   return parsed.toISOString();
 };
 
-// sanitizeTunnelMetrics is defined earlier; avoid duplicate declaration
-
-const discoveryNotePattern = /\[discovery\]\s+local=([^\s]+)\s+remote=([^\s]+)/i;
+// discoveryNotePattern is defined earlier; avoid duplicate declaration
 
 const collectNormalizedIpAddresses = (value) => {
   if (value === null || value === undefined) {
@@ -1308,9 +1306,7 @@ const sanitizeTunnelProfile = (profile = {}, baseline = defaultTunnelProfile()) 
 
 
 
-// sanitizeTunnelMetrics is defined earlier; avoid duplicate declaration
-
-const discoveryNotePattern = /\[discovery\]\s+local=([^\s]+)\s+remote=([^\s]+)/i;
+// discoveryNotePattern is defined earlier; avoid duplicate declaration
 
 const collectNormalizedIpAddresses = (value) => {
   if (value === null || value === undefined) {
