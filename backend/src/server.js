@@ -3164,8 +3164,8 @@ const bootstrap = async () => {
     }
   });
 
-  server.listen(port, () => {
-    console.log(`API server ready at http://localhost:${port}`);
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`API server ready at http://0.0.0.0:${port}`);
   });
 };
 
