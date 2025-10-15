@@ -489,6 +489,7 @@ export const resolveDatabaseFile = (databasePath = './data/app.db') => {
     throw new Error('Database path must be provided.');
   }
 
+  return path.resolve(databasePath);
 };
 
 // normalizeIpAddress is defined earlier; avoid duplicate declaration
