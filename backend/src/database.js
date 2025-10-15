@@ -461,17 +461,6 @@ const collectNormalizedIpAddresses = (value) => {
     return [];
   }
 
-    .map((segment) => {
-      const withoutPrefix = segment.includes('=') ? segment.split('=').pop() : segment;
-      const slashIndex = withoutPrefix.indexOf('/');
-      const base = slashIndex >= 0 ? withoutPrefix.slice(0, slashIndex) : withoutPrefix;
-      const scopeIndex = base.indexOf('%');
-      const candidate = scopeIndex >= 0 ? base.slice(0, scopeIndex) : base;
-      return candidate && isIP(candidate) ? candidate : null;
-    })
-    .filter(Boolean);
-
-  return [...new Set(addresses)];
 };
 
 // normalizeIpAddress is defined earlier; avoid duplicate declaration
@@ -498,14 +487,6 @@ const collectNormalizedIpAddresses = (value) => {
 
 
 
-      ? tunnel.tags.map((tag) => normalizeOptionalText(tag).toLowerCase())
-      : [];
-
-    if (tags.includes('discovered')) {
-      const match = discoveryNotePattern.exec(tunnel.notes ?? '');
-      if (match) {
-        const addressKey = buildDevicePairKey(sourceId, targetId, match[1], match[2]);
-        if (addressKey) {
 
 
 
@@ -521,17 +502,6 @@ export const resolveDatabaseFile = (databasePath = './data/app.db') => {
     throw new Error('Database path must be provided.');
   }
 
-    .map((segment) => {
-      const withoutPrefix = segment.includes('=') ? segment.split('=').pop() : segment;
-      const slashIndex = withoutPrefix.indexOf('/');
-      const base = slashIndex >= 0 ? withoutPrefix.slice(0, slashIndex) : withoutPrefix;
-      const scopeIndex = base.indexOf('%');
-      const candidate = scopeIndex >= 0 ? base.slice(0, scopeIndex) : base;
-      return candidate && isIP(candidate) ? candidate : null;
-    })
-    .filter(Boolean);
-
-  return [...new Set(addresses)];
 };
 
 // normalizeIpAddress is defined earlier; avoid duplicate declaration
@@ -558,14 +528,6 @@ export const resolveDatabaseFile = (databasePath = './data/app.db') => {
 
 
 
-      ? tunnel.tags.map((tag) => normalizeOptionalText(tag).toLowerCase())
-      : [];
-
-    if (tags.includes('discovered')) {
-      const match = discoveryNotePattern.exec(tunnel.notes ?? '');
-      if (match) {
-        const addressKey = buildDevicePairKey(sourceId, targetId, match[1], match[2]);
-        if (addressKey) {
 
 
 
@@ -1445,17 +1407,6 @@ const collectNormalizedIpAddresses = (value) => {
     return [];
   }
 
-    .map((segment) => {
-      const withoutPrefix = segment.includes('=') ? segment.split('=').pop() : segment;
-      const slashIndex = withoutPrefix.indexOf('/');
-      const base = slashIndex >= 0 ? withoutPrefix.slice(0, slashIndex) : withoutPrefix;
-      const scopeIndex = base.indexOf('%');
-      const candidate = scopeIndex >= 0 ? base.slice(0, scopeIndex) : base;
-      return candidate && isIP(candidate) ? candidate : null;
-    })
-    .filter(Boolean);
-
-  return [...new Set(addresses)];
 };
 
 const normalizeIpAddress = (value) => {
@@ -1485,14 +1436,6 @@ const normalizeIpAddress = (value) => {
 
 
 
-      ? tunnel.tags.map((tag) => normalizeOptionalText(tag).toLowerCase())
-      : [];
-
-    if (tags.includes('discovered')) {
-      const match = discoveryNotePattern.exec(tunnel.notes ?? '');
-      if (match) {
-        const addressKey = buildDevicePairKey(sourceId, targetId, match[1], match[2]);
-        if (addressKey) {
 
 
 
