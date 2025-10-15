@@ -734,11 +734,11 @@ const Mikrotiks = () => {
                   </div>
                 ) : null}
               </>
-            ) : null}
-          </div>
-        ) : (
-          <p className="empty-hint">Enable the RouterOS API to configure ports and credentials.</p>
-        )}
+            ) : (
+              <p className="empty-hint">Enable the RouterOS API to configure ports and credentials.</p>
+            )}
+          </section>
+        </div>
 
         <div className="routeros-config__version">
           <label>
