@@ -1913,9 +1913,7 @@ const ensureStateShape = async (databaseFile) => {
     mutated = true;
   }
 
-  // nextAddressListIdSeed is defined earlier; avoid duplicate declaration
-
-  const addressIdentifiers = new Set();
+  // addressIdentifiers is defined earlier; avoid duplicate declaration
 
   const sanitizedAddressLists = normalized.addressLists.map((entry) => {
     let identifier = Number.parseInt(entry.id, 10);
@@ -2133,9 +2131,7 @@ const ensureStateShape = async (databaseFile) => {
     mutated = true;
   }
 
-  // nextAddressListIdSeed is defined earlier; avoid duplicate declaration
-
-  const addressIdentifiers = new Set();
+  // addressIdentifiers is defined earlier; avoid duplicate declaration
 
   const sanitizedAddressLists = normalized.addressLists.map((entry) => {
     let identifier = Number.parseInt(entry.id, 10);
@@ -2343,9 +2339,7 @@ const ensureStateShape = async (databaseFile) => {
     mutated = true;
   }
 
-  // nextAddressListIdSeed is defined earlier; avoid duplicate declaration
-
-  const addressIdentifiers = new Set();
+  // addressIdentifiers is defined earlier; avoid duplicate declaration
 
   const sanitizedAddressLists = normalized.addressLists.map((entry) => {
     let identifier = Number.parseInt(entry.id, 10);
