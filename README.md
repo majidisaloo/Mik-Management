@@ -165,18 +165,23 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## Updating an Existing Installation
 
-From `/opt/mik-management` on the server:
+From `/opt/mik-management` on the server (systemd-managed backend):
 
 ```bash
 sudo systemctl stop nginx
 cd /opt/mik-management
 sudo git pull --ff-only
 
+# Backend
 cd backend
 npm install
 npm run prepare:db
-pm2 restart mik-api --update-env
 
+# Restart systemd backend
+sudo systemctl restart mik-management-backend
+sudo systemctl status mik-management-backend --no-pager
+
+# Frontend
 cd ../frontend
 npm install
 npm run build
