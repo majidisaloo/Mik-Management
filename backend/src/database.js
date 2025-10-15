@@ -1913,10 +1913,7 @@ const ensureStateShape = async (databaseFile) => {
     mutated = true;
   }
 
-  let nextAddressListIdSeed = Math.max(
-    Number.isInteger(normalized.lastAddressListId) ? normalized.lastAddressListId : 0,
-    normalized.addressLists.reduce((max, entry) => Math.max(max, Number.parseInt(entry.id, 10) || 0), 0)
-  );
+  // nextAddressListIdSeed is defined earlier; avoid duplicate declaration
 
   const addressIdentifiers = new Set();
 
@@ -2136,10 +2133,7 @@ const ensureStateShape = async (databaseFile) => {
     mutated = true;
   }
 
-  let nextAddressListIdSeed = Math.max(
-    Number.isInteger(normalized.lastAddressListId) ? normalized.lastAddressListId : 0,
-    normalized.addressLists.reduce((max, entry) => Math.max(max, Number.parseInt(entry.id, 10) || 0), 0)
-  );
+  // nextAddressListIdSeed is defined earlier; avoid duplicate declaration
 
   const addressIdentifiers = new Set();
 
@@ -2349,10 +2343,7 @@ const ensureStateShape = async (databaseFile) => {
     mutated = true;
   }
 
-  let nextAddressListIdSeed = Math.max(
-    Number.isInteger(normalized.lastAddressListId) ? normalized.lastAddressListId : 0,
-    normalized.addressLists.reduce((max, entry) => Math.max(max, Number.parseInt(entry.id, 10) || 0), 0)
-  );
+  // nextAddressListIdSeed is defined earlier; avoid duplicate declaration
 
   const addressIdentifiers = new Set();
 
