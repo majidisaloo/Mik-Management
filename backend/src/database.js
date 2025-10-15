@@ -1949,7 +1949,6 @@ const ensureStateShape = async (databaseFile) => {
     };
   });
 
-
   normalized.addressLists = sanitizedAddressLists;
 
   if (!Array.isArray(normalized.firewallFilters)) {
@@ -2031,8 +2030,6 @@ const ensureStateShape = async (databaseFile) => {
     };
   });
 
-
-
   if (!Number.isInteger(normalized.lastAddressListId)) {
     normalized.lastAddressListId = normalized.addressLists.reduce(
       (max, entry) => Math.max(max, Number.parseInt(entry.id, 10) || 0),
@@ -2081,22 +2078,6 @@ const ensureStateShape = async (databaseFile) => {
     };
   });
 
-
-
-    const states = sanitizeFirewallStatesList(filter.states);
-    const actionCandidate = typeof filter.action === 'string' ? filter.action.toLowerCase() : '';
-    const action = allowedFirewallActions.has(actionCandidate) ? actionCandidate : 'accept';
-      states,
-      action,
-      enabled,
-      comment,
-      createdAt,
-      updatedAt
-    };
-  });
-
-
-
   if (!Number.isInteger(normalized.lastAddressListId)) {
     normalized.lastAddressListId = normalized.addressLists.reduce(
       (max, entry) => Math.max(max, Number.parseInt(entry.id, 10) || 0),
@@ -2106,23 +2087,6 @@ const ensureStateShape = async (databaseFile) => {
   }
 
   // sanitizedAddressLists is defined earlier; avoid duplicate declaration
-
-
-
-
-
-    const states = sanitizeFirewallStatesList(filter.states);
-    const actionCandidate = typeof filter.action === 'string' ? filter.action.toLowerCase() : '';
-    const action = allowedFirewallActions.has(actionCandidate) ? actionCandidate : 'accept';
-      states,
-      action,
-      enabled,
-      comment,
-      createdAt,
-      updatedAt
-    };
-  });
-
 
   const validRoleIds = new Set(normalized.roles.map((role) => role.id));
 
