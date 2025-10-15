@@ -377,7 +377,7 @@ const Groups = () => {
     }
   }, [filteredTreeIds, loading]);
 
-  const selectedGroup = useMemo(() => (selectedGroupId ? groupLookup.get(selectedGroupId) ?? null : null), [
+  const selectedGroupMemo = useMemo(() => (selectedGroupId ? groupLookup.get(selectedGroupId) ?? null : null), [
     selectedGroupId,
     groupLookup
   ]);
@@ -393,17 +393,17 @@ const Groups = () => {
   }, [selectedTreeNode]);
 
   const directChildren = useMemo(
-    () => groups.filter((group) => group.parentId === (selectedGroup ? selectedGroup.id : null)),
-    [groups, selectedGroup]
+    () => groups.filter((group) => group.parentId === (selectedGroupMemo ? selectedGroupMemo.id : null)),
+    [groups, selectedGroupMemo]
   );
 
   const selectedBreadcrumb = useMemo(() => {
-    if (!selectedGroup) {
+    if (!selectedGroupMemo) {
       return [];
     }
 
     const chain = [];
-    let current = selectedGroup;
+    let current = selectedGroupMemo;
     const guard = new Set();
 
     while (current && !guard.has(current.id)) {
@@ -418,7 +418,7 @@ const Groups = () => {
     }
 
     return chain;
-  }, [groupLookup, selectedGroup]);
+  }, [groupLookup, selectedGroupMemo]);
 
   const hasTreeResults = filteredTree.length > 0;
 
@@ -605,25 +605,25 @@ const Groups = () => {
           </section>
 
           <section className="group-details" aria-live="polite">
-            {selectedGroup ? (
+            {selectedGroupMemo ? (
               <>
                 <header className="group-details__header">
                   <div>
-                    <h2>{selectedGroup.name}</h2>
+                    <h2>{selectedGroupMemo.name}</h2>
                     <p className="muted">{selectedParentName}</p>
                   </div>
                   <div className="group-details__actions">
                     <button
                       type="button"
                       className="action-button"
-                      onClick={() => openManageModal(selectedGroup)}
+                      onClick={() => openManageModal(selectedGroupMemo)}
                     >
                       Edit group
                     </button>
                     <button
                       type="button"
                       className="action-button action-button--primary"
-                      onClick={() => openCreateModal(selectedGroup.id)}
+                      onClick={() => openCreateModal(selectedGroupMemo.id)}
                     >
                       Add subgroup
                     </button>
@@ -641,11 +641,11 @@ const Groups = () => {
                   </div>
                   <div>
                     <dt>Created</dt>
-                    <dd>{formatDateTime(selectedGroup.createdAt)}</dd>
+                    <dd>{formatDateTime(selectedGroupMemo.createdAt)}</dd>
                   </div>
                   <div>
                     <dt>Last updated</dt>
-                    <dd>{formatDateTime(selectedGroup.updatedAt)}</dd>
+                    <dd>{formatDateTime(selectedGroupMemo.updatedAt)}</dd>
                   </div>
                 </dl>
 
@@ -654,7 +654,7 @@ const Groups = () => {
                   so they remain scannable in the hierarchy panel.
                 </p>
 
-                {!canDeleteSelectedGroup && selectedGroup.name !== 'Mik-Group Root' && selectedChildrenCount > 0 ? (
+                {!canDeleteSelectedGroup && selectedGroupMemo.name !== 'Mik-Group Root' && selectedChildrenCount > 0 ? (
                   <p className="group-details__warning">
                     Remove or move the {selectedChildrenCount === 1 ? 'child group' : 'child groups'} before deleting
                     this group.
