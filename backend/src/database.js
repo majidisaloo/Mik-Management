@@ -448,14 +448,7 @@ const normalizeIsoDate = (value) => {
   return parsed.toISOString();
 };
 
-// discoveryNotePattern is defined earlier; avoid duplicate declaration
-
-const collectNormalizedIpAddresses = (value) => {
-  if (value === null || value === undefined) {
-    return [];
-  }
-
-};
+// collectNormalizedIpAddresses is defined earlier; avoid duplicate declaration
 
 // normalizeIpAddress is defined earlier; avoid duplicate declaration
 
@@ -1306,14 +1299,7 @@ const sanitizeTunnelProfile = (profile = {}, baseline = defaultTunnelProfile()) 
 
 
 
-// discoveryNotePattern is defined earlier; avoid duplicate declaration
-
-const collectNormalizedIpAddresses = (value) => {
-  if (value === null || value === undefined) {
-    return [];
-  }
-
-};
+// collectNormalizedIpAddresses is defined earlier; avoid duplicate declaration
 
 const normalizeIpAddress = (value) => {
   const [address] = collectNormalizedIpAddresses(value);
