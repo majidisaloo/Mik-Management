@@ -448,11 +448,7 @@ const normalizeIsoDate = (value) => {
   return parsed.toISOString();
 };
 
-const sanitizeTunnelMetrics = (metrics = {}) => ({
-  latencyMs: parseOptionalNumber(metrics.latencyMs, { min: 0, max: 1_000_000 }),
-  packetLoss: parseOptionalNumber(metrics.packetLoss, { min: 0, max: 100 }),
-  lastCheckedAt: normalizeIsoDate(metrics.lastCheckedAt)
-});
+// sanitizeTunnelMetrics is defined earlier; avoid duplicate declaration
 
 const discoveryNotePattern = /\[discovery\]\s+local=([^\s]+)\s+remote=([^\s]+)/i;
 
@@ -538,11 +534,7 @@ export const resolveDatabaseFile = (databasePath = './data/app.db') => {
 
 
 
-const sanitizeTunnelMetrics = (metrics = {}) => ({
-  latencyMs: parseOptionalNumber(metrics.latencyMs, { min: 0, max: 1_000_000 }),
-  packetLoss: parseOptionalNumber(metrics.packetLoss, { min: 0, max: 100 }),
-  lastCheckedAt: normalizeIsoDate(metrics.lastCheckedAt)
-});
+// sanitizeTunnelMetrics is defined earlier; avoid duplicate declaration
 
 const parseOptionalInteger = (value, { min, max }) => {
   if (value === null || value === undefined || value === '') {
@@ -1394,11 +1386,7 @@ const sanitizeTunnelProfile = (profile = {}, baseline = defaultTunnelProfile()) 
   return normalized;
 };
 
-const sanitizeTunnelMetrics = (metrics = {}) => ({
-  latencyMs: parseOptionalNumber(metrics.latencyMs, { min: 0, max: 1_000_000 }),
-  packetLoss: parseOptionalNumber(metrics.packetLoss, { min: 0, max: 100 }),
-  lastCheckedAt: normalizeIsoDate(metrics.lastCheckedAt)
-});
+// sanitizeTunnelMetrics is defined earlier; avoid duplicate declaration
 
 const discoveryNotePattern = /\[discovery\]\s+local=([^\s]+)\s+remote=([^\s]+)/i;
 
