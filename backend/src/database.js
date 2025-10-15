@@ -506,18 +506,7 @@ const collectNormalizedIpAddresses = (value) => {
 
 // combinePacketLoss is defined earlier; avoid duplicate declaration
 
-const deriveDiscoveredTunnelName = (sourceDevice, targetDevice, sourceCandidate, targetCandidate) => {
-  const sourceName = normalizeOptionalText(sourceDevice?.name ?? '') || `Device ${sourceCandidate.deviceId}`;
-  const targetName = normalizeOptionalText(targetDevice?.name ?? '') || `Device ${targetCandidate.deviceId}`;
-
-  const sourceInterface = normalizeOptionalText(sourceCandidate.interfaceName ?? '');
-  const targetInterface = normalizeOptionalText(targetCandidate.interfaceName ?? '');
-
-  const interfaceLabel =
-    sourceInterface && targetInterface ? ` (${sourceInterface} ↔ ${targetInterface})` : '';
-
-  return `Discovered ${sourceName} ↔ ${targetName}${interfaceLabel}`;
-};
+// deriveDiscoveredTunnelName is defined earlier; avoid duplicate declaration
 
 const buildDiscoveryNotes = (sourceDevice, targetDevice, sourceCandidate, targetCandidate) => {
   const segments = [
@@ -967,18 +956,7 @@ export const resolveDatabaseFile = (databasePath = './data/app.db') => {
 
 // combinePacketLoss is defined earlier; avoid duplicate declaration
 
-const deriveDiscoveredTunnelName = (sourceDevice, targetDevice, sourceCandidate, targetCandidate) => {
-  const sourceName = normalizeOptionalText(sourceDevice?.name ?? '') || `Device ${sourceCandidate.deviceId}`;
-  const targetName = normalizeOptionalText(targetDevice?.name ?? '') || `Device ${targetCandidate.deviceId}`;
-
-  const sourceInterface = normalizeOptionalText(sourceCandidate.interfaceName ?? '');
-  const targetInterface = normalizeOptionalText(targetCandidate.interfaceName ?? '');
-
-  const interfaceLabel =
-    sourceInterface && targetInterface ? ` (${sourceInterface} ↔ ${targetInterface})` : '';
-
-  return `Discovered ${sourceName} ↔ ${targetName}${interfaceLabel}`;
-};
+// deriveDiscoveredTunnelName is defined earlier; avoid duplicate declaration
 
 const buildDiscoveryNotes = (sourceDevice, targetDevice, sourceCandidate, targetCandidate) => {
   const segments = [
@@ -2295,18 +2273,7 @@ const normalizeIpAddress = (value) => {
 
 // combinePacketLoss is defined earlier; avoid duplicate declaration
 
-const deriveDiscoveredTunnelName = (sourceDevice, targetDevice, sourceCandidate, targetCandidate) => {
-  const sourceName = normalizeOptionalText(sourceDevice?.name ?? '') || `Device ${sourceCandidate.deviceId}`;
-  const targetName = normalizeOptionalText(targetDevice?.name ?? '') || `Device ${targetCandidate.deviceId}`;
-
-  const sourceInterface = normalizeOptionalText(sourceCandidate.interfaceName ?? '');
-  const targetInterface = normalizeOptionalText(targetCandidate.interfaceName ?? '');
-
-  const interfaceLabel =
-    sourceInterface && targetInterface ? ` (${sourceInterface} ↔ ${targetInterface})` : '';
-
-  return `Discovered ${sourceName} ↔ ${targetName}${interfaceLabel}`;
-};
+// deriveDiscoveredTunnelName is defined earlier; avoid duplicate declaration
 
 const buildDiscoveryNotes = (sourceDevice, targetDevice, sourceCandidate, targetCandidate) => {
   const segments = [
