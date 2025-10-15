@@ -1909,127 +1909,14 @@ const ensureStateShape = async (databaseFile) => {
     mutated = true;
   }
 
-  // sanitizedAddressLists is defined earlier; avoid duplicate declaration
-
-
-    const address = normalizeOptionalText(entry.address ?? '');
-    const comment = normalizeOptionalText(entry.comment ?? '');
-
-    if (
-      entry.name !== name ||
-      entry.referenceType !== referenceType ||
-      (entry.referenceId ?? null) !== referenceId ||
-      (entry.address ?? '') !== address ||
-      (entry.comment ?? '') !== comment ||
-      entry.createdAt !== createdAt ||
-      entry.updatedAt !== updatedAt
-    ) {
-      mutated = true;
-    }
-
-    const status = deriveDeviceStatus(device.status, routeros);
-    const connectivity = sanitizeConnectivity(device.connectivity, routeros);
-
-    if (JSON.stringify(connectivity) !== JSON.stringify(device.connectivity ?? {})) {
-      mutated = true;
-    }
-
-    return {
-      id: identifier,
-      name,
-      host,
-      groupId,
-      tags,
-      notes,
-      routeros,
-      status,
-      connectivity,
-      createdAt,
-      updatedAt
-    };
-  });
-
-  normalized.addressLists = sanitizedAddressLists;
+  // Address lists are already sanitized in the main function
+  // No need to reassign sanitizedAddressLists
 
   if (!Array.isArray(normalized.firewallFilters)) {
     normalized.firewallFilters = [];
     mutated = true;
   }
 
-
-    const updatedAt = filter.updatedAt ?? createdAt;
-    const name = normalizeOptionalText(filter.name ?? `Rule ${identifier}`) || `Rule ${identifier}`;
-    const groupCandidate = Number.parseInt(filter.groupId, 10);
-    const groupId = availableGroupIds.has(groupCandidate) ? groupCandidate : null;
-
-    const chainCandidate = typeof filter.chain === 'string' ? filter.chain.toLowerCase() : '';
-    const chain = allowedFirewallChains.has(chainCandidate) ? chainCandidate : 'forward';
-
-    const sourceAddressListCandidate = Number.parseInt(filter.sourceAddressListId, 10);
-    const sourceAddressListId = validAddressListIds.has(sourceAddressListCandidate)
-      ? sourceAddressListCandidate
-      : null;
-
-    const connectionType = (normalizeOptionalText(tunnel.connectionType ?? tunnel.type ?? '') || 'GRE').toUpperCase();
-
-    const sourcePort = sanitizePortExpression(filter.sourcePort);
-    const destinationPort = sanitizePortExpression(filter.destinationPort);
-
-    const enabled = normalizeBoolean(tunnel.enabled, true);
-    const tags = normalizeTags(tunnel.tags);
-    const notes = normalizeOptionalText(tunnel.notes ?? '');
-    const metrics = sanitizeTunnelMetrics(tunnel.metrics ?? tunnel);
-    const profile = sanitizeTunnelProfile(tunnel.profile ?? {}, tunnel.profile ?? defaultTunnelProfile());
-    const monitoring = sanitizeTunnelMonitoring(tunnel.monitoring ?? {}, tunnel.monitoring ?? defaultTunnelMonitoring());
-    const ospf = sanitizeTunnelOspf(tunnel.ospf ?? {}, tunnel.ospf ?? defaultTunnelOspf());
-    const vpnProfiles = sanitizeVpnProfiles(tunnel.vpnProfiles ?? {}, tunnel.vpnProfiles ?? defaultVpnProfiles());
-
-    if (
-      tunnel.name !== name ||
-      tunnel.groupId !== groupId ||
-      tunnel.sourceId !== sourceId ||
-      tunnel.targetId !== targetId ||
-      tunnel.connectionType !== connectionType ||
-      tunnel.state !== status ||
-      tunnel.status !== status ||
-      tunnel.enabled !== enabled ||
-      JSON.stringify(tunnel.tags ?? []) !== JSON.stringify(tags) ||
-      (tunnel.notes ?? '') !== notes ||
-      JSON.stringify(tunnel.metrics ?? {}) !== JSON.stringify(metrics) ||
-      JSON.stringify(tunnel.profile ?? {}) !== JSON.stringify(profile) ||
-      JSON.stringify(tunnel.monitoring ?? {}) !== JSON.stringify(monitoring) ||
-      JSON.stringify(tunnel.ospf ?? {}) !== JSON.stringify(ospf) ||
-      JSON.stringify(tunnel.vpnProfiles ?? {}) !== JSON.stringify(vpnProfiles) ||
-      tunnel.createdAt !== createdAt ||
-      tunnel.updatedAt !== updatedAt
-    ) {
-      mutated = true;
-    }
-
-    return {
-      id: identifier,
-      name,
-      groupId,
-      chain,
-      sourceAddressListId,
-      destinationAddressListId,
-      sourcePort,
-      destinationPort,
-      states,
-      action,
-      enabled,
-      tags,
-      notes,
-      metrics,
-      profile,
-      monitoring,
-      ospf,
-      vpnProfiles,
-      createdAt,
-      updatedAt
-    };
-  });
-
   if (!Number.isInteger(normalized.lastAddressListId)) {
     normalized.lastAddressListId = normalized.addressLists.reduce(
       (max, entry) => Math.max(max, Number.parseInt(entry.id, 10) || 0),
@@ -2037,56 +1924,6 @@ const ensureStateShape = async (databaseFile) => {
     );
     mutated = true;
   }
-
-  // sanitizedAddressLists is defined earlier; avoid duplicate declaration
-
-
-    const address = normalizeOptionalText(entry.address ?? '');
-    const comment = normalizeOptionalText(entry.comment ?? '');
-
-    if (
-      entry.name !== name ||
-      entry.referenceType !== referenceType ||
-      (entry.referenceId ?? null) !== referenceId ||
-      (entry.address ?? '') !== address ||
-      (entry.comment ?? '') !== comment ||
-      entry.createdAt !== createdAt ||
-      entry.updatedAt !== updatedAt
-    ) {
-      mutated = true;
-    }
-
-    const status = deriveDeviceStatus(device.status, routeros);
-    const connectivity = sanitizeConnectivity(device.connectivity, routeros);
-
-    if (JSON.stringify(connectivity) !== JSON.stringify(device.connectivity ?? {})) {
-      mutated = true;
-    }
-
-    return {
-      id: identifier,
-      name,
-      host,
-      groupId,
-      tags,
-      notes,
-      routeros,
-      status,
-      connectivity,
-      createdAt,
-      updatedAt
-    };
-  });
-
-  if (!Number.isInteger(normalized.lastAddressListId)) {
-    normalized.lastAddressListId = normalized.addressLists.reduce(
-      (max, entry) => Math.max(max, Number.parseInt(entry.id, 10) || 0),
-      0
-    );
-    mutated = true;
-  }
-
-  // sanitizedAddressLists is defined earlier; avoid duplicate declaration
 
   const validRoleIds = new Set(normalized.roles.map((role) => role.id));
 
