@@ -494,19 +494,7 @@ const collectNormalizedIpAddresses = (value) => {
 
 // normalizeIpAddress is defined earlier; avoid duplicate declaration
 
-const pickField = (entry, keys) => {
-  if (!entry || typeof entry !== 'object') {
-    return null;
-  }
-
-  for (const key of keys) {
-    if (entry[key] !== undefined && entry[key] !== null && entry[key] !== '') {
-      return entry[key];
-    }
-  }
-
-  return null;
-};
+// pickField is defined earlier; avoid duplicate declaration
 
 const canonicalizeConnectionType = (value) => {
   const text = normalizeOptionalText(value ?? '');
@@ -1072,19 +1060,7 @@ export const resolveDatabaseFile = (databasePath = './data/app.db') => {
 
 // normalizeIpAddress is defined earlier; avoid duplicate declaration
 
-const pickField = (entry, keys) => {
-  if (!entry || typeof entry !== 'object') {
-    return null;
-  }
-
-  for (const key of keys) {
-    if (entry[key] !== undefined && entry[key] !== null && entry[key] !== '') {
-      return entry[key];
-    }
-  }
-
-  return null;
-};
+// pickField is defined earlier; avoid duplicate declaration
 
 const canonicalizeConnectionType = (value) => {
   const text = normalizeOptionalText(value ?? '');
@@ -2517,19 +2493,7 @@ const normalizeIpAddress = (value) => {
   return address ?? null;
 };
 
-const pickField = (entry, keys) => {
-  if (!entry || typeof entry !== 'object') {
-    return null;
-  }
-
-  for (const key of keys) {
-    if (entry[key] !== undefined && entry[key] !== null && entry[key] !== '') {
-      return entry[key];
-    }
-  }
-
-  return null;
-};
+// pickField is defined earlier; avoid duplicate declaration
 
 const canonicalizeConnectionType = (value) => {
   const text = normalizeOptionalText(value ?? '');
