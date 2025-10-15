@@ -510,29 +510,7 @@ const collectNormalizedIpAddresses = (value) => {
 
 // buildDiscoveryNotes is defined earlier; avoid duplicate declaration
 
-const buildDevicePairKey = (deviceAId, deviceBId, addressA, addressB) => {
-  const parsedIds = [deviceAId, deviceBId]
-    .map((value) => Number.parseInt(value, 10))
-    .filter((value) => Number.isInteger(value));
-
-  if (parsedIds.length !== 2) {
-    return null;
-  }
-
-  parsedIds.sort((a, b) => a - b);
-
-  if (addressA && addressB) {
-    const normalizedA = normalizeIpAddress(addressA);
-    const normalizedB = normalizeIpAddress(addressB);
-
-    if (normalizedA && normalizedB) {
-      const addresses = [normalizedA, normalizedB].sort();
-      return `${parsedIds[0]}|${parsedIds[1]}|${addresses[0]}|${addresses[1]}`;
-    }
-  }
-
-  return `${parsedIds[0]}|${parsedIds[1]}`;
-};
+// buildDevicePairKey is defined earlier; avoid duplicate declaration
 
 const extractTunnelInventoryCandidates = (device) => {
   if (!device || typeof device !== 'object') {
@@ -929,29 +907,7 @@ export const resolveDatabaseFile = (databasePath = './data/app.db') => {
 
 // buildDiscoveryNotes is defined earlier; avoid duplicate declaration
 
-const buildDevicePairKey = (deviceAId, deviceBId, addressA, addressB) => {
-  const parsedIds = [deviceAId, deviceBId]
-    .map((value) => Number.parseInt(value, 10))
-    .filter((value) => Number.isInteger(value));
-
-  if (parsedIds.length !== 2) {
-    return null;
-  }
-
-  parsedIds.sort((a, b) => a - b);
-
-  if (addressA && addressB) {
-    const normalizedA = normalizeIpAddress(addressA);
-    const normalizedB = normalizeIpAddress(addressB);
-
-    if (normalizedA && normalizedB) {
-      const addresses = [normalizedA, normalizedB].sort();
-      return `${parsedIds[0]}|${parsedIds[1]}|${addresses[0]}|${addresses[1]}`;
-    }
-  }
-
-  return `${parsedIds[0]}|${parsedIds[1]}`;
-};
+// buildDevicePairKey is defined earlier; avoid duplicate declaration
 
 const extractTunnelInventoryCandidates = (device) => {
   if (!device || typeof device !== 'object') {
@@ -2215,29 +2171,7 @@ const normalizeIpAddress = (value) => {
 
 // buildDiscoveryNotes is defined earlier; avoid duplicate declaration
 
-const buildDevicePairKey = (deviceAId, deviceBId, addressA, addressB) => {
-  const parsedIds = [deviceAId, deviceBId]
-    .map((value) => Number.parseInt(value, 10))
-    .filter((value) => Number.isInteger(value));
-
-  if (parsedIds.length !== 2) {
-    return null;
-  }
-
-  parsedIds.sort((a, b) => a - b);
-
-  if (addressA && addressB) {
-    const normalizedA = normalizeIpAddress(addressA);
-    const normalizedB = normalizeIpAddress(addressB);
-
-    if (normalizedA && normalizedB) {
-      const addresses = [normalizedA, normalizedB].sort();
-      return `${parsedIds[0]}|${parsedIds[1]}|${addresses[0]}|${addresses[1]}`;
-    }
-  }
-
-  return `${parsedIds[0]}|${parsedIds[1]}`;
-};
+// buildDevicePairKey is defined earlier; avoid duplicate declaration
 
 const extractTunnelInventoryCandidates = (device) => {
   if (!device || typeof device !== 'object') {
