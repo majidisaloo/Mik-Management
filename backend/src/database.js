@@ -509,7 +509,6 @@ const collectNormalizedIpAddresses = (value) => {
 // deriveDiscoveredTunnelName is defined earlier; avoid duplicate declaration
 
 // buildDiscoveryNotes is defined earlier; avoid duplicate declaration
-};
 
 const buildDevicePairKey = (deviceAId, deviceBId, addressA, addressB) => {
   const parsedIds = [deviceAId, deviceBId]
@@ -929,7 +928,6 @@ export const resolveDatabaseFile = (databasePath = './data/app.db') => {
 // deriveDiscoveredTunnelName is defined earlier; avoid duplicate declaration
 
 // buildDiscoveryNotes is defined earlier; avoid duplicate declaration
-};
 
 const buildDevicePairKey = (deviceAId, deviceBId, addressA, addressB) => {
   const parsedIds = [deviceAId, deviceBId]
@@ -2216,7 +2214,6 @@ const normalizeIpAddress = (value) => {
 // deriveDiscoveredTunnelName is defined earlier; avoid duplicate declaration
 
 // buildDiscoveryNotes is defined earlier; avoid duplicate declaration
-};
 
 const buildDevicePairKey = (deviceAId, deviceBId, addressA, addressB) => {
   const parsedIds = [deviceAId, deviceBId]
