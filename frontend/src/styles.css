@@ -303,7 +303,7 @@ a:hover {
 
 .app-main {
   flex: 1;
-  padding: var(--space-6);
+  padding: var(--space-4);
   overflow-y: auto;
   background: var(--bg-primary);
   min-width: 0;
@@ -312,6 +312,7 @@ a:hover {
   align-items: center;
   justify-content: flex-start;
   width: 100%;
+  max-width: none;
 }
 
 /* Brand */
