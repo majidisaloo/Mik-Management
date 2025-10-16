@@ -252,8 +252,12 @@ a:hover {
 }
 
 .app-shell--authed {
-  display: flex;
-  flex-direction: row;
+  display: grid;
+  grid-template-areas: 
+    "header header"
+    "sidebar main";
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: auto 1fr;
   min-height: 100vh;
   width: 100%;
   margin: 0;
@@ -279,24 +283,22 @@ a:hover {
 }
 
 .app-content {
+  grid-area: main;
   display: flex;
-  flex-direction: row;
-  flex: 1;
+  flex-direction: column;
   min-height: 0;
   width: 100%;
 }
 
 .app-sidebar {
+  grid-area: sidebar;
   background: var(--surface-elevated);
   border-right: 1px solid var(--border-primary);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   transition: all var(--transition-normal);
-  width: 280px;
-  min-width: 280px;
-  max-width: 280px;
-  flex-shrink: 0;
+  width: 100%;
 }
 
 .app-main {
@@ -927,11 +929,11 @@ a:hover {
 /* Responsive Design */
 @media (max-width: 768px) {
   .app-shell--authed {
-    flex-direction: column;
-  }
-  
-  .app-content {
-    flex-direction: column;
+    grid-template-areas: 
+      "header"
+      "main";
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
   }
   
   .app-sidebar {
