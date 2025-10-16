@@ -90,7 +90,7 @@ const Layout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
-  const [meta, setMeta] = useState({ version: '0.0', registrationOpen: true });
+  const [meta, setMeta] = useState({ version: '0.0', registrationOpen: false });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -279,14 +279,16 @@ const Layout = () => {
               </div>
             ) : (
               <nav className="flex items-center gap-4">
-                {meta.registrationOpen && (
+                {meta.registrationOpen && location.pathname !== '/register' && (
                   <Link to="/register" className="btn btn--ghost btn--sm">
                     Register
                   </Link>
                 )}
-                <Link to="/" className="btn btn--primary btn--sm">
-                  Login
-                </Link>
+                {location.pathname !== '/' && (
+                  <Link to="/" className="btn btn--primary btn--sm">
+                    Login
+                  </Link>
+                )}
               </nav>
             )}
           </div>
