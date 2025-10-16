@@ -334,11 +334,11 @@ const Dashboard = () => {
 
       {/* Last Updated */}
       {lastUpdated && (
-        <div className="text-center text-sm text-tertiary">
+        <div className="dashboard-last-updated">
           Last updated: {formatDateTime(lastUpdated)}
         </div>
       )}
-    </>
+    </div>
   );
 };
 
