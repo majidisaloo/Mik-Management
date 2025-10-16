@@ -4,6 +4,7 @@ import BrandMark from './BrandMark.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
 import { formatCommitVersion } from '../lib/version';
+import './Layout.css';
 
 // Modern SVG Icons
 const MoonIcon = () => (
@@ -15,278 +16,239 @@ const MoonIcon = () => (
 const SunIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="12" cy="12" r="5" fill="currentColor" />
-    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-  </svg>
-);
-
-const LogoutIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    <polyline points="16,17 21,12 16,7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
 const MenuIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <line x1="3" y1="6" x2="21" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    <line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    <line x1="3" y1="18" x2="21" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
 const CloseIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
-const navigationIcons = {
-  dashboard: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2" />
-      <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2" />
-      <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2" />
-      <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  users: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="2" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  ),
-  groups: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="2" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  ),
-  mikrotiks: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" strokeWidth="2" />
-      <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2" />
-      <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  tunnels: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  ),
-  settings: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  )
-};
+const LogoutIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const DashboardIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2" />
+    <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2" />
+    <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2" />
+    <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2" />
+  </svg>
+);
+
+const UsersIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const GroupsIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const MikrotikIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" strokeWidth="2" />
+    <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2" />
+    <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2" />
+  </svg>
+);
+
+const TunnelsIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const SettingsIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
 const Layout = () => {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
   const { theme, toggleTheme } = useTheme();
-  const [meta, setMeta] = useState({ version: '0.0', registrationOpen: false });
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [meta, setMeta] = useState({ registrationOpen: false });
 
-  // Get version from commit count
+  // Get commit count and format version
   const commitCount = Number(import.meta.env.VITE_COMMIT_COUNT ?? 0);
   const version = formatCommitVersion(commitCount);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    let mounted = true;
+  // Navigation items
+  const navigation = useMemo(() => [
+    {
+      label: 'Main',
+      items: [
+        { to: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
+        { to: '/users', label: 'Users & Roles', icon: UsersIcon },
+        { to: '/groups', label: 'Mik-Groups', icon: GroupsIcon },
+        { to: '/mikrotiks', label: 'Mikrotiks', icon: MikrotikIcon },
+        { to: '/tunnels', label: 'Tunnels', icon: TunnelsIcon },
+        { to: '/settings', label: 'Settings', icon: SettingsIcon },
+      ],
+    },
+  ], []);
 
+  // Load meta information
+  useEffect(() => {
     const loadMeta = async () => {
       try {
-        const response = await fetch('/api/meta', { signal: controller.signal });
-
-        if (!response.ok) {
-          throw new Error('Meta request failed');
-        }
-
-        const payload = await response.json();
-
-        if (mounted) {
-          setMeta({
-            version: payload?.version ?? '0.0',
-            registrationOpen: payload?.registrationOpen !== false,
-            userCount: payload?.userCount ?? 0
-          });
+        const response = await fetch('/api/meta');
+        if (response.ok) {
+          const data = await response.json();
+          setMeta(data);
         }
       } catch (error) {
-        if (mounted) {
-          setMeta((current) => ({ ...current, version: current.version || '0.0' }));
-        }
+        console.error('Failed to load meta:', error);
       }
     };
 
     loadMeta();
-
-    return () => {
-      mounted = false;
-      controller.abort();
-    };
   }, []);
 
-  const handleSignOut = () => {
-    logout();
-    navigate('/login', { replace: true });
-  };
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
-  const toggleSidebar = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
-  };
+  // Close mobile menu on escape key
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, []);
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
   };
 
-  const renderThemeToggle = (placement) => {
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
+  const renderThemeToggle = (location) => {
+    const isDark = theme === 'dark';
+    const buttonClass = location === 'header' ? 'app-theme-toggle' : 'app-sidebar-link';
+    
     return (
       <button
         type="button"
-        className={`btn btn--ghost btn--sm ${placement === 'sidebar' ? 'w-full' : ''}`}
+        className={buttonClass}
         onClick={toggleTheme}
-        aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+        aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
       >
-        {theme === 'light' ? <MoonIcon /> : <SunIcon />}
-        {placement === 'sidebar' && !sidebarCollapsed && (
-          <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
-        )}
+        <span className="app-sidebar-link-icon">
+          {isDark ? <SunIcon /> : <MoonIcon />}
+        </span>
+        {location === 'sidebar' && <span>Dark mode</span>}
       </button>
     );
   };
 
-  const renderLogoutButton = (placement) => {
+  const renderLogoutButton = (location) => {
+    const buttonClass = location === 'header' ? 'app-logout-btn' : 'app-sidebar-link';
+    
     return (
       <button
         type="button"
-        className={`btn btn--ghost btn--sm ${placement === 'sidebar' ? 'w-full text-error' : 'text-error'}`}
-        onClick={handleSignOut}
+        className={buttonClass}
+        onClick={handleLogout}
         aria-label="Sign out"
       >
+        <span className="app-sidebar-link-icon">
           <LogoutIcon />
-        {placement === 'sidebar' && !sidebarCollapsed && <span>Sign out</span>}
+        </span>
+        {location === 'sidebar' && <span>Sign out</span>}
       </button>
     );
   };
 
-  const navigation = useMemo(() => {
-    if (!user) return [];
-
-    const baseNav = [
-      {
-        items: [
-          {
-            to: '/',
-            label: 'Dashboard',
-            icon: navigationIcons.dashboard
-          }
-        ]
-      }
-    ];
-
-    if (user.permissions?.users) {
-      baseNav[0].items.push({
-            to: '/users',
-        label: 'Users & Roles',
-        icon: navigationIcons.users
-      });
-    }
-
-    if (user.permissions?.groups) {
-      baseNav[0].items.push({
-            to: '/groups',
-            label: 'Mik-Groups',
-        icon: navigationIcons.groups
-      });
-    }
-
-    if (user.permissions?.mikrotiks) {
-      baseNav[0].items.push({
-            to: '/mikrotiks',
-            label: 'Mikrotiks',
-        icon: navigationIcons.mikrotiks
-      });
-    }
-
-    if (user.permissions?.tunnels) {
-      baseNav[0].items.push({
-        to: '/tunnels',
-        label: 'Tunnels',
-        icon: navigationIcons.tunnels
-      });
-    }
-
-    baseNav[0].items.push({
-      to: '/settings',
-      label: 'Settings',
-      icon: navigationIcons.settings
-    });
-
-    return baseNav;
-  }, [user]);
-
   const renderNavEntry = (item) => {
-    const isActive = location.pathname === item.to || (item.to !== '/' && location.pathname.startsWith(item.to));
-
-      return (
-        <NavLink
-          key={item.to}
-          to={item.to}
-        className={`sidebar-link ${isActive ? 'sidebar-link--active' : ''}`}
+    const Icon = item.icon;
+    
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        className={({ isActive }) =>
+          `app-sidebar-link${isActive ? ' app-sidebar-link--active' : ''}`
+        }
         onClick={() => setMobileMenuOpen(false)}
       >
-        <span className="sidebar-link__icon">{item.icon}</span>
-        {!sidebarCollapsed && <span>{item.label}</span>}
+        <span className="app-sidebar-link-icon">
+          <Icon />
+        </span>
+        <span>{item.label}</span>
       </NavLink>
     );
   };
 
   return (
-    <div
-      className={`app-shell${user ? ' app-shell--authed' : ''}${sidebarCollapsed ? ' app-shell--collapsed' : ''}`}
-    >
+    <div className={`app-shell${user ? ' app-shell--authed' : ''}`}>
       {/* Only show main header if not on login page */}
       {location.pathname !== '/' && (
-        <header className="fixed top-0 inset-x-0 h-16 z-50 border-b bg-white">
-          <div className="h-full px-4 lg:px-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <header className="app-header">
+          <div className="app-header-content">
+            <div className="app-header-left">
               {user && (
                 <button
                   type="button"
-                  className="btn btn--ghost btn--sm md:hidden"
+                  className="app-mobile-menu-btn"
                   onClick={toggleMobileMenu}
                   aria-label="Toggle menu"
                 >
                   {mobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
                 </button>
               )}
-              <Link to="/" className="logo" aria-label="MikroManage home">
+              <Link to="/" className="app-logo" aria-label="MikroManage home">
                 <BrandMark />
               </Link>
             </div>
-            <div className={`header-actions${user ? ' header-actions--authed' : ''}`}>
-              {renderThemeToggle('header')}
+            <div className="app-header-right">
+              {renderThemeToggle('header')} {/* Always show theme toggle */}
               {user ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-tertiary">v{version}</span>
+                  <span className="app-version">v{version}</span>
                   {renderLogoutButton('header')}
                 </div>
               ) : (
-                <nav className="flex items-center gap-4">
+                <nav className="app-auth-nav">
                   {meta.registrationOpen && location.pathname !== '/register' && (
-                    <Link to="/register" className="btn btn--ghost btn--sm">
+                    <Link to="/register" className="app-register-btn">
                       Register
                     </Link>
                   )}
-                  <Link to="/" className="btn btn--primary btn--sm">
+                  {/* Login button always visible when not authenticated */}
+                  <Link to="/" className="app-login-btn">
                     Login
                   </Link>
                 </nav>
@@ -297,15 +259,15 @@ const Layout = () => {
       )}
 
       {user ? (
-        <div className="pt-16 min-h-screen">
-          <div className="flex">
-            {/* Sidebar - Fixed width */}
-            <aside className="w-64 flex-shrink-0 border-r min-h-[calc(100vh-4rem)] bg-white">
-              <div className="p-4">
+        <div className="app-main-layout">
+          {/* Sidebar - Fixed width */}
+          <aside className="app-sidebar">
+            <div className="app-sidebar-content">
+              <div className="app-sidebar-nav">
                 {navigation.map((section) => (
-                  <div className="mb-6" key={section.label ?? 'primary'}>
+                  <div className="app-sidebar-group" key={section.label ?? 'primary'}>
                     {section.label && !sidebarCollapsed && (
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{section.label}</p>
+                      <p className="app-sidebar-group-label">{section.label}</p>
                     )}
                     <div className="space-y-1">
                       {section.items.map((item) => renderNavEntry(item))}
@@ -314,26 +276,22 @@ const Layout = () => {
                 ))}
                 
                 {/* Theme and Logout buttons */}
-                <div className="mt-6 pt-4 border-t">
+                <div className="app-sidebar-footer">
                   {renderThemeToggle('sidebar')}
                   <div className="mt-2">{renderLogoutButton('sidebar')}</div>
                 </div>
               </div>
-            </aside>
-            
-            {/* Main Content - Takes remaining space */}
-            <main className="flex-1 p-6">
-              <div className="max-w-4xl mx-auto">
-                <Outlet />
-              </div>
-            </main>
-          </div>
+            </div>
+          </aside>
+          
+          {/* Main Content - Takes remaining space */}
+          <main className="app-main-content">
+            <Outlet />
+          </main>
         </div>
       ) : (
-        <main className="pt-16 min-h-screen p-6">
-          <div className="max-w-4xl mx-auto">
-            <Outlet />
-          </div>
+        <main className="app-main-content">
+          <Outlet />
         </main>
       )}
 
@@ -341,26 +299,28 @@ const Layout = () => {
       {mobileMenuOpen && (
         <>
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+            className="app-mobile-sidebar-overlay app-mobile-sidebar-overlay--open"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <aside className="fixed top-16 left-0 w-64 h-[calc(100vh-4rem)] bg-white border-r z-50 md:hidden">
-            <div className="p-4">
-              {navigation.map((section) => (
-                <div className="mb-6" key={section.label ?? 'primary'}>
-                  {section.label && !sidebarCollapsed && (
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{section.label}</p>
-                  )}
-                  <div className="space-y-1">
-                    {section.items.map((item) => renderNavEntry(item))}
+          <aside className="app-mobile-sidebar app-mobile-sidebar--open">
+            <div className="app-sidebar-content">
+              <div className="app-sidebar-nav">
+                {navigation.map((section) => (
+                  <div className="app-sidebar-group" key={section.label ?? 'primary'}>
+                    {section.label && !sidebarCollapsed && (
+                      <p className="app-sidebar-group-label">{section.label}</p>
+                    )}
+                    <div className="space-y-1">
+                      {section.items.map((item) => renderNavEntry(item))}
+                    </div>
                   </div>
+                ))}
+                
+                {/* Theme and Logout buttons */}
+                <div className="app-sidebar-footer">
+                  {renderThemeToggle('sidebar')}
+                  <div className="mt-2">{renderLogoutButton('sidebar')}</div>
                 </div>
-              ))}
-              
-              {/* Theme and Logout buttons */}
-              <div className="mt-6 pt-4 border-t">
-                {renderThemeToggle('sidebar')}
-                <div className="mt-2">{renderLogoutButton('sidebar')}</div>
               </div>
             </div>
           </aside>

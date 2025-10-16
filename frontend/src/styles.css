@@ -294,7 +294,7 @@ a:hover {
 }
 
 
-/* Navigation */
+/* Navigation - Disabled for page-specific CSS */
 .sidebar-nav {
   flex: 1;
   padding: var(--space-4);
@@ -353,6 +353,16 @@ a:hover {
   padding: var(--space-4);
   border-top: 1px solid var(--border-primary);
   background: var(--surface-primary);
+}
+
+/* Disable sidebar styles for authenticated pages */
+.app-shell--authed .sidebar-nav,
+.app-shell--authed .sidebar-group,
+.app-shell--authed .sidebar-group__label,
+.app-shell--authed .sidebar-link,
+.app-shell--authed .sidebar-link__icon,
+.app-shell--authed .sidebar-footer {
+  all: unset !important;
 }
 
 /* Buttons */
