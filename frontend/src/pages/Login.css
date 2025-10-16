@@ -1,21 +1,24 @@
-/* Login Page Specific Styles - Completely Separate from main styles */
+/* Login Page Specific Styles - Using main CSS variables for theme support */
 
 .login-container {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f9fafb;
+  background-color: var(--bg-primary);
   padding: 3rem 1rem;
+  transition: background-color var(--transition-normal);
 }
 
 .login-card {
   max-width: 28rem;
   width: 100%;
-  background-color: white;
+  background-color: var(--surface-elevated);
   padding: 2rem 1.5rem;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  border-radius: 0.5rem;
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-primary);
+  transition: all var(--transition-normal);
 }
 
 .login-header {
@@ -24,16 +27,18 @@
 }
 
 .login-title {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: #111827;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
   margin: 0;
+  transition: color var(--transition-normal);
 }
 
 .login-subtitle {
   margin-top: 0.5rem;
-  font-size: 0.875rem;
-  color: #6b7280;
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+  transition: color var(--transition-normal);
 }
 
 .login-form {
@@ -49,30 +54,32 @@
 
 .login-label {
   display: block;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #374151;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
   margin-bottom: 0.5rem;
+  transition: color var(--transition-normal);
 }
 
 .login-input {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  font-size: 0.875rem;
-  color: #111827;
-  background-color: white;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  background-color: var(--surface-primary);
+  transition: all var(--transition-fast);
 }
 
 .login-input::placeholder {
-  color: #9ca3af;
+  color: var(--text-tertiary);
 }
 
 .login-input:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--border-focus);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
@@ -82,18 +89,20 @@
   justify-content: center;
   padding: 0.75rem 1rem;
   border: none;
-  border-radius: 0.375rem;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: white;
-  background-color: #2563eb;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-inverse);
+  background: linear-gradient(135deg, var(--accent-primary), var(--color-primary-600));
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all var(--transition-fast);
 }
 
 .login-button:hover:not(:disabled) {
-  background-color: #1d4ed8;
+  background: linear-gradient(135deg, var(--accent-primary-hover), var(--color-primary-700));
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .login-button:focus {
@@ -104,25 +113,27 @@
 .login-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
 .login-message {
   margin-top: 1rem;
   padding: 0.75rem;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  transition: all var(--transition-normal);
 }
 
 .login-message--error {
-  background-color: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+  background-color: var(--status-error-bg);
+  color: var(--status-error);
+  border: 1px solid var(--color-error-200);
 }
 
 .login-message--success {
-  background-color: #f0fdf4;
-  color: #166534;
-  border: 1px solid #bbf7d0;
+  background-color: var(--status-success-bg);
+  color: var(--status-success);
+  border: 1px solid var(--color-success-200);
 }
 
 /* Responsive Design */

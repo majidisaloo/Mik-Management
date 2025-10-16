@@ -284,11 +284,9 @@ const Layout = () => {
                     Register
                   </Link>
                 )}
-                {location.pathname !== '/' && (
-                  <Link to="/" className="btn btn--primary btn--sm">
-                    Login
-                  </Link>
-                )}
+                <Link to="/" className="btn btn--primary btn--sm">
+                  Login
+                </Link>
               </nav>
             )}
           </div>
