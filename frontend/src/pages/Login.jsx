@@ -87,22 +87,22 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-gray-50)' }}>
       <div className="max-w-md w-full space-y-8">
-        <div className="bg-white py-10 px-8 shadow-2xl rounded-2xl border border-gray-100">
+        <div className="card" style={{ padding: '2.5rem 2rem' }}>
           <div className="text-center mb-8">
-            <div className="mx-auto h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center mb-4">
-              <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="mx-auto h-16 w-16 rounded-xl flex items-center justify-center mb-6" style={{ backgroundColor: 'var(--color-primary-500)' }}>
+              <svg className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900">Welcome Back</h1>
-            <p className="mt-2 text-sm text-gray-600">Sign in to your MikroManage account</p>
+            <h1 className="text-3xl font-bold" style={{ color: 'var(--color-gray-900)' }}>Welcome Back</h1>
+            <p className="mt-2 text-sm" style={{ color: 'var(--color-gray-600)' }}>Sign in to your MikroManage account</p>
           </div>
           
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="loginEmail" className="block text-sm font-semibold text-gray-700 mb-2">
+              <label htmlFor="loginEmail" className="block text-sm font-semibold mb-2" style={{ color: 'var(--color-gray-700)' }}>
                 Email Address
               </label>
               <input
@@ -113,13 +113,28 @@ const Login = () => {
                 required
                 value={form.email}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white"
+                className="w-full px-4 py-3 rounded-lg border transition-all duration-200 focus:outline-none focus:ring-2"
+                style={{
+                  borderColor: 'var(--color-gray-300)',
+                  backgroundColor: 'var(--color-gray-50)',
+                  color: 'var(--color-gray-900)'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = 'var(--color-primary-500)';
+                  e.target.style.backgroundColor = 'white';
+                  e.target.style.boxShadow = '0 0 0 3px var(--color-primary-100)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = 'var(--color-gray-300)';
+                  e.target.style.backgroundColor = 'var(--color-gray-50)';
+                  e.target.style.boxShadow = 'none';
+                }}
                 placeholder="Enter your email"
               />
             </div>
             
             <div>
-              <label htmlFor="loginPassword" className="block text-sm font-semibold text-gray-700 mb-2">
+              <label htmlFor="loginPassword" className="block text-sm font-semibold mb-2" style={{ color: 'var(--color-gray-700)' }}>
                 Password
               </label>
               <input
@@ -130,7 +145,22 @@ const Login = () => {
                 required
                 value={form.password}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white"
+                className="w-full px-4 py-3 rounded-lg border transition-all duration-200 focus:outline-none focus:ring-2"
+                style={{
+                  borderColor: 'var(--color-gray-300)',
+                  backgroundColor: 'var(--color-gray-50)',
+                  color: 'var(--color-gray-900)'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = 'var(--color-primary-500)';
+                  e.target.style.backgroundColor = 'white';
+                  e.target.style.boxShadow = '0 0 0 3px var(--color-primary-100)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = 'var(--color-gray-300)';
+                  e.target.style.backgroundColor = 'var(--color-gray-50)';
+                  e.target.style.boxShadow = 'none';
+                }}
                 placeholder="Enter your password"
               />
             </div>
@@ -138,7 +168,16 @@ const Login = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02]"
+              className="w-full flex justify-center py-3 px-4 rounded-lg text-sm font-semibold text-white transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ backgroundColor: 'var(--color-primary-500)' }}
+              onMouseEnter={(e) => {
+                if (!e.target.disabled) {
+                  e.target.style.backgroundColor = 'var(--color-primary-600)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'var(--color-primary-500)';
+              }}
             >
               {isSubmitting ? (
                 <div className="flex items-center">
@@ -155,11 +194,15 @@ const Login = () => {
           </form>
           
           {status.message && (
-            <div className={`mt-6 p-4 rounded-xl text-sm font-medium ${
+            <div className={`mt-6 p-4 rounded-lg text-sm font-medium ${
               status.type === 'error' 
-                ? 'bg-red-50 text-red-700 border border-red-200' 
-                : 'bg-green-50 text-green-700 border border-green-200'
-            }`}>
+                ? 'border' 
+                : 'border'
+            }`} style={{
+              backgroundColor: status.type === 'error' ? 'var(--color-error-50)' : 'var(--color-success-50)',
+              color: status.type === 'error' ? 'var(--color-error-700)' : 'var(--color-success-700)',
+              borderColor: status.type === 'error' ? 'var(--color-error-200)' : 'var(--color-success-200)'
+            }}>
               <div className="flex items-center">
                 {status.type === 'error' ? (
                   <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
