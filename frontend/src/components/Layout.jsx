@@ -166,7 +166,7 @@ const Layout = () => {
         onClick={handleSignOut}
         aria-label="Sign out"
       >
-        <LogoutIcon />
+          <LogoutIcon />
         {placement === 'sidebar' && !sidebarCollapsed && <span>Sign out</span>}
       </button>
     );
@@ -189,7 +189,7 @@ const Layout = () => {
 
     if (user.permissions?.users) {
       baseNav[0].items.push({
-        to: '/users',
+            to: '/users',
         label: 'Users & Roles',
         icon: navigationIcons.users
       });
@@ -197,16 +197,16 @@ const Layout = () => {
 
     if (user.permissions?.groups) {
       baseNav[0].items.push({
-        to: '/groups',
-        label: 'Mik-Groups',
+            to: '/groups',
+            label: 'Mik-Groups',
         icon: navigationIcons.groups
       });
     }
 
     if (user.permissions?.mikrotiks) {
       baseNav[0].items.push({
-        to: '/mikrotiks',
-        label: 'Mikrotiks',
+            to: '/mikrotiks',
+            label: 'Mikrotiks',
         icon: navigationIcons.mikrotiks
       });
     }
@@ -231,10 +231,10 @@ const Layout = () => {
   const renderNavEntry = (item) => {
     const isActive = location.pathname === item.to || (item.to !== '/' && location.pathname.startsWith(item.to));
 
-    return (
-      <NavLink
-        key={item.to}
-        to={item.to}
+      return (
+        <NavLink
+          key={item.to}
+          to={item.to}
         className={`sidebar-link ${isActive ? 'sidebar-link--active' : ''}`}
         onClick={() => setMobileMenuOpen(false)}
       >
@@ -260,9 +260,9 @@ const Layout = () => {
               {mobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
             </button>
           )}
-          <Link to="/" className="logo" aria-label="MikroManage home">
-            <BrandMark />
-          </Link>
+        <Link to="/" className="logo" aria-label="MikroManage home">
+          <BrandMark />
+        </Link>
         </div>
         <div className={`header-actions${user ? ' header-actions--authed' : ''}`}>
           {!user && renderThemeToggle('header')}
@@ -287,7 +287,7 @@ const Layout = () => {
       </header>
 
       {user ? (
-        <>
+        <div className="app-content">
           <aside className={`app-sidebar ${mobileMenuOpen ? 'app-sidebar--open' : ''}`} aria-label="Primary navigation">
             <div className="sidebar-nav">
               {navigation.map((section) => (
@@ -301,7 +301,7 @@ const Layout = () => {
               
               {/* Theme and Logout buttons */}
               <div className="sidebar-group mt-4">
-                {renderThemeToggle('sidebar')}
+              {renderThemeToggle('sidebar')}
                 <div className="mt-2">{renderLogoutButton('sidebar')}</div>
               </div>
             </div>
@@ -309,9 +309,9 @@ const Layout = () => {
           <main className="app-main">
             <Outlet />
           </main>
-        </>
+        </div>
       ) : (
-        <main className="app-main">
+        <main className="app-main pt-16">
           <Outlet />
         </main>
       )}
