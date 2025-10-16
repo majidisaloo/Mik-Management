@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import BrandMark from './BrandMark.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
-import { formatCommitVersion } from '../lib/version.js';
+import { formatCommitVersion } from '../lib/version';
 
 // Modern SVG Icons
 const MoonIcon = () => (
