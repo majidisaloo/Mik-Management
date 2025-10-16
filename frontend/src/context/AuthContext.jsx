@@ -4,6 +4,7 @@ const AuthContext = createContext({
   user: null,
   login: () => {},
   logout: () => {},
+  register: () => {},
   updateUser: () => {}
 });
 
@@ -96,23 +97,79 @@ export const AuthProvider = ({ children }) => {
     };
   }, [user?.id]);
 
+  const login = async (email, password) => {
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, password })
+      });
+
+      if (!response.ok) {
+        const payload = await response.json();
+        throw new Error(payload.message || 'Login failed');
+      }
+
+      const user = await response.json();
+      setUser(user);
+      return user;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
+  };
+
+  const register = async (firstName, lastName, email, password) => {
+    try {
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ firstName, lastName, email, password })
+      });
+
+      if (!response.ok) {
+        const payload = await response.json();
+        throw new Error(payload.message || 'Registration failed');
+      }
+
+      const user = await response.json();
+      setUser(user);
+      return user;
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
+    }
+  };
+
+  const logout = () => {
+    setUser(null);
+  };
+
+  const updateUser = (updater) => {
+    setUser((current) => {
+      if (!current) {
+        return current;
+      }
+
+      if (typeof updater === 'function') {
+        return updater(current);
+      }
+
+      return { ...current, ...updater };
+    });
+  };
+
   const value = useMemo(
     () => ({
       user,
-      login: (nextUser) => setUser(nextUser),
-      logout: () => setUser(null),
-      updateUser: (updater) =>
-        setUser((current) => {
-          if (!current) {
-            return current;
-          }
-
-          if (typeof updater === 'function') {
-            return updater(current);
-          }
-
-          return { ...current, ...updater };
-        })
+      login,
+      logout,
+      register,
+      updateUser
     }),
     [user]
   );
