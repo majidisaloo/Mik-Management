@@ -253,45 +253,48 @@ const Layout = () => {
     <div
       className={`app-shell${user ? ' app-shell--authed' : ''}${sidebarCollapsed ? ' app-shell--collapsed' : ''}`}
     >
-      <header className="fixed top-0 inset-x-0 h-16 z-50 border-b bg-white">
-        <div className="h-full px-4 lg:px-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {user && (
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm md:hidden"
-                onClick={toggleMobileMenu}
-                aria-label="Toggle menu"
-              >
-                {mobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
-              </button>
-            )}
-            <Link to="/" className="logo" aria-label="MikroManage home">
-              <BrandMark />
-            </Link>
-          </div>
-          <div className={`header-actions${user ? ' header-actions--authed' : ''}`}>
-            {!user && renderThemeToggle('header')}
-            {user ? (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-tertiary">v{version}</span>
-                {renderLogoutButton('header')}
-              </div>
-            ) : (
-              <nav className="flex items-center gap-4">
-                {meta.registrationOpen && location.pathname !== '/register' && (
-                  <Link to="/register" className="btn btn--ghost btn--sm">
-                    Register
+      {/* Only show main header if not on login page */}
+      {location.pathname !== '/' && (
+        <header className="fixed top-0 inset-x-0 h-16 z-50 border-b bg-white">
+          <div className="h-full px-4 lg:px-6 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {user && (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm md:hidden"
+                  onClick={toggleMobileMenu}
+                  aria-label="Toggle menu"
+                >
+                  {mobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
+                </button>
+              )}
+              <Link to="/" className="logo" aria-label="MikroManage home">
+                <BrandMark />
+              </Link>
+            </div>
+            <div className={`header-actions${user ? ' header-actions--authed' : ''}`}>
+              {!user && renderThemeToggle('header')}
+              {user ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-tertiary">v{version}</span>
+                  {renderLogoutButton('header')}
+                </div>
+              ) : (
+                <nav className="flex items-center gap-4">
+                  {meta.registrationOpen && location.pathname !== '/register' && (
+                    <Link to="/register" className="btn btn--ghost btn--sm">
+                      Register
+                    </Link>
+                  )}
+                  <Link to="/" className="btn btn--primary btn--sm">
+                    Login
                   </Link>
-                )}
-                <Link to="/" className="btn btn--primary btn--sm">
-                  Login
-                </Link>
-              </nav>
-            )}
+                </nav>
+              )}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {user ? (
         <div className="pt-16 min-h-screen">

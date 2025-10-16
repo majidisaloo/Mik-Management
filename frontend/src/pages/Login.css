@@ -1,12 +1,92 @@
 /* Login Page Specific Styles - Using main CSS variables for theme support */
 
+.login-page {
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  transition: background-color var(--transition-normal);
+}
+
+/* Login Page Navbar */
+.login-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4rem;
+  background-color: var(--surface-elevated);
+  border-bottom: 1px solid var(--border-primary);
+  z-index: 50;
+  transition: all var(--transition-normal);
+}
+
+.login-navbar-content {
+  height: 100%;
+  padding: 0 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.login-logo {
+  display: flex;
+  align-items: center;
+}
+
+.login-navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.login-theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.login-theme-toggle:hover {
+  background-color: var(--surface-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-secondary);
+}
+
+.login-login-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, var(--accent-primary), var(--color-primary-600));
+  color: var(--text-inverse);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition: all var(--transition-fast);
+}
+
+.login-login-btn:hover {
+  background: linear-gradient(135deg, var(--accent-primary-hover), var(--color-primary-700));
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
 .login-container {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   background-color: var(--bg-primary);
-  padding: 3rem 1rem;
+  padding: 6rem 1rem 3rem 1rem;
   transition: background-color var(--transition-normal);
 }
 
