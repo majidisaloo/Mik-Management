@@ -242,14 +242,14 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="w-full space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
+      <div className="w-full max-w-none space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex-1">
             <h1 className="text-3xl font-bold text-primary">Network Health Overview</h1>
             <p className="text-tertiary mt-2">Keep track of MikroTik devices, inter-site tunnels, and their responsiveness in real time.</p>
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-none">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="card loading">
               <div className="card__body text-center">
@@ -263,16 +263,16 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full max-w-none space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex-1">
           <h1 className="text-3xl font-bold text-primary">Network Health Overview</h1>
           <p className="text-tertiary mt-2">Keep track of MikroTik devices, inter-site tunnels, and their responsiveness in real time.</p>
         </div>
         <button
           type="button"
-          className="btn btn--primary"
+          className="btn btn--primary self-start sm:self-auto"
           onClick={refreshMetrics}
           disabled={loading}
         >
@@ -293,7 +293,7 @@ const Dashboard = () => {
       )}
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-none">
         {metricCards.map((card, index) => (
           <MetricCard key={index} {...card} />
         ))}
