@@ -103,6 +103,11 @@ const Settings = () => {
   const [ipamStatus, setIpamStatus] = useState({ type: '', message: '' });
   const [ipamForm, setIpamForm] = useState(emptyIpamForm);
   const [showIpamModal, setShowIpamModal] = useState(false);
+  
+  // Debug: Log modal state changes
+  useEffect(() => {
+    console.log('IPAM modal state changed:', showIpamModal);
+  }, [showIpamModal]);
   const [isEditingIpam, setIsEditingIpam] = useState(false);
   const [selectedIpamId, setSelectedIpamId] = useState(null);
   const [testingIpam, setTestingIpam] = useState(null);
@@ -329,6 +334,7 @@ const Settings = () => {
   };
 
   const handleNewIpam = () => {
+    console.log('Opening IPAM modal');
     setIpamForm(emptyIpamForm);
     setSelectedIpamId(null);
     setIsEditingIpam(false);
@@ -547,7 +553,18 @@ const Settings = () => {
       </div>
 
       {/* Create/Edit IPAM Modal */}
-      <div className={`modal ${showIpamModal ? 'modal--open' : ''}`}>
+      <div 
+        className={`modal ${showIpamModal ? 'modal--open' : ''}`}
+        onClick={(e) => {
+          // Close modal when clicking on backdrop
+          if (e.target === e.currentTarget) {
+            setShowIpamModal(false);
+            setIpamForm(emptyIpamForm);
+            setIsEditingIpam(false);
+            setSelectedIpamId(null);
+          }
+        }}
+      >
         <div className="modal__dialog">
           <div className="modal__header">
             <div>
@@ -562,6 +579,7 @@ const Settings = () => {
               type="button"
               className="modal__close"
               onClick={() => {
+                console.log('Closing IPAM modal');
                 setShowIpamModal(false);
                 setIpamForm(emptyIpamForm);
                 setIsEditingIpam(false);
