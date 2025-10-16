@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import './Dashboard.css';
 
 // Modern Icons
 const RefreshIcon = () => (
@@ -93,28 +94,20 @@ const MetricCard = ({ title, value, subtitle, icon, trend, status, className = '
   };
 
   return (
-    <div className={`card ${className}`}>
-      <div className="card__body text-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className={`p-3 rounded-xl ${status ? `bg-${status}-50` : 'bg-primary-50'}`}>
-            <div className={getStatusColor(status)}>
-              {icon}
-            </div>
-          </div>
-          <div>
-            <h3 className="text-sm font-medium text-tertiary mb-1">{title}</h3>
-            <p className="text-3xl font-bold text-primary mb-1">{value}</p>
-            {subtitle && (
-              <p className="text-sm text-tertiary">{subtitle}</p>
-            )}
-          </div>
-          {trend && (
-            <div className={`text-sm font-medium ${trend > 0 ? 'text-success' : 'text-error'}`}>
-              {trend > 0 ? '+' : ''}{trend}%
-            </div>
-          )}
-        </div>
+    <div className={`dashboard-metric-card ${className}`}>
+      <div className="dashboard-metric-icon">
+        {icon}
       </div>
+      <div className="dashboard-metric-value">{value}</div>
+      <div className="dashboard-metric-label">{title}</div>
+      {subtitle && (
+        <div className="text-xs text-tertiary mt-1">{subtitle}</div>
+      )}
+      {trend && (
+        <div className={`text-sm font-medium ${trend > 0 ? 'text-success' : 'text-error'}`}>
+          {trend > 0 ? '+' : ''}{trend}%
+        </div>
+      )}
     </div>
   );
 };
@@ -242,13 +235,9 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold text-primary">Network Health Overview</h1>
-            <p className="text-tertiary mt-2">Keep track of MikroTik devices, inter-site tunnels, and their responsiveness in real time.</p>
-          </div>
-        </div>
+      <>
+        <h1 className="text-3xl font-bold text-primary mb-2">Network Health Overview</h1>
+        <p className="text-tertiary mb-6">Keep track of MikroTik devices, inter-site tunnels, and their responsiveness in real time.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="card loading">
@@ -258,21 +247,21 @@ const Dashboard = () => {
             </div>
           ))}
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="dashboard-page">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="dashboard-header">
         <div className="flex-1">
-          <h1 className="text-3xl font-bold text-primary">Network Health Overview</h1>
-          <p className="text-tertiary mt-2">Keep track of MikroTik devices, inter-site tunnels, and their responsiveness in real time.</p>
+          <h1 className="dashboard-title">Network Health Overview</h1>
+          <p className="dashboard-subtitle">Keep track of MikroTik devices, inter-site tunnels, and their responsiveness in real time.</p>
         </div>
         <button
           type="button"
-          className="btn btn--primary w-full sm:w-auto self-start sm:self-auto"
+          className="dashboard-refresh-btn"
           onClick={refreshMetrics}
           disabled={loading}
         >
@@ -283,17 +272,17 @@ const Dashboard = () => {
 
       {/* Status Message */}
       {status.message && (
-        <div className={`p-4 rounded-xl border ${
+        <div className={`dashboard-status ${
           status.type === 'error' 
-            ? 'bg-error-50 border-error-200 text-error-700' 
-            : 'bg-success-50 border-success-200 text-success-700'
+            ? 'dashboard-status--error' 
+            : 'dashboard-status--success'
         }`}>
           {status.message}
         </div>
       )}
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="dashboard-metrics">
         {metricCards.map((card, index) => (
           <MetricCard key={index} {...card} />
         ))}
@@ -349,7 +338,7 @@ const Dashboard = () => {
           Last updated: {formatDateTime(lastUpdated)}
         </div>
       )}
-    </div>
+    </>
   );
 };
 

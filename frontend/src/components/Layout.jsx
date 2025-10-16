@@ -273,7 +273,7 @@ const Layout = () => {
               </Link>
             </div>
             <div className={`header-actions${user ? ' header-actions--authed' : ''}`}>
-              {!user && renderThemeToggle('header')}
+              {renderThemeToggle('header')}
               {user ? (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-tertiary">v{version}</span>
