@@ -103,11 +103,6 @@ const Groups = () => {
     [groupLookup, selectedId]
   );
 
-  const selectedGroupMemo = useMemo(() => (selectedGroupId ? groupLookup.get(selectedGroupId) ?? null : null), [
-    selectedGroupId,
-    groupLookup
-  ]);
-
   const groupTree = useMemo(() => {
     const nodeLookup = new Map();
     const roots = [];
@@ -177,8 +172,8 @@ const Groups = () => {
   }, [groupTree, searchTerm]);
 
   const directChildren = useMemo(
-    () => groups.filter((group) => group.parentId === (selectedGroupMemo ? selectedGroupMemo.id : null)),
-    [groups, selectedGroupMemo]
+    () => groups.filter((group) => group.parentId === (selectedGroup ? selectedGroup.id : null)),
+    [groups, selectedGroup]
   );
 
   const loadGroups = async () => {
