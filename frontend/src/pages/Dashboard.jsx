@@ -94,18 +94,19 @@ const MetricCard = ({ title, value, subtitle, icon, trend, status, className = '
 
   return (
     <div className={`card ${className}`}>
-      <div className="card__body">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className={`p-3 rounded-xl ${status ? `bg-${status}-50` : 'bg-primary-50'}`}>
-              <div className={getStatusColor(status)}>
-                {icon}
-              </div>
+      <div className="card__body text-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className={`p-3 rounded-xl ${status ? `bg-${status}-50` : 'bg-primary-50'}`}>
+            <div className={getStatusColor(status)}>
+              {icon}
             </div>
-            <div>
-              <h3 className="text-sm font-medium text-tertiary">{title}</h3>
-              <p className="text-2xl font-bold text-primary">{value}</p>
-            </div>
+          </div>
+          <div>
+            <h3 className="text-sm font-medium text-tertiary mb-1">{title}</h3>
+            <p className="text-3xl font-bold text-primary mb-1">{value}</p>
+            {subtitle && (
+              <p className="text-sm text-tertiary">{subtitle}</p>
+            )}
           </div>
           {trend && (
             <div className={`text-sm font-medium ${trend > 0 ? 'text-success' : 'text-error'}`}>
@@ -113,9 +114,6 @@ const MetricCard = ({ title, value, subtitle, icon, trend, status, className = '
             </div>
           )}
         </div>
-        {subtitle && (
-          <p className="text-sm text-tertiary">{subtitle}</p>
-        )}
       </div>
     </div>
   );
@@ -251,10 +249,10 @@ const Dashboard = () => {
             <p className="text-tertiary mt-2">Keep track of MikroTik devices, inter-site tunnels, and their responsiveness in real time.</p>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="card loading">
-              <div className="card__body">
+              <div className="card__body text-center">
                 <div className="h-20 bg-tertiary bg-opacity-20 rounded-lg animate-pulse"></div>
               </div>
             </div>
@@ -295,7 +293,7 @@ const Dashboard = () => {
       )}
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {metricCards.map((card, index) => (
           <MetricCard key={index} {...card} />
         ))}
