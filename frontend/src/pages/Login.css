@@ -1,9 +1,18 @@
-/* Login Page Specific Styles - Using main CSS variables for theme support */
+/* Login Page Specific Styles - Completely isolated from main CSS */
+
+/* Reset any main CSS interference */
+.login-page * {
+  box-sizing: border-box;
+}
 
 .login-page {
   min-height: 100vh;
   background-color: var(--bg-primary);
   transition: background-color var(--transition-normal);
+  /* Override any main CSS */
+  font-family: var(--font-family-sans) !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 /* Login Page Navbar */
@@ -32,6 +41,31 @@
 .login-logo {
   display: flex;
   align-items: center;
+}
+
+/* Override any main CSS that might affect the logo */
+.login-logo .brand-mark {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+}
+
+.login-logo .brand-icon {
+  width: auto !important;
+  height: auto !important;
+  background: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.login-logo .brand-icon svg {
+  width: 300px !important;
+  height: 80px !important;
+  max-width: none !important;
+  max-height: none !important;
 }
 
 .login-navbar-actions {
