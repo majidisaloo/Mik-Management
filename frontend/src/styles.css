@@ -259,11 +259,8 @@ a:hover {
   padding: 0;
 }
 
-/* Authenticated Layout - Two Column Grid */
+/* Authenticated Layout - Now handled by Tailwind classes */
 .app-shell--authed {
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  grid-template-rows: auto 1fr;
   min-height: 100vh;
   width: 100%;
   margin: 0;
@@ -271,77 +268,7 @@ a:hover {
 }
 
 .app-shell--collapsed {
-  grid-template-columns: 80px 1fr;
-}
-
-/* Fixed Header */
-.app-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-4) var(--space-6);
-  background: var(--surface-elevated);
-  border-bottom: 1px solid var(--border-primary);
-  backdrop-filter: blur(10px);
-  z-index: var(--z-sticky);
-}
-
-/* Content Area - Grid Layout with Navbar Offset */
-.app-content {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 0 1rem; /* gap-x-4 (16px) - more compact */
-  min-height: calc(100vh - 4rem);
-  width: 100%;
-  padding-top: 4rem; /* pt-16 - matches navbar height */
-}
-
-/* Sidebar - Within Grid Column */
-.app-sidebar {
-  grid-column: 1;
-  background: var(--surface-elevated);
-  border-right: 2px solid #e5e7eb; /* border-r border-gray-200 - stronger divider */
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  transition: all var(--transition-normal);
-  width: 100%;
-  height: calc(100vh - 4rem); /* Full viewport height minus navbar */
-  position: sticky;
-  top: 4rem; /* Sticky under the navbar */
-}
-
-/* Main Content - Within Grid Column */
-.app-main {
-  grid-column: 2;
-  width: 100%;
-  padding: 1rem 1rem; /* px-4 - tighter padding */
-  overflow-y: auto;
-  background: var(--bg-primary);
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  height: calc(100vh - 4rem); /* Full viewport height minus navbar */
-  /* No negative margins, no transforms */
-  margin: 0;
-  transform: none;
-}
-
-/* Content wrapper for max-width constraint */
-.app-main > * {
-  max-width: 64rem; /* max-w-4xl */
-  margin-left: auto;
-  margin-right: auto;
-  width: 100%;
+  /* Handled by Tailwind classes */
 }
 
 /* Brand */
@@ -956,60 +883,18 @@ a:hover {
 .shadow-md { box-shadow: var(--shadow-md); }
 .shadow-lg { box-shadow: var(--shadow-lg); }
 
-/* Responsive Design - Mobile */
+/* Mobile sidebar overlay */
 @media (max-width: 768px) {
-  .app-shell--authed {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
-  }
-  
-  .app-content {
-    grid-column: 1;
-    grid-row: 2;
-    grid-template-columns: 1fr;
-    gap: 0;
-    padding-top: 4rem; /* pt-16 - matches navbar height */
-  }
-  
-  .app-sidebar {
-    position: fixed;
-    top: 0;
-    left: -260px;
-    width: 260px;
-    height: 100vh;
-    z-index: var(--z-modal);
-    transition: left var(--transition-normal);
-    background: var(--surface-elevated);
-    border-right: 2px solid #e5e7eb; /* Stronger divider on mobile too */
-    box-shadow: var(--shadow-xl);
-    /* No negative margins, no transforms */
-    margin: 0;
-    transform: none;
-  }
-  
   .app-sidebar--open {
-    left: 0;
-  }
-  
-  .app-main {
-    grid-column: 1;
-    padding: 1rem; /* px-4 - consistent with desktop */
-    width: 100%;
-    height: auto;
-    /* No negative margins, no transforms */
-    margin: 0;
-    transform: none;
-  }
-  
-  /* Remove max-width constraint on mobile for full width */
-  .app-main > * {
-    max-width: none;
-    margin-left: 0;
-    margin-right: 0;
-  }
-  
-  .app-header {
-    padding: var(--space-3) var(--space-4);
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 260px !important;
+    height: 100vh !important;
+    z-index: var(--z-modal) !important;
+    background: var(--surface-elevated) !important;
+    border-right: 2px solid #e5e7eb !important;
+    box-shadow: var(--shadow-xl) !important;
   }
   
   .modal__dialog {
@@ -1018,12 +903,7 @@ a:hover {
   }
 }
 
-/* Large screens - Responsive padding */
-@media (min-width: 1024px) {
-  .app-main {
-    padding: 1.5rem 1.5rem; /* lg:px-6 - more padding on large screens */
-  }
-}
+/* Large screens - Handled by Tailwind classes */
 
 /* Animation Classes */
 .fade-in {

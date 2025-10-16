@@ -1,5 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { execSync } from 'node:child_process';
+
+// Get commit count at build time
+const commitCount = execSync('git rev-list --count HEAD').toString().trim();
 
 export default defineConfig({
   server: {
@@ -11,5 +15,8 @@ export default defineConfig({
       }
     }
   },
-  plugins: [react()]
+  plugins: [react()],
+  define: {
+    'import.meta.env.VITE_COMMIT_COUNT': JSON.stringify(commitCount)
+  }
 });
