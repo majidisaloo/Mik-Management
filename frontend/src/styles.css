@@ -243,32 +243,12 @@ a:hover {
   color: var(--accent-primary-hover);
 }
 
-/* Layout Components */
-.app-shell {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-}
-
-/* App Shell - Base */
+/* App Shell - Base (simplified) */
 .app-shell {
   min-height: 100vh;
   width: 100%;
   margin: 0;
   padding: 0;
-}
-
-/* Authenticated Layout - Now handled by Tailwind classes */
-.app-shell--authed {
-  min-height: 100vh;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-}
-
-.app-shell--collapsed {
-  /* Handled by Tailwind classes */
 }
 
 /* Brand */
@@ -304,11 +284,6 @@ a:hover {
   color: var(--text-primary);
 }
 
-.brand-subtitle {
-  font-size: var(--font-size-sm);
-  color: var(--text-tertiary);
-  font-weight: var(--font-weight-normal);
-}
 
 /* Navigation */
 .sidebar-nav {
@@ -561,28 +536,7 @@ a:hover {
   border: 1px solid var(--color-success-200);
 }
 
-/* Login Page Layout */
-.app-main {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: calc(100vh - 80px);
-  padding: var(--space-6);
-}
-
-.app-main .card {
-  width: 100%;
-  max-width: 400px;
-  padding: var(--space-8);
-  text-align: center;
-}
-
-.app-main .card h1 {
-  margin-bottom: var(--space-6);
-  font-size: var(--font-size-3xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--text-primary);
-}
+/* Login Page Layout - Removed (handled by Login.css) */
 
 .card__header {
   padding: var(--space-6);
@@ -816,72 +770,7 @@ a:hover {
   background: var(--surface-primary);
 }
 
-/* Utilities */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-.text-center { text-align: center; }
-.text-left { text-align: left; }
-.text-right { text-align: right; }
-
-.font-bold { font-weight: var(--font-weight-bold); }
-.font-semibold { font-weight: var(--font-weight-semibold); }
-.font-medium { font-weight: var(--font-weight-medium); }
-
-.text-sm { font-size: var(--font-size-sm); }
-.text-lg { font-size: var(--font-size-lg); }
-.text-xl { font-size: var(--font-size-xl); }
-
-.text-primary { color: var(--text-primary); }
-.text-secondary { color: var(--text-secondary); }
-.text-tertiary { color: var(--text-tertiary); }
-
-.bg-primary { background-color: var(--bg-primary); }
-.bg-secondary { background-color: var(--bg-secondary); }
-
-.p-4 { padding: var(--space-4); }
-.p-6 { padding: var(--space-6); }
-.p-8 { padding: var(--space-8); }
-
-.m-4 { margin: var(--space-4); }
-.m-6 { margin: var(--space-6); }
-.m-8 { margin: var(--space-8); }
-
-.mb-4 { margin-bottom: var(--space-4); }
-.mb-6 { margin-bottom: var(--space-6); }
-.mb-8 { margin-bottom: var(--space-8); }
-
-.mt-4 { margin-top: var(--space-4); }
-.mt-6 { margin-top: var(--space-6); }
-.mt-8 { margin-top: var(--space-8); }
-
-.flex { display: flex; }
-.flex-col { flex-direction: column; }
-.items-center { align-items: center; }
-.justify-center { justify-content: center; }
-.justify-between { justify-content: space-between; }
-
-.gap-2 { gap: var(--space-2); }
-.gap-3 { gap: var(--space-3); }
-.gap-4 { gap: var(--space-4); }
-.gap-6 { gap: var(--space-6); }
-
-.rounded { border-radius: var(--radius-md); }
-.rounded-lg { border-radius: var(--radius-lg); }
-.rounded-xl { border-radius: var(--radius-xl); }
-
-.shadow { box-shadow: var(--shadow-sm); }
-.shadow-md { box-shadow: var(--shadow-md); }
-.shadow-lg { box-shadow: var(--shadow-lg); }
+/* Utilities - Removed (conflicts with Tailwind) */
 
 /* Mobile sidebar overlay */
 @media (max-width: 768px) {
@@ -904,6 +793,13 @@ a:hover {
 }
 
 /* Large screens - Handled by Tailwind classes */
+
+/* Utility Classes */
+.no-margin-collapse {
+  margin-top: 0 !important;
+}
+
+/* Prevent first-child margin collapse in page content - Removed (conflicts with Tailwind) */
 
 /* Animation Classes */
 .fade-in {
