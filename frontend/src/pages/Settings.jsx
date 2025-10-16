@@ -173,11 +173,12 @@ const Settings = () => {
 
       setIpamForm(emptyIpamForm);
       setShowIpamModal(false);
-      await loadIpams();
       setIpamStatus({
         type: 'success',
         message: 'IPAM configuration created successfully.'
       });
+      // Reload data in background
+      loadIpams();
     } catch (error) {
       setIpamStatus({
         type: 'error',
@@ -205,11 +206,12 @@ const Settings = () => {
       setShowIpamModal(false);
       setIsEditingIpam(false);
       setSelectedIpamId(null);
-      await loadIpams();
       setIpamStatus({
         type: 'success',
         message: 'IPAM configuration updated successfully.'
       });
+      // Reload data in background
+      loadIpams();
     } catch (error) {
       setIpamStatus({
         type: 'error',
@@ -230,11 +232,12 @@ const Settings = () => {
       }
 
       setSelectedIpamId(null);
-      await loadIpams();
       setIpamStatus({
         type: 'success',
         message: 'IPAM configuration deleted successfully.'
       });
+      // Reload data in background
+      loadIpams();
     } catch (error) {
       setIpamStatus({
         type: 'error',
@@ -332,7 +335,7 @@ const Settings = () => {
     setShowIpamModal(true);
   };
 
-  if (ipamLoading) {
+  if (ipamLoading && !showIpamModal) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -574,37 +577,37 @@ const Settings = () => {
                 <label htmlFor="ipam-name" className="form-label">
                   Configuration Name *
                 </label>
-                <input
+                  <input
                   id="ipam-name"
-                  type="text"
+                    type="text"
                   className="form-input"
-                  value={ipamForm.name}
+                    value={ipamForm.name}
                   onChange={(e) => setIpamForm({ ...ipamForm, name: e.target.value })}
                   placeholder="e.g., Production IPAM"
-                  required
-                />
+                    required
+                  />
               </div>
 
               <div className="form-group">
                 <label htmlFor="ipam-base-url" className="form-label">
                   Base URL *
                 </label>
-                <input
+                  <input
                   id="ipam-base-url"
-                  type="url"
+                    type="url"
                   className="form-input"
-                  value={ipamForm.baseUrl}
+                    value={ipamForm.baseUrl}
                   onChange={(e) => setIpamForm({ ...ipamForm, baseUrl: e.target.value })}
                   placeholder="https://ipam.example.com"
-                  required
-                />
+                    required
+                  />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="form-group">
                   <label htmlFor="ipam-app-id" className="form-label">
                     App ID *
-                  </label>
+                </label>
                   <input
                     id="ipam-app-id"
                     type="text"
@@ -619,7 +622,7 @@ const Settings = () => {
                 <div className="form-group">
                   <label htmlFor="ipam-app-code" className="form-label">
                     App Code *
-                  </label>
+                </label>
                   <input
                     id="ipam-app-code"
                     type="password"
@@ -636,7 +639,7 @@ const Settings = () => {
                 <div className="form-group">
                   <label htmlFor="ipam-permissions" className="form-label">
                     Permissions
-                  </label>
+                </label>
                   <select
                     id="ipam-permissions"
                     className="form-input form-select"
@@ -651,7 +654,7 @@ const Settings = () => {
                 <div className="form-group">
                   <label htmlFor="ipam-security" className="form-label">
                     Security
-                  </label>
+                </label>
                   <select
                     id="ipam-security"
                     className="form-input form-select"
@@ -665,10 +668,10 @@ const Settings = () => {
                 </div>
               </div>
             </form>
-          </div>
+                      </div>
           <div className="modal__footer">
-            <button
-              type="button"
+                      <button
+                        type="button"
               className="btn btn--ghost"
               onClick={() => {
                 setShowIpamModal(false);
@@ -678,17 +681,17 @@ const Settings = () => {
               }}
             >
               Cancel
-            </button>
-            <button
+                      </button>
+                      <button
               type="submit"
               form="ipam-form"
               className="btn btn--primary"
               disabled={!ipamForm.name.trim() || !ipamForm.baseUrl.trim() || !ipamForm.appId.trim() || !ipamForm.appCode.trim()}
             >
               {isEditingIpam ? 'Update Configuration' : 'Add Configuration'}
-            </button>
+                      </button>
           </div>
-        </div>
+          </div>
       </div>
     </div>
   );
