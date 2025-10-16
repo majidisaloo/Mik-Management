@@ -294,41 +294,74 @@ const Layout = () => {
       </header>
 
       {user ? (
-        <div className="pt-16 grid grid-cols-[260px_minmax(0,1fr)] gap-x-4 min-h-screen">
-          <aside className={`border-r sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto ${mobileMenuOpen ? 'app-sidebar--open' : ''}`} aria-label="Primary navigation">
-            <div className="sidebar-nav">
+        <div className="pt-16 min-h-screen">
+          <div className="flex">
+            {/* Sidebar - Fixed width */}
+            <aside className="w-64 flex-shrink-0 border-r min-h-[calc(100vh-4rem)] bg-white">
+              <div className="p-4">
+                {navigation.map((section) => (
+                  <div className="mb-6" key={section.label ?? 'primary'}>
+                    {section.label && !sidebarCollapsed && (
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{section.label}</p>
+                    )}
+                    <div className="space-y-1">
+                      {section.items.map((item) => renderNavEntry(item))}
+                    </div>
+                  </div>
+                ))}
+                
+                {/* Theme and Logout buttons */}
+                <div className="mt-6 pt-4 border-t">
+                  {renderThemeToggle('sidebar')}
+                  <div className="mt-2">{renderLogoutButton('sidebar')}</div>
+                </div>
+              </div>
+            </aside>
+            
+            {/* Main Content - Takes remaining space */}
+            <main className="flex-1 p-6">
+              <div className="max-w-4xl mx-auto">
+                <Outlet />
+              </div>
+            </main>
+          </div>
+        </div>
+      ) : (
+        <main className="pt-16 min-h-screen p-6">
+          <div className="max-w-4xl mx-auto">
+            <Outlet />
+          </div>
+        </main>
+      )}
+
+      {/* Mobile Sidebar Overlay */}
+      {mobileMenuOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <aside className="fixed top-16 left-0 w-64 h-[calc(100vh-4rem)] bg-white border-r z-50 md:hidden">
+            <div className="p-4">
               {navigation.map((section) => (
-                <div className="sidebar-group" key={section.label ?? 'primary'}>
+                <div className="mb-6" key={section.label ?? 'primary'}>
                   {section.label && !sidebarCollapsed && (
-                    <p className="sidebar-group__label">{section.label}</p>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{section.label}</p>
                   )}
-                  {section.items.map((item) => renderNavEntry(item))}
+                  <div className="space-y-1">
+                    {section.items.map((item) => renderNavEntry(item))}
+                  </div>
                 </div>
               ))}
               
               {/* Theme and Logout buttons */}
-              <div className="sidebar-group mt-4">
-              {renderThemeToggle('sidebar')}
+              <div className="mt-6 pt-4 border-t">
+                {renderThemeToggle('sidebar')}
                 <div className="mt-2">{renderLogoutButton('sidebar')}</div>
               </div>
             </div>
           </aside>
-          <main className="w-full px-4 lg:px-6 py-6 overflow-x-hidden">
-            <Outlet />
-          </main>
-        </div>
-      ) : (
-        <main className="pt-16 w-full px-4 lg:px-6 py-6 overflow-x-hidden">
-          <Outlet />
-        </main>
-      )}
-
-      {/* Mobile overlay */}
-      {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-overlay z-modal-backdrop md:hidden"
-          onClick={() => setMobileMenuOpen(false)}
-        />
+        </>
       )}
     </div>
   );
