@@ -253,7 +253,7 @@ a:hover {
 
 .app-shell--authed {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   min-height: 100vh;
   width: 100%;
   margin: 0;
@@ -280,6 +280,7 @@ a:hover {
 
 .app-content {
   display: flex;
+  flex-direction: row;
   flex: 1;
   min-height: 0;
   width: 100%;
@@ -307,9 +308,8 @@ a:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-start;
   width: 100%;
-  margin-left: 0;
-  padding-left: var(--space-6);
 }
 
 /* Brand */
@@ -926,6 +926,14 @@ a:hover {
 
 /* Responsive Design */
 @media (max-width: 768px) {
+  .app-shell--authed {
+    flex-direction: column;
+  }
+  
+  .app-content {
+    flex-direction: column;
+  }
+  
   .app-sidebar {
     position: fixed;
     top: 0;
@@ -945,6 +953,7 @@ a:hover {
   
   .app-main {
     padding: var(--space-3);
+    width: 100%;
   }
   
   .app-header {
