@@ -157,7 +157,7 @@ const Layout = () => {
 
   const renderThemeToggle = (location) => {
     const isDark = theme === 'dark';
-    const buttonClass = location === 'header' ? 'app-theme-toggle' : 'app-sidebar-link';
+    const buttonClass = location === 'header' ? 'app-header-theme-toggle' : 'app-sidebar-theme-toggle';
     
     return (
       <button
@@ -175,7 +175,7 @@ const Layout = () => {
   };
 
   const renderLogoutButton = (location) => {
-    const buttonClass = location === 'header' ? 'app-logout-btn' : 'app-sidebar-link';
+    const buttonClass = location === 'header' ? 'app-header-logout-btn' : 'app-sidebar-logout-btn';
     
     return (
       <button
@@ -237,7 +237,6 @@ const Layout = () => {
               {renderThemeToggle('header')} {/* Always show theme toggle */}
               {user ? (
                 <div className="flex items-center gap-2">
-                  <span className="app-version">v{version}</span>
                   {renderLogoutButton('header')}
                 </div>
               ) : (
@@ -279,6 +278,9 @@ const Layout = () => {
                 <div className="app-sidebar-footer">
                   {renderThemeToggle('sidebar')}
                   <div className="mt-2">{renderLogoutButton('sidebar')}</div>
+                  <div className="app-sidebar-version">
+                    <span className="app-version-display">v{version}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -320,6 +322,9 @@ const Layout = () => {
                 <div className="app-sidebar-footer">
                   {renderThemeToggle('sidebar')}
                   <div className="mt-2">{renderLogoutButton('sidebar')}</div>
+                  <div className="app-sidebar-version">
+                    <span className="app-version-display">v{version}</span>
+                  </div>
                 </div>
               </div>
             </div>
