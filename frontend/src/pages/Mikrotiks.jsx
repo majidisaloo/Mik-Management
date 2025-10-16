@@ -153,9 +153,10 @@ const Mikrotiks = () => {
       }
 
       const payload = await response.json();
-      setDevices(payload);
+      setDevices(Array.isArray(payload) ? payload : []);
       setStatus({ type: '', message: '' });
     } catch (error) {
+      setDevices([]);
       setStatus({
         type: 'error',
         message: error.message || 'Unable to load MikroTik devices.'
@@ -174,9 +175,10 @@ const Mikrotiks = () => {
       }
 
       const payload = await response.json();
-      setGroups(payload);
+      setGroups(Array.isArray(payload) ? payload : []);
     } catch (error) {
       console.error('Failed to load groups:', error);
+      setGroups([]);
     }
   };
 

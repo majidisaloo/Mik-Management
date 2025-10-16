@@ -191,9 +191,10 @@ const Groups = () => {
       }
 
       const payload = await response.json();
-      setGroups(payload);
+      setGroups(Array.isArray(payload) ? payload : []);
       setStatus({ type: '', message: '' });
     } catch (error) {
+      setGroups([]);
       setStatus({
         type: 'error',
         message: error.message || 'Unable to load groups.'

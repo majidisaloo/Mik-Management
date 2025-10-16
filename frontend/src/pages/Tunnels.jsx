@@ -173,9 +173,10 @@ const Tunnels = () => {
       }
 
       const payload = await response.json();
-      setTunnels(payload);
+      setTunnels(Array.isArray(payload) ? payload : []);
       setStatus({ type: '', message: '' });
     } catch (error) {
+      setTunnels([]);
       setStatus({
         type: 'error',
         message: error.message || 'Unable to load tunnels.'
@@ -194,9 +195,10 @@ const Tunnels = () => {
       }
 
       const payload = await response.json();
-      setDevices(payload);
+      setDevices(Array.isArray(payload) ? payload : []);
     } catch (error) {
       console.error('Failed to load devices:', error);
+      setDevices([]);
     }
   };
 
@@ -209,9 +211,10 @@ const Tunnels = () => {
       }
 
       const payload = await response.json();
-      setGroups(payload);
+      setGroups(Array.isArray(payload) ? payload : []);
     } catch (error) {
       console.error('Failed to load groups:', error);
+      setGroups([]);
     }
   };
 

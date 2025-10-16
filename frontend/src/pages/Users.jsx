@@ -243,9 +243,10 @@ const Users = () => {
       }
 
       const payload = await response.json();
-      setUsers(payload);
+      setUsers(Array.isArray(payload) ? payload : []);
       setStatus({ type: '', message: '' });
     } catch (error) {
+      setUsers([]);
       setStatus({
         type: 'error',
         message: error.message || 'Unable to load users.'
@@ -264,9 +265,10 @@ const Users = () => {
       }
 
       const payload = await response.json();
-      setRoles(payload);
+      setRoles(Array.isArray(payload) ? payload : []);
     } catch (error) {
       console.error('Failed to load roles:', error);
+      setRoles([]);
     }
   };
 
