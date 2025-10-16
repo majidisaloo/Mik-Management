@@ -19,6 +19,8 @@ const Login = () => {
     registrationContext ? { type: 'success', message: registrationContext } : { type: '', message: '' }
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasUsers, setHasUsers] = useState(false);
+  const [checkingUsers, setCheckingUsers] = useState(true);
 
   useEffect(() => {
     if (user) {
@@ -30,6 +32,28 @@ const Login = () => {
       navigate('.', { replace: true, state: initialEmail ? { email: initialEmail } : null });
     }
   }, [user, navigate, cameFromRegistration, initialEmail]);
+
+  // Check if users exist
+  useEffect(() => {
+    const checkUsers = async () => {
+      try {
+        const response = await fetch('/api/users');
+        if (response.ok) {
+          const users = await response.json();
+          setHasUsers(Array.isArray(users) && users.length > 0);
+        } else {
+          setHasUsers(false);
+        }
+      } catch (error) {
+        console.error('Failed to check users:', error);
+        setHasUsers(false);
+      } finally {
+        setCheckingUsers(false);
+      }
+    };
+
+    checkUsers();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -170,14 +194,16 @@ const Login = () => {
               </div>
             </form>
 
-            <div className="login-card-footer">
-              <div className="login-divider">
-                <span>Don't have an account?</span>
+            {!checkingUsers && !hasUsers && (
+              <div className="login-card-footer">
+                <div className="login-divider">
+                  <span>Don't have an account?</span>
+                </div>
+                <Link to="/register" className="login-register-link">
+                  Create New Account
+                </Link>
               </div>
-              <Link to="/register" className="login-register-link">
-                Create New Account
-              </Link>
-            </div>
+            )}
           </div>
         </div>
       </main>
