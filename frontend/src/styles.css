@@ -282,6 +282,7 @@ a:hover {
   display: flex;
   flex: 1;
   min-height: 0;
+  width: 100%;
 }
 
 .app-sidebar {
@@ -303,6 +304,12 @@ a:hover {
   overflow-y: auto;
   background: var(--bg-primary);
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-left: 0;
+  padding-left: var(--space-6);
 }
 
 /* Brand */
