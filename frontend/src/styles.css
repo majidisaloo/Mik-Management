@@ -955,7 +955,6 @@ a:hover {
   .app-header {
     padding: var(--space-3) var(--space-4);
   }
-}
   
   .modal__dialog {
     margin: var(--space-4);
