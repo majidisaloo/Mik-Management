@@ -287,7 +287,7 @@ const Layout = () => {
       </header>
 
       {user ? (
-        <div className="app-content">
+        <>
           <aside className={`app-sidebar ${mobileMenuOpen ? 'app-sidebar--open' : ''}`} aria-label="Primary navigation">
             <div className="sidebar-nav">
               {navigation.map((section) => (
@@ -309,7 +309,7 @@ const Layout = () => {
           <main className="app-main">
             <Outlet />
           </main>
-        </div>
+        </>
       ) : (
         <main className="app-main">
           <Outlet />
