@@ -484,22 +484,22 @@ const Users = () => {
       </div>
 
       <div className="users-actions">
-              <button
-                type="button"
+        <button
+          type="button"
           className="users-action-btn users-action-btn--secondary"
-          onClick={() => setShowRoleModal(true)}
-              >
+          onClick={handleNewRole}
+        >
           <ShieldIcon />
           New Role
-              </button>
-              <button
-                type="button"
+        </button>
+        <button
+          type="button"
           className="users-action-btn users-action-btn--primary"
-          onClick={() => setShowUserModal(true)}
+          onClick={handleNewUser}
         >
           <UserIcon />
           New User
-              </button>
+        </button>
             </div>
 
       <div className="users-filters">
