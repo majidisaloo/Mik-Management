@@ -298,10 +298,12 @@ const Layout = () => {
                   {section.items.map((item) => renderNavEntry(item))}
                 </div>
               ))}
-            </div>
-            <div className="sidebar-footer p-4 border-t border-primary">
-              {renderThemeToggle('sidebar')}
-              <div className="mt-4">{renderLogoutButton('sidebar')}</div>
+              
+              {/* Theme and Logout buttons */}
+              <div className="sidebar-group mt-4">
+                {renderThemeToggle('sidebar')}
+                <div className="mt-2">{renderLogoutButton('sidebar')}</div>
+              </div>
             </div>
           </aside>
           <main className="app-main">
