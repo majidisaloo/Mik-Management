@@ -96,6 +96,26 @@ const IPAMIcon = () => (
   </svg>
 );
 
+const RoutesIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="6" cy="6" r="2" fill="currentColor" />
+    <circle cx="6" cy="12" r="2" fill="currentColor" />
+    <circle cx="6" cy="18" r="2" fill="currentColor" />
+    <circle cx="18" cy="6" r="2" fill="currentColor" />
+    <circle cx="18" cy="12" r="2" fill="currentColor" />
+    <circle cx="18" cy="18" r="2" fill="currentColor" />
+  </svg>
+);
+
+const FirewallIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2L2 7l10 5 10-5-10-5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M2 17l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const Layout = () => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -122,6 +142,8 @@ const Layout = () => {
         { to: '/groups', label: 'Mik-Groups', icon: GroupsIcon },
         { to: '/mikrotiks', label: 'Mikrotiks', icon: MikrotikIcon },
         { to: '/tunnels', label: 'Tunnels', icon: TunnelsIcon },
+        { to: '/routes', label: 'Routes', icon: RoutesIcon },
+        { to: '/firewall', label: 'Firewall', icon: FirewallIcon },
         { to: '/ipam', label: 'IPAM', icon: IPAMIcon },
         { to: '/settings', label: 'Settings', icon: SettingsIcon },
       ],
@@ -178,7 +200,7 @@ const Layout = () => {
   const renderThemeToggle = (location) => {
     const isDark = theme === 'dark';
     const buttonClass = location === 'header' ? 'app-header-theme-toggle' : 'app-sidebar-theme-toggle';
-    
+
     return (
       <button
         type="button"
@@ -196,7 +218,7 @@ const Layout = () => {
 
   const renderLogoutButton = (location) => {
     const buttonClass = location === 'header' ? 'app-header-logout-btn' : 'app-sidebar-logout-btn';
-    
+
     return (
       <button
         type="button"
@@ -214,11 +236,11 @@ const Layout = () => {
 
   const renderNavEntry = (item) => {
     const Icon = item.icon;
-    
-    return (
-      <NavLink
-        key={item.to}
-        to={item.to}
+
+      return (
+        <NavLink
+          key={item.to}
+          to={item.to}
         className={({ isActive }) =>
           `app-sidebar-link${isActive ? ' app-sidebar-link--active' : ''}`
         }
@@ -250,8 +272,8 @@ const Layout = () => {
                 </button>
               )}
               <Link to="/" className="app-logo" aria-label="MikroManage home">
-                <BrandMark />
-              </Link>
+          <BrandMark />
+        </Link>
             </div>
             <div className="app-header-right">
               {renderThemeToggle('header')} {/* Always show theme toggle */}
@@ -268,13 +290,13 @@ const Layout = () => {
                   )}
                   {/* Login button always visible when not authenticated */}
                   <Link to="/" className="app-login-btn">
-                    Login
+                Login
                   </Link>
-                </nav>
-              )}
+            </nav>
+          )}
             </div>
-          </div>
-        </header>
+        </div>
+      </header>
       )}
 
       {user ? (
@@ -283,13 +305,13 @@ const Layout = () => {
           <aside className="app-sidebar">
             <div className="app-sidebar-content">
               <div className="app-sidebar-nav">
-                {navigation.map((section) => (
+              {navigation.map((section) => (
                   <div className="app-sidebar-group" key={section.label ?? 'primary'}>
                     {section.label && !sidebarCollapsed && (
                       <p className="app-sidebar-group-label">{section.label}</p>
                     )}
                     <div className="space-y-1">
-                      {section.items.map((item) => renderNavEntry(item))}
+                  {section.items.map((item) => renderNavEntry(item))}
                     </div>
                   </div>
                 ))}

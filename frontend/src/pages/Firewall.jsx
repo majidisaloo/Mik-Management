@@ -1,717 +1,398 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Modal from '../components/Modal.jsx';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
+import './Firewall.css';
 
-const emptyAddressForm = () => ({
-  name: '',
-  referenceType: 'mikrotik',
-  referenceId: '',
-  address: '',
-  comment: ''
-});
+// Icons
+const FirewallIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2L2 7l10 5 10-5-10-5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M2 17l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
-const emptyFilterForm = () => ({
-  name: '',
-  groupId: '',
-  chain: 'forward',
-  sourceAddressListId: '',
-  destinationAddressListId: '',
-  sourcePort: '',
-  destinationPort: '',
-  states: [],
-  action: 'accept',
-  enabled: true,
-  comment: ''
-});
+const PlusIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
-const chainOptions = [
-  { value: 'input', label: 'Input' },
-  { value: 'output', label: 'Output' },
-  { value: 'forward', label: 'Forward' }
-];
+const SearchIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2" />
+    <path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
-const actionOptions = [
-  { value: 'accept', label: 'Accept' },
-  { value: 'drop', label: 'Drop' }
-];
-
-const stateOptions = [
-  { value: 'new', label: 'New' },
-  { value: 'established', label: 'Established' },
-  { value: 'related', label: 'Related' },
-  { value: 'invalid', label: 'Invalid' },
-  { value: 'syn', label: 'Syn' }
-];
-
-const formatDateTime = (value) => {
-  if (!value) {
-    return '—';
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return '—';
-  }
-
-  return date.toLocaleString();
-};
+const ShieldIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
 const Firewall = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState({ type: '', message: '' });
-  const [addressLists, setAddressLists] = useState([]);
   const [filters, setFilters] = useState([]);
-  const [groups, setGroups] = useState([]);
+  const [addressLists, setAddressLists] = useState([]);
   const [mikrotiks, setMikrotiks] = useState([]);
-  const [targetVersion, setTargetVersion] = useState('');
-  const [addressModal, setAddressModal] = useState({ open: false, id: null, form: emptyAddressForm() });
-  const [filterModal, setFilterModal] = useState({ open: false, id: null, form: emptyFilterForm() });
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [groups, setGroups] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedGroup, setSelectedGroup] = useState('all');
+  const [activeTab, setActiveTab] = useState('filters');
 
   useEffect(() => {
-    if (!user) {
-      navigate('/login', { replace: true });
-      return;
-    }
+    if (!user) return;
+    loadFirewallData();
+    loadMikrotiks();
+    loadGroups();
+  }, [user]);
 
-    if (!user.permissions?.mikrotiks) {
-      navigate('/dashboard', { replace: true });
-      return;
-    }
-
-    const controller = new AbortController();
-
-    const load = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch('/api/firewall', { signal: controller.signal });
-
-        if (!response.ok) {
-          throw new Error('Unable to load firewall inventory.');
-        }
-
-        const payload = await response.json();
-        setAddressLists(Array.isArray(payload?.addressLists) ? payload.addressLists : []);
-        setFilters(Array.isArray(payload?.filters) ? payload.filters : []);
-        setGroups(Array.isArray(payload?.groups) ? payload.groups : []);
-        setMikrotiks(Array.isArray(payload?.mikrotiks) ? payload.mikrotiks : []);
-        setTargetVersion(typeof payload?.targetRouterOs === 'string' ? payload.targetRouterOs : '');
-        setStatus({ type: '', message: '' });
-      } catch (error) {
-        if (error.name === 'AbortError') {
-          return;
-        }
-        setStatus({
-          type: 'error',
-          message: error.message || 'Firewall inventory is unavailable right now. Confirm the API is reachable and refresh the page.'
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
-
-    return () => controller.abort();
-  }, [navigate, user]);
-
-  const sortedAddressLists = useMemo(() => {
-    return [...addressLists].sort((a, b) => a.name.localeCompare(b.name));
-  }, [addressLists]);
-
-  const sortedFilters = useMemo(() => {
-    return [...filters].sort((a, b) => a.name.localeCompare(b.name));
-  }, [filters]);
-
-  const refreshInventory = async () => {
+  const loadFirewallData = async () => {
     try {
       const response = await fetch('/api/firewall');
-      if (!response.ok) {
-        throw new Error('Unable to refresh the firewall data.');
+      if (response.ok) {
+        const data = await response.json();
+        setFilters(data.filters || []);
+        setAddressLists(data.addressLists || []);
       }
-      const payload = await response.json();
-      setAddressLists(Array.isArray(payload?.addressLists) ? payload.addressLists : []);
-      setFilters(Array.isArray(payload?.filters) ? payload.filters : []);
-      setGroups(Array.isArray(payload?.groups) ? payload.groups : []);
-      setMikrotiks(Array.isArray(payload?.mikrotiks) ? payload.mikrotiks : []);
-      setTargetVersion(typeof payload?.targetRouterOs === 'string' ? payload.targetRouterOs : '');
     } catch (error) {
-      setStatus({ type: 'error', message: error.message || 'Unable to refresh the firewall inventory.' });
-    }
-  };
-
-  const openAddressCreate = () => {
-    setAddressModal({ open: true, id: null, form: emptyAddressForm() });
-    setStatus({ type: '', message: '' });
-  };
-
-  const openAddressEdit = (entry) => {
-    setAddressModal({
-      open: true,
-      id: entry.id,
-      form: {
-        name: entry.name ?? '',
-        referenceType: entry.referenceType ?? 'mikrotik',
-        referenceId: entry.referenceId ? String(entry.referenceId) : '',
-        address: entry.address ?? '',
-        comment: entry.comment ?? ''
-      }
-    });
-    setStatus({ type: '', message: '' });
-  };
-
-  const closeAddressModal = () => {
-    setAddressModal({ open: false, id: null, form: emptyAddressForm() });
-    setSaving(false);
-    setDeleting(false);
-  };
-
-  const handleAddressField = (event) => {
-    const { name, value } = event.target;
-    setAddressModal((current) => {
-      if (name === 'referenceType') {
-        return {
-          ...current,
-          form: {
-            ...current.form,
-            referenceType: value,
-            referenceId: ''
-          }
-        };
-      }
-
-      return {
-        ...current,
-        form: {
-          ...current.form,
-          [name]: value
-        }
-      };
-    });
-  };
-
-  const submitAddressList = async (event) => {
-    event.preventDefault();
-    setSaving(true);
-
-    const payload = {
-      name: addressModal.form.name,
-      referenceType: addressModal.form.referenceType,
-      referenceId: addressModal.form.referenceId ? Number.parseInt(addressModal.form.referenceId, 10) : null,
-      address: addressModal.form.address,
-      comment: addressModal.form.comment
-    };
-
-    try {
-      const endpoint = addressModal.id ? `/api/address-lists/${addressModal.id}` : '/api/address-lists';
-      const method = addressModal.id ? 'PUT' : 'POST';
-      const response = await fetch(endpoint, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const body = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        const message = body?.message || 'Unable to save the address list entry.';
-        throw new Error(message);
-      }
-
-      setStatus({ type: 'success', message: addressModal.id ? 'Address list updated.' : 'Address list created.' });
-      closeAddressModal();
-      await refreshInventory();
-    } catch (error) {
-      setStatus({ type: 'error', message: error.message });
+      console.error('Error loading firewall data:', error);
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  const handleDeleteAddressList = async () => {
-    if (!addressModal.id) {
-      return;
-    }
-    setDeleting(true);
-    setStatus({ type: '', message: '' });
-
+  const loadMikrotiks = async () => {
     try {
-      const response = await fetch(`/api/address-lists/${addressModal.id}`, { method: 'DELETE' });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        const message = body?.message || 'Unable to delete the address list entry.';
-        throw new Error(message);
+      const response = await fetch('/api/mikrotiks');
+      if (response.ok) {
+        const data = await response.json();
+        setMikrotiks(data.mikrotiks || []);
       }
-
-      setStatus({ type: 'success', message: 'Address list entry deleted.' });
-      closeAddressModal();
-      await refreshInventory();
     } catch (error) {
-      setStatus({ type: 'error', message: error.message });
-    } finally {
-      setDeleting(false);
+      console.error('Error loading mikrotiks:', error);
     }
   };
 
-  const openFilterCreate = () => {
-    setFilterModal({ open: true, id: null, form: emptyFilterForm() });
-    setStatus({ type: '', message: '' });
-  };
-
-  const openFilterEdit = (entry) => {
-    setFilterModal({
-      open: true,
-      id: entry.id,
-      form: {
-        name: entry.name ?? '',
-        groupId: entry.groupId ? String(entry.groupId) : '',
-        chain: entry.chain ?? 'forward',
-        sourceAddressListId: entry.sourceAddressListId ? String(entry.sourceAddressListId) : '',
-        destinationAddressListId: entry.destinationAddressListId ? String(entry.destinationAddressListId) : '',
-        sourcePort: entry.sourcePort ?? '',
-        destinationPort: entry.destinationPort ?? '',
-        states: Array.isArray(entry.states) ? entry.states : [],
-        action: entry.action ?? 'accept',
-        enabled: entry.enabled !== undefined ? Boolean(entry.enabled) : true,
-        comment: entry.comment ?? ''
-      }
-    });
-    setStatus({ type: '', message: '' });
-  };
-
-  const closeFilterModal = () => {
-    setFilterModal({ open: false, id: null, form: emptyFilterForm() });
-    setSaving(false);
-    setDeleting(false);
-  };
-
-  const handleFilterField = (event) => {
-    const { name, value, type, checked } = event.target;
-    if (name === 'states') {
-      const stateValue = value;
-      setFilterModal((current) => {
-        const present = current.form.states.includes(stateValue);
-        return {
-          ...current,
-          form: {
-            ...current.form,
-            states: present
-              ? current.form.states.filter((item) => item !== stateValue)
-              : [...current.form.states, stateValue]
-          }
-        };
-      });
-      return;
-    }
-
-    setFilterModal((current) => ({
-      ...current,
-      form: {
-        ...current.form,
-        [name]: type === 'checkbox' ? checked : value
-      }
-    }));
-  };
-
-  const submitFilter = async (event) => {
-    event.preventDefault();
-    setSaving(true);
-
-    const payload = {
-      name: filterModal.form.name,
-      groupId: filterModal.form.groupId ? Number.parseInt(filterModal.form.groupId, 10) : null,
-      chain: filterModal.form.chain,
-      sourceAddressListId: filterModal.form.sourceAddressListId
-        ? Number.parseInt(filterModal.form.sourceAddressListId, 10)
-        : null,
-      destinationAddressListId: filterModal.form.destinationAddressListId
-        ? Number.parseInt(filterModal.form.destinationAddressListId, 10)
-        : null,
-      sourcePort: filterModal.form.sourcePort,
-      destinationPort: filterModal.form.destinationPort,
-      states: filterModal.form.states,
-      action: filterModal.form.action,
-      enabled: Boolean(filterModal.form.enabled),
-      comment: filterModal.form.comment
-    };
-
+  const loadGroups = async () => {
     try {
-      const endpoint = filterModal.id ? `/api/firewall/filters/${filterModal.id}` : '/api/firewall/filters';
-      const method = filterModal.id ? 'PUT' : 'POST';
-      const response = await fetch(endpoint, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const body = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        const message = body?.message || 'Unable to save the firewall rule.';
-        throw new Error(message);
+      const response = await fetch('/api/groups');
+      if (response.ok) {
+        const data = await response.json();
+        setGroups(data.groups || []);
       }
-
-      setStatus({ type: 'success', message: filterModal.id ? 'Firewall rule updated.' : 'Firewall rule created.' });
-      closeFilterModal();
-      await refreshInventory();
     } catch (error) {
-      setStatus({ type: 'error', message: error.message });
-    } finally {
-      setSaving(false);
+      console.error('Error loading groups:', error);
     }
   };
 
-  const handleDeleteFilter = async () => {
-    if (!filterModal.id) {
-      return;
-    }
-    setDeleting(true);
-    setStatus({ type: '', message: '' });
+  const filteredFilters = filters.filter(filter => {
+    const matchesSearch = filter.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         filter.chain?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         filter.action?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesGroup = selectedGroup === 'all' || filter.groupId?.toString() === selectedGroup;
+    return matchesSearch && matchesGroup;
+  });
 
-    try {
-      const response = await fetch(`/api/firewall/filters/${filterModal.id}`, { method: 'DELETE' });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        const message = body?.message || 'Unable to delete the firewall rule.';
-        throw new Error(message);
-      }
+  const filteredAddressLists = addressLists.filter(list => {
+    const matchesSearch = list.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         list.address?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesGroup = selectedGroup === 'all' || list.referenceId?.toString() === selectedGroup;
+    return matchesSearch && matchesGroup;
+  });
 
-      setStatus({ type: 'success', message: 'Firewall rule deleted.' });
-      closeFilterModal();
-      await refreshInventory();
-    } catch (error) {
-      setStatus({ type: 'error', message: error.message });
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  if (!user?.permissions?.mikrotiks) {
-    return null;
+  if (loading) {
+    return (
+      <div className="firewall-page">
+        <div className="flex justify-center items-center h-64">
+          <div className="spinner"></div>
+          <p className="ml-3 text-primary">Loading firewall configuration...</p>
+        </div>
+      </div>
+    );
   }
 
-  const referenceOptions = addressModal.form.referenceType === 'group' ? groups : mikrotiks;
-
   return (
-    <section className="card">
-      <header className="card-header">
-        <div>
-          <h1>Firewall</h1>
-          <p className="card-intro">
-            Define MikroTik address lists and filter rules to orchestrate RouterOS deployments. Target version: {targetVersion || '—'}
-          </p>
+    <div className="firewall-page">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-primary-50 rounded-lg">
+            <FirewallIcon />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-primary">Firewall</h1>
+            <p className="text-tertiary mt-1">Configure firewall rules and address lists</p>
+          </div>
         </div>
-        <button type="button" className="secondary-button" onClick={refreshInventory} disabled={loading}>
-          {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
-      </header>
+        <div className="flex items-center gap-3">
+          <button className="btn btn--secondary flex items-center gap-2">
+            <ShieldIcon />
+            Address Lists
+          </button>
+          <button className="btn btn--primary flex items-center gap-2">
+            <PlusIcon />
+            New Rule
+          </button>
+        </div>
+      </div>
 
-      {status.message ? <div className={`card-alert card-alert--${status.type}`}>{status.message}</div> : null}
+      {/* Tabs */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('filters')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'filters'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Filter Rules ({filters.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('addresslists')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'addresslists'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Address Lists ({addressLists.length})
+          </button>
+        </nav>
+      </div>
 
-      {loading ? (
-        <p className="muted">Loading firewall configuration…</p>
+      {/* Filters */}
+      <div className="card mb-6">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-tertiary" />
+              <input
+                type="text"
+                placeholder={`Search ${activeTab === 'filters' ? 'filter rules' : 'address lists'}...`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="input pl-10"
+              />
+            </div>
+          </div>
+          <div className="sm:w-48">
+            <select
+              value={selectedGroup}
+              onChange={(e) => setSelectedGroup(e.target.value)}
+              className="input"
+            >
+              <option value="all">All Groups</option>
+              {groups.map(group => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      {activeTab === 'filters' ? (
+        <div className="card">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">Firewall Filter Rules</h3>
+          </div>
+          
+          {filteredFilters.length === 0 ? (
+            <div className="text-center py-12">
+              <FirewallIcon className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No filter rules found</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {searchTerm || selectedGroup !== 'all' 
+                  ? 'Try adjusting your search or filter criteria.'
+                  : 'Get started by creating your first firewall filter rule.'
+                }
+              </p>
+              {!searchTerm && selectedGroup === 'all' && (
+                <div className="mt-6">
+                  <button className="btn btn--primary flex items-center gap-2 mx-auto">
+                    <PlusIcon />
+                    Create First Rule
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Rule Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Chain
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Source
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Destination
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Action
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredFilters.map((filter) => (
+                    <tr key={filter.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {filter.name || 'Unnamed Rule'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {filter.chain || 'input'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {filter.sourceAddressListName || 'Any'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {filter.destinationAddressListName || 'Any'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          filter.action === 'accept' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {filter.action || 'drop'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          filter.enabled 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {filter.enabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button className="text-primary hover:text-primary-dark mr-4">
+                          Edit
+                        </button>
+                        <button className="text-red-600 hover:text-red-900">
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       ) : (
-        <div className="firewall-grid">
-          <section>
-            <header className="panel__header">
-              <div>
-                <h2>Address lists</h2>
-                <p className="muted">Map MikroTik devices or groups into reusable address lists.</p>
-              </div>
-              <button type="button" className="action-button action-button--primary" onClick={openAddressCreate}>
-                Add entry
-              </button>
-            </header>
-            {sortedAddressLists.length === 0 ? (
-              <p className="muted">No address list entries have been defined.</p>
-            ) : (
-              <ul className="management-list">
-                {sortedAddressLists.map((entry) => (
-                  <li key={entry.id} className="management-list__item">
-                    <div className="management-list__summary">
-                      <span className="management-list__title">{entry.name}</span>
-                      <div className="management-list__meta">
-                        <span>
-                          {entry.referenceType === 'group' ? 'Group' : 'Mikrotik'} · {entry.referenceName || 'Unknown reference'}
-                        </span>
-                        <span>{entry.address || 'No explicit address'}</span>
-                        <span>{entry.comment || 'No comment'}</span>
-                        <span>Created {formatDateTime(entry.createdAt)}</span>
-                      </div>
-                    </div>
-                    <div className="management-list__actions">
-                      <button type="button" className="action-button" onClick={() => openAddressEdit(entry)}>
-                        Manage
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section>
-            <header className="panel__header">
-              <div>
-                <h2>Filter rules</h2>
-                <p className="muted">Compose filter policies across RouterOS chains using address lists.</p>
-              </div>
-              <button type="button" className="action-button action-button--primary" onClick={openFilterCreate}>
-                Add rule
-              </button>
-            </header>
-            {sortedFilters.length === 0 ? (
-              <p className="muted">No firewall rules have been defined yet.</p>
-            ) : (
-              <ul className="management-list">
-                {sortedFilters.map((entry) => (
-                  <li key={entry.id} className="management-list__item">
-                    <div className="management-list__summary">
-                      <span className="management-list__title">{entry.name}</span>
-                      <div className="management-list__meta">
-                        <span>Chain: {entry.chain}</span>
-                        <span>Group: {entry.groupName || 'Any'}</span>
-                        <span>Action: {entry.action}</span>
-                        <span>Enabled: {entry.enabled ? 'Yes' : 'No'}</span>
-                        <span>
-                          Source list: {entry.sourceAddressListName || '—'} · Destination list: {entry.destinationAddressListName || '—'}
-                        </span>
-                        <span>
-                          Ports S/D: {entry.sourcePort || '—'} / {entry.destinationPort || '—'}
-                        </span>
-                        <span>States: {entry.states?.length ? entry.states.join(', ') : 'None'}</span>
-                        <span>{entry.comment || 'No comment'}</span>
-                        <span>Updated {formatDateTime(entry.updatedAt)}</span>
-                      </div>
-                    </div>
-                    <div className="management-list__actions">
-                      <button type="button" className="action-button" onClick={() => openFilterEdit(entry)}>
-                        Manage
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+        <div className="card">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">Address Lists</h3>
+          </div>
+          
+          {filteredAddressLists.length === 0 ? (
+            <div className="text-center py-12">
+              <ShieldIcon className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No address lists found</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {searchTerm || selectedGroup !== 'all' 
+                  ? 'Try adjusting your search or filter criteria.'
+                  : 'Get started by creating your first address list.'
+                }
+              </p>
+              {!searchTerm && selectedGroup === 'all' && (
+                <div className="mt-6">
+                  <button className="btn btn--primary flex items-center gap-2 mx-auto">
+                    <PlusIcon />
+                    Create First Address List
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      List Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Address
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Reference
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Comment
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredAddressLists.map((list) => (
+                    <tr key={list.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {list.name || 'Unnamed List'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {list.address || '—'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {list.referenceName || '—'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">
+                          {list.comment || '—'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button className="text-primary hover:text-primary-dark mr-4">
+                          Edit
+                        </button>
+                        <button className="text-red-600 hover:text-red-900">
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
-
-      {addressModal.open ? (
-        <Modal
-          title={addressModal.id ? 'Edit address list entry' : 'Add address list entry'}
-          description="Associate MikroTik devices or groups with reusable address lists."
-          onClose={closeAddressModal}
-          actions={
-            <>
-              <button type="button" className="action-button" onClick={closeAddressModal}>
-                Cancel
-              </button>
-              {addressModal.id ? (
-                <button
-                  type="button"
-                  className="action-button action-button--danger"
-                  onClick={handleDeleteAddressList}
-                  disabled={deleting}
-                >
-                  {deleting ? 'Removing…' : 'Delete'}
-                </button>
-              ) : null}
-              <button
-                type="submit"
-                form="address-form"
-                className="action-button action-button--primary"
-                disabled={saving}
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            </>
-          }
-        >
-          <form id="address-form" onSubmit={submitAddressList} className="form-grid">
-            <label>
-              <span>List name</span>
-              <input name="name" value={addressModal.form.name} onChange={handleAddressField} required autoComplete="off" />
-            </label>
-            <label>
-              <span>Reference type</span>
-              <select name="referenceType" value={addressModal.form.referenceType} onChange={handleAddressField}>
-                <option value="mikrotik">Mikrotik device</option>
-                <option value="group">Mik-Group</option>
-              </select>
-            </label>
-            <label>
-              <span>{addressModal.form.referenceType === 'group' ? 'Group' : 'Device'}</span>
-              <select name="referenceId" value={addressModal.form.referenceId} onChange={handleAddressField} required>
-                <option value="">Select…</option>
-                {referenceOptions.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Address (optional)</span>
-              <input name="address" value={addressModal.form.address} onChange={handleAddressField} autoComplete="off" />
-            </label>
-            <label className="wide">
-              <span>Comment</span>
-              <textarea name="comment" rows="3" value={addressModal.form.comment} onChange={handleAddressField} />
-            </label>
-          </form>
-        </Modal>
-      ) : null}
-
-      {filterModal.open ? (
-        <Modal
-          title={filterModal.id ? 'Edit firewall rule' : 'Add firewall rule'}
-          description="Author high-level filter rules using MikroTik address lists and chain controls."
-          onClose={closeFilterModal}
-          actions={
-            <>
-              <button type="button" className="action-button" onClick={closeFilterModal}>
-                Cancel
-              </button>
-              {filterModal.id ? (
-                <button
-                  type="button"
-                  className="action-button action-button--danger"
-                  onClick={handleDeleteFilter}
-                  disabled={deleting}
-                >
-                  {deleting ? 'Removing…' : 'Delete'}
-                </button>
-              ) : null}
-              <button
-                type="submit"
-                form="filter-form"
-                className="action-button action-button--primary"
-                disabled={saving}
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            </>
-          }
-        >
-          <form id="filter-form" onSubmit={submitFilter} className="form-grid">
-            <label>
-              <span>Rule name</span>
-              <input name="name" value={filterModal.form.name} onChange={handleFilterField} required autoComplete="off" />
-            </label>
-            <label>
-              <span>Applies to group</span>
-              <select name="groupId" value={filterModal.form.groupId} onChange={handleFilterField}>
-                <option value="">Any group</option>
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Chain</span>
-              <select name="chain" value={filterModal.form.chain} onChange={handleFilterField}>
-                {chainOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Source address list</span>
-              <select
-                name="sourceAddressListId"
-                value={filterModal.form.sourceAddressListId}
-                onChange={handleFilterField}
-              >
-                <option value="">None</option>
-                {addressLists.map((list) => (
-                  <option key={list.id} value={list.id}>
-                    {list.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Destination address list</span>
-              <select
-                name="destinationAddressListId"
-                value={filterModal.form.destinationAddressListId}
-                onChange={handleFilterField}
-              >
-                <option value="">None</option>
-                {addressLists.map((list) => (
-                  <option key={list.id} value={list.id}>
-                    {list.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Source port</span>
-              <input name="sourcePort" value={filterModal.form.sourcePort} onChange={handleFilterField} autoComplete="off" />
-            </label>
-            <label>
-              <span>Destination port</span>
-              <input
-                name="destinationPort"
-                value={filterModal.form.destinationPort}
-                onChange={handleFilterField}
-                autoComplete="off"
-              />
-            </label>
-            <fieldset className="wide">
-              <legend>Connection states</legend>
-              <div className="toggle-grid">
-                {stateOptions.map((option) => (
-                  <label key={option.value} className="toggle-field">
-                    <input
-                      type="checkbox"
-                      name="states"
-                      value={option.value}
-                      checked={filterModal.form.states.includes(option.value)}
-                      onChange={handleFilterField}
-                    />
-                    <span>{option.label}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <label>
-              <span>Action</span>
-              <select name="action" value={filterModal.form.action} onChange={handleFilterField}>
-                {actionOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="toggle-field">
-              <input
-                type="checkbox"
-                name="enabled"
-                checked={filterModal.form.enabled}
-                onChange={handleFilterField}
-              />
-              <span>Enabled</span>
-            </label>
-            <label className="wide">
-              <span>Comment</span>
-              <textarea name="comment" rows="3" value={filterModal.form.comment} onChange={handleFilterField} />
-            </label>
-          </form>
-        </Modal>
-      ) : null}
-    </section>
+    </div>
   );
 };
 
