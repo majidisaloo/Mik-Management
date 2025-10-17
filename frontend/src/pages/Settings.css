@@ -137,6 +137,136 @@
   color: var(--tertiary-light);
 }
 
+/* Tab Navigation Styles */
+.settings-tabs {
+  background: var(--surface-elevated);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-color);
+  padding: 0.25rem;
+}
+
+.settings-tab {
+  padding: 0.625rem 1rem;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-tab--active {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.settings-tab--inactive {
+  color: var(--tertiary);
+}
+
+.settings-tab--inactive:hover {
+  color: var(--primary);
+  background: var(--primary-50);
+}
+
+/* Update Channel Cards */
+.update-channel-card {
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.update-channel-card:hover {
+  border-color: var(--primary);
+  background: var(--primary-50);
+}
+
+.update-channel-card input[type="radio"] {
+  margin-top: 0.25rem;
+  margin-right: 0.75rem;
+  color: var(--primary);
+}
+
+/* Version Display */
+.version-display {
+  background: linear-gradient(to right, var(--primary-50), var(--primary-100));
+  border: 1px solid var(--primary-200);
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.version-number {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: var(--primary-900);
+}
+
+.version-label {
+  font-size: 0.875rem;
+  color: var(--primary-700);
+  margin-top: 0.25rem;
+}
+
+/* Update Info Cards */
+.update-info-card {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.update-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.update-info-row:last-child {
+  border-bottom: none;
+}
+
+.update-info-label {
+  color: var(--tertiary);
+}
+
+.update-info-value {
+  font-weight: 500;
+  color: var(--primary);
+}
+
+/* Action Buttons */
+.update-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+@media (min-width: 640px) {
+  .update-actions {
+    flex-direction: row;
+  }
+}
+
+.update-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .service-card {
@@ -163,5 +293,22 @@
   .status-badge {
     padding: 3px 6px;
     font-size: 9px;
+  }
+  
+  .settings-tab {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+  }
+  
+  .update-channel-card {
+    padding: 0.75rem;
+  }
+  
+  .version-display {
+    padding: 0.75rem;
+  }
+  
+  .version-number {
+    font-size: 1.1rem;
   }
 }
