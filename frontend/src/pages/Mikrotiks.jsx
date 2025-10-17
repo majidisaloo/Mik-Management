@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import './Mikrotiks.css';
 
 // Modern Icons
 const PlusIcon = () => (
@@ -54,6 +55,24 @@ const SSHIcon = () => (
     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" strokeWidth="2" />
     <circle cx="12" cy="16" r="1" fill="currentColor" />
     <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const ChevronRightIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <polyline points="9,18 15,12 9,6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const ChevronDownIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <polyline points="6,9 12,15 18,9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const FolderIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
@@ -119,6 +138,14 @@ const Mikrotiks = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGroup, setFilterGroup] = useState('');
   const [testingDevice, setTestingDevice] = useState(null);
+  const [expandedGroups, setExpandedGroups] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('mikrotiks-groups-expanded');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
 
   const groupLookup = useMemo(() => {
     const lookup = new Map();
@@ -126,6 +153,45 @@ const Mikrotiks = () => {
       lookup.set(group.id, group);
     });
     return lookup;
+  }, [groups]);
+
+  const groupTree = useMemo(() => {
+    const nodeLookup = new Map();
+    const roots = [];
+
+    groups.forEach((group) => {
+      const node = {
+        ...group,
+        children: []
+      };
+      nodeLookup.set(group.id, node);
+    });
+
+    groups.forEach((group) => {
+      const node = nodeLookup.get(group.id);
+      if (group.parentId) {
+        const parent = nodeLookup.get(group.parentId);
+        if (parent) {
+          parent.children.push(node);
+        } else {
+          roots.push(node);
+        }
+      } else {
+        roots.push(node);
+      }
+    });
+
+    const sortNodes = (nodes) => {
+      nodes.sort((a, b) => a.name.localeCompare(b.name));
+      nodes.forEach((node) => {
+        if (node.children.length > 0) {
+          sortNodes(node.children);
+        }
+      });
+    };
+
+    sortNodes(roots);
+    return roots;
   }, [groups]);
 
   const selectedDevice = useMemo(
@@ -358,6 +424,78 @@ const Mikrotiks = () => {
         message: `SSH connection failed for ${device.name}: ${error.message}`
       });
     }
+  };
+
+  const toggleExpanded = (groupId) => {
+    setExpandedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupId)) {
+        newSet.delete(groupId);
+      } else {
+        newSet.add(groupId);
+      }
+      try {
+        sessionStorage.setItem('mikrotiks-groups-expanded', JSON.stringify([...newSet]));
+      } catch (error) {
+        console.warn('Failed to save expanded state:', error);
+      }
+      return newSet;
+    });
+  };
+
+  const renderGroupNode = (node, depth = 0) => {
+    const hasChildren = node.children && node.children.length > 0;
+    const isExpanded = expandedGroups.has(node.id);
+    const isSelected = form.groupId === node.id.toString();
+
+    return (
+      <div key={node.id} className="tree-node" data-depth={depth}>
+        <div
+          className={`tree-item ${isSelected ? 'tree-item--selected' : ''}`}
+          onClick={() => setForm({ ...form, groupId: node.id.toString() })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              setForm({ ...form, groupId: node.id.toString() });
+            }
+          }}
+          tabIndex={0}
+          role="button"
+          aria-label={`Select group ${node.name}`}
+        >
+          <div className="tree-indent" style={{ paddingLeft: `${depth * 20}px` }}>
+            {hasChildren && (
+              <button
+                type="button"
+                className="tree-toggle"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleExpanded(node.id);
+                }}
+                aria-label={isExpanded ? 'Collapse' : 'Expand'}
+              >
+                {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
+              </button>
+            )}
+            {!hasChildren && <div className="tree-spacer" />}
+          </div>
+
+          <div className="tree-icon">
+            <FolderIcon />
+          </div>
+
+          <div className="tree-content">
+            <div className="tree-name">{node.name}</div>
+          </div>
+        </div>
+
+        {/* Children */}
+        {hasChildren && isExpanded && (
+          <div className="tree-children">
+            {node.children?.map((child) => renderGroupNode(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const handleSubmit = (event) => {
@@ -690,19 +828,31 @@ const Mikrotiks = () => {
               <label htmlFor="device-group" className="form-label">
                 Group
               </label>
-              <select
-                id="device-group"
-                className="form-input form-select"
-                value={form.groupId}
-                onChange={(e) => setForm({ ...form, groupId: e.target.value })}
-              >
-                <option value="">No group</option>
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
+              <div className="group-tree-container">
+                <div 
+                  className={`tree-item tree-item--no-group ${!form.groupId ? 'tree-item--selected' : ''}`}
+                  onClick={() => setForm({ ...form, groupId: '' })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setForm({ ...form, groupId: '' });
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label="No group"
+                >
+                  <div className="tree-indent">
+                    <div className="tree-spacer" />
+                  </div>
+                  <div className="tree-icon">
+                    <FolderIcon />
+                  </div>
+                  <div className="tree-content">
+                    <div className="tree-name">No group</div>
+                  </div>
+                </div>
+                {groupTree.map((node) => renderGroupNode(node))}
+              </div>
             </div>
 
             <div className="form-group">

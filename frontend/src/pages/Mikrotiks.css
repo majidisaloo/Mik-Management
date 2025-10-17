@@ -1,0 +1,169 @@
+/* Mikrotiks page - Tree structure styles for group selection */
+
+/* Group tree container */
+.group-tree-container {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* Tree node */
+.tree-node {
+  position: relative;
+}
+
+/* Tree item - main row */
+.tree-item {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-bottom: 1px solid var(--border-color);
+  position: relative;
+}
+
+.tree-item:hover {
+  background-color: var(--surface-hover);
+}
+
+.tree-item--selected {
+  background-color: var(--primary-light);
+  color: var(--primary);
+}
+
+.tree-item--no-group {
+  font-style: italic;
+  color: var(--tertiary);
+}
+
+.tree-item:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+/* Tree indentation */
+.tree-indent {
+  display: flex;
+  align-items: center;
+  min-width: 24px;
+  padding-left: 8px;
+}
+
+.tree-line {
+  width: 1px;
+  height: 100%;
+  background-color: var(--border-color);
+  margin-right: 12px;
+}
+
+/* Tree toggle button */
+.tree-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--tertiary);
+  transition: color 0.15s ease;
+  padding: 0;
+  margin-right: 4px;
+}
+
+.tree-toggle:hover {
+  color: var(--primary);
+}
+
+.tree-toggle:focus {
+  outline: 1px solid var(--primary);
+  border-radius: 2px;
+}
+
+/* Tree spacer for items without children */
+.tree-spacer {
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+}
+
+/* Tree icon */
+.tree-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  color: var(--tertiary);
+}
+
+/* Tree content */
+.tree-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.tree-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Tree children */
+.tree-children {
+  position: relative;
+  margin-left: 16px;
+}
+
+.tree-children::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: var(--border-color);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .tree-item {
+    min-height: 36px;
+    padding: 6px 8px;
+  }
+  
+  .tree-indent {
+    min-width: 20px;
+    padding-left: 6px;
+  }
+  
+  .tree-children {
+    margin-left: 12px;
+  }
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .tree-item--selected {
+  background-color: var(--primary-dark);
+  color: var(--primary-light);
+}
+
+[data-theme="dark"] .tree-toggle:hover {
+  color: var(--primary-light);
+}
+
+[data-theme="dark"] .tree-name {
+  color: var(--secondary-light);
+}
