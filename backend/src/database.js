@@ -3577,6 +3577,14 @@ const initializeDatabase = async (databasePath) => {
         : null;
 
       return {
+        // Frontend expected fields
+        deviceCount: totalMikrotiks,
+        tunnelCount: totalTunnels,
+        groupCount: state.groups ? state.groups.length : 0,
+        userCount: state.users ? state.users.length : 0,
+        lastUpdatedAt,
+        
+        // Additional detailed data
         mikrotik: {
           total: totalMikrotiks,
           updated: updatedMikrotiks,
@@ -3588,7 +3596,7 @@ const initializeDatabase = async (databasePath) => {
           sshOffline,
           target: TARGET_ROUTEROS_VERSION
         },
-        tunnels: {
+        tunnelDetails: {
           total: totalTunnels,
           up: tunnelsUp,
           down: tunnelsDown,
@@ -3596,7 +3604,10 @@ const initializeDatabase = async (databasePath) => {
           latencyLeaderboard,
           packetLossLeaderboard
         },
-        lastUpdatedAt
+        
+        // Include raw data for frontend
+        tunnels: state.tunnels || [],
+        mikrotiks: state.mikrotiks || []
       };
     },
 
