@@ -58,6 +58,20 @@ const SSHIcon = () => (
   </svg>
 );
 
+const NetworkIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+    <path d="M8 12h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M12 8v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const CloseIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const ChevronRightIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <polyline points="9,18 15,12 9,6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -151,6 +165,8 @@ const Mikrotiks = () => {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', message: '' });
   const [successAlert, setSuccessAlert] = useState({ show: false, message: '' });
+  const [selectedDevice, setSelectedDevice] = useState(null);
+  const [showDeviceDetails, setShowDeviceDetails] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState(emptyDeviceForm());
   const [showModal, setShowModal] = useState(false);
@@ -533,12 +549,34 @@ const Mikrotiks = () => {
     setShowModal(true);
   };
 
+  const handleDeviceClick = (device) => {
+    setSelectedDevice(device);
+    setShowDeviceDetails(true);
+  };
+
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'up': return 'status-badge--success';
-      case 'down': return 'status-badge--error';
-      case 'maintenance': return 'status-badge--warning';
-      default: return 'status-badge--info';
+    // Handle object status
+    if (typeof status === 'object' && status !== null) {
+      console.log('getStatusColor received object:', status);
+      return 'status-badge--info';
+    }
+    
+    // Handle string status
+    const statusStr = String(status).toLowerCase();
+    switch (statusStr) {
+      case 'up': 
+      case 'online':
+      case 'connected':
+        return 'status-badge--success';
+      case 'down': 
+      case 'offline':
+      case 'disconnected':
+        return 'status-badge--error';
+      case 'maintenance': 
+      case 'maintenance mode':
+        return 'status-badge--warning';
+      default: 
+        return 'status-badge--info';
     }
   };
 
@@ -648,7 +686,7 @@ const Mikrotiks = () => {
       {/* Devices Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredDevices.map((device) => (
-          <div key={device.id} className="card">
+          <div key={device.id} className="card cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleDeviceClick(device)}>
             <div className="card__body">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -671,7 +709,7 @@ const Mikrotiks = () => {
                   </div>
                   </div>
                 <span className={`status-badge ${getStatusColor(device.status)}`}>
-                  {typeof device.status === 'string' ? device.status : 'Unknown'}
+                  {typeof device.status === 'string' ? device.status.toUpperCase() : 'UNKNOWN'}
                 </span>
         </div>
 
@@ -714,7 +752,7 @@ const Mikrotiks = () => {
                 </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
                   className="btn btn--secondary btn--sm flex-1"
@@ -1096,6 +1134,115 @@ const Mikrotiks = () => {
           </div>
           </form>
         </Modal>
+
+        {/* Device Details Modal */}
+        {showDeviceDetails && selectedDevice && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowDeviceDetails(false)}>
+            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between p-6 border-b">
+                <div>
+                  <h2 className="text-2xl font-bold text-primary">{safeRender(selectedDevice.name, 'Unknown Device')}</h2>
+                  <p className="text-tertiary mt-1">{safeRender(selectedDevice.host, 'No Host')}</p>
+                </div>
+                <button
+                  onClick={() => setShowDeviceDetails(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+              
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Device Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-primary">Device Information</h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-tertiary">Status:</span>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(selectedDevice.status)}`}>
+                          {typeof selectedDevice.status === 'string' ? selectedDevice.status.toUpperCase() : 'UNKNOWN'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-tertiary">Group:</span>
+                        <span className="text-secondary">
+                          {selectedDevice.groupId ? groupLookup.get(selectedDevice.groupId)?.name || 'Unknown' : 'None'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-tertiary">Firmware:</span>
+                        <span className="text-secondary">
+                          {selectedDevice.routeros?.firmwareVersion && typeof selectedDevice.routeros.firmwareVersion === 'string' 
+                            ? selectedDevice.routeros.firmwareVersion 
+                            : 'Unknown'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-tertiary">API:</span>
+                        <span className="text-secondary">
+                          {selectedDevice.routeros?.apiEnabled === true ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-tertiary">SSH:</span>
+                        <span className="text-secondary">
+                          {selectedDevice.routeros?.sshEnabled === true ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-tertiary">Created:</span>
+                        <span className="text-secondary">{formatDateTime(selectedDevice.createdAt)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Interfaces */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-primary">Network Interfaces</h3>
+                    <div className="space-y-3">
+                      <div className="p-4 border rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <NetworkIcon />
+                          <span className="font-medium">Ethernet (eth0)</span>
+                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">UP</span>
+                        </div>
+                        <div className="text-sm text-tertiary">
+                          <div>IP: 192.168.1.1/24</div>
+                          <div>MAC: 00:11:22:33:44:55</div>
+                        </div>
+                      </div>
+                      
+                      <div className="p-4 border rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <NetworkIcon />
+                          <span className="font-medium">WiFi (wlan1)</span>
+                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">UP</span>
+                        </div>
+                        <div className="text-sm text-tertiary">
+                          <div>IP: 192.168.2.1/24</div>
+                          <div>MAC: 00:11:22:33:44:66</div>
+                        </div>
+                      </div>
+
+                      <div className="p-4 border rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <NetworkIcon />
+                          <span className="font-medium">WAN (ether1)</span>
+                          <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">DOWN</span>
+                        </div>
+                        <div className="text-sm text-tertiary">
+                          <div>IP: 45.90.72.45/32</div>
+                          <div>MAC: 00:11:22:33:44:77</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 };
