@@ -298,6 +298,88 @@ const UsersAndRoles = () => {
     }
   };
 
+  const handleUpdateUser = async () => {
+    try {
+      if (userForm.password && userForm.password !== userForm.passwordConfirmation) {
+        setStatus({
+          type: 'error',
+          message: 'Passwords do not match.'
+        });
+        return;
+      }
+
+      // Remove empty password fields for update
+      const updateData = {
+        firstName: userForm.firstName,
+        lastName: userForm.lastName,
+        email: userForm.email,
+        roleIds: userForm.roleIds
+      };
+      
+      if (userForm.password) {
+        updateData.password = userForm.password;
+      }
+
+      const response = await fetch(`/api/users/${selectedUserId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.message || 'Unable to update user.');
+      }
+
+      setUserForm(emptyUserForm());
+      setShowUserModal(false);
+      setIsEditingUser(false);
+      setSelectedUserId(null);
+      await loadUsers();
+      setStatus({
+        type: 'success',
+        message: 'User updated successfully.'
+      });
+    } catch (error) {
+      setStatus({
+        type: 'error',
+        message: error.message || 'Unable to update user.'
+      });
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    const user = users.find(u => u.id === userId);
+    if (!confirm(`Are you sure you want to delete the user "${user?.firstName || 'Unknown'}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const payload = await response.json();
+        throw new Error(payload.message || 'Unable to delete user.');
+      }
+
+      await loadUsers();
+      setStatus({
+        type: 'success',
+        message: `User "${user?.firstName || 'Unknown'}" deleted successfully.`
+      });
+    } catch (error) {
+      setStatus({
+        type: 'error',
+        message: error.message || 'Unable to delete user.'
+      });
+    }
+  };
+
   const handleNewUser = () => {
     console.log('handleNewUser called');
     setUserForm(emptyUserForm());
@@ -612,6 +694,17 @@ const UsersAndRoles = () => {
                     >
                       <EditIcon />
                     </button>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm text-error"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDeleteUser(user.id);
+                      }}
+                    >
+                      <TrashIcon />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -879,7 +972,7 @@ const UsersAndRoles = () => {
             <button
               type="button"
               className="btn btn--primary"
-              onClick={handleCreateUser}
+              onClick={isEditingUser ? handleUpdateUser : handleCreateUser}
             >
               {isEditingUser ? 'Update User' : 'Create User'}
             </button>
