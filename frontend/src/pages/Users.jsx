@@ -474,7 +474,7 @@ const Users = () => {
           }}
           title={isEditing ? 'Edit User' : 'Create User'}
         >
-          <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+          <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="form-group">
                 <label htmlFor="user-first-name" className="form-label">
@@ -487,8 +487,7 @@ const Users = () => {
                   value={userForm.firstName}
                   onChange={(e) => setUserForm({ ...userForm, firstName: e.target.value })}
                   placeholder="Enter first name"
-              required
-            />
+                />
               </div>
 
               <div className="form-group">
@@ -502,8 +501,7 @@ const Users = () => {
                   value={userForm.lastName}
                   onChange={(e) => setUserForm({ ...userForm, lastName: e.target.value })}
                   placeholder="Enter last name"
-              required
-            />
+                />
               </div>
             </div>
 
@@ -518,8 +516,7 @@ const Users = () => {
                 value={userForm.email}
                 onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
                 placeholder="Enter email address"
-              required
-            />
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -534,7 +531,6 @@ const Users = () => {
                   value={userForm.password}
                   onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
                   placeholder={isEditing ? 'Leave blank to keep current' : 'Enter password'}
-                  required={!isEditing}
                 />
               </div>
 
@@ -549,11 +545,9 @@ const Users = () => {
                   value={userForm.passwordConfirmation}
                   onChange={(e) => setUserForm({ ...userForm, passwordConfirmation: e.target.value })}
                   placeholder={isEditing ? 'Leave blank to keep current' : 'Confirm password'}
-                  required={!isEditing}
                 />
               </div>
           </div>
-        </form>
 
           <div className="modal__footer">
             <button
@@ -590,11 +584,11 @@ const Users = () => {
           }}
           title="Create Role"
         >
-          <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+          <div className="space-y-4">
             <div className="form-group">
               <label htmlFor="role-name" className="form-label">
                 Role Name *
-            </label>
+              </label>
               <input
                 id="role-name"
                 type="text"
@@ -602,7 +596,6 @@ const Users = () => {
                 value={roleForm.name}
                 onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })}
                 placeholder="Enter role name"
-                required
               />
             </div>
 
@@ -656,7 +649,6 @@ const Users = () => {
                 ))}
               </div>
             </div>
-          </form>
 
           <div className="modal__footer">
             <button
