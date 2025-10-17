@@ -5,12 +5,13 @@
   background: var(--surface-elevated);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 16px;
+  padding: 12px;
   transition: all 0.2s ease;
-  min-height: 140px;
+  min-height: 120px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  max-width: 200px;
 }
 
 .service-card:hover {
@@ -23,29 +24,29 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   background: var(--primary-50);
-  border-radius: 12px;
+  border-radius: 8px;
   color: var(--primary);
   flex-shrink: 0;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 /* Service name */
 .service-name {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--primary);
-  margin: 0 0 4px 0;
+  margin: 0 0 2px 0;
   line-height: 1.2;
 }
 
 /* Service description */
 .service-description {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--tertiary);
-  margin: 0 0 12px 0;
+  margin: 0 0 8px 0;
   line-height: 1.2;
 }
 
@@ -53,13 +54,13 @@
 .status-badge {
   display: inline-flex;
   align-items: center;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   flex-shrink: 0;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
 }
 
 .status-badge--success {
@@ -113,27 +114,28 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .service-card {
-    padding: 12px;
-    min-height: 120px;
+    padding: 10px;
+    min-height: 100px;
+    max-width: 150px;
   }
   
   .service-icon {
-    width: 40px;
-    height: 40px;
-    margin-bottom: 6px;
+    width: 32px;
+    height: 32px;
+    margin-bottom: 4px;
   }
   
   .service-name {
-    font-size: 14px;
+    font-size: 12px;
   }
   
   .service-description {
-    font-size: 11px;
-    margin-bottom: 8px;
+    font-size: 10px;
+    margin-bottom: 6px;
   }
   
   .status-badge {
-    padding: 4px 8px;
-    font-size: 10px;
+    padding: 3px 6px;
+    font-size: 9px;
   }
 }
