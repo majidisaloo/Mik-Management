@@ -211,6 +211,21 @@ const UsersAndRoles = () => {
     loadData();
   }, [navigate, user]);
 
+  // Fix browser back button issue
+  useEffect(() => {
+    const handlePopState = (event) => {
+      // Allow browser back button to work properly
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        navigate('/dashboard');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [navigate]);
+
   // User handlers
   const handleCreateUser = async () => {
     try {
@@ -258,10 +273,12 @@ const UsersAndRoles = () => {
   };
 
   const handleNewUser = () => {
+    console.log('handleNewUser called');
     setUserForm(emptyUserForm());
     setIsEditingUser(false);
     setSelectedUserId(null);
     setShowUserModal(true);
+    console.log('User modal should be open now, showUserModal:', true);
   };
 
   // Role handlers
@@ -432,19 +449,6 @@ const UsersAndRoles = () => {
   return (
     <div className="users-roles-page">
       <div className="users-roles-header">
-        <div className="flex items-center gap-4 mb-4">
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            onClick={() => navigate('/dashboard')}
-            title="Back to Dashboard"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 12H5M12 19l-7-7 7-7"/>
-            </svg>
-            Back
-          </button>
-        </div>
         <h1 className="users-roles-title">Users & Roles</h1>
         <p className="users-roles-description">Manage system users and their permissions.</p>
       </div>
@@ -549,7 +553,10 @@ const UsersAndRoles = () => {
                     <button
                       type="button"
                       className="btn btn--ghost btn--sm"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('Edit user button clicked for:', user);
                         setUserForm({
                           firstName: user.firstName || '',
                           lastName: user.lastName || '',
@@ -561,6 +568,7 @@ const UsersAndRoles = () => {
                         setSelectedUserId(user.id);
                         setIsEditingUser(true);
                         setShowUserModal(true);
+                        console.log('User modal should be open now, showUserModal:', true);
                       }}
                     >
                       <EditIcon />

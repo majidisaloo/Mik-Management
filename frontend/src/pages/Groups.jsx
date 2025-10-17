@@ -593,6 +593,7 @@ const Groups = () => {
           <div className="card">
             <div className="card__header">
               <h2 className="card__title">Group Details</h2>
+              <p className="card__subtitle">View and manage group information</p>
             </div>
             <div className="card__body">
             {selectedGroup ? (
@@ -603,19 +604,19 @@ const Groups = () => {
                   </div>
                   
                   <div className="space-y-3">
-                    <div>
-                      <label className="text-sm font-medium text-secondary">Created</label>
+                    <div className="p-3 bg-surface-elevated rounded-lg border">
+                      <label className="text-sm font-medium text-secondary block mb-1">Created</label>
                       <p className="text-sm text-tertiary">{formatDateTime(selectedGroup.createdAt)}</p>
                     </div>
                     
-                    <div>
-                      <label className="text-sm font-medium text-secondary">Sub-groups</label>
-                      <p className="text-sm text-tertiary">{directChildren.length}</p>
+                    <div className="p-3 bg-surface-elevated rounded-lg border">
+                      <label className="text-sm font-medium text-secondary block mb-1">Sub-groups</label>
+                      <p className="text-sm text-tertiary">{directChildren.length} sub-groups</p>
                     </div>
                     
                     {selectedGroup.parentId && (
-                      <div>
-                        <label className="text-sm font-medium text-secondary">Parent Group</label>
+                      <div className="p-3 bg-surface-elevated rounded-lg border">
+                        <label className="text-sm font-medium text-secondary block mb-1">Parent Group</label>
                         <p className="text-sm text-tertiary">
                           {groupLookup.get(selectedGroup.parentId)?.name || 'Unknown'}
                         </p>
@@ -623,7 +624,7 @@ const Groups = () => {
                     )}
                   </div>
 
-                  <div className="flex gap-2 pt-4">
+                  <div className="flex gap-2 pt-4 border-t">
                     <button
                       type="button"
                       className="btn btn--secondary btn--sm flex-1"
@@ -643,11 +644,14 @@ const Groups = () => {
                   </div>
                   </div>
               ) : (
-                <div className="text-center py-8 text-tertiary">
-                  <FolderIcon />
-                  <p className="mt-2">Select a group to view details</p>
-              </div>
-            )}
+                <div className="text-center py-12 text-tertiary">
+                  <div className="mb-4">
+                    <FolderIcon />
+                  </div>
+                  <h3 className="text-lg font-medium text-secondary mb-2">Select a Group</h3>
+                  <p className="text-sm">Choose a group from the hierarchy to view its details.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
