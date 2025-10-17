@@ -259,7 +259,7 @@ const IPAM = () => {
       </div>
 
       {/* IPAM Configurations */}
-      <div className="card">
+      <div className="card mt-8">
         <div className="card__body">
           {loading ? (
             <div className="text-center py-12">
