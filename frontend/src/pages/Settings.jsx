@@ -556,7 +556,7 @@ const Settings = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="font-mono text-lg font-bold text-green-900">
-                          {updateInfo?.currentVersion?.replace('-beta', '') || 'Loading...'}
+                          {updateInfo?.currentVersion ? updateInfo.currentVersion.replace('-beta', '') : 'Loading...'}
                         </span>
                         <div className="text-sm text-green-600 mt-1">Stable Version</div>
                       </div>
@@ -577,15 +577,13 @@ const Settings = () => {
                     </div>
                   </div>
                 </div>
-                    {lastCheckTime && (
-                      <div className="text-right">
-                        <div className="text-xs text-blue-500">
-                          Last checked: {new Date(lastCheckTime).toLocaleTimeString()}
-                        </div>
-                      </div>
-                    )}
+                {lastCheckTime && (
+                  <div className="text-right">
+                    <div className="text-xs text-blue-500">
+                      Last checked: {new Date(lastCheckTime).toLocaleTimeString()}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Update Status */}

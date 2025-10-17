@@ -183,3 +183,13 @@
 [data-theme="dark"] .tree-name {
   color: var(--secondary-light);
 }
+
+/* Small status badge for compact cards */
+.status-badge--sm {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}

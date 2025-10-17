@@ -678,114 +678,126 @@ const Mikrotiks = () => {
         </div>
 
       {/* Devices Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
         {filteredDevices.map((device) => (
-          <div key={device.id} className="card cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleDeviceClick(device)}>
-            <div className="card__body">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary-50 rounded-lg">
+          <div key={device.id} className="card cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02]" onClick={() => handleDeviceClick(device)}>
+            <div className="card__body p-4">
+              {/* Header with device info and action buttons */}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="p-1.5 bg-primary-50 rounded-lg flex-shrink-0">
                     <DeviceIcon />
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-primary">{safeRender(device.name, 'Unknown Device')}</h3>
-                    <p className="text-sm text-tertiary">{safeRender(device.host, 'No Host')}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="flex items-center gap-1">
-                        <div className={`w-2 h-2 rounded-full ${device.routeros?.apiEnabled === true ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                        <span className="text-xs text-tertiary">API</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className={`w-2 h-2 rounded-full ${device.routeros?.sshEnabled === true ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                        <span className="text-xs text-tertiary">SSH</span>
-                      </div>
-                    </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold text-primary text-sm truncate" title={safeRender(device.name, 'Unknown Device')}>
+                      {safeRender(device.name, 'Unknown Device')}
+                    </h3>
+                    <p className="text-xs text-tertiary truncate" title={safeRender(device.host, 'No Host')}>
+                      {safeRender(device.host, 'No Host')}
+                    </p>
                   </div>
+                </div>
+                
+                {/* Action buttons in top-right */}
+                <div className="flex items-center gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    className="p-1.5 text-tertiary hover:text-primary hover:bg-primary-50 rounded transition-colors"
+                    onClick={() => handleEdit(device)}
+                    title="Edit Device"
+                  >
+                    <EditIcon />
+                  </button>
+                  <button
+                    type="button"
+                    className="p-1.5 text-tertiary hover:text-primary hover:bg-primary-50 rounded transition-colors"
+                    onClick={() => handleTestConnectivity(device)}
+                    disabled={testingDevice === device.id}
+                    title="Test Connection"
+                  >
+                    {testingDevice === device.id ? (
+                      <RefreshIcon />
+                    ) : (
+                      <TestIcon />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="p-1.5 text-tertiary hover:text-primary hover:bg-primary-50 rounded transition-colors"
+                    onClick={() => handleSSHConnection(device)}
+                    title="SSH Connection"
+                  >
+                    <SSHIcon />
+                  </button>
+                  <button
+                    type="button"
+                    className="p-1.5 text-tertiary hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                    onClick={() => handleDelete(device)}
+                    title="Delete Device"
+                  >
+                    <TrashIcon />
+                  </button>
+                </div>
+              </div>
+
+              {/* Status and connection indicators */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <div className={`w-1.5 h-1.5 rounded-full ${device.routeros?.apiEnabled === true ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                    <span className="text-xs text-tertiary">API</span>
                   </div>
-                <span className={`status-badge ${getStatusColor(device.status)}`}>
+                  <div className="flex items-center gap-1">
+                    <div className={`w-1.5 h-1.5 rounded-full ${device.routeros?.sshEnabled === true ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                    <span className="text-xs text-tertiary">SSH</span>
+                  </div>
+                </div>
+                <span className={`status-badge status-badge--sm ${getStatusColor(device.status)}`}>
                   {typeof device.status === 'string' ? device.status.toUpperCase() : 'UNKNOWN'}
                 </span>
-        </div>
+              </div>
 
-              <div className="space-y-2 mb-4">
-                <div className="flex justify-between text-sm">
+              {/* Device details in compact format */}
+              <div className="space-y-1.5 mb-3">
+                <div className="flex justify-between text-xs">
                   <span className="text-tertiary">Group:</span>
-                  <span className="text-secondary">
+                  <span className="text-secondary truncate ml-2" title={device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}>
                     {device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}
                   </span>
-        </div>
-                <div className="flex justify-between text-sm">
+                </div>
+                <div className="flex justify-between text-xs">
                   <span className="text-tertiary">Firmware:</span>
-                  <span className="text-secondary">
+                  <span className="text-secondary truncate ml-2" title={device.routeros?.firmwareVersion && typeof device.routeros.firmwareVersion === 'string' ? device.routeros.firmwareVersion : 'Unknown'}>
                     {device.routeros?.firmwareVersion && typeof device.routeros.firmwareVersion === 'string' 
                       ? device.routeros.firmwareVersion 
                       : 'Unknown'}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-tertiary">API:</span>
-                  <span className="text-secondary">
-                    {device.routeros?.apiEnabled === true ? 'Enabled' : 'Disabled'}
+                <div className="flex justify-between text-xs">
+                  <span className="text-tertiary">Created:</span>
+                  <span className="text-secondary truncate ml-2" title={formatDateTime(device.createdAt)}>
+                    {formatDateTime(device.createdAt)}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-tertiary">Created:</span>
-                  <span className="text-secondary">{formatDateTime(device.createdAt)}</span>
-                </div>
-      </div>
+              </div>
 
+              {/* Tags */}
               {device.tags && typeof device.tags === 'string' && device.tags.trim() && (
-                <div className="mb-4">
-                  <div className="flex flex-wrap gap-1">
-                    {device.tags.split(',').map((tag, index) => (
-                      <span key={index} className="px-2 py-1 bg-tertiary bg-opacity-20 text-xs rounded-full">
-                        {tag.trim()}
-                      </span>
-                    ))}
-                  </div>
+                <div className="flex flex-wrap gap-1">
+                  {device.tags.split(',').slice(0, 3).map((tag, index) => (
+                    <span key={index} className="px-1.5 py-0.5 bg-tertiary bg-opacity-20 text-xs rounded-full truncate max-w-[80px]" title={tag.trim()}>
+                      {tag.trim()}
+                    </span>
+                  ))}
+                  {device.tags.split(',').length > 3 && (
+                    <span className="px-1.5 py-0.5 bg-tertiary bg-opacity-20 text-xs rounded-full">
+                      +{device.tags.split(',').length - 3}
+                    </span>
+                  )}
                 </div>
               )}
-
-              <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                <button
-                  type="button"
-                  className="btn btn--secondary btn--sm flex-1"
-                  onClick={() => handleEdit(device)}
-                >
-                  <EditIcon />
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--sm"
-                  onClick={() => handleTestConnectivity(device)}
-                  disabled={testingDevice === device.id}
-                  title="Test API Connection"
-                >
-                  {testingDevice === device.id ? (
-                    <RefreshIcon />
-                  ) : (
-                    <TestIcon />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--sm"
-                  onClick={() => handleSSHConnection(device)}
-                  title="SSH Connection"
-                >
-                  <SSHIcon />
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--danger btn--sm"
-                  onClick={() => handleDelete(device)}
-                >
-                  <TrashIcon />
-                </button>
-                </div>
-              </div>
-              </div>
+            </div>
+          </div>
         ))}
       </div>
 

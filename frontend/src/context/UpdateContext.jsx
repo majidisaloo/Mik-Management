@@ -13,7 +13,7 @@ export const useUpdate = () => {
 export const UpdateProvider = ({ children }) => {
   const [updateChannel, setUpdateChannel] = useState('stable');
   const [updateInfo, setUpdateInfo] = useState({
-    currentVersion: formatCommitVersion(Number(import.meta.env.VITE_COMMIT_COUNT ?? 0), 'beta'),
+    currentVersion: null, // Will be loaded from API
     updateAvailable: false,
     channel: 'beta'
   });
