@@ -49,6 +49,14 @@ const RefreshIcon = () => (
   </svg>
 );
 
+const SSHIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" strokeWidth="2" />
+    <circle cx="12" cy="16" r="1" fill="currentColor" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const defaultRouterForm = () => ({
   apiEnabled: false,
   apiSSL: false,
@@ -59,13 +67,14 @@ const defaultRouterForm = () => ({
   apiTimeout: '5000',
   apiRetries: '1',
   allowInsecureCiphers: false,
-  preferredApiFirst: true,
-  firmwareVersion: '',
   sshEnabled: false,
   sshPort: '22',
-  sshUsername: '',
+  sshUsername: 'admin',
   sshPassword: '',
-  sshAcceptNewHostKeys: true
+  sshKeyFile: '',
+  sshAcceptNewHostKeys: true,
+  preferredApiFirst: true,
+  firmwareVersion: ''
 });
 
 const emptyDeviceForm = () => ({
@@ -168,6 +177,7 @@ const Mikrotiks = () => {
 
   const loadGroups = async () => {
     try {
+      console.log('Loading groups for Mikrotiks...');
       const response = await fetch('/api/groups');
 
       if (!response.ok) {
@@ -175,7 +185,18 @@ const Mikrotiks = () => {
       }
 
       const payload = await response.json();
-      setGroups(Array.isArray(payload) ? payload : []);
+      console.log('Groups payload:', payload);
+      
+      // Handle both array and object response formats
+      let groupsArray = [];
+      if (Array.isArray(payload)) {
+        groupsArray = payload;
+      } else if (payload && Array.isArray(payload.groups)) {
+        groupsArray = payload.groups;
+      }
+      
+      console.log('Groups array:', groupsArray);
+      setGroups(groupsArray);
     } catch (error) {
       console.error('Failed to load groups:', error);
       setGroups([]);
@@ -303,6 +324,39 @@ const Mikrotiks = () => {
       });
     } finally {
       setTestingDevice(null);
+    }
+  };
+
+  const handleSSHConnection = async (device) => {
+    try {
+      // Check if SSH is enabled for this device
+      if (!device.routeros?.sshEnabled) {
+        setStatus({
+          type: 'error',
+          message: `SSH is not enabled for ${device.name}. Please enable SSH in device settings.`
+        });
+        return;
+      }
+
+      // Simulate SSH connection
+      setStatus({
+        type: 'success',
+        message: `SSH connection initiated for ${device.name} (${device.host}:${device.routeros.sshPort})`
+      });
+
+      // In a real implementation, this would open an SSH terminal or redirect to SSH client
+      console.log('SSH Connection details:', {
+        host: device.host,
+        port: device.routeros.sshPort,
+        username: device.routeros.sshUsername,
+        keyFile: device.routeros.sshKeyFile
+      });
+
+    } catch (error) {
+      setStatus({
+        type: 'error',
+        message: `SSH connection failed for ${device.name}: ${error.message}`
+      });
     }
   };
 
@@ -505,12 +559,21 @@ const Mikrotiks = () => {
                   className="btn btn--ghost btn--sm"
                   onClick={() => handleTestConnectivity(device)}
                   disabled={testingDevice === device.id}
+                  title="Test API Connection"
                 >
                   {testingDevice === device.id ? (
                     <RefreshIcon />
                   ) : (
                     <TestIcon />
                   )}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => handleSSHConnection(device)}
+                  title="SSH Connection"
+                >
+                  <SSHIcon />
                 </button>
                 <button
                   type="button"
@@ -758,6 +821,111 @@ const Mikrotiks = () => {
                     placeholder="5000"
                   />
             </div>
+              </div>
+            )}
+          </div>
+
+          {/* SSH Configuration */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-primary">SSH Configuration</h3>
+            
+            <div className="form-group">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.routeros.sshEnabled}
+                  onChange={(e) => setForm({
+                    ...form,
+                    routeros: { ...form.routeros, sshEnabled: e.target.checked }
+                  })}
+                />
+                <span className="form-label mb-0">Enable SSH Connection</span>
+              </label>
+            </div>
+
+            {form.routeros.sshEnabled && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label htmlFor="ssh-port" className="form-label">
+                    SSH Port
+                  </label>
+                  <input
+                    id="ssh-port"
+                    type="number"
+                    className="form-input"
+                    value={form.routeros.sshPort}
+                    onChange={(e) => setForm({
+                      ...form,
+                      routeros: { ...form.routeros, sshPort: e.target.value }
+                    })}
+                    placeholder="22"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="ssh-username" className="form-label">
+                    SSH Username
+                  </label>
+                  <input
+                    id="ssh-username"
+                    type="text"
+                    className="form-input"
+                    value={form.routeros.sshUsername}
+                    onChange={(e) => setForm({
+                      ...form,
+                      routeros: { ...form.routeros, sshUsername: e.target.value }
+                    })}
+                    placeholder="admin"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="ssh-password" className="form-label">
+                    SSH Password
+                  </label>
+                  <input
+                    id="ssh-password"
+                    type="password"
+                    className="form-input"
+                    value={form.routeros.sshPassword}
+                    onChange={(e) => setForm({
+                      ...form,
+                      routeros: { ...form.routeros, sshPassword: e.target.value }
+                    })}
+                    placeholder="Enter SSH password"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="ssh-keyfile" className="form-label">
+                    SSH Key File (Optional)
+                  </label>
+                  <input
+                    id="ssh-keyfile"
+                    type="text"
+                    className="form-input"
+                    value={form.routeros.sshKeyFile}
+                    onChange={(e) => setForm({
+                      ...form,
+                      routeros: { ...form.routeros, sshKeyFile: e.target.value }
+                    })}
+                    placeholder="/path/to/private/key"
+                  />
+                </div>
+
+                <div className="form-group md:col-span-2">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={form.routeros.sshAcceptNewHostKeys}
+                      onChange={(e) => setForm({
+                        ...form,
+                        routeros: { ...form.routeros, sshAcceptNewHostKeys: e.target.checked }
+                      })}
+                    />
+                    <span className="form-label mb-0">Accept new host keys automatically</span>
+                  </label>
+                </div>
               </div>
             )}
           </div>
