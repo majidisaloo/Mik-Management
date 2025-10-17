@@ -485,10 +485,10 @@ const Settings = () => {
           </div>
         </div>
         <div className="card__body">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Nginx */}
             <div className="service-card">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col items-center text-center gap-3">
                 <div className="service-icon">
                   <WebIcon />
                 </div>
@@ -504,7 +504,7 @@ const Settings = () => {
 
             {/* Frontend */}
             <div className="service-card">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col items-center text-center gap-3">
                 <div className="service-icon">
                   <WebIcon />
                 </div>
@@ -520,7 +520,7 @@ const Settings = () => {
 
             {/* Backend */}
             <div className="service-card">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col items-center text-center gap-3">
                 <div className="service-icon">
                   <ServerIcon />
                 </div>
@@ -536,7 +536,7 @@ const Settings = () => {
 
             {/* API */}
             <div className="service-card">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col items-center text-center gap-3">
                 <div className="service-icon">
                   <ApiIcon />
                 </div>
@@ -552,7 +552,7 @@ const Settings = () => {
 
             {/* Database */}
             <div className="service-card">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col items-center text-center gap-3">
                 <div className="service-icon">
                   <DatabaseIcon />
                 </div>
