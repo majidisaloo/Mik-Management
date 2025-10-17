@@ -7,6 +7,12 @@
   padding: 8px 16px !important;
   font-size: 14px !important;
   font-weight: 500 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+  margin-right: 8px !important;
 }
 
 .groups-page .btn--primary {
@@ -15,11 +21,7 @@
   padding: 8px 16px !important;
   font-size: 14px !important;
   font-weight: 500 !important;
-}
-
-.groups-page .btn--secondary,
-.groups-page .btn--primary {
-  display: flex !important;
+  display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 8px !important;
@@ -31,6 +33,14 @@
 .groups-page .btn--primary:hover {
   transform: translateY(-1px) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Ensure buttons container is flex */
+.groups-page .flex.items-center.gap-2 {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
 }
 
 /* Tree container */

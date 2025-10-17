@@ -443,70 +443,17 @@ const Mikrotiks = () => {
     });
   };
 
-  const renderGroupNode = (node, depth = 0) => {
-    const hasChildren = node.children && node.children.length > 0;
-    const isExpanded = expandedGroups.has(node.id);
-    const isSelected = form.groupId === node.id.toString();
-
-    const handleNodeClick = (e) => {
-      e.stopPropagation();
-      setForm({ ...form, groupId: node.id.toString() });
-    };
-
-    const handleToggleExpand = (e) => {
-      e.stopPropagation();
-      toggleExpanded(node.id);
-    };
-
+  const renderGroupOption = (node, depth = 0) => {
+    const indent = '　'.repeat(depth * 2); // Using full-width spaces for indentation
+    const prefix = depth > 0 ? '└─ ' : '';
+    
     return (
-      <div key={node.id} className="tree-node" data-depth={depth}>
-        <div
-          className={`tree-item ${isSelected ? 'tree-item--selected' : ''}`}
-          onClick={handleNodeClick}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              handleNodeClick(e);
-            } else if (e.key === 'ArrowRight' && hasChildren && !isExpanded) {
-              handleToggleExpand(e);
-            } else if (e.key === 'ArrowLeft' && hasChildren && isExpanded) {
-              handleToggleExpand(e);
-            }
-          }}
-          tabIndex={0}
-          role="button"
-          aria-label={`Select group ${node.name}`}
-          aria-selected={isSelected}
-        >
-          <div className="tree-indent" style={{ paddingLeft: `${depth * 20}px` }}>
-            {hasChildren && (
-              <button
-                type="button"
-                className="tree-toggle"
-                onClick={handleToggleExpand}
-                aria-label={isExpanded ? 'Collapse' : 'Expand'}
-              >
-                {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
-              </button>
-            )}
-            {!hasChildren && <div className="tree-spacer" />}
-          </div>
-
-          <div className="tree-icon">
-            <FolderIcon />
-          </div>
-
-          <div className="tree-content">
-            <div className="tree-name">{node.name}</div>
-          </div>
-        </div>
-
-        {/* Children */}
-        {hasChildren && isExpanded && (
-          <div className="tree-children">
-            {node.children?.map((child) => renderGroupNode(child, depth + 1))}
-          </div>
-        )}
-      </div>
+      <React.Fragment key={node.id}>
+        <option value={node.id}>
+          {indent}{prefix}{node.name}
+        </option>
+        {node.children?.map((child) => renderGroupOption(child, depth + 1))}
+      </React.Fragment>
     );
   };
 
@@ -847,11 +794,7 @@ const Mikrotiks = () => {
                 onChange={(e) => setForm({ ...form, groupId: e.target.value })}
               >
                 <option value="">No group</option>
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
+                {groupTree.map((node) => renderGroupOption(node, 0))}
               </select>
             </div>
 
