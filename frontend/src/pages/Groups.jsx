@@ -89,6 +89,7 @@ const Groups = () => {
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState(new Set());
 
   const groupLookup = useMemo(() => {
     const lookup = new Map();
@@ -327,8 +328,22 @@ const Groups = () => {
     setShowModal(true);
   };
 
+  const toggleExpanded = (groupId) => {
+    setExpandedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupId)) {
+        newSet.delete(groupId);
+      } else {
+        newSet.add(groupId);
+      }
+      return newSet;
+    });
+  };
+
   const renderGroupNode = (node, depth = 0) => {
     const indent = depth * 24;
+    const hasChildren = node.children && node.children.length > 0;
+    const isExpanded = expandedGroups.has(node.id);
 
     return (
       <div key={node.id} className="group-node">
@@ -338,6 +353,30 @@ const Groups = () => {
           onClick={() => setSelectedId(node.id)}
         >
           <div className="flex items-center gap-3">
+            {/* Expand/Collapse Button */}
+            {hasChildren ? (
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm p-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleExpanded(node.id);
+                }}
+              >
+                {isExpanded ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 15l-6-6-6 6"/>
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M9 18l6-6-6-6"/>
+                  </svg>
+                )}
+              </button>
+            ) : (
+              <div className="w-6 h-6"></div> // Spacer for alignment
+            )}
+            
             <FolderIcon />
             <div className="flex-1">
               <h3 className="font-medium text-primary">{node.name}</h3>
@@ -371,7 +410,7 @@ const Groups = () => {
             </div>
           </div>
         </div>
-        {node.children?.map((child) => renderGroupNode(child, depth + 1))}
+        {hasChildren && isExpanded && node.children?.map((child) => renderGroupNode(child, depth + 1))}
       </div>
     );
   };

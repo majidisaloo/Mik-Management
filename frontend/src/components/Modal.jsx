@@ -33,20 +33,24 @@ const Modal = ({ title, description, children, actions, onClose, open = false })
     const previouslyFocused = document.activeElement;
     const dialog = dialogRef.current;
 
-    // Temporarily disable focus management to test input issue
-    // if (dialog && !hasFocusedRef.current) {
-    //   const focusable = dialog.querySelector(
-    //     'input, select, textarea, button:not(.modal__close), [href], [tabindex]:not([tabindex="-1"])'
-    //   );
+    // Focus management with better handling
+    if (dialog && !hasFocusedRef.current) {
+      // Only focus on initial open, not on every re-render
+      const focusable = dialog.querySelector(
+        'input:not([readonly]):not([disabled]), select:not([disabled]), textarea:not([readonly]):not([disabled]), button:not(.modal__close):not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+      );
 
-    //   if (focusable) {
-    //     focusable.focus();
-    //   } else {
-    //     dialog.focus();
-    //   }
+      if (focusable) {
+        // Use setTimeout to ensure the modal is fully rendered
+        setTimeout(() => {
+          focusable.focus();
+        }, 0);
+      } else {
+        dialog.focus();
+      }
       
-    //   hasFocusedRef.current = true;
-    // }
+      hasFocusedRef.current = true;
+    }
 
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
