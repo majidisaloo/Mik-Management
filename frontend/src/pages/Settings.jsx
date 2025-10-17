@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import './Settings.css';
 
@@ -65,6 +65,11 @@ const NetworkIcon = () => (
 const Settings = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Get active tab from URL
+  const urlParams = new URLSearchParams(location.search);
+  const activeTab = urlParams.get('tab') || 'services';
 
   // Services status state
   const [servicesStatus, setServicesStatus] = useState({
@@ -75,6 +80,12 @@ const Settings = () => {
     database: { status: 'unknown', uptime: null, lastCheck: null }
   });
   const [servicesLoading, setServicesLoading] = useState(false);
+
+  // Updates state
+  const [updateChannel, setUpdateChannel] = useState('stable');
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState({ type: '', message: '' });
 
   // System information state
   const [configInfo, setConfigInfo] = useState(null);
@@ -133,6 +144,81 @@ const Settings = () => {
       setConfigLoading(false);
     }
   }, []);
+
+  // Update functions
+  const checkForUpdates = async () => {
+    try {
+      setUpdateLoading(true);
+      const response = await fetch('/api/check-updates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ channel: updateChannel }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setUpdateInfo(data);
+        if (data.updateAvailable) {
+          setUpdateStatus({
+            type: 'success',
+            message: `Update available: ${data.latestVersion}`
+          });
+        } else {
+          setUpdateStatus({
+            type: 'info',
+            message: 'You are up to date!'
+          });
+        }
+      } else {
+        throw new Error(data.message || 'Failed to check for updates');
+      }
+    } catch (error) {
+      setUpdateStatus({
+        type: 'error',
+        message: error.message || 'Failed to check for updates'
+      });
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  const performUpdate = async () => {
+    if (!updateInfo?.updateAvailable) return;
+
+    try {
+      setUpdateLoading(true);
+      const response = await fetch('/api/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ channel: updateChannel }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setUpdateStatus({
+          type: 'success',
+          message: 'Update completed! System will restart shortly.'
+        });
+        // Redirect to login after update
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 3000);
+      } else {
+        throw new Error(data.message || 'Update failed');
+      }
+    } catch (error) {
+      setUpdateStatus({
+        type: 'error',
+        message: error.message || 'Update failed'
+      });
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
 
   // Status variant helper
   const statusVariant = (status) => {
@@ -196,8 +282,45 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => navigate('/settings?tab=services')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'services'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Services Status
+          </button>
+          <button
+            onClick={() => navigate('/settings?tab=updates')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'updates'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Updates
+          </button>
+          <button
+            onClick={() => navigate('/settings?tab=system')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'system'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            System Info
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'services' && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Services Status */}
         <div className="card">
           <div className="card__header">
@@ -366,6 +489,193 @@ const Settings = () => {
           </div>
         )}
       </div>
+      )}
+
+      {/* Updates Tab */}
+      {activeTab === 'updates' && (
+        <div className="space-y-6">
+          <div className="card">
+            <div className="card__header">
+              <h2 className="card__title">System Updates</h2>
+              <p className="card__subtitle">Manage system updates and version channels</p>
+            </div>
+            <div className="card__content space-y-6">
+              {/* Update Channel Selection */}
+              <div className="space-y-3">
+                <label className="form-label">Update Channel</label>
+                <div className="flex space-x-4">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="updateChannel"
+                      value="stable"
+                      checked={updateChannel === 'stable'}
+                      onChange={(e) => setUpdateChannel(e.target.value)}
+                      className="mr-2"
+                    />
+                    <span>Stable</span>
+                    <span className="ml-2 text-sm text-gray-500">(Recommended for production)</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="updateChannel"
+                      value="beta"
+                      checked={updateChannel === 'beta'}
+                      onChange={(e) => setUpdateChannel(e.target.value)}
+                      className="mr-2"
+                    />
+                    <span>Beta</span>
+                    <span className="ml-2 text-sm text-gray-500">(Latest features, may be unstable)</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Current Version */}
+              <div className="space-y-3">
+                <label className="form-label">Current Version</label>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <span className="font-mono text-lg">{updateInfo?.currentVersion || 'Loading...'}</span>
+                </div>
+              </div>
+
+              {/* Update Status */}
+              {updateStatus.message && (
+                <div className={`p-4 rounded-lg ${
+                  updateStatus.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' :
+                  updateStatus.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' :
+                  'bg-blue-50 text-blue-700 border border-blue-200'
+                }`}>
+                  {updateStatus.message}
+                </div>
+              )}
+
+              {/* Update Info */}
+              {updateInfo && (
+                <div className="space-y-3">
+                  <label className="form-label">Update Information</label>
+                  <div className="p-4 bg-gray-50 rounded-lg space-y-2">
+                    <div className="flex justify-between">
+                      <span>Channel:</span>
+                      <span className="font-medium">{updateInfo.channel}</span>
+                    </div>
+                    {updateInfo.updateAvailable ? (
+                      <>
+                        <div className="flex justify-between">
+                          <span>Latest Version:</span>
+                          <span className="font-medium text-green-600">{updateInfo.latestVersion}</span>
+                        </div>
+                        {updateInfo.updateInfo?.updateSize && (
+                          <div className="flex justify-between">
+                            <span>Commits Behind:</span>
+                            <span className="font-medium">{updateInfo.updateInfo.updateSize}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center text-gray-600">
+                        You are up to date!
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={checkForUpdates}
+                  disabled={updateLoading}
+                >
+                  {updateLoading ? 'Checking...' : 'Check for Updates'}
+                </button>
+                {updateInfo?.updateAvailable && (
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    onClick={performUpdate}
+                    disabled={updateLoading}
+                  >
+                    {updateLoading ? 'Updating...' : 'Update Now'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* System Info Tab */}
+      {activeTab === 'system' && (
+        <div className="space-y-6">
+          <div className="card">
+            <div className="card__header">
+              <h2 className="card__title">System Information</h2>
+              <p className="card__subtitle">View system configuration and details</p>
+            </div>
+            <div className="card__content">
+              {configLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="mt-2 text-tertiary">Loading system information...</p>
+                </div>
+              ) : configInfo ? (
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary-50 rounded-lg">
+                        <DatabaseIcon />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-primary">Database</h3>
+                        <p className="text-sm text-tertiary">System database</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-tertiary">Driver:</span>
+                        <span className="text-secondary">{configInfo.database?.driver || 'Unknown'}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-tertiary">File:</span>
+                        <span className="text-secondary font-mono text-xs">
+                          {configInfo.database?.file || 'Unknown'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary-50 rounded-lg">
+                        <DatabaseIcon />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-primary">Configuration</h3>
+                        <p className="text-sm text-tertiary">System configuration</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-tertiary">Config File:</span>
+                        <span className="text-secondary font-mono text-xs">
+                          {configInfo.database?.configFile || 'Unknown'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-tertiary">Failed to load system information</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

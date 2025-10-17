@@ -2,10 +2,55 @@ import http from 'http';
 import https from 'https';
 import { URL } from 'url';
 import crypto from 'crypto';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 import initializeDatabase, { resolveDatabaseFile } from './database.js';
 import { ensureDatabaseConfig, getConfigFilePath } from './config.js';
 import getProjectVersion from './version.js';
+
+// Helper functions for version management
+const getCommitCount = async () => {
+  try {
+    const { execSync } = await import('child_process');
+    const count = execSync('git rev-list --count HEAD', { encoding: 'utf8' }).trim();
+    return parseInt(count, 10);
+  } catch (error) {
+    console.error('Error getting commit count:', error);
+    return 0;
+  }
+};
+
+const getLatestCommitCount = async () => {
+  try {
+    const { execSync } = await import('child_process');
+    // Fetch latest from remote
+    execSync('git fetch origin main', { encoding: 'utf8' });
+    const count = execSync('git rev-list --count origin/main', { encoding: 'utf8' }).trim();
+    return parseInt(count, 10);
+  } catch (error) {
+    console.error('Error getting latest commit count:', error);
+    return 0;
+  }
+};
+
+const getLatestStableVersion = async () => {
+  try {
+    const { execSync } = await import('child_process');
+    // Check for latest stable tag
+    const tags = execSync('git tag --sort=-version:refname | grep -E "^v[0-9]+\\.[0-9]+$" | head -1', { encoding: 'utf8' }).trim();
+    return tags || null;
+  } catch (error) {
+    console.error('Error getting latest stable version:', error);
+    return null;
+  }
+};
+
+const formatVersion = (commitCount) => {
+  const major = Math.floor(commitCount / 100);
+  const minor = commitCount % 100;
+  return `v${major}.${minor.toString().padStart(2, '0')}`;
+};
 
 const normalizeHeaderInit = (headersInit = {}) => {
   const headers = {};
@@ -1325,6 +1370,99 @@ const bootstrap = async () => {
         sendJson(res, 500, {
           message: 'Registration failed unexpectedly. Please review your input and try again.'
         });
+      }
+    };
+
+    const handleCheckUpdates = async () => {
+      try {
+        const currentCommitCount = await getCommitCount();
+        const currentVersion = formatVersion(currentCommitCount);
+        
+        // Get version channel from request body or default to 'stable'
+        const body = await parseJsonBody(req);
+        const channel = body?.channel || 'stable';
+        
+        // Check for updates based on channel
+        let latestVersion = null;
+        let updateAvailable = false;
+        let updateInfo = null;
+        
+        if (channel === 'beta') {
+          // For beta, check latest commit count
+          const latestCommitCount = await getLatestCommitCount();
+          if (latestCommitCount > currentCommitCount) {
+            latestVersion = formatVersion(latestCommitCount);
+            updateAvailable = true;
+            updateInfo = {
+              currentVersion,
+              latestVersion,
+              channel: 'beta',
+              commitCount: latestCommitCount,
+              updateSize: latestCommitCount - currentCommitCount
+            };
+          }
+        } else {
+          // For stable, check if there's a stable release
+          const stableVersion = await getLatestStableVersion();
+          if (stableVersion && stableVersion !== currentVersion) {
+            latestVersion = stableVersion;
+            updateAvailable = true;
+            updateInfo = {
+              currentVersion,
+              latestVersion,
+              channel: 'stable',
+              isStableRelease: true
+            };
+          }
+        }
+        
+        sendJson(res, 200, {
+          updateAvailable,
+          currentVersion,
+          latestVersion,
+          channel,
+          updateInfo
+        });
+      } catch (error) {
+        console.error('Check updates error:', error);
+        sendJson(res, 500, { message: 'Unable to check for updates.' });
+      }
+    };
+
+    const handlePerformUpdate = async () => {
+      try {
+        const body = await parseJsonBody(req);
+        const channel = body?.channel || 'stable';
+        
+        console.log(`Performing update for channel: ${channel}`);
+        
+        // Pull latest changes
+        execSync('git pull origin main', { cwd: process.cwd() });
+        
+        // Install dependencies if needed
+        execSync('npm install', { cwd: process.cwd() });
+        
+        // For frontend updates
+        const frontendPath = path.join(process.cwd(), 'frontend');
+        if (fs.existsSync(frontendPath)) {
+          execSync('npm install', { cwd: frontendPath });
+          execSync('npm run build', { cwd: frontendPath });
+        }
+        
+        sendJson(res, 200, { 
+          message: 'Update completed successfully. System will restart.',
+          channel,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Restart the application after a short delay
+        setTimeout(() => {
+          process.exit(0);
+        }, 2000);
+        
+      } catch (error) {
+        console.error('Update error:', error);
+        sendJson(res, 500, { message: 'Update failed: ' + error.message });
       }
     };
 
@@ -3345,6 +3483,16 @@ const bootstrap = async () => {
             configFile: getConfigFilePath()
           }
         });
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/check-updates' || resourcePath === '/check-updates')) {
+        await handleCheckUpdates();
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/update' || resourcePath === '/update')) {
+        await handlePerformUpdate();
         return;
       }
 
