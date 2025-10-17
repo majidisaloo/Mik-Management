@@ -58,7 +58,6 @@ const Users = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [showUserModal, setShowUserModal] = useState(false);
-  const [showRoleModal, setShowRoleModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [status, setStatus] = useState({ type: '', message: '' });
@@ -73,12 +72,6 @@ const Users = () => {
   roleIds: []
   });
 
-  // Role form
-  const [roleForm, setRoleForm] = useState({
-  name: '',
-    description: '',
-    permissions: []
-  });
 
   // Filter users
   const filteredUsers = useMemo(() => {
@@ -208,40 +201,6 @@ const Users = () => {
     }
   };
 
-  const handleCreateRole = async () => {
-    try {
-      const response = await fetch('/api/roles', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: roleForm.name,
-          description: roleForm.description,
-          permissions: roleForm.permissions
-        })
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.message || 'Unable to create role.');
-      }
-
-      setRoleForm(emptyRoleForm());
-      setShowRoleModal(false);
-      await loadRoles();
-      setStatus({
-        type: 'success',
-        message: 'Role created successfully.'
-      });
-    } catch (error) {
-      setStatus({
-        type: 'error',
-        message: error.message || 'Unable to create role.'
-      });
-    }
-  };
 
   const handleNewUser = () => {
     console.log('handleNewUser called');
@@ -252,12 +211,6 @@ const Users = () => {
     console.log('showUserModal set to true');
   };
 
-  const handleNewRole = () => {
-    console.log('handleNewRole called');
-    setRoleForm(emptyRoleForm());
-    setShowRoleModal(true);
-    console.log('showRoleModal set to true');
-  };
 
   const emptyUserForm = () => ({
     firstName: '',
@@ -268,11 +221,6 @@ const Users = () => {
     roleIds: []
   });
 
-  const emptyRoleForm = () => ({
-    name: '',
-    description: '',
-    permissions: []
-  });
 
   const getInitials = (firstName, lastName) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -329,28 +277,20 @@ const Users = () => {
   return (
     <div className="users-page">
       <div className="users-header">
-        <h1 className="users-title">Users & Roles</h1>
-        <p className="users-description">Manage system users and their permissions.</p>
+        <h1 className="users-title">Users Management</h1>
+        <p className="users-description">Manage system users and their roles.</p>
       </div>
 
       <div className="users-actions">
-              <button
-                type="button"
-          className="users-action-btn users-action-btn--secondary"
-          onClick={handleNewRole}
-              >
-          <ShieldIcon />
-          New Role
-              </button>
-              <button
-                type="button"
+        <button
+          type="button"
           className="users-action-btn users-action-btn--primary"
           onClick={handleNewUser}
         >
           <UserIcon />
           New User
-              </button>
-            </div>
+        </button>
+      </div>
 
       <div className="users-filters">
         <div className="users-search">
@@ -580,105 +520,6 @@ const Users = () => {
       </Modal>
       )}
 
-      {/* Role Modal */}
-      {showRoleModal && (
-      <Modal
-          open={showRoleModal}
-          onClose={() => {
-            console.log('Role Modal onClose called');
-            setShowRoleModal(false);
-            setRoleForm(emptyRoleForm());
-          }}
-          title="Create Role"
-        >
-          <div className="space-y-4">
-            <div className="form-group">
-              <label htmlFor="role-name" className="form-label">
-                Role Name *
-              </label>
-              <input
-                id="role-name"
-                type="text"
-                className="form-input"
-                value={roleForm.name}
-                onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })}
-                placeholder="Enter role name"
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="role-description" className="form-label">
-                Description
-            </label>
-              <textarea
-                id="role-description"
-                className="form-input form-textarea"
-                value={roleForm.description}
-                onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })}
-                placeholder="Enter role description"
-                rows="3"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Permissions</label>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { key: 'dashboard', label: 'Dashboard' },
-                  { key: 'users', label: 'Users' },
-                  { key: 'roles', label: 'Roles' },
-                  { key: 'groups', label: 'Groups' },
-                  { key: 'mikrotiks', label: 'Mikrotiks' },
-                  { key: 'tunnels', label: 'Tunnels' },
-                  { key: 'settings', label: 'Settings' }
-                ].map((permission) => (
-                  <label key={permission.key} className="flex items-center gap-2">
-              <input
-                      type="checkbox"
-                      checked={roleForm.permissions.includes(permission.key)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setRoleForm({
-                            ...roleForm,
-                            permissions: [...roleForm.permissions, permission.key]
-                          });
-                        } else {
-                          setRoleForm({
-                            ...roleForm,
-                            permissions: roleForm.permissions.filter(p => p !== permission.key)
-                          });
-                        }
-                      }}
-                      className="rounded border-primary text-primary focus:ring-focus"
-                    />
-                    <span className="text-sm">{permission.label}</span>
-            </label>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="modal__footer">
-            <button
-              type="button"
-              className="btn btn--secondary"
-              onClick={() => {
-                setShowRoleModal(false);
-                setRoleForm(emptyRoleForm());
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={handleCreateRole}
-            >
-              Create Role
-            </button>
-          </div>
-      </Modal>
-      )}
 
       {/* Status Messages */}
       {status.message && (

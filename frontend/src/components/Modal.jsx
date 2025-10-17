@@ -44,25 +44,25 @@ const Modal = ({ title, description, children, actions, onClose, open = false })
     };
   }, [onClose, open]);
 
-  // Separate effect for initial focus only
-  useEffect(() => {
-    if (!open) return;
+  // Completely disable focus management to fix input typing issue
+  // useEffect(() => {
+  //   if (!open) return;
 
-    const dialog = dialogRef.current;
-    if (dialog && !hasFocusedRef.current) {
-      const focusable = dialog.querySelector(
-        'input:not([readonly]):not([disabled]), select:not([disabled]), textarea:not([readonly]):not([disabled])'
-      );
+  //   const dialog = dialogRef.current;
+  //   if (dialog && !hasFocusedRef.current) {
+  //     const focusable = dialog.querySelector(
+  //       'input:not([readonly]):not([disabled]), select:not([disabled]), textarea:not([readonly]):not([disabled])'
+  //     );
 
-      if (focusable) {
-        // Use setTimeout to ensure the modal is fully rendered
-        setTimeout(() => {
-          focusable.focus();
-        }, 100);
-        hasFocusedRef.current = true;
-      }
-    }
-  }, [open]); // Only run when modal opens, not on every re-render
+  //     if (focusable) {
+  //       // Use setTimeout to ensure the modal is fully rendered
+  //       setTimeout(() => {
+  //         focusable.focus();
+  //       }, 100);
+  //       hasFocusedRef.current = true;
+  //     }
+  //   }
+  // }, [open]); // Only run when modal opens, not on every re-render
 
   const handleBackdropClick = (event) => {
     if (event.target === event.currentTarget) {

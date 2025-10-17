@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import './Groups.css';
 
 // Modern Icons
 const PlusIcon = () => (
@@ -348,11 +349,11 @@ const Groups = () => {
     return (
       <div key={node.id} className="group-node">
         <div 
-          className={`group-item ${selectedId === node.id ? 'group-item--selected' : ''}`}
-          style={{ paddingLeft: `${indent + 16}px` }}
+          className={`group-item group-item--compact ${selectedId === node.id ? 'group-item--selected' : ''}`}
+          style={{ paddingLeft: `${indent + 12}px` }}
           onClick={() => setSelectedId(node.id)}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {/* Expand/Collapse Button */}
             {hasChildren ? (
               <button
@@ -378,13 +379,13 @@ const Groups = () => {
             )}
             
             <FolderIcon />
-            <div className="flex-1">
-              <h3 className="font-medium text-primary">{node.name}</h3>
-              <p className="text-sm text-tertiary">
-                {node.children?.length || 0} sub-groups • Created {formatDateTime(node.createdAt)}
+            <div className="flex-1 min-w-0">
+              <h3 className="font-medium text-primary text-sm truncate">{node.name}</h3>
+              <p className="text-xs text-tertiary">
+                {node.children?.length || 0} sub-groups • {formatDateTime(node.createdAt)}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 className="btn btn--ghost btn--sm"

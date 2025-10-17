@@ -1,0 +1,44 @@
+/* Groups page specific styles */
+
+.group-item--compact {
+  padding: 8px 12px !important;
+  min-height: 48px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.group-item--compact:hover {
+  background-color: var(--surface-hover);
+}
+
+.group-item--compact.group-item--selected {
+  background-color: var(--primary-50);
+  border: 1px solid var(--primary-200);
+}
+
+.group-item--compact .btn--ghost {
+  padding: 4px;
+  min-width: 28px;
+  height: 28px;
+}
+
+.group-item--compact .btn--ghost svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Compact spacing for group nodes */
+.group-node {
+  margin-bottom: 2px;
+}
+
+/* Better visual hierarchy for compact view */
+.group-item--compact h3 {
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+
+.group-item--compact p {
+  line-height: 1.1;
+  margin: 0;
+}

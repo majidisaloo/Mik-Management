@@ -53,6 +53,12 @@ const UsersIcon = () => (
   </svg>
 );
 
+const RolesIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const GroupsIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -102,7 +108,8 @@ const Layout = () => {
       label: 'Main',
       items: [
         { to: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
-        { to: '/users', label: 'Users & Roles', icon: UsersIcon },
+        { to: '/users', label: 'Users', icon: UsersIcon },
+        { to: '/roles', label: 'Roles', icon: RolesIcon },
         { to: '/groups', label: 'Mik-Groups', icon: GroupsIcon },
         { to: '/mikrotiks', label: 'Mikrotiks', icon: MikrotikIcon },
         { to: '/tunnels', label: 'Tunnels', icon: TunnelsIcon },
