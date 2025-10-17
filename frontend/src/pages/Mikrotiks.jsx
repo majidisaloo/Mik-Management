@@ -448,29 +448,41 @@ const Mikrotiks = () => {
     const isExpanded = expandedGroups.has(node.id);
     const isSelected = form.groupId === node.id.toString();
 
+    const handleNodeClick = (e) => {
+      e.stopPropagation();
+      setForm({ ...form, groupId: node.id.toString() });
+    };
+
+    const handleToggleExpand = (e) => {
+      e.stopPropagation();
+      toggleExpanded(node.id);
+    };
+
     return (
       <div key={node.id} className="tree-node" data-depth={depth}>
         <div
           className={`tree-item ${isSelected ? 'tree-item--selected' : ''}`}
-          onClick={() => setForm({ ...form, groupId: node.id.toString() })}
+          onClick={handleNodeClick}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              setForm({ ...form, groupId: node.id.toString() });
+              handleNodeClick(e);
+            } else if (e.key === 'ArrowRight' && hasChildren && !isExpanded) {
+              handleToggleExpand(e);
+            } else if (e.key === 'ArrowLeft' && hasChildren && isExpanded) {
+              handleToggleExpand(e);
             }
           }}
           tabIndex={0}
           role="button"
           aria-label={`Select group ${node.name}`}
+          aria-selected={isSelected}
         >
           <div className="tree-indent" style={{ paddingLeft: `${depth * 20}px` }}>
             {hasChildren && (
               <button
                 type="button"
                 className="tree-toggle"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleExpanded(node.id);
-                }}
+                onClick={handleToggleExpand}
                 aria-label={isExpanded ? 'Collapse' : 'Expand'}
               >
                 {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
@@ -840,6 +852,7 @@ const Mikrotiks = () => {
                   tabIndex={0}
                   role="button"
                   aria-label="No group"
+                  aria-selected={!form.groupId}
                 >
                   <div className="tree-indent">
                     <div className="tree-spacer" />
