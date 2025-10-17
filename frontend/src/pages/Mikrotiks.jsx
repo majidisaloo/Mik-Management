@@ -131,6 +131,7 @@ const Mikrotiks = () => {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', message: '' });
+  const [successAlert, setSuccessAlert] = useState({ show: false, message: '' });
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState(emptyDeviceForm());
   const [showModal, setShowModal] = useState(false);
@@ -228,7 +229,20 @@ const Mikrotiks = () => {
       }
 
       const payload = await response.json();
-      setDevices(Array.isArray(payload) ? payload : []);
+      console.log('Mikrotiks API response:', payload);
+      
+      // Handle different response structures
+      let devicesArray = [];
+      if (Array.isArray(payload)) {
+        devicesArray = payload;
+      } else if (payload && Array.isArray(payload.devices)) {
+        devicesArray = payload.devices;
+      } else if (payload && Array.isArray(payload.mikrotiks)) {
+        devicesArray = payload.mikrotiks;
+      }
+      
+      console.log('Devices array:', devicesArray);
+      setDevices(devicesArray);
         setStatus({ type: '', message: '' });
       } catch (error) {
       setDevices([]);
@@ -297,10 +311,14 @@ const Mikrotiks = () => {
       setForm(emptyDeviceForm());
       setShowModal(false);
       await loadDevices();
-      setStatus({
-        type: 'success',
-        message: 'Device created successfully.'
+      setSuccessAlert({
+        show: true,
+        message: 'MikroTik device added successfully!'
       });
+      // Auto-hide success alert after 3 seconds
+      setTimeout(() => {
+        setSuccessAlert({ show: false, message: '' });
+      }, 3000);
     } catch (error) {
       setStatus({
         type: 'error',
@@ -552,8 +570,25 @@ const Mikrotiks = () => {
           </div>
       )}
 
+      {/* Success Alert */}
+      {successAlert.show && (
+        <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c1.3 0 2.52.28 3.64.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span className="font-medium">{successAlert.message}</span>
+          <button
+            onClick={() => setSuccessAlert({ show: false, message: '' })}
+            className="ml-2 text-white/80 hover:text-white"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Filters */}
-      <div className="card">
+      <div className="card mt-8">
         <div className="card__body">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -600,6 +635,16 @@ const Mikrotiks = () => {
                   <div>
                     <h3 className="font-semibold text-primary">{device.name}</h3>
                     <p className="text-sm text-tertiary">{device.host}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-1">
+                        <div className={`w-2 h-2 rounded-full ${device.routeros?.apiEnabled ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                        <span className="text-xs text-tertiary">API</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className={`w-2 h-2 rounded-full ${device.routeros?.sshEnabled ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                        <span className="text-xs text-tertiary">SSH</span>
+                      </div>
+                    </div>
                   </div>
                   </div>
                 <span className={`status-badge ${getStatusColor(device.status)}`}>

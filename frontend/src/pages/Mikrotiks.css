@@ -1,5 +1,21 @@
 /* Mikrotiks page - Tree structure styles for group selection */
 
+/* Success alert animation */
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
 /* Group tree container */
 .group-tree-container {
   background: var(--surface-elevated);
