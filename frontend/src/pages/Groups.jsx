@@ -358,24 +358,25 @@ const Groups = () => {
             {hasChildren ? (
               <button
                 type="button"
-                className="btn btn--ghost btn--sm p-1"
+                className="expand-button"
                 onClick={(e) => {
                   e.stopPropagation();
                   toggleExpanded(node.id);
                 }}
+                title={isExpanded ? 'Collapse' : 'Expand'}
               >
                 {isExpanded ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M18 15l-6-6-6 6"/>
                   </svg>
                 ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M9 18l6-6-6-6"/>
                   </svg>
                 )}
               </button>
             ) : (
-              <div className="w-6 h-6"></div> // Spacer for alignment
+              <div className="expand-spacer"></div>
             )}
             
             <FolderIcon />

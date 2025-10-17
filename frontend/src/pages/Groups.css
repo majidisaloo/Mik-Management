@@ -1,44 +1,93 @@
 /* Groups page specific styles */
 
 .group-item--compact {
-  padding: 8px 12px !important;
-  min-height: 48px;
-  border-radius: 6px;
+  padding: 6px 10px !important;
+  min-height: 40px;
+  border-radius: 4px;
   transition: all 0.2s ease;
+  border: 1px solid transparent;
 }
 
 .group-item--compact:hover {
   background-color: var(--surface-hover);
+  border-color: var(--border-color);
 }
 
 .group-item--compact.group-item--selected {
   background-color: var(--primary-50);
-  border: 1px solid var(--primary-200);
+  border-color: var(--primary-200);
 }
 
-.group-item--compact .btn--ghost {
-  padding: 4px;
-  min-width: 28px;
-  height: 28px;
+/* Expand/Collapse Button */
+.expand-button {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
-.group-item--compact .btn--ghost svg {
-  width: 14px;
-  height: 14px;
+.expand-button:hover {
+  background-color: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.expand-spacer {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
 /* Compact spacing for group nodes */
 .group-node {
-  margin-bottom: 2px;
+  margin-bottom: 1px;
 }
 
 /* Better visual hierarchy for compact view */
 .group-item--compact h3 {
-  line-height: 1.2;
-  margin-bottom: 2px;
+  line-height: 1.1;
+  margin-bottom: 1px;
+  font-size: 0.875rem;
 }
 
 .group-item--compact p {
-  line-height: 1.1;
+  line-height: 1;
   margin: 0;
+  font-size: 0.75rem;
+}
+
+/* Action buttons */
+.group-item--compact .btn--ghost {
+  padding: 2px;
+  min-width: 24px;
+  height: 24px;
+}
+
+.group-item--compact .btn--ghost svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Hierarchy indicators */
+.group-item--compact[style*="padding-left: 12px"] {
+  border-left: 2px solid var(--primary-200);
+}
+
+.group-item--compact[style*="padding-left: 36px"] {
+  border-left: 2px solid var(--success-200);
+}
+
+.group-item--compact[style*="padding-left: 60px"] {
+  border-left: 2px solid var(--warning-200);
+}
+
+.group-item--compact[style*="padding-left: 84px"] {
+  border-left: 2px solid var(--error-200);
 }

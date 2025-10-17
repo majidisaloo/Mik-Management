@@ -3,8 +3,7 @@ import Layout from './components/Layout.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import Dashboard from './pages/Dashboard.jsx';
-import Users from './pages/Users.jsx';
-import Roles from './pages/Roles.jsx';
+import UsersAndRoles from './pages/UsersAndRoles.jsx';
 import Groups from './pages/Groups.jsx';
 import Mikrotiks from './pages/Mikrotiks.jsx';
 import Tunnels from './pages/Tunnels.jsx';
@@ -12,8 +11,8 @@ import Settings from './pages/Settings.jsx';
 
 const managementRoutes = [
   { path: 'dashboard', Component: Dashboard },
-  { path: 'users', Component: Users },
-  { path: 'roles', Component: Roles },
+  { path: 'users', Component: UsersAndRoles },
+  { path: 'roles', Component: UsersAndRoles },
   { path: 'groups', Component: Groups },
   { path: 'mikrotiks', Component: Mikrotiks },
   { path: 'tunnels', Component: Tunnels },

@@ -108,8 +108,7 @@ const Layout = () => {
       label: 'Main',
       items: [
         { to: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
-        { to: '/users', label: 'Users', icon: UsersIcon },
-        { to: '/roles', label: 'Roles', icon: RolesIcon },
+        { to: '/users', label: 'Users & Roles', icon: UsersIcon },
         { to: '/groups', label: 'Mik-Groups', icon: GroupsIcon },
         { to: '/mikrotiks', label: 'Mikrotiks', icon: MikrotikIcon },
         { to: '/tunnels', label: 'Tunnels', icon: TunnelsIcon },

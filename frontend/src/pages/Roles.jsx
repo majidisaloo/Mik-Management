@@ -88,6 +88,7 @@ const Roles = () => {
   const loadRoles = async () => {
     try {
       console.log('Loading roles...');
+      setLoading(true);
       const response = await fetch('/api/roles');
       console.log('Roles response status:', response.status);
 
@@ -101,9 +102,16 @@ const Roles = () => {
       const rolesArray = payload.roles || payload;
       console.log('Roles array:', rolesArray);
       setRoles(Array.isArray(rolesArray) ? rolesArray : []);
+      setStatus({ type: '', message: '' });
     } catch (error) {
       console.error('Failed to load roles:', error);
       setRoles([]);
+      setStatus({
+        type: 'error',
+        message: error.message || 'Unable to load roles.'
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
