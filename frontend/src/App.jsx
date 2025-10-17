@@ -12,6 +12,7 @@ import RoutesPage from './pages/Routes.jsx';
 import Firewall from './pages/Firewall.jsx';
 import IPAM from './pages/IPAM.jsx';
 import Settings from './pages/Settings.jsx';
+import { UpdateProvider } from './context/UpdateContext.jsx';
 
 const managementRoutes = [
   { path: 'dashboard', Component: Dashboard },
@@ -37,14 +38,16 @@ const buildRouteVariants = ({ path, Component }) => {
 
 const App = () => {
   return (
-    <Routes>
-      <Route path="/" element={<Layout />}>
-        <Route index element={<Login />} />
-        <Route path="register" element={<Register />} />
-        <Route path="login" element={<Login />} />
-        {managementRoutes.flatMap((route) => buildRouteVariants(route))}
-      </Route>
-    </Routes>
+    <UpdateProvider>
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Login />} />
+          <Route path="register" element={<Register />} />
+          <Route path="login" element={<Login />} />
+          {managementRoutes.flatMap((route) => buildRouteVariants(route))}
+        </Route>
+      </Routes>
+    </UpdateProvider>
   );
 };
 

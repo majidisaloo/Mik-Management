@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import BrandMark from './BrandMark.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
+import { useUpdate } from '../context/UpdateContext.jsx';
 import { formatCommitVersion } from '../lib/version';
 import './Layout.css';
 
@@ -128,6 +129,7 @@ const UpdateIcon = () => (
 const Layout = () => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { updateNotification, setUpdateNotification } = useUpdate();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -397,6 +399,43 @@ const Layout = () => {
             </div>
           </aside>
         </>
+      )}
+
+      {/* Global Update Notification */}
+      {updateNotification && (
+        <div className="fixed top-4 right-4 z-50 max-w-sm">
+          <div className={`p-4 rounded-lg shadow-lg border ${
+            updateNotification.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' :
+            updateNotification.type === 'error' ? 'bg-red-50 text-red-700 border-red-200' :
+            'bg-blue-50 text-blue-700 border-blue-200'
+          }`}>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="font-medium">{updateNotification.message}</p>
+                <p className="text-xs mt-1 opacity-75">
+                  {new Date(updateNotification.timestamp).toLocaleTimeString()}
+                </p>
+              </div>
+              <button
+                onClick={() => setUpdateNotification(null)}
+                className="ml-2 text-current opacity-50 hover:opacity-100"
+              >
+                ×
+              </button>
+            </div>
+            <div className="mt-3 flex space-x-2">
+              <button
+                onClick={() => {
+                  navigate('/settings?tab=updates');
+                  setUpdateNotification(null);
+                }}
+                className="text-xs bg-current text-white px-2 py-1 rounded hover:opacity-80"
+              >
+                View Updates
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useUpdate } from '../context/UpdateContext.jsx';
 import './Settings.css';
 
 // Modern Icons
@@ -71,6 +72,22 @@ const Settings = () => {
   const urlParams = new URLSearchParams(location.search);
   const activeTab = urlParams.get('tab') || 'services';
 
+  // Update context
+  const {
+    updateChannel,
+    setUpdateChannel,
+    updateInfo,
+    setUpdateInfo,
+    autoCheckEnabled,
+    setAutoCheckEnabled,
+    checkInterval,
+    setCheckInterval,
+    lastCheckTime,
+    updateNotification,
+    setUpdateNotification,
+    autoCheckForUpdates
+  } = useUpdate();
+
   // Services status state
   const [servicesStatus, setServicesStatus] = useState({
     nginx: { status: 'unknown', uptime: null, lastCheck: null },
@@ -81,9 +98,7 @@ const Settings = () => {
   });
   const [servicesLoading, setServicesLoading] = useState(false);
 
-  // Updates state
-  const [updateChannel, setUpdateChannel] = useState('stable');
-  const [updateInfo, setUpdateInfo] = useState(null);
+  // Local update state
   const [updateLoading, setUpdateLoading] = useState(false);
   const [updateStatus, setUpdateStatus] = useState({ type: '', message: '' });
 
@@ -220,6 +235,7 @@ const Settings = () => {
     }
   };
 
+
   // Status variant helper
   const statusVariant = (status) => {
     if (!status) {
@@ -271,6 +287,7 @@ const Settings = () => {
     loadConfigInfo();
     checkServicesStatus();
   }, [navigate, user, loadConfigInfo]);
+
 
   return (
     <div className="space-y-6">
@@ -470,7 +487,7 @@ const Settings = () => {
                     <div className="p-2 bg-primary-50 rounded-lg">
                       <NetworkIcon />
                     </div>
-                    <div>
+            <div>
                       <h3 className="font-semibold text-primary">Configuration</h3>
                       <p className="text-sm text-tertiary">System settings</p>
                     </div>
@@ -531,22 +548,73 @@ const Settings = () => {
                 </div>
               </div>
 
+              {/* Auto-Check Settings */}
+              <div className="space-y-3">
+                <label className="form-label">Automatic Update Checking</label>
+                <div className="space-y-3">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={autoCheckEnabled}
+                      onChange={(e) => setAutoCheckEnabled(e.target.checked)}
+                      className="mr-2"
+                    />
+                    <span>Enable automatic update checking</span>
+                  </label>
+                  
+                  {autoCheckEnabled && (
+                    <div className="ml-6 space-y-2">
+                      <label className="form-label text-sm">Check Interval</label>
+                      <select
+                        value={checkInterval}
+                        onChange={(e) => setCheckInterval(Number(e.target.value))}
+                        className="form-input"
+                      >
+                        <option value={60}>Every 1 minute</option>
+                        <option value={300}>Every 5 minutes</option>
+                        <option value={900}>Every 15 minutes</option>
+                        <option value={1800}>Every 30 minutes</option>
+                        <option value={3600}>Every 1 hour</option>
+                      </select>
+                      <p className="text-xs text-gray-500">
+                        System will automatically check for updates in the background
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Current Version */}
               <div className="space-y-3">
                 <label className="form-label">Current Version</label>
                 <div className="p-3 bg-gray-50 rounded-lg">
-                  <span className="font-mono text-lg">{updateInfo?.currentVersion || 'Loading...'}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="font-mono text-lg">{updateInfo?.currentVersion || 'Loading...'}</span>
+                    {lastCheckTime && (
+                      <span className="text-xs text-gray-500">
+                        Last checked: {new Date(lastCheckTime).toLocaleTimeString()}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* Update Status */}
-              {updateStatus.message && (
+              {(updateStatus.message || updateNotification) && (
                 <div className={`p-4 rounded-lg ${
-                  updateStatus.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' :
-                  updateStatus.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' :
+                  (updateStatus.type === 'success' || updateNotification?.type === 'success') ? 'bg-green-50 text-green-700 border border-green-200' :
+                  (updateStatus.type === 'error' || updateNotification?.type === 'error') ? 'bg-red-50 text-red-700 border border-red-200' :
                   'bg-blue-50 text-blue-700 border border-blue-200'
                 }`}>
-                  {updateStatus.message}
+                  {updateStatus.message || updateNotification?.message}
+                  {updateNotification && (
+                    <button
+                      onClick={() => setUpdateNotification(null)}
+                      className="ml-2 text-xs underline hover:no-underline"
+                    >
+                      Dismiss
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -656,7 +724,7 @@ const Settings = () => {
                         <h3 className="font-semibold text-primary">Configuration</h3>
                         <p className="text-sm text-tertiary">System configuration</p>
                       </div>
-                    </div>
+                        </div>
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-tertiary">Config File:</span>
@@ -670,13 +738,13 @@ const Settings = () => {
               ) : (
                 <div className="text-center py-8">
                   <p className="text-tertiary">Failed to load system information</p>
-                </div>
+                    </div>
               )}
             </div>
           </div>
-        </div>
+            </div>
       )}
-    </div>
+      </div>
   );
 };
 
