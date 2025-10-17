@@ -1,0 +1,18 @@
+[Unit]
+Description=Mik-Management Frontend Service
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/mik-management/frontend
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm run dev
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

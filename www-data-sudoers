@@ -1,0 +1,7 @@
+# Allow www-data to run specific commands for Mik-Management updates
+www-data ALL=(ALL) NOPASSWD: /usr/bin/git pull origin main
+www-data ALL=(ALL) NOPASSWD: /usr/bin/npm install
+www-data ALL=(ALL) NOPASSWD: /usr/bin/npm run build
+www-data ALL=(ALL) NOPASSWD: /bin/chown -R www-data:www-data /opt/mik-management/*
+www-data ALL=(ALL) NOPASSWD: /bin/chown -R www-data:www-data /opt/mik-management/backend/*
+www-data ALL=(ALL) NOPASSWD: /bin/chown -R www-data:www-data /opt/mik-management/frontend/*
