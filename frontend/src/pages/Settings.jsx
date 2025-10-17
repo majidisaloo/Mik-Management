@@ -308,49 +308,32 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-1">
-        <nav className="flex space-x-1">
-          <button
-            onClick={() => navigate('/settings?tab=services')}
-            className={`px-4 py-2.5 rounded-md font-medium text-sm transition-all duration-200 ${
-              activeTab === 'services'
-                ? 'bg-primary text-white shadow-sm'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-            }`}
-          >
-            <div className="flex items-center space-x-2">
-              <ServerIcon />
-              <span>Services Status</span>
-            </div>
-          </button>
-          <button
-            onClick={() => navigate('/settings?tab=updates')}
-            className={`px-4 py-2.5 rounded-md font-medium text-sm transition-all duration-200 ${
-              activeTab === 'updates'
-                ? 'bg-primary text-white shadow-sm'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-            }`}
-          >
-            <div className="flex items-center space-x-2">
-              <UpdateIcon />
-              <span>Updates</span>
-            </div>
-          </button>
-          <button
-            onClick={() => navigate('/settings?tab=system')}
-            className={`px-4 py-2.5 rounded-md font-medium text-sm transition-all duration-200 ${
-              activeTab === 'system'
-                ? 'bg-primary text-white shadow-sm'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-            }`}
-          >
-            <div className="flex items-center space-x-2">
-              <DatabaseIcon />
-              <span>System Info</span>
-            </div>
-          </button>
-        </nav>
+      {/* Tab Navigation - Like Users & Roles */}
+      <div className="settings-tabs">
+        <button
+          type="button"
+          className={`tab-button ${activeTab === 'services' ? 'tab-button--active' : ''}`}
+          onClick={() => navigate('/settings?tab=services')}
+        >
+          <ServerIcon />
+          Services Status
+        </button>
+        <button
+          type="button"
+          className={`tab-button ${activeTab === 'updates' ? 'tab-button--active' : ''}`}
+          onClick={() => navigate('/settings?tab=updates')}
+        >
+          <UpdateIcon />
+          Updates
+        </button>
+        <button
+          type="button"
+          className={`tab-button ${activeTab === 'system' ? 'tab-button--active' : ''}`}
+          onClick={() => navigate('/settings?tab=system')}
+        >
+          <DatabaseIcon />
+          System Info
+        </button>
       </div>
 
       {/* Tab Content */}
@@ -580,14 +563,14 @@ const Settings = () => {
                   <p className="text-sm text-gray-600 mt-1">Configure automatic background update checks</p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                  <label className="flex items-center">
+                  <label className="auto-check-checkbox">
                     <input
                       type="checkbox"
                       checked={autoCheckEnabled}
                       onChange={(e) => setAutoCheckEnabled(e.target.checked)}
-                      className="mr-3 text-primary focus:ring-primary rounded"
+                      className="auto-check-input"
                     />
-                    <span className="font-medium text-gray-900">Enable automatic update checking</span>
+                    <span className="auto-check-label">Enable automatic update checking</span>
                   </label>
                   
                   {autoCheckEnabled && (
