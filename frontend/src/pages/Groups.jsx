@@ -490,7 +490,7 @@ const Groups = () => {
         <div className="space-y-6">
           {/* Header */}
           <div>
-            <div className="flex items-center justify-end mb-6">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-4">
                 <button
                   type="button"
@@ -522,7 +522,7 @@ const Groups = () => {
                 </button>
               </div>
             </div>
-            <div className="mb-2">
+            <div>
               <h1 className="text-3xl font-bold text-primary">Mik-Groups</h1>
               <p className="text-tertiary mt-2">Organize your MikroTik devices into hierarchical groups.</p>
             </div>

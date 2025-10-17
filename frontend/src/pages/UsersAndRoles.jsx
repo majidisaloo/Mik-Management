@@ -144,9 +144,11 @@ const UsersAndRoles = () => {
 
   // Filter roles
   const filteredRoles = useMemo(() => {
-    if (!debouncedRoleSearch) return roles;
+    if (!debouncedRoleSearch || debouncedRoleSearch.trim() === '') {
+      return roles;
+    }
     
-    const term = debouncedRoleSearch.toLowerCase();
+    const term = debouncedRoleSearch.toLowerCase().trim();
     return roles.filter(role => 
       role.name.toLowerCase().includes(term) ||
       role.description?.toLowerCase().includes(term) ||
@@ -430,6 +432,19 @@ const UsersAndRoles = () => {
   return (
     <div className="users-roles-page">
       <div className="users-roles-header">
+        <div className="flex items-center gap-4 mb-4">
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={() => navigate('/dashboard')}
+            title="Back to Dashboard"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+            Back
+          </button>
+        </div>
         <h1 className="users-roles-title">Users & Roles</h1>
         <p className="users-roles-description">Manage system users and their permissions.</p>
       </div>
@@ -815,17 +830,17 @@ const UsersAndRoles = () => {
       )}
 
       {/* Role Modal */}
-      {showRoleModal && (
-        <Modal
-          open={showRoleModal}
-          onClose={() => {
-            setShowRoleModal(false);
-            setRoleForm(emptyRoleForm());
-            setIsEditingRole(false);
-            setSelectedRoleId(null);
-          }}
-          title={isEditingRole ? 'Edit Role' : 'Create Role'}
-        >
+      <Modal
+        open={showRoleModal}
+        onClose={() => {
+          console.log('Role modal closing');
+          setShowRoleModal(false);
+          setRoleForm(emptyRoleForm());
+          setIsEditingRole(false);
+          setSelectedRoleId(null);
+        }}
+        title={isEditingRole ? 'Edit Role' : 'Create Role'}
+      >
           <div className="role-form">
             <div className="form-group">
               <label htmlFor="role-name" className="form-label">
@@ -915,7 +930,6 @@ const UsersAndRoles = () => {
             </button>
           </div>
         </Modal>
-      )}
 
       {/* Status Messages */}
       {status.message && (
