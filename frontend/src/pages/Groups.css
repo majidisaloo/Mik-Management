@@ -43,14 +43,15 @@
 .tree-indent {
   display: flex;
   align-items: center;
-  min-width: 20px;
+  min-width: 24px;
+  padding-left: 8px;
 }
 
 .tree-line {
   width: 1px;
   height: 100%;
   background-color: var(--border-color);
-  margin-right: 8px;
+  margin-right: 12px;
 }
 
 /* Tree toggle (expand/collapse) */
@@ -186,12 +187,13 @@
 /* Tree children */
 .tree-children {
   position: relative;
+  margin-left: 16px;
 }
 
 .tree-children::before {
   content: '';
   position: absolute;
-  left: 8px;
+  left: -8px;
   top: 0;
   bottom: 0;
   width: 1px;

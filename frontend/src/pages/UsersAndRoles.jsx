@@ -586,7 +586,12 @@ const UsersAndRoles = () => {
                       <button
                         type="button"
                         className="btn btn--ghost btn--sm"
-                        onClick={() => handleEditRole(role)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('Edit role button clicked for:', role);
+                          handleEditRole(role);
+                        }}
                       >
                         <EditIcon />
                       </button>

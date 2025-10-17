@@ -487,44 +487,46 @@ const Groups = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-primary">Mik-Groups</h1>
-          <p className="text-tertiary mt-2">Organize your MikroTik devices into hierarchical groups.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className="btn btn--secondary"
-            onClick={() => {
-              // Expand all groups
-              const allGroupIds = new Set();
-              const collectIds = (nodes) => {
-                nodes.forEach(node => {
-                  if (node.children && node.children.length > 0) {
-                    allGroupIds.add(node.id);
-                    collectIds(node.children);
-                  }
-                });
-              };
-              collectIds(filteredGroups);
-              setExpandedGroups(allGroupIds);
-            }}
-          >
-            Expand All
-          </button>
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={handleNewGroup}
-          >
-            <PlusIcon />
-            New Group
-          </button>
-        </div>
-      </div>
+        <div className="space-y-6">
+          {/* Header */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() => {
+                    // Expand all groups
+                    const allGroupIds = new Set();
+                    const collectIds = (nodes) => {
+                      nodes.forEach(node => {
+                        if (node.children && node.children.length > 0) {
+                          allGroupIds.add(node.id);
+                          collectIds(node.children);
+                        }
+                      });
+                    };
+                    collectIds(filteredGroups);
+                    setExpandedGroups(allGroupIds);
+                  }}
+                >
+                  Expand All
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={handleNewGroup}
+                >
+                  <PlusIcon />
+                  New Group
+                </button>
+              </div>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-primary">Mik-Groups</h1>
+              <p className="text-tertiary mt-2">Organize your MikroTik devices into hierarchical groups.</p>
+            </div>
+          </div>
 
       {/* Status Message */}
       {status.message && (

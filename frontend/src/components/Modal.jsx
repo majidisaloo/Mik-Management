@@ -23,25 +23,31 @@ const renderActions = (actions) => {
 const Modal = ({ title, description, children, actions, onClose, open = false }) => {
   const dialogRef = useRef(null);
 
-  useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
+  // Completely disable all event handling to fix input typing issue
+  // useEffect(() => {
+  //   if (!open) {
+  //     return undefined;
+  //   }
 
-    const handleKeyDown = (event) => {
-      // Only handle Escape key, ignore all other keys to prevent input interference
-      if (event.key === 'Escape' && event.target === document.body) {
-        event.preventDefault();
-        onClose();
-      }
-    };
+  //   const handleKeyDown = (event) => {
+  //     // Only handle Escape key when modal is focused, ignore all other keys
+  //     if (event.key === 'Escape' && event.target === dialogRef.current) {
+  //       event.preventDefault();
+  //       onClose();
+  //     }
+  //   };
 
-    document.addEventListener('keydown', handleKeyDown);
+  //   const dialog = dialogRef.current;
+  //   if (dialog) {
+  //     dialog.addEventListener('keydown', handleKeyDown);
+  //   }
 
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [onClose, open]);
+  //   return () => {
+  //     if (dialog) {
+  //       dialog.removeEventListener('keydown', handleKeyDown);
+  //     }
+  //   };
+  // }, [onClose, open]);
 
   const handleBackdropClick = (event) => {
     if (event.target === event.currentTarget) {
