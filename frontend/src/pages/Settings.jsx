@@ -107,11 +107,11 @@ const statusVariant = (status) => {
 
   const value = status.toLowerCase();
 
-  if (value === 'connected') {
+  if (value === 'connected' || value === 'running') {
     return 'status-badge--success';
   }
 
-  if (value === 'failed') {
+  if (value === 'failed' || value === 'error') {
     return 'status-badge--error';
   }
 
@@ -454,6 +454,9 @@ const Settings = () => {
         </div>
       </div>
 
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
       {/* Status Message */}
       {ipamStatus.message && (
         <div className={`p-4 rounded-xl border ${
@@ -465,8 +468,8 @@ const Settings = () => {
         </div>
       )}
 
-      {/* Services Status */}
-      <div className="card">
+        {/* Services Status */}
+        <div className="card">
         <div className="card__header">
           <div className="flex items-center justify-between">
             <div>
@@ -575,9 +578,9 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* System Information */}
-      {configInfo && (
-        <div className="card">
+        {/* System Information */}
+        {configInfo && (
+          <div className="card">
           <div className="card__header">
             <h2 className="card__title">System Information</h2>
             <p className="card__subtitle">Current system configuration</p>
@@ -632,8 +635,8 @@ const Settings = () => {
         </div>
       )}
 
-      {/* IPAM Configurations */}
-      <div className="card">
+        {/* IPAM Configurations */}
+        <div className="card xl:col-span-2">
         <div className="card__header">
           <div className="flex items-center justify-between">
             <div>
@@ -900,6 +903,7 @@ const Settings = () => {
                       </button>
           </div>
           </div>
+      </div>
       </div>
     </div>
   );
