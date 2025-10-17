@@ -332,7 +332,17 @@ const Layout = () => {
                   {renderThemeToggle('sidebar')}
                   <div className="mt-2">{renderLogoutButton('sidebar')}</div>
                   <div className="app-sidebar-version">
-                    <span className="app-version-display">v{version}</span>
+                    <div className="flex flex-col items-center space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="app-version-display">v{version}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
+                          BETA
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Stable: v{version.replace('-beta', '')}
+                      </div>
+                    </div>
                     <button
                       type="button"
                       className="app-update-btn"
@@ -384,7 +394,17 @@ const Layout = () => {
                   {renderThemeToggle('sidebar')}
                   <div className="mt-2">{renderLogoutButton('sidebar')}</div>
                   <div className="app-sidebar-version">
-                    <span className="app-version-display">v{version}</span>
+                    <div className="flex flex-col items-center space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="app-version-display">v{version}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
+                          BETA
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Stable: v{version.replace('-beta', '')}
+                      </div>
+                    </div>
                     <button
                       type="button"
                       className="app-update-btn"
