@@ -12,7 +12,11 @@ export const useUpdate = () => {
 
 export const UpdateProvider = ({ children }) => {
   const [updateChannel, setUpdateChannel] = useState('stable');
-  const [updateInfo, setUpdateInfo] = useState(null);
+  const [updateInfo, setUpdateInfo] = useState({
+    currentVersion: formatCommitVersion(Number(import.meta.env.VITE_COMMIT_COUNT ?? 0), 'beta'),
+    updateAvailable: false,
+    channel: 'beta'
+  });
   const [autoCheckEnabled, setAutoCheckEnabled] = useState(true);
   const [checkInterval, setCheckInterval] = useState(300); // 5 minutes default
   const [lastCheckTime, setLastCheckTime] = useState(null);
@@ -91,6 +95,7 @@ export const UpdateProvider = ({ children }) => {
   useEffect(() => {
     const loadInitialVersion = async () => {
       try {
+        console.log('Loading initial version for channel:', updateChannel);
         const response = await fetch('/api/check-updates', {
           method: 'POST',
           headers: {
@@ -100,15 +105,20 @@ export const UpdateProvider = ({ children }) => {
         });
 
         const data = await response.json();
+        console.log('Initial version API response:', data);
+        
         if (response.ok) {
           setUpdateInfo(data);
           console.log('Initial version loaded:', data.currentVersion);
+        } else {
+          console.error('Failed to load initial version:', data);
         }
       } catch (error) {
-        console.log('Failed to load initial version:', error);
+        console.error('Failed to load initial version:', error);
       }
     };
 
+    // Load immediately on mount
     loadInitialVersion();
   }, [updateChannel]);
 

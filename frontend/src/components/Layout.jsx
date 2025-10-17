@@ -138,8 +138,10 @@ const Layout = () => {
 
   // Get version from UpdateContext to ensure consistency
   const { updateInfo } = useUpdate();
-  const version = updateInfo?.currentVersion || formatCommitVersion(Number(import.meta.env.VITE_COMMIT_COUNT ?? 0), 'beta');
-  console.log('Layout - version from UpdateContext:', version);
+  const version = updateInfo?.currentVersion || 'Loading...';
+  
+  console.log('Layout - UpdateContext version:', updateInfo?.currentVersion);
+  console.log('Layout - Final version:', version);
 
   // Navigation items
   const navigation = useMemo(() => [
