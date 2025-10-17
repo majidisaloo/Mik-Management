@@ -34,6 +34,7 @@ const DeviceDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [groupLookup, setGroupLookup] = useState(new Map());
+  const [testingConnection, setTestingConnection] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -108,6 +109,33 @@ const DeviceDetails = () => {
     navigate('/mikrotiks');
   };
 
+  const handleTestConnection = async () => {
+    if (!device) return;
+    
+    setTestingConnection(true);
+    try {
+      const response = await fetch(`/api/mikrotiks/${device.id}/test-connectivity`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to test connection');
+      }
+
+      const result = await response.json();
+      if (result.mikrotik) {
+        setDevice(result.mikrotik);
+      }
+    } catch (err) {
+      console.error('Error testing connection:', err);
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="device-details-page">
@@ -157,180 +185,182 @@ const DeviceDetails = () => {
             </div>
           </div>
         </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleTestConnection}
+            disabled={testingConnection}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {testingConnection ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Testing...
+              </>
+            ) : (
+              'Test Connection'
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Device Status & Connection */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-primary">Connection Status</h3>
-          <div className="space-y-3">
-            <div className="p-4 border rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-medium">Device Status</span>
-                <div className="flex items-center gap-2">
+      {/* Tabs Navigation */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="-mb-px flex space-x-8">
+          <button className="py-2 px-1 border-b-2 border-primary text-primary font-medium text-sm">
+            Overview
+          </button>
+          <button className="py-2 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm">
+            Interfaces
+          </button>
+          <button className="py-2 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm">
+            Configuration
+          </button>
+          <button className="py-2 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm">
+            Logs
+          </button>
+        </nav>
+      </div>
+
+      {/* Overview Tab Content */}
+      <div className="space-y-6">
+        {/* Status Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-6 rounded-lg border shadow-sm">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${getConnectionStatus(device).active ? 'bg-green-100' : 'bg-red-100'}`}>
                   <div className={`w-3 h-3 rounded-full ${getConnectionStatus(device).active ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                  <span className={`text-sm font-medium ${getConnectionStatus(device).active ? 'text-green-700' : 'text-red-700'}`}>
-                    {getConnectionStatus(device).active ? 'ACTIVE' : 'INACTIVE'}
-                  </span>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-tertiary">Connection</span>
-                <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${getConnectionStatus(device).connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                  <span className={`text-sm font-medium ${getConnectionStatus(device).connected ? 'text-green-700' : 'text-red-700'}`}>
-                    {getConnectionStatus(device).connected ? 'CONNECTED' : 'DISCONNECTED'}
-                  </span>
-                </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Device Status</p>
+                <p className={`text-lg font-semibold ${getConnectionStatus(device).active ? 'text-green-600' : 'text-red-600'}`}>
+                  {getConnectionStatus(device).active ? 'ACTIVE' : 'INACTIVE'}
+                </p>
               </div>
             </div>
-            
-            <div className="p-4 border rounded-lg">
-              <div className="flex items-center justify-between mb-3">
-                <span className="font-medium">Access Methods</span>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg border shadow-sm">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${getConnectionStatus(device).connected ? 'bg-green-100' : 'bg-red-100'}`}>
+                  <div className={`w-3 h-3 rounded-full ${getConnectionStatus(device).connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="checkbox" 
-                      checked={device.routeros?.apiEnabled === true} 
-                      readOnly 
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <span className="text-sm">API Access</span>
-                  </div>
-                  <span className={`text-xs px-2 py-1 rounded ${device.routeros?.apiEnabled === true ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {device.routeros?.apiEnabled === true ? 'ENABLED' : 'DISABLED'}
-                  </span>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Connection</p>
+                <p className={`text-lg font-semibold ${getConnectionStatus(device).connected ? 'text-green-600' : 'text-red-600'}`}>
+                  {getConnectionStatus(device).connected ? 'CONNECTED' : 'DISCONNECTED'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg border shadow-sm">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                  <span className="text-blue-600 font-semibold text-sm">API</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="checkbox" 
-                      checked={device.routeros?.sshEnabled === true} 
-                      readOnly 
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <span className="text-sm">SSH Access</span>
-                  </div>
-                  <span className={`text-xs px-2 py-1 rounded ${device.routeros?.sshEnabled === true ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {device.routeros?.sshEnabled === true ? 'ENABLED' : 'DISABLED'}
-                  </span>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">API Access</p>
+                <p className={`text-lg font-semibold ${device.routeros?.apiEnabled === true ? 'text-green-600' : 'text-red-600'}`}>
+                  {device.routeros?.apiEnabled === true ? 'ENABLED' : 'DISABLED'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg border shadow-sm">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                  <span className="text-green-600 font-semibold text-sm">SSH</span>
                 </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">SSH Access</p>
+                <p className={`text-lg font-semibold ${device.routeros?.sshEnabled === true ? 'text-green-600' : 'text-red-600'}`}>
+                  {device.routeros?.sshEnabled === true ? 'ENABLED' : 'DISABLED'}
+                </p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Device Information */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-primary">Device Information</h3>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-tertiary">Group:</span>
-              <span className="text-secondary">
-                {device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-tertiary">Created:</span>
-              <span className="text-secondary">{formatDateTime(device.createdAt)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-tertiary">Last Updated:</span>
-              <span className="text-secondary">{formatDateTime(device.updatedAt)}</span>
-            </div>
+        <div className="bg-white rounded-lg border shadow-sm">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">Device Information</h3>
+          </div>
+          <div className="px-6 py-4">
+            <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Group</dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  {device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Firmware Version</dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  {device.routeros?.firmwareVersion && typeof device.routeros.firmwareVersion === 'string' 
+                    ? device.routeros.firmwareVersion 
+                    : 'Unknown'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Created</dt>
+                <dd className="mt-1 text-sm text-gray-900">{formatDateTime(device.createdAt)}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Last Updated</dt>
+                <dd className="mt-1 text-sm text-gray-900">{formatDateTime(device.updatedAt)}</dd>
+              </div>
+            </dl>
           </div>
         </div>
 
-        {/* MikroTik Version & Output */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-primary">MikroTik Information</h3>
-          <div className="space-y-3">
-            <div className="p-4 border rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-medium">Firmware Version</span>
-                <div className="flex items-center gap-1">
-                  {device.routeros?.apiEnabled === true && (
-                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">API</span>
-                  )}
-                  {device.routeros?.sshEnabled === true && (
-                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">SSH</span>
-                  )}
-                </div>
-              </div>
-              <div className="text-sm text-secondary">
-                {device.routeros?.firmwareVersion && typeof device.routeros.firmwareVersion === 'string' 
-                  ? device.routeros.firmwareVersion 
-                  : 'Unknown'}
+        {/* API & SSH Output */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-lg border shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium text-gray-900">API Output</h3>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  API
+                </span>
               </div>
             </div>
-            
-            <div className="p-4 border rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-medium">API Output</span>
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">API</span>
-              </div>
-              <div className="text-xs text-tertiary bg-gray-50 p-2 rounded font-mono">
-                {device.routeros?.apiOutput || 'No API data available'}
-              </div>
-            </div>
-
-            <div className="p-4 border rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-medium">SSH Output</span>
-                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">SSH</span>
-              </div>
-              <div className="text-xs text-tertiary bg-gray-50 p-2 rounded font-mono">
-                {device.routeros?.sshOutput || 'No SSH data available'}
+            <div className="px-6 py-4">
+              <div className="bg-gray-50 rounded-md p-4">
+                <pre className="text-xs text-gray-600 whitespace-pre-wrap">
+                  {device.routeros?.apiOutput || 'No API data available\n\nClick "Test Connection" to fetch real data from the device.'}
+                </pre>
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Network Interfaces */}
-      <div className="mt-8">
-        <h3 className="text-lg font-semibold text-primary mb-4">Network Interfaces</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="p-4 border rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <NetworkIcon />
-              <span className="font-medium">Ethernet (eth0)</span>
-              <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">UP</span>
+          <div className="bg-white rounded-lg border shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium text-gray-900">SSH Output</h3>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  SSH
+                </span>
+              </div>
             </div>
-            <div className="text-sm text-tertiary space-y-1">
-              <div>IP: 192.168.1.1/24</div>
-              <div>MAC: 00:11:22:33:44:55</div>
-              <div>Speed: 1 Gbps</div>
-            </div>
-          </div>
-          
-          <div className="p-4 border rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <NetworkIcon />
-              <span className="font-medium">WiFi (wlan1)</span>
-              <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">UP</span>
-            </div>
-            <div className="text-sm text-tertiary space-y-1">
-              <div>IP: 192.168.2.1/24</div>
-              <div>MAC: 00:11:22:33:44:66</div>
-              <div>SSID: MikroTik-WiFi</div>
-            </div>
-          </div>
-
-          <div className="p-4 border rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <NetworkIcon />
-              <span className="font-medium">WAN (ether1)</span>
-              <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">DOWN</span>
-            </div>
-            <div className="text-sm text-tertiary space-y-1">
-              <div>IP: 45.90.72.45/32</div>
-              <div>MAC: 00:11:22:33:44:77</div>
-              <div>Provider: ISP</div>
+            <div className="px-6 py-4">
+              <div className="bg-gray-50 rounded-md p-4">
+                <pre className="text-xs text-gray-600 whitespace-pre-wrap">
+                  {device.routeros?.sshOutput || 'No SSH data available\n\nClick "Test Connection" to fetch real data from the device.'}
+                </pre>
+              </div>
             </div>
           </div>
         </div>
