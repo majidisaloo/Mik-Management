@@ -16,3 +16,4 @@ backend/data/*.json
 data.db
 
 backend/config/database.config.json
+.cursor/
