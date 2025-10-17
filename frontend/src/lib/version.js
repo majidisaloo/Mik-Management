@@ -4,8 +4,9 @@ export const formatCommitVersion = (commitCount) => {
     return '0.0';
   }
 
-  // Format as v1.xx where xx is the commit count
-  const major = Math.floor(commitCount / 100) + 1;
+  // Format as vX.XX where X.XX is the commit count divided by 100
+  // 216 commits -> 2.16, 320 commits -> 3.20
+  const major = Math.floor(commitCount / 100);
   const minor = commitCount % 100;
   
   const version = `${major}.${minor.toString().padStart(2, '0')}`;
