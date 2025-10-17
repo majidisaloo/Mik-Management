@@ -637,18 +637,18 @@ const Mikrotiks = () => {
                     <p className="text-sm text-tertiary">{device.host}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <div className="flex items-center gap-1">
-                        <div className={`w-2 h-2 rounded-full ${device.routeros?.apiEnabled ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                        <div className={`w-2 h-2 rounded-full ${device.routeros?.apiEnabled === true ? 'bg-green-500' : 'bg-red-500'}`}></div>
                         <span className="text-xs text-tertiary">API</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <div className={`w-2 h-2 rounded-full ${device.routeros?.sshEnabled ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                        <div className={`w-2 h-2 rounded-full ${device.routeros?.sshEnabled === true ? 'bg-green-500' : 'bg-red-500'}`}></div>
                         <span className="text-xs text-tertiary">SSH</span>
                       </div>
                     </div>
                   </div>
                   </div>
                 <span className={`status-badge ${getStatusColor(device.status)}`}>
-                  {device.status || 'Unknown'}
+                  {typeof device.status === 'string' ? device.status : 'Unknown'}
                 </span>
         </div>
 
@@ -661,12 +661,12 @@ const Mikrotiks = () => {
         </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-tertiary">Firmware:</span>
-                  <span className="text-secondary">{device.routeros?.firmwareVersion || 'Unknown'}</span>
+                  <span className="text-secondary">{typeof device.routeros?.firmwareVersion === 'string' ? device.routeros.firmwareVersion : 'Unknown'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-tertiary">API:</span>
                   <span className="text-secondary">
-                    {device.routeros?.apiEnabled ? 'Enabled' : 'Disabled'}
+                    {device.routeros?.apiEnabled === true ? 'Enabled' : 'Disabled'}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
