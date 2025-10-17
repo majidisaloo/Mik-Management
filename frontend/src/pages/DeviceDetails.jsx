@@ -35,6 +35,8 @@ const DeviceDetails = () => {
   const [error, setError] = useState(null);
   const [groupLookup, setGroupLookup] = useState(new Map());
   const [testingConnection, setTestingConnection] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [diagnosticResults, setDiagnosticResults] = useState(null);
 
   useEffect(() => {
     if (!user) {
@@ -136,6 +138,56 @@ const DeviceDetails = () => {
     }
   };
 
+  const handleRunDiagnostics = async () => {
+    if (!device) return;
+    
+    setTestingConnection(true);
+    setShowDiagnostics(true);
+    setDiagnosticResults(null);
+    
+    try {
+      const response = await fetch('/api/test-mikrotik-connection', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          host: device.host,
+          port: device.routeros?.apiPort,
+          username: device.routeros?.apiUsername || 'admin',
+          password: device.routeros?.apiPassword || '',
+          protocol: device.routeros?.apiPort === 80 ? 'http' : 'https'
+        }),
+      });
+
+      const result = await response.json();
+      setDiagnosticResults(result);
+      
+      // If diagnostics found a working connection, update the device
+      if (result.success && result.successfulConnection) {
+        const updatedDevice = {
+          ...device,
+          routeros: {
+            ...device.routeros,
+            firmwareVersion: result.successfulConnection.firmwareVersion,
+            apiOutput: JSON.stringify(result.successfulConnection.data, null, 2)
+          }
+        };
+        setDevice(updatedDevice);
+      }
+    } catch (err) {
+      console.error('Error running diagnostics:', err);
+      setDiagnosticResults({
+        success: false,
+        message: `Diagnostic error: ${err.message}`,
+        diagnostics: { tests: [] },
+        recommendations: []
+      });
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="device-details-page">
@@ -185,25 +237,42 @@ const DeviceDetails = () => {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleTestConnection}
-            disabled={testingConnection}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {testingConnection ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Testing...
-              </>
-            ) : (
-              'Test Connection'
-            )}
-          </button>
-        </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleTestConnection}
+                disabled={testingConnection}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {testingConnection ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Testing...
+                  </>
+                ) : (
+                  'Test Connection'
+                )}
+              </button>
+              <button
+                onClick={handleRunDiagnostics}
+                disabled={testingConnection}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {testingConnection ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Running Diagnostics...
+                  </>
+                ) : (
+                  'Run Diagnostics'
+                )}
+              </button>
+            </div>
       </div>
 
       {/* Tabs Navigation */}
@@ -224,8 +293,77 @@ const DeviceDetails = () => {
         </nav>
       </div>
 
-      {/* Overview Tab Content */}
-      <div className="space-y-6">
+          {/* Diagnostics Results */}
+          {showDiagnostics && diagnosticResults && (
+            <div className="mb-6 bg-white rounded-lg border shadow-sm">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900">Connection Diagnostics</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  {diagnosticResults.success ? '✅ Connection successful!' : '❌ Connection failed'}
+                </p>
+              </div>
+              <div className="px-6 py-4">
+                <div className="space-y-4">
+                  {/* Test Results */}
+                  {diagnosticResults.diagnostics?.tests?.map((test, index) => (
+                    <div key={index} className="flex items-start space-x-3">
+                      <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                        test.status === 'success' ? 'bg-green-100 text-green-800' :
+                        test.status === 'failed' ? 'bg-red-100 text-red-800' :
+                        test.status === 'error' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {test.status === 'success' ? '✓' :
+                         test.status === 'failed' ? '✗' :
+                         test.status === 'error' ? '!' : '?'}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-gray-900">{test.name}</h4>
+                        <p className="text-sm text-gray-600">{test.details}</p>
+                        {test.data && (
+                          <div className="mt-2 text-xs text-gray-500">
+                            <pre className="bg-gray-50 p-2 rounded overflow-x-auto">
+                              {JSON.stringify(test.data, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Recommendations */}
+                  {diagnosticResults.recommendations?.length > 0 && (
+                    <div className="mt-6">
+                      <h4 className="text-sm font-medium text-gray-900 mb-3">Recommendations</h4>
+                      {diagnosticResults.recommendations.map((rec, index) => (
+                        <div key={index} className={`p-4 rounded-lg mb-3 ${
+                          rec.type === 'error' ? 'bg-red-50 border border-red-200' :
+                          rec.type === 'warning' ? 'bg-yellow-50 border border-yellow-200' :
+                          'bg-blue-50 border border-blue-200'
+                        }`}>
+                          <h5 className={`font-medium ${
+                            rec.type === 'error' ? 'text-red-800' :
+                            rec.type === 'warning' ? 'text-yellow-800' :
+                            'text-blue-800'
+                          }`}>
+                            {rec.title}
+                          </h5>
+                          <ul className="mt-2 text-sm text-gray-700 list-disc list-inside">
+                            {rec.suggestions.map((suggestion, i) => (
+                              <li key={i}>{suggestion}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Overview Tab Content */}
+          <div className="space-y-6">
         {/* Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white p-6 rounded-lg border shadow-sm">

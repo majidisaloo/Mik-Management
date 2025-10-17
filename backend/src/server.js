@@ -2475,48 +2475,232 @@ const bootstrap = async () => {
         return;
       }
 
+      const diagnostics = {
+        host,
+        timestamp: new Date().toISOString(),
+        tests: []
+      };
+
       try {
-        const testPort = port || (protocol === 'http' ? 80 : 443);
-        const testProtocol = protocol || 'https';
-        const apiUrl = `${testProtocol}://${host}:${testPort}/rest/system/resource`;
-        const auth = Buffer.from(`${username || 'admin'}:${password || ''}`).toString('base64');
-        
-        console.log(`Testing direct MikroTik API connection to: ${apiUrl}`);
-        
-        const response = await fetch(apiUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${auth}`,
-            'Content-Type': 'application/json'
-          },
-          rejectUnauthorized: false,
-          timeout: 10000
+        // Test 1: Basic connectivity (ping simulation)
+        diagnostics.tests.push({
+          name: 'Basic Connectivity',
+          status: 'running',
+          details: `Testing basic connectivity to ${host}`
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          sendJson(res, 200, {
-            success: true,
-            message: 'Connection successful',
-            data: data[0],
-            firmwareVersion: data[0]?.version,
-            url: apiUrl
-          });
-        } else {
-          sendJson(res, 400, {
-            success: false,
-            message: `Connection failed: HTTP ${response.status}: ${response.statusText}`,
-            url: apiUrl
+        // Test 2: Port availability
+        const testPorts = [443, 80, 8728, 8729, port].filter(p => p).filter((v, i, a) => a.indexOf(v) === i);
+        
+        for (const testPort of testPorts) {
+          diagnostics.tests.push({
+            name: `Port ${testPort} Test`,
+            status: 'running',
+            details: `Testing if port ${testPort} is open`
           });
         }
+
+        // Test 3: HTTP/HTTPS endpoints
+        const endpoints = [
+          { protocol: 'https', port: 443, path: '/rest/system/resource' },
+          { protocol: 'http', port: 80, path: '/rest/system/resource' },
+          { protocol: 'https', port: port || 443, path: '/rest/system/resource' },
+          { protocol: 'http', port: port || 80, path: '/rest/system/resource' }
+        ];
+
+        let successfulConnection = null;
+
+        for (const endpoint of endpoints) {
+          const testName = `${endpoint.protocol.toUpperCase()} ${endpoint.port} API Test`;
+          const apiUrl = `${endpoint.protocol}://${host}:${endpoint.port}${endpoint.path}`;
+          
+          try {
+            console.log(`🔍 Testing: ${apiUrl}`);
+            
+            const auth = Buffer.from(`${username || 'admin'}:${password || ''}`).toString('base64');
+            
+            const response = await fetch(apiUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Basic ${auth}`,
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mik-Management/1.0'
+              },
+              rejectUnauthorized: false,
+              timeout: 15000
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              successfulConnection = {
+                url: apiUrl,
+                protocol: endpoint.protocol,
+                port: endpoint.port,
+                data: data[0],
+                firmwareVersion: data[0]?.version,
+                responseHeaders: Object.fromEntries(response.headers.entries())
+              };
+
+              diagnostics.tests.push({
+                name: testName,
+                status: 'success',
+                details: `✅ Connection successful! Firmware: ${data[0]?.version || 'Unknown'}`,
+                data: {
+                  url: apiUrl,
+                  firmwareVersion: data[0]?.version,
+                  architecture: data[0]?.['architecture-name'],
+                  boardName: data[0]?.['board-name'],
+                  uptime: data[0]?.uptime
+                }
+              });
+
+              console.log(`✅ Success: ${apiUrl} - Firmware: ${data[0]?.version}`);
+              break; // Stop on first successful connection
+            } else {
+              diagnostics.tests.push({
+                name: testName,
+                status: 'failed',
+                details: `❌ HTTP ${response.status}: ${response.statusText}`,
+                data: {
+                  url: apiUrl,
+                  status: response.status,
+                  statusText: response.statusText,
+                  headers: Object.fromEntries(response.headers.entries())
+                }
+              });
+
+              console.log(`❌ Failed: ${apiUrl} - ${response.status}: ${response.statusText}`);
+            }
+          } catch (error) {
+            diagnostics.tests.push({
+              name: testName,
+              status: 'error',
+              details: `❌ Connection error: ${error.message}`,
+              data: {
+                url: apiUrl,
+                error: error.message,
+                code: error.code
+              }
+            });
+
+            console.log(`❌ Error: ${apiUrl} - ${error.message}`);
+          }
+        }
+
+        // Test 4: Alternative endpoints
+        const alternativeEndpoints = [
+          { protocol: 'https', port: 443, path: '/rest/system/identity' },
+          { protocol: 'http', port: 80, path: '/rest/system/identity' },
+          { protocol: 'https', port: 443, path: '/rest/interface' },
+          { protocol: 'http', port: 80, path: '/rest/interface' }
+        ];
+
+        if (!successfulConnection) {
+          for (const endpoint of alternativeEndpoints) {
+            const testName = `${endpoint.protocol.toUpperCase()} ${endpoint.port} ${endpoint.path} Test`;
+            const apiUrl = `${endpoint.protocol}://${host}:${endpoint.port}${endpoint.path}`;
+            
+            try {
+              const auth = Buffer.from(`${username || 'admin'}:${password || ''}`).toString('base64');
+              
+              const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Basic ${auth}`,
+                  'Content-Type': 'application/json'
+                },
+                rejectUnauthorized: false,
+                timeout: 10000
+              });
+
+              if (response.ok) {
+                diagnostics.tests.push({
+                  name: testName,
+                  status: 'success',
+                  details: `✅ Alternative endpoint accessible`,
+                  data: { url: apiUrl }
+                });
+                break;
+              }
+            } catch (error) {
+              // Skip alternative endpoint errors
+            }
+          }
+        }
+
+        // Summary
+        const successCount = diagnostics.tests.filter(t => t.status === 'success').length;
+        const totalTests = diagnostics.tests.length;
+
+        sendJson(res, 200, {
+          success: successCount > 0,
+          message: successCount > 0 ? 
+            `Connection successful! (${successCount}/${totalTests} tests passed)` : 
+            `All connection attempts failed (0/${totalTests} tests passed)`,
+          diagnostics,
+          successfulConnection,
+          recommendations: generateRecommendations(diagnostics)
+        });
+
       } catch (error) {
-        console.error('Direct MikroTik connection test error:', error);
+        console.error('Diagnostic test error:', error);
         sendJson(res, 500, {
           success: false,
-          message: `Connection error: ${error.message}`,
+          message: `Diagnostic test failed: ${error.message}`,
+          diagnostics,
           error: error.message
         });
       }
+    };
+
+    const generateRecommendations = (diagnostics) => {
+      const recommendations = [];
+      
+      const hasSuccessfulTests = diagnostics.tests.some(t => t.status === 'success');
+      const hasFailedTests = diagnostics.tests.some(t => t.status === 'failed');
+      const hasErrorTests = diagnostics.tests.some(t => t.status === 'error');
+
+      if (!hasSuccessfulTests) {
+        recommendations.push({
+          type: 'error',
+          title: 'No successful connections found',
+          suggestions: [
+            'Check if MikroTik device is powered on and accessible',
+            'Verify the IP address is correct',
+            'Ensure MikroTik REST API is enabled in RouterOS',
+            'Check firewall rules on MikroTik device',
+            'Verify network connectivity from this server to the device'
+          ]
+        });
+      }
+
+      if (hasErrorTests) {
+        recommendations.push({
+          type: 'warning',
+          title: 'Connection errors detected',
+          suggestions: [
+            'Check network connectivity (ping the device)',
+            'Verify the device is not behind a firewall',
+            'Try different ports (443, 80, 8728, 8729)',
+            'Check if the device supports REST API (RouterOS v7.1+)'
+          ]
+        });
+      }
+
+      if (hasFailedTests) {
+        recommendations.push({
+          type: 'info',
+          title: 'Authentication or permission issues',
+          suggestions: [
+            'Verify username and password are correct',
+            'Check if the user has API access permissions',
+            'Try with admin user (default: admin with no password)',
+            'Check RouterOS user permissions for API access'
+          ]
+        });
+      }
+
+      return recommendations;
     };
 
     const handleCreateTunnel = async () => {
