@@ -2875,9 +2875,10 @@ const initializeDatabase = async (databasePath) => {
             if (response.ok) {
               const data = await response.json();
               apiStatus = 'online';
-              firmwareVersion = data[0]?.version || firmwareVersion;
+              firmwareVersion = data[0]?.version || 'Unknown';
               apiOutput = JSON.stringify(data[0], null, 2);
               console.log(`✅ MikroTik API connection successful via ${method.protocol}:${method.port}. Firmware: ${firmwareVersion}`);
+              console.log(`API Data:`, data[0]);
               break; // Success, exit the loop
             } else {
               console.log(`❌ MikroTik API connection failed via ${method.protocol}:${method.port}: HTTP ${response.status}: ${response.statusText}`);
@@ -2903,13 +2904,13 @@ const initializeDatabase = async (databasePath) => {
       if (routerosBaseline.sshEnabled) {
         try {
           // Test SSH connection using net.Socket
-          const net = require('net');
+          const { createConnection } = await import('net');
           const sshPort = routerosBaseline.sshPort || 22;
           
           console.log(`Testing SSH connection to ${host}:${sshPort}`);
           
           const sshTest = new Promise((resolve) => {
-            const socket = new net.Socket();
+            const socket = createConnection({ port: sshPort, host });
             const timeout = 5000; // 5 second timeout
             
             socket.setTimeout(timeout);
@@ -2930,8 +2931,6 @@ const initializeDatabase = async (databasePath) => {
               console.log(`❌ SSH connection error to ${host}:${sshPort}: ${err.message}`);
               resolve({ success: false, message: `SSH connection failed: ${err.message}` });
             });
-            
-            socket.connect(sshPort, host);
           });
           
           const sshResult = await sshTest;
@@ -2974,7 +2973,8 @@ const initializeDatabase = async (databasePath) => {
         apiOutput: apiOutput,
         sshOutput: sshOutput
       };
-      const status = deriveDeviceStatus(existing.status, normalizedRouteros);
+      // Set device status based on API connectivity
+      const status = apiStatus === 'online' ? 'connected' : existing.status;
 
       const record = {
         ...existing,

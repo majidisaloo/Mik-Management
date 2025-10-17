@@ -2640,11 +2640,11 @@ const bootstrap = async () => {
         // Test SSH connectivity
         if (username && password) {
           try {
-            const net = require('net');
+            const { createConnection } = await import('net');
             const sshPort = 22;
             
             const sshTest = new Promise((resolve) => {
-              const socket = new net.Socket();
+              const socket = createConnection({ port: sshPort, host });
               const timeout = 5000;
               
               socket.setTimeout(timeout);
@@ -2663,7 +2663,7 @@ const bootstrap = async () => {
                 resolve({ success: false, message: `SSH connection failed: ${err.message}` });
               });
               
-              socket.connect(sshPort, host);
+              // Connection is already established by createConnection
             });
             
             const sshResult = await sshTest;
