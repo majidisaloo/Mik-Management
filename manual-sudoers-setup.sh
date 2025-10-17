@@ -20,20 +20,10 @@ fi
 # Create sudoers file with proper syntax
 cat > /etc/sudoers.d/99-mik-management-www-data << 'EOF'
 # Allow www-data to run specific commands for Mik-Management updates
-www-data ALL=(ALL) NOPASSWD: /usr/bin/git pull origin main
-www-data ALL=(ALL) NOPASSWD: /usr/bin/git fetch origin main
-www-data ALL=(ALL) NOPASSWD: /usr/bin/git rev-list --count HEAD
-www-data ALL=(ALL) NOPASSWD: /usr/bin/git tag --sort=-version:refname
-www-data ALL=(ALL) NOPASSWD: /usr/bin/npm install
-www-data ALL=(ALL) NOPASSWD: /usr/bin/npm run build
-www-data ALL=(ALL) NOPASSWD: /usr/bin/npm run dev
-www-data ALL=(ALL) NOPASSWD: /bin/chown -R www-data:www-data /opt/mik-management/
-www-data ALL=(ALL) NOPASSWD: /bin/chown -R www-data:www-data /opt/mik-management/backend/
-www-data ALL=(ALL) NOPASSWD: /bin/chown -R www-data:www-data /opt/mik-management/frontend/
-www-data ALL=(ALL) NOPASSWD: /bin/chown -R www-data:www-data /opt/mik-management/frontend/dist/
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart mik-management-backend
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart mik-management-frontend
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart nginx
+www-data ALL=(ALL) NOPASSWD: /usr/bin/git
+www-data ALL=(ALL) NOPASSWD: /usr/bin/npm
+www-data ALL=(ALL) NOPASSWD: /bin/chown
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl
 EOF
 
 # Set proper permissions
