@@ -136,12 +136,10 @@ const Layout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [meta, setMeta] = useState({ registrationOpen: false });
 
-  // Get commit count and format version
-  const commitCount = Number(import.meta.env.VITE_COMMIT_COUNT ?? 0);
-  console.log('Layout - VITE_COMMIT_COUNT:', import.meta.env.VITE_COMMIT_COUNT);
-  console.log('Layout - commitCount:', commitCount);
-  const version = formatCommitVersion(commitCount, 'beta'); // Default to beta
-  console.log('Layout - final version:', version);
+  // Get version from UpdateContext to ensure consistency
+  const { updateInfo } = useUpdate();
+  const version = updateInfo?.currentVersion || formatCommitVersion(Number(import.meta.env.VITE_COMMIT_COUNT ?? 0), 'beta');
+  console.log('Layout - version from UpdateContext:', version);
 
   // Navigation items
   const navigation = useMemo(() => [

@@ -87,6 +87,31 @@ export const UpdateProvider = ({ children }) => {
     if (savedInterval) setCheckInterval(Number(savedInterval));
   }, []);
 
+  // Initial version load on startup
+  useEffect(() => {
+    const loadInitialVersion = async () => {
+      try {
+        const response = await fetch('/api/check-updates', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ channel: updateChannel }),
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+          setUpdateInfo(data);
+          console.log('Initial version loaded:', data.currentVersion);
+        }
+      } catch (error) {
+        console.log('Failed to load initial version:', error);
+      }
+    };
+
+    loadInitialVersion();
+  }, [updateChannel]);
+
   // Save settings to localStorage
   useEffect(() => {
     localStorage.setItem('updateChannel', updateChannel);
