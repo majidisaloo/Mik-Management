@@ -149,11 +149,26 @@ const UsersAndRoles = () => {
     }
     
     const term = debouncedRoleSearch.toLowerCase().trim();
-    return roles.filter(role => 
-      role.name.toLowerCase().includes(term) ||
-      role.description?.toLowerCase().includes(term) ||
-      role.permissions?.some(p => p.toLowerCase().includes(term))
-    );
+    return roles.filter(role => {
+      // Check name and description
+      if (role.name.toLowerCase().includes(term) || 
+          role.description?.toLowerCase().includes(term)) {
+        return true;
+      }
+      
+      // Check permissions (handle both array and object formats)
+      if (role.permissions) {
+        if (Array.isArray(role.permissions)) {
+          return role.permissions.some(p => p.toLowerCase().includes(term));
+        } else if (typeof role.permissions === 'object') {
+          return Object.keys(role.permissions).some(key => 
+            key.toLowerCase().includes(term) && role.permissions[key] === true
+          );
+        }
+      }
+      
+      return false;
+    });
   }, [roles, debouncedRoleSearch]);
 
   // Load users
@@ -401,10 +416,22 @@ const UsersAndRoles = () => {
 
   const handleEditRole = (role) => {
     console.log('handleEditRole called with:', role);
+    
+    // Convert permissions object to array if needed
+    let permissionsArray = [];
+    if (role.permissions) {
+      if (Array.isArray(role.permissions)) {
+        permissionsArray = role.permissions;
+      } else if (typeof role.permissions === 'object') {
+        // Convert object to array of keys where value is true
+        permissionsArray = Object.keys(role.permissions).filter(key => role.permissions[key] === true);
+      }
+    }
+    
     setRoleForm({
       name: role.name || '',
       description: role.description || '',
-      permissions: role.permissions || []
+      permissions: permissionsArray
     });
     setSelectedRoleId(role.id);
     setIsEditingRole(true);
@@ -670,20 +697,31 @@ const UsersAndRoles = () => {
                     </div>
                   </div>
                   
-                  <div className="role-permissions">
-                    <h4>Permissions:</h4>
-                    <div className="permissions-list">
-                      {role.permissions && role.permissions.length > 0 ? (
-                        role.permissions.map((permission) => (
-                          <span key={permission} className="permission-tag">
-                            {permission}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="no-permissions">No permissions assigned</span>
-                      )}
+                    <div className="role-permissions">
+                      <h4>Permissions:</h4>
+                      <div className="permissions-list">
+                        {(() => {
+                          let permissionsArray = [];
+                          if (role.permissions) {
+                            if (Array.isArray(role.permissions)) {
+                              permissionsArray = role.permissions;
+                            } else if (typeof role.permissions === 'object') {
+                              permissionsArray = Object.keys(role.permissions).filter(key => role.permissions[key] === true);
+                            }
+                          }
+                          
+                          return permissionsArray.length > 0 ? (
+                            permissionsArray.map((permission) => (
+                              <span key={permission} className="permission-tag">
+                                {permission}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="no-permissions">No permissions assigned</span>
+                          );
+                        })()}
+                      </div>
                     </div>
-                  </div>
                   
                   <div className="role-meta">
                     <span>Created: {formatDateTime(role.createdAt)}</span>
