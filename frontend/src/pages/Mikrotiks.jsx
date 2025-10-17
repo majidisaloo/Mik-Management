@@ -165,8 +165,6 @@ const Mikrotiks = () => {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', message: '' });
   const [successAlert, setSuccessAlert] = useState({ show: false, message: '' });
-  const [selectedDevice, setSelectedDevice] = useState(null);
-  const [showDeviceDetails, setShowDeviceDetails] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState(emptyDeviceForm());
   const [showModal, setShowModal] = useState(false);
@@ -546,8 +544,7 @@ const Mikrotiks = () => {
   };
 
   const handleDeviceClick = (device) => {
-    setSelectedDevice(device);
-    setShowDeviceDetails(true);
+    navigate(`/mikrotiks/${device.id}`);
   };
 
   const getStatusColor = (status) => {
@@ -576,16 +573,6 @@ const Mikrotiks = () => {
     }
   };
 
-  const getConnectionStatus = (device) => {
-    // Check if device is active (API or SSH enabled)
-    const active = device.routeros?.apiEnabled === true || device.routeros?.sshEnabled === true;
-    
-    // Check if device is connected (based on status or other indicators)
-    const connected = device.status && typeof device.status === 'string' && 
-      ['up', 'online', 'connected'].includes(device.status.toLowerCase());
-    
-    return { active, connected };
-  };
 
   if (loading) {
     return (
@@ -1142,209 +1129,6 @@ const Mikrotiks = () => {
           </form>
         </Modal>
 
-        {/* Device Details Modal */}
-        {showDeviceDetails && selectedDevice && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 pt-8" onClick={() => setShowDeviceDetails(false)}>
-            <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between p-6 border-b">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-primary-50 rounded-lg">
-                    <DeviceIcon />
-                  </div>
-          <div>
-                    <h2 className="text-2xl font-bold text-primary">{safeRender(selectedDevice.name, 'Unknown Device')}</h2>
-                    <p className="text-tertiary mt-1">{safeRender(selectedDevice.host, 'No Host')}</p>
-          </div>
-        </div>
-                <button
-                  onClick={() => setShowDeviceDetails(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <CloseIcon />
-                </button>
-        </div>
-              
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Device Status & Connection */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-primary">Connection Status</h3>
-                    <div className="space-y-3">
-                      <div className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium">Device Status</span>
-                          <div className="flex items-center gap-2">
-                            <div className={`w-3 h-3 rounded-full ${getConnectionStatus(selectedDevice).active ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                            <span className={`text-sm font-medium ${getConnectionStatus(selectedDevice).active ? 'text-green-700' : 'text-red-700'}`}>
-                              {getConnectionStatus(selectedDevice).active ? 'ACTIVE' : 'INACTIVE'}
-                            </span>
-                  </div>
-                  </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-tertiary">Connection</span>
-                          <div className="flex items-center gap-2">
-                            <div className={`w-3 h-3 rounded-full ${getConnectionStatus(selectedDevice).connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                            <span className={`text-sm font-medium ${getConnectionStatus(selectedDevice).connected ? 'text-green-700' : 'text-red-700'}`}>
-                              {getConnectionStatus(selectedDevice).connected ? 'CONNECTED' : 'DISCONNECTED'}
-                            </span>
-                  </div>
-        </div>
-                      </div>
-                      
-                      <div className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="font-medium">Access Methods</span>
-        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-          <input
-                                type="checkbox" 
-                                checked={selectedDevice.routeros?.apiEnabled === true} 
-                                readOnly 
-                                className="w-4 h-4 text-blue-600"
-                              />
-                              <span className="text-sm">API Access</span>
-                            </div>
-                            <span className={`text-xs px-2 py-1 rounded ${selectedDevice.routeros?.apiEnabled === true ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                              {selectedDevice.routeros?.apiEnabled === true ? 'ENABLED' : 'DISABLED'}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <input 
-                                type="checkbox" 
-                                checked={selectedDevice.routeros?.sshEnabled === true} 
-                                readOnly 
-                                className="w-4 h-4 text-blue-600"
-                              />
-                              <span className="text-sm">SSH Access</span>
-                            </div>
-                            <span className={`text-xs px-2 py-1 rounded ${selectedDevice.routeros?.sshEnabled === true ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                              {selectedDevice.routeros?.sshEnabled === true ? 'ENABLED' : 'DISABLED'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-        </div>
-      </div>
-
-                  {/* Device Information */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-primary">Device Information</h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-tertiary">Group:</span>
-                        <span className="text-secondary">
-                          {selectedDevice.groupId ? groupLookup.get(selectedDevice.groupId)?.name || 'Unknown' : 'None'}
-                  </span>
-                </div>
-                      <div className="flex justify-between">
-                        <span className="text-tertiary">Created:</span>
-                        <span className="text-secondary">{formatDateTime(selectedDevice.createdAt)}</span>
-              </div>
-                      <div className="flex justify-between">
-                        <span className="text-tertiary">Last Updated:</span>
-                        <span className="text-secondary">{formatDateTime(selectedDevice.updatedAt)}</span>
-              </div>
-                    </div>
-                  </div>
-
-                  {/* MikroTik Version & Output */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-primary">MikroTik Information</h3>
-                    <div className="space-y-3">
-                      <div className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium">Firmware Version</span>
-                          <div className="flex items-center gap-1">
-                            {selectedDevice.routeros?.apiEnabled === true && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">API</span>
-                            )}
-                            {selectedDevice.routeros?.sshEnabled === true && (
-                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">SSH</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-sm text-secondary">
-                          {selectedDevice.routeros?.firmwareVersion && typeof selectedDevice.routeros.firmwareVersion === 'string' 
-                            ? selectedDevice.routeros.firmwareVersion 
-                            : 'Unknown'}
-                        </div>
-                      </div>
-                      
-                      <div className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium">API Output</span>
-                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">API</span>
-                        </div>
-                        <div className="text-xs text-tertiary bg-gray-50 p-2 rounded font-mono">
-                          {selectedDevice.routeros?.apiOutput || 'No API data available'}
-                        </div>
-                      </div>
-
-                      <div className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium">SSH Output</span>
-                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">SSH</span>
-            </div>
-                        <div className="text-xs text-tertiary bg-gray-50 p-2 rounded font-mono">
-                          {selectedDevice.routeros?.sshOutput || 'No SSH data available'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Network Interfaces */}
-                <div className="mt-8">
-                  <h3 className="text-lg font-semibold text-primary mb-4">Network Interfaces</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div className="p-4 border rounded-lg">
-                      <div className="flex items-center gap-2 mb-2">
-                        <NetworkIcon />
-                        <span className="font-medium">Ethernet (eth0)</span>
-                        <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">UP</span>
-                      </div>
-                      <div className="text-sm text-tertiary space-y-1">
-                        <div>IP: 192.168.1.1/24</div>
-                        <div>MAC: 00:11:22:33:44:55</div>
-                        <div>Speed: 1 Gbps</div>
-                      </div>
-                    </div>
-                    
-                    <div className="p-4 border rounded-lg">
-                      <div className="flex items-center gap-2 mb-2">
-                        <NetworkIcon />
-                        <span className="font-medium">WiFi (wlan1)</span>
-                        <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">UP</span>
-                      </div>
-                      <div className="text-sm text-tertiary space-y-1">
-                        <div>IP: 192.168.2.1/24</div>
-                        <div>MAC: 00:11:22:33:44:66</div>
-                        <div>SSID: MikroTik-WiFi</div>
-                      </div>
-                    </div>
-
-                    <div className="p-4 border rounded-lg">
-                      <div className="flex items-center gap-2 mb-2">
-                        <NetworkIcon />
-                        <span className="font-medium">WAN (ether1)</span>
-                        <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">DOWN</span>
-                      </div>
-                      <div className="text-sm text-tertiary space-y-1">
-                        <div>IP: 45.90.72.45/32</div>
-                        <div>MAC: 00:11:22:33:44:77</div>
-                        <div>Provider: ISP</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
     </div>
   );
 };

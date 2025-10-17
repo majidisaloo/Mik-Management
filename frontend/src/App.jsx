@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import UsersAndRoles from './pages/UsersAndRoles.jsx';
 import Groups from './pages/Groups.jsx';
 import Mikrotiks from './pages/Mikrotiks.jsx';
+import DeviceDetails from './pages/DeviceDetails.jsx';
 import Tunnels from './pages/Tunnels.jsx';
 import IPAM from './pages/IPAM.jsx';
 import Settings from './pages/Settings.jsx';
@@ -16,6 +17,7 @@ const managementRoutes = [
   { path: 'roles', Component: UsersAndRoles },
   { path: 'groups', Component: Groups },
   { path: 'mikrotiks', Component: Mikrotiks },
+  { path: 'mikrotiks/:id', Component: DeviceDetails },
   { path: 'tunnels', Component: Tunnels },
   { path: 'ipam', Component: IPAM },
   { path: 'settings', Component: Settings }
