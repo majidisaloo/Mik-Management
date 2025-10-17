@@ -1,0 +1,49 @@
+/* UpdateStatusIcon - Completely isolated styles */
+
+.update-status-checkmark {
+  /* Force exact size - override any external CSS */
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  flex-shrink: 0 !important;
+  
+  /* Prevent any external styling */
+  font-size: 8px !important;
+  line-height: 8px !important;
+  
+  /* Ensure proper display */
+  display: inline-block !important;
+  vertical-align: middle !important;
+  
+  /* Override any Tailwind or other framework styles */
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: none !important;
+  
+  /* Prevent any transforms or scaling */
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* Additional protection against external CSS */
+.update-status-checkmark * {
+  width: inherit !important;
+  height: inherit !important;
+  max-width: inherit !important;
+  max-height: inherit !important;
+}
+
+/* Dark mode support */
+[data-theme="dark"] .update-status-checkmark {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+}

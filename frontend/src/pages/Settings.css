@@ -296,6 +296,8 @@
   gap: 0.5rem;
 }
 
+/* Update Status Checkmark Icon - Moved to separate component */
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .service-card {

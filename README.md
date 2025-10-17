@@ -13,6 +13,8 @@ external database services.
 - [Production Deployment on Ubuntu with Nginx](#production-deployment-on-ubuntu-with-nginx)
 - [Systemd + Nginx Deployment (example configs)](#systemd--nginx-deployment-example-configs)
 - [Updating an Existing Installation](#updating-an-existing-installation)
+- [Fix Sudo Permissions for Update System](#fix-sudo-permissions-for-update-system)
+- [Troubleshooting](#troubleshooting)
 - [Operational Notes](#operational-notes)
 
 ## Project Structure
@@ -215,6 +217,9 @@ sudo chown -R root:root /opt/mik-management
 git config --global --add safe.directory /opt/mik-management
 sudo chown -R www-data:www-data /opt/mik-management
 
+# Fix sudo permissions for update system (if needed)
+sudo ./fix-sudo-permissions.sh
+
 # Backend update
 cd backend
 npm install
@@ -233,6 +238,40 @@ sudo systemctl start nginx
 sudo systemctl status mik-management-backend --no-pager
 sudo systemctl status nginx --no-pager
 curl http://localhost/api/users
+```
+
+## Fix Sudo Permissions for Update System
+
+If you encounter permission issues with the update system, run the fix permissions script:
+
+```bash
+# From /opt/mik-management directory
+sudo ./fix-sudo-permissions.sh
+```
+
+This script will:
+- Remove any existing sudoers configuration
+- Create a new sudoers file with proper syntax
+- Allow www-data to run git, npm, chown, and systemctl commands
+- Validate the sudoers syntax
+
+**Alternative manual setup:**
+```bash
+sudo ./manual-sudoers-setup.sh
+```
+
+**Manual sudoers configuration:**
+```bash
+sudo tee /etc/sudoers.d/99-mik-management-www-data <<'EOF'
+# Allow www-data to run specific commands for Mik-Management updates
+www-data ALL=(ALL) NOPASSWD: /usr/bin/git
+www-data ALL=(ALL) NOPASSWD: /usr/bin/npm
+www-data ALL=(ALL) NOPASSWD: /bin/chown
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl
+EOF
+
+sudo chmod 440 /etc/sudoers.d/99-mik-management-www-data
+sudo visudo -c -f /etc/sudoers.d/99-mik-management-www-data
 ```
 
 ## Troubleshooting
