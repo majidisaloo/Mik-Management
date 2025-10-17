@@ -338,12 +338,12 @@ const Settings = () => {
 
       {/* Tab Content */}
       {activeTab === 'services' && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="space-y-6">
         {/* Services Status */}
         <div className="card">
           <div className="card__header">
             <div className="flex items-center justify-between">
-              <div>
+            <div>
                 <h2 className="card__title">Services Status</h2>
                 <p className="card__subtitle">Monitor system services health</p>
               </div>
@@ -447,65 +447,6 @@ const Settings = () => {
             </div>
           </div>
         </div>
-
-        {/* System Information */}
-        {configInfo && (
-          <div className="card">
-            <div className="card__header">
-              <div>
-                <h2 className="card__title">System Information</h2>
-                <p className="card__subtitle">Current system configuration</p>
-              </div>
-            </div>
-            <div className="card__body">
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary-50 rounded-lg">
-                      <DatabaseIcon />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-primary">Database</h3>
-                      <p className="text-sm text-tertiary">System database</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-tertiary">Driver:</span>
-                      <span className="text-secondary">{configInfo.database?.driver || 'Unknown'}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-tertiary">File:</span>
-                      <span className="text-secondary font-mono text-xs">
-                        {configInfo.database?.file || 'Unknown'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary-50 rounded-lg">
-                      <NetworkIcon />
-                    </div>
-            <div>
-                      <h3 className="font-semibold text-primary">Configuration</h3>
-                      <p className="text-sm text-tertiary">System settings</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-tertiary">Config File:</span>
-                      <span className="text-secondary font-mono text-xs">
-                        {configInfo.database?.configFile || 'Unknown'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
       )}
 
@@ -644,7 +585,7 @@ const Settings = () => {
               {/* Update Info */}
               {updateInfo && (
                 <div className="space-y-4">
-                  <div>
+                      <div>
                     <label className="form-label text-base font-semibold">Update Information</label>
                     <p className="text-sm text-gray-600 mt-1">Current update status and available versions</p>
                   </div>
