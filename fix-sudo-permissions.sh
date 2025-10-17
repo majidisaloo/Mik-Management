@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Manual sudoers setup for Mik-Management
-echo "Manual sudoers setup for Mik-Management..."
+# Quick fix for sudo permissions on Ubuntu
+echo "Quick fix for sudo permissions on Ubuntu..."
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
@@ -9,7 +9,7 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-echo "Setting up sudoers for www-data..."
+echo "Fixing sudo permissions for www-data..."
 
 # Remove existing sudoers file if it exists
 if [ -f /etc/sudoers.d/99-mik-management-www-data ]; then
@@ -17,7 +17,7 @@ if [ -f /etc/sudoers.d/99-mik-management-www-data ]; then
     rm /etc/sudoers.d/99-mik-management-www-data
 fi
 
-# Create sudoers file with proper syntax
+# Create sudoers file
 cat > /etc/sudoers.d/99-mik-management-www-data << 'EOF'
 # Allow www-data to run specific commands for Mik-Management updates
 www-data ALL=(ALL) NOPASSWD: /usr/bin/git pull origin main
@@ -74,5 +74,5 @@ else
     echo "❌ NPM command failed"
 fi
 
-echo "Sudoers setup complete!"
+echo "Sudo permissions fixed!"
 echo "You can now test the update system in the web interface."
