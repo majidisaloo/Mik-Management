@@ -2874,11 +2874,13 @@ const initializeDatabase = async (databasePath) => {
 
             if (response.ok) {
               const data = await response.json();
+              console.log(`🔍 API Response for ${apiUrl}:`, JSON.stringify(data, null, 2));
+              
               apiStatus = 'online';
-              firmwareVersion = data[0]?.version || 'Unknown';
-              apiOutput = JSON.stringify(data[0], null, 2);
+              firmwareVersion = data[0]?.version || data?.version || 'Unknown';
+              apiOutput = JSON.stringify(data[0] || data, null, 2);
               console.log(`✅ MikroTik API connection successful via ${method.protocol}:${method.port}. Firmware: ${firmwareVersion}`);
-              console.log(`API Data:`, data[0]);
+              console.log(`API Data:`, data[0] || data);
               break; // Success, exit the loop
             } else {
               console.log(`❌ MikroTik API connection failed via ${method.protocol}:${method.port}: HTTP ${response.status}: ${response.statusText}`);

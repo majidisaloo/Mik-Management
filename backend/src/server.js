@@ -2541,29 +2541,32 @@ const bootstrap = async () => {
 
             if (response.ok) {
               const data = await response.json();
+              console.log(`🔍 API Response for ${apiUrl}:`, JSON.stringify(data, null, 2));
+              
               successfulConnection = {
                 url: apiUrl,
                 protocol: endpoint.protocol,
                 port: endpoint.port,
-                data: data[0],
-                firmwareVersion: data[0]?.version,
+                data: data[0] || data,
+                firmwareVersion: data[0]?.version || data?.version || 'Unknown',
                 responseHeaders: Object.fromEntries(response.headers.entries())
               };
 
               diagnostics.tests.push({
                 name: testName,
                 status: 'success',
-                details: `✅ Connection successful! Firmware: ${data[0]?.version || 'Unknown'}`,
+                details: `✅ Connection successful! Firmware: ${data[0]?.version || data?.version || 'Unknown'}`,
                 data: {
                   url: apiUrl,
-                  firmwareVersion: data[0]?.version,
-                  architecture: data[0]?.['architecture-name'],
-                  boardName: data[0]?.['board-name'],
-                  uptime: data[0]?.uptime
+                  firmwareVersion: data[0]?.version || data?.version,
+                  architecture: data[0]?.['architecture-name'] || data?.['architecture-name'],
+                  boardName: data[0]?.['board-name'] || data?.['board-name'],
+                  uptime: data[0]?.uptime || data?.uptime,
+                  fullResponse: data
                 }
               });
 
-              console.log(`✅ Success: ${apiUrl} - Firmware: ${data[0]?.version}`);
+              console.log(`✅ Success: ${apiUrl} - Firmware: ${data[0]?.version || data?.version}`);
               break; // Stop on first successful connection
             } else {
               diagnostics.tests.push({
