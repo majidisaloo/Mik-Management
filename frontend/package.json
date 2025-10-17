@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:version": "echo 'Building with commit count:' && git rev-list --count HEAD && vite build",
     "preview": "vite preview",
     "lint": "eslint ."
   },

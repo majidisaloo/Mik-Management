@@ -91,7 +91,10 @@ const Layout = () => {
 
   // Get commit count and format version
   const commitCount = Number(import.meta.env.VITE_COMMIT_COUNT ?? 0);
+  console.log('Layout - VITE_COMMIT_COUNT:', import.meta.env.VITE_COMMIT_COUNT);
+  console.log('Layout - commitCount:', commitCount);
   const version = formatCommitVersion(commitCount);
+  console.log('Layout - final version:', version);
 
   // Navigation items
   const navigation = useMemo(() => [
