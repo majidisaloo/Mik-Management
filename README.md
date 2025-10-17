@@ -89,17 +89,42 @@ sudo apt install nginx nodejs npm rpm -y
 sudo rm -rf /opt/mik-management
 sudo git clone https://github.com/majidisaloo/Mik-Management.git /opt/mik-management
 
+# Backend setup
 cd /opt/mik-management/backend
 npm install
 npm run prepare:db
-npm install -g pm2
-pm2 start src/server.js --name mik-api
-pm2 save
 
+# Create systemd service for backend
+sudo tee /etc/systemd/system/mik-management-backend.service <<'EOF'
+[Unit]
+Description=Mik-Management Backend API
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/mik-management/backend
+ExecStart=/usr/bin/node src/server.js
+Environment=PORT=3000
+Environment=NODE_ENV=production
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start backend service
+sudo systemctl daemon-reload
+sudo systemctl enable mik-management-backend
+sudo systemctl start mik-management-backend
+
+# Frontend setup
 cd /opt/mik-management/frontend
 npm install
 npm run build
 
+# Nginx configuration
 sudo tee /etc/nginx/sites-available/mik-management <<'NGINX'
 server {
     listen 80;
@@ -109,22 +134,31 @@ server {
     index index.html;
 
     location /api/ {
-        proxy_pass http://127.0.0.1:4000/api/;
+        proxy_pass http://127.0.0.1:3000/api/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection keep-alive;
         proxy_set_header Host $host;
         proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
     }
 
     location / {
-        try_files $uri /index.html;
+        try_files $uri $uri/ /index.html;
     }
 }
 NGINX
 
 sudo ln -sf /etc/nginx/sites-available/mik-management /etc/nginx/sites-enabled/mik-management
 sudo nginx -t && sudo systemctl reload nginx
+
+# Verify services
+sudo systemctl status mik-management-backend
+sudo systemctl status nginx
+curl http://localhost/api/users
 ```
 
 ## Production Deployment on Ubuntu with Nginx
@@ -168,31 +202,85 @@ sudo nginx -t && sudo systemctl reload nginx
 From `/opt/mik-management` on the server (systemd-managed backend):
 
 ```bash
+# Stop services
 sudo systemctl stop nginx
+sudo systemctl stop mik-management-backend
+
+# Update code
 cd /opt/mik-management
 sudo git pull --ff-only
 
-# Backend
+# Fix ownership issues
+sudo chown -R root:root /opt/mik-management
+git config --global --add safe.directory /opt/mik-management
+sudo chown -R www-data:www-data /opt/mik-management
+
+# Backend update
 cd backend
 npm install
 npm run prepare:db
 
-# Restart systemd backend
-sudo systemctl restart mik-management-backend
-sudo systemctl status mik-management-backend --no-pager
-
-# Frontend
+# Frontend update
 cd ../frontend
 npm install
 npm run build
-```
 
-To refresh the Nginx content:
-
-```bash
+# Restart services
+sudo systemctl start mik-management-backend
 sudo systemctl start nginx
-sudo nginx -t && sudo systemctl reload nginx
+
+# Verify services
+sudo systemctl status mik-management-backend --no-pager
+sudo systemctl status nginx --no-pager
+curl http://localhost/api/users
 ```
+
+## Troubleshooting
+
+### Users not loading in frontend
+If users are not displayed in the Users & Roles page:
+
+1. **Check backend logs:**
+   ```bash
+   sudo journalctl -u mik-management-backend -f
+   ```
+
+2. **Test API directly:**
+   ```bash
+   curl http://localhost/api/users
+   curl http://localhost/api/roles
+   ```
+
+3. **Check frontend logs:**
+   ```bash
+   sudo journalctl -u mik-management-frontend -f
+   ```
+
+4. **Verify database:**
+   ```bash
+   ls -la /opt/mik-management/backend/data/
+   ```
+
+### Port conflicts
+If you get port conflicts:
+
+1. **Check what's using the port:**
+   ```bash
+   sudo netstat -tlnp | grep :3000
+   sudo netstat -tlnp | grep :5173
+   ```
+
+2. **Kill conflicting processes:**
+   ```bash
+   sudo pkill -f "node.*server.js"
+   sudo pkill -f "vite"
+   ```
+
+3. **Restart services:**
+   ```bash
+   sudo systemctl restart mik-management-backend
+   sudo systemctl restart mik-management-frontend
+   ```
 
 ## Systemd + Nginx Deployment (example configs)
 
