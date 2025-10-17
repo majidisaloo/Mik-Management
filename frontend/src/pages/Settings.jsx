@@ -721,7 +721,7 @@ const Settings = () => {
                         <h3 className="font-semibold text-primary">Configuration</h3>
                         <p className="text-sm text-tertiary">System configuration</p>
                       </div>
-                        </div>
+                    </div>
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-tertiary">Config File:</span>
