@@ -1859,6 +1859,28 @@ const bootstrap = async () => {
       }
     };
 
+    const handleGetMikrotik = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        const device = await db.getMikrotikById(deviceId);
+
+        if (!device) {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        const groups = await db.listGroups();
+        sendJson(res, 200, mapMikrotik(device, groups));
+      } catch (error) {
+        console.error('Get Mikrotik error', error);
+        sendJson(res, 500, { message: 'Unable to load the requested Mikrotik device.' });
+      }
+    };
+
     const handleCreateMikrotik = async () => {
       const body = await parseJsonBody(req);
       const { name, host, groupId, tags, notes, routeros, status } = body ?? {};
@@ -3043,6 +3065,11 @@ const bootstrap = async () => {
       if (resourceSegments[0] === 'mikrotiks' && resourceSegments.length === 2) {
         const idSegment = resourceSegments[1];
         const deviceId = Number.parseInt(idSegment, 10);
+
+        if (method === 'GET') {
+          await handleGetMikrotik(deviceId);
+          return;
+        }
 
         if (method === 'PUT') {
           await handleUpdateMikrotik(deviceId);

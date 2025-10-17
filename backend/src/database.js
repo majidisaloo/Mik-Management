@@ -2620,6 +2620,22 @@ const initializeDatabase = async (databasePath) => {
       }));
     },
 
+    async getMikrotikById(id) {
+      const state = await load();
+      const device = state.mikrotiks.find((device) => device.id === id);
+      if (!device) {
+        return null;
+      }
+      return {
+        ...device,
+        tags: Array.isArray(device.tags) ? [...device.tags] : [],
+        connectivity: {
+          api: { ...(device.connectivity?.api ?? {}) },
+          ssh: { ...(device.connectivity?.ssh ?? {}) }
+        }
+      };
+    },
+
     async createMikrotik({ name, host, groupId, tags, notes, routeros, status, connectivity }) {
       const state = await load();
 
