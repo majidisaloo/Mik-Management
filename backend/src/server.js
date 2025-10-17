@@ -1440,32 +1440,35 @@ const bootstrap = async () => {
         const isRoot = process.getuid && process.getuid() === 0;
         const useSudo = !isRoot;
         
+        // Use sudo with NOPASSWD configuration
+        const sudoPrefix = useSudo ? 'sudo -n' : '';
+        
         // Pull latest changes
-        const gitCommand = useSudo ? 'sudo git pull origin main' : 'git pull origin main';
+        const gitCommand = `${sudoPrefix} git pull origin main`;
         execSync(gitCommand, { cwd: process.cwd() });
         
         // Install backend dependencies
-        const backendInstallCommand = useSudo ? 'sudo npm install' : 'npm install';
+        const backendInstallCommand = `${sudoPrefix} npm install`;
         execSync(backendInstallCommand, { cwd: process.cwd() });
         
         // For frontend updates
         const frontendPath = path.join(process.cwd(), 'frontend');
         if (fs.existsSync(frontendPath)) {
-          const frontendInstallCommand = useSudo ? 'sudo npm install' : 'npm install';
-          const frontendBuildCommand = useSudo ? 'sudo npm run build' : 'npm run build';
+          const frontendInstallCommand = `${sudoPrefix} npm install`;
+          const frontendBuildCommand = `${sudoPrefix} npm run build`;
           
           execSync(frontendInstallCommand, { cwd: frontendPath });
           execSync(frontendBuildCommand, { cwd: frontendPath });
           
           // Fix ownership after sudo operations
           if (useSudo) {
-            execSync('sudo chown -R www-data:www-data .', { cwd: frontendPath });
+            execSync('sudo -n chown -R www-data:www-data .', { cwd: frontendPath });
           }
         }
         
         // Fix ownership for backend as well
         if (useSudo) {
-          execSync('sudo chown -R www-data:www-data .', { cwd: process.cwd() });
+          execSync('sudo -n chown -R www-data:www-data .', { cwd: process.cwd() });
         }
         
         sendJson(res, 200, { 
