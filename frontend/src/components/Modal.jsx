@@ -22,18 +22,21 @@ const renderActions = (actions) => {
 
 const Modal = ({ title, description, children, actions, onClose, open = false }) => {
   const dialogRef = useRef(null);
+  const hasFocusedRef = useRef(false);
 
   useEffect(() => {
     if (!open) {
+      hasFocusedRef.current = false;
       return undefined;
     }
 
     const previouslyFocused = document.activeElement;
     const dialog = dialogRef.current;
 
-    if (dialog) {
+    // Only focus on initial open, not on every re-render
+    if (dialog && !hasFocusedRef.current) {
       const focusable = dialog.querySelector(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        'input, select, textarea, button:not(.modal__close), [href], [tabindex]:not([tabindex="-1"])'
       );
 
       if (focusable) {
@@ -41,6 +44,8 @@ const Modal = ({ title, description, children, actions, onClose, open = false })
       } else {
         dialog.focus();
       }
+      
+      hasFocusedRef.current = true;
     }
 
     const handleKeyDown = (event) => {
