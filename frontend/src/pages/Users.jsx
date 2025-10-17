@@ -547,6 +547,7 @@ const Users = () => {
                   placeholder={isEditing ? 'Leave blank to keep current' : 'Confirm password'}
                 />
               </div>
+            </div>
           </div>
 
           <div className="modal__footer">
