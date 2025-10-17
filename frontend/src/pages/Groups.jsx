@@ -487,14 +487,14 @@ const Groups = () => {
   }
 
   return (
-        <div className="space-y-6">
+        <div className="space-y-6 groups-page">
           {/* Header */}
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="btn btn--secondary btn--md flex items-center justify-center min-w-[120px] h-10 px-4 text-sm"
+                  className="btn btn--secondary"
                   onClick={() => {
                     // Expand all groups
                     const allGroupIds = new Set();
@@ -514,7 +514,7 @@ const Groups = () => {
                 </button>
                 <button
                   type="button"
-                  className="btn btn--primary btn--md flex items-center justify-center min-w-[120px] h-10 px-4 text-sm gap-2"
+                  className="btn btn--primary"
                   onClick={handleNewGroup}
                 >
                   <PlusIcon />

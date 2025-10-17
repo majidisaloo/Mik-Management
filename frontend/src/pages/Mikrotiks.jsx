@@ -840,32 +840,19 @@ const Mikrotiks = () => {
               <label htmlFor="device-group" className="form-label">
                 Group
               </label>
-              <div className="group-tree-container">
-                <div 
-                  className={`tree-item tree-item--no-group ${!form.groupId ? 'tree-item--selected' : ''}`}
-                  onClick={() => setForm({ ...form, groupId: '' })}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      setForm({ ...form, groupId: '' });
-                    }
-                  }}
-                  tabIndex={0}
-                  role="button"
-                  aria-label="No group"
-                  aria-selected={!form.groupId}
-                >
-                  <div className="tree-indent">
-                    <div className="tree-spacer" />
-                  </div>
-                  <div className="tree-icon">
-                    <FolderIcon />
-                  </div>
-                  <div className="tree-content">
-                    <div className="tree-name">No group</div>
-                  </div>
-                </div>
-                {groupTree.map((node) => renderGroupNode(node))}
-              </div>
+              <select
+                id="device-group"
+                className="form-input form-select"
+                value={form.groupId}
+                onChange={(e) => setForm({ ...form, groupId: e.target.value })}
+              >
+                <option value="">No group</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="form-group">

@@ -1,5 +1,38 @@
 /* Groups page - Windows Explorer-like tree styles */
 
+/* Groups page specific button styles */
+.groups-page .btn--secondary {
+  min-width: 120px !important;
+  height: 40px !important;
+  padding: 8px 16px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.groups-page .btn--primary {
+  min-width: 120px !important;
+  height: 40px !important;
+  padding: 8px 16px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.groups-page .btn--secondary,
+.groups-page .btn--primary {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+}
+
+.groups-page .btn--secondary:hover,
+.groups-page .btn--primary:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
 /* Tree container */
 .tree-container {
   background: var(--surface-elevated);
