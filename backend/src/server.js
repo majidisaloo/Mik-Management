@@ -8,6 +8,13 @@ import path from 'path';
 import initializeDatabase, { resolveDatabaseFile } from './database.js';
 import { ensureDatabaseConfig, getConfigFilePath } from './config.js';
 import getProjectVersion from './version.js';
+import { 
+  getVersionInfo, 
+  getStableVersion, 
+  getBetaVersion, 
+  isBetaAhead, 
+  promoteBetaToStable 
+} from './version-manager.js';
 
 // Helper functions for version management
 const getCommitCount = async () => {
@@ -1412,66 +1419,54 @@ const bootstrap = async () => {
 
     const handleCheckUpdates = async () => {
       try {
-        const currentCommitCount = await getCommitCount();
-        const currentVersion = formatVersion(currentCommitCount);
-        
-        // Get version channel from request body or default to 'stable'
+        const versionInfo = getVersionInfo();
         const body = await parseJsonBody(req);
         const channel = body?.channel || 'stable';
         
         console.log(`=== Update Check Request ===`);
         console.log(`Channel: ${channel}`);
-        console.log(`Current commit count: ${currentCommitCount}`);
-        console.log(`Current version: ${currentVersion}`);
+        console.log(`Stable version: ${versionInfo.stableVersion}`);
+        console.log(`Beta version: ${versionInfo.betaVersion}`);
+        console.log(`Beta ahead: ${versionInfo.isBetaAhead}`);
         
-        // Check for updates based on channel
-        let latestVersion = null;
-        let updateAvailable = false;
         let updateInfo = null;
+        let updateAvailable = false;
         
         if (channel === 'beta') {
-          // For beta, check latest commit count
-          const latestCommitCount = await getLatestCommitCount();
-          console.log(`Update check - Current: ${currentCommitCount}, Latest: ${latestCommitCount}`);
-          
-          if (latestCommitCount > currentCommitCount) {
-            latestVersion = `${formatVersion(latestCommitCount)}-beta`;
-            updateAvailable = true;
-            updateInfo = {
-              currentVersion,
-              latestVersion,
-              channel: 'beta',
-              commitCount: latestCommitCount,
-              updateSize: latestCommitCount - currentCommitCount
-            };
-            console.log(`Update available: ${currentVersion} -> ${latestVersion}`);
-          } else {
-            console.log('No updates available for beta channel');
-            updateInfo = {
-              currentVersion,
-              latestVersion: `${currentVersion}-beta`,
-              channel: 'beta',
-              message: 'You are up to date!'
-            };
-          }
-        } else {
-          // For stable, use current stable version (no updates for stable)
-          const currentStableVersion = await getCurrentStableVersion();
-          latestVersion = currentStableVersion;
-          updateAvailable = false;
+          // For beta channel, show beta version as current
           updateInfo = {
-            currentVersion,
-            latestVersion,
-            channel: 'stable',
-            isStableRelease: true,
-            message: 'Stable version - no updates available'
+            currentVersion: versionInfo.betaVersion,
+            latestVersion: versionInfo.betaVersion,
+            channel: 'beta',
+            stableVersion: versionInfo.stableVersion,
+            betaVersion: versionInfo.betaVersion,
+            isBetaAhead: versionInfo.isBetaAhead,
+            message: 'You are on the latest beta version!'
           };
+        } else {
+          // For stable channel, show stable version as current
+          updateInfo = {
+            currentVersion: versionInfo.stableVersion,
+            latestVersion: versionInfo.stableVersion,
+            channel: 'stable',
+            stableVersion: versionInfo.stableVersion,
+            betaVersion: versionInfo.betaVersion,
+            isBetaAhead: versionInfo.isBetaAhead,
+            message: 'You are on the latest stable version!'
+          };
+          
+          // Check if there's a newer beta available
+          if (versionInfo.isBetaAhead) {
+            updateAvailable = true;
+            updateInfo.latestVersion = versionInfo.betaVersion;
+            updateInfo.message = `New beta version available: ${versionInfo.betaVersion}`;
+          }
         }
         
         sendJson(res, 200, {
           updateAvailable,
-          currentVersion,
-          latestVersion,
+          currentVersion: updateInfo.currentVersion,
+          latestVersion: updateInfo.latestVersion,
           channel,
           updateInfo
         });

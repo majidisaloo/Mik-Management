@@ -556,7 +556,7 @@ const Settings = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="font-mono text-lg font-bold text-green-900">
-                          {updateInfo?.currentVersion ? updateInfo.currentVersion.replace('-beta', '') : 'Loading...'}
+                          {updateInfo?.stableVersion || updateInfo?.currentVersion?.replace('-beta', '') || 'Loading...'}
                         </span>
                         <div className="text-sm text-green-600 mt-1">Stable Version</div>
                       </div>
@@ -569,7 +569,7 @@ const Settings = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="font-mono text-lg font-bold text-orange-900">
-                          {updateInfo?.currentVersion || 'Loading...'}
+                          {updateInfo?.betaVersion || updateInfo?.currentVersion || 'Loading...'}
                         </span>
                         <div className="text-sm text-orange-600 mt-1">Beta Version</div>
                       </div>
