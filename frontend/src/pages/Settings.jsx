@@ -545,14 +545,33 @@ const Settings = () => {
                   <label className="form-label text-base font-semibold">Current Version</label>
                   <p className="text-sm text-gray-600 mt-1">Your current system version</p>
                 </div>
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <span className="font-mono text-xl font-bold text-blue-900">
-                        {updateInfo?.currentVersion || 'Loading...'}
-                      </span>
-                      <div className="text-sm text-blue-600 mt-1">System Version</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Stable Version */}
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-mono text-lg font-bold text-green-900">
+                          {updateInfo?.currentVersion?.replace('-beta', '') || 'Loading...'}
+                        </span>
+                        <div className="text-sm text-green-600 mt-1">Stable Version</div>
+                      </div>
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                     </div>
+                  </div>
+                  
+                  {/* Beta Version */}
+                  <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-mono text-lg font-bold text-orange-900">
+                          {updateInfo?.currentVersion || 'Loading...'}
+                        </span>
+                        <div className="text-sm text-orange-600 mt-1">Beta Version</div>
+                      </div>
+                      <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                    </div>
+                  </div>
+                </div>
                     {lastCheckTime && (
                       <div className="text-right">
                         <div className="text-xs text-blue-500">

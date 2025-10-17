@@ -1,4 +1,4 @@
-export const formatCommitVersion = (commitCount) => {
+export const formatCommitVersion = (commitCount, channel = 'beta') => {
   if (!Number.isInteger(commitCount) || commitCount < 0) {
     console.warn('Invalid commit count:', commitCount);
     return '0.0';
@@ -10,9 +10,11 @@ export const formatCommitVersion = (commitCount) => {
   const minor = commitCount % 100;
   
   const version = `${major}.${minor.toString().padStart(2, '0')}`;
-  console.log(`Version calculation: ${commitCount} commits -> v${version}`);
+  const suffix = channel === 'beta' ? '-beta' : '';
   
-  return version;
+  console.log(`Version calculation: ${commitCount} commits -> v${version}${suffix} (${channel})`);
+  
+  return `${version}${suffix}`;
 };
 
 export const getVersion = () => {

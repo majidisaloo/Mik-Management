@@ -37,11 +37,25 @@ const getLatestCommitCount = async () => {
 const getLatestStableVersion = async () => {
   try {
     const { execSync } = await import('child_process');
-    // Check for latest stable tag
+    // Check for latest stable tag (without -beta suffix)
     const tags = execSync('git tag --sort=-version:refname | grep -E "^v[0-9]+\\.[0-9]+$" | head -1', { encoding: 'utf8' }).trim();
     return tags || null;
   } catch (error) {
     console.error('Error getting latest stable version:', error);
+    return null;
+  }
+};
+
+const getCurrentStableVersion = async () => {
+  try {
+    const { execSync } = await import('child_process');
+    // Get the last stable version (without -beta suffix)
+    const currentCommitCount = getCommitCount();
+    const major = Math.floor(currentCommitCount / 100);
+    const minor = currentCommitCount % 100;
+    return `v${major}.${minor.toString().padStart(2, '0')}`;
+  } catch (error) {
+    console.error('Error getting current stable version:', error);
     return null;
   }
 };
@@ -1391,7 +1405,7 @@ const bootstrap = async () => {
           // For beta, check latest commit count
           const latestCommitCount = await getLatestCommitCount();
           if (latestCommitCount > currentCommitCount) {
-            latestVersion = formatVersion(latestCommitCount);
+            latestVersion = `${formatVersion(latestCommitCount)}-beta`;
             updateAvailable = true;
             updateInfo = {
               currentVersion,
@@ -1402,18 +1416,17 @@ const bootstrap = async () => {
             };
           }
         } else {
-          // For stable, check if there's a stable release
-          const stableVersion = await getLatestStableVersion();
-          if (stableVersion && stableVersion !== currentVersion) {
-            latestVersion = stableVersion;
-            updateAvailable = true;
-            updateInfo = {
-              currentVersion,
-              latestVersion,
-              channel: 'stable',
-              isStableRelease: true
-            };
-          }
+          // For stable, use current stable version (no updates for stable)
+          const currentStableVersion = await getCurrentStableVersion();
+          latestVersion = currentStableVersion;
+          updateAvailable = false;
+          updateInfo = {
+            currentVersion,
+            latestVersion,
+            channel: 'stable',
+            isStableRelease: true,
+            message: 'Stable version - no updates available'
+          };
         }
         
         sendJson(res, 200, {
