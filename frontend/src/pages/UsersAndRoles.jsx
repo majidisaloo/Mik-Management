@@ -104,6 +104,7 @@ const UsersAndRoles = () => {
   // Roles state
   const [roles, setRoles] = useState([]);
   const [roleSearchTerm, setRoleSearchTerm] = useState('');
+  const [debouncedRoleSearch, setDebouncedRoleSearch] = useState('');
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [isEditingRole, setIsEditingRole] = useState(false);
   const [selectedRoleId, setSelectedRoleId] = useState(null);
@@ -132,17 +133,26 @@ const UsersAndRoles = () => {
     return filtered;
   }, [users, userSearchTerm, userFilterRole]);
 
+  // Debounce role search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedRoleSearch(roleSearchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [roleSearchTerm]);
+
   // Filter roles
   const filteredRoles = useMemo(() => {
-    if (!roleSearchTerm) return roles;
+    if (!debouncedRoleSearch) return roles;
     
-    const term = roleSearchTerm.toLowerCase();
+    const term = debouncedRoleSearch.toLowerCase();
     return roles.filter(role => 
       role.name.toLowerCase().includes(term) ||
       role.description?.toLowerCase().includes(term) ||
       role.permissions?.some(p => p.toLowerCase().includes(term))
     );
-  }, [roles, roleSearchTerm]);
+  }, [roles, debouncedRoleSearch]);
 
   // Load users
   const loadUsers = async () => {
@@ -255,14 +265,22 @@ const UsersAndRoles = () => {
   // Role handlers
   const handleCreateRole = async () => {
     try {
+      if (!roleForm.name.trim()) {
+        setStatus({
+          type: 'error',
+          message: 'Role name is required.'
+        });
+        return;
+      }
+
       const response = await fetch('/api/roles', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          name: roleForm.name,
-          description: roleForm.description,
+          name: roleForm.name.trim(),
+          description: roleForm.description?.trim() || '',
           permissions: roleForm.permissions
         })
       });
@@ -290,14 +308,22 @@ const UsersAndRoles = () => {
 
   const handleUpdateRole = async () => {
     try {
+      if (!roleForm.name.trim()) {
+        setStatus({
+          type: 'error',
+          message: 'Role name is required.'
+        });
+        return;
+      }
+
       const response = await fetch(`/api/roles/${selectedRoleId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          name: roleForm.name,
-          description: roleForm.description,
+          name: roleForm.name.trim(),
+          description: roleForm.description?.trim() || '',
           permissions: roleForm.permissions
         })
       });
@@ -326,7 +352,8 @@ const UsersAndRoles = () => {
   };
 
   const handleDeleteRole = async (roleId) => {
-    if (!confirm('Are you sure you want to delete this role?')) {
+    const role = roles.find(r => r.id === roleId);
+    if (!confirm(`Are you sure you want to delete the role "${role?.name || 'Unknown'}"?`)) {
       return;
     }
 
@@ -343,7 +370,7 @@ const UsersAndRoles = () => {
       await loadRoles();
       setStatus({
         type: 'success',
-        message: 'Role deleted successfully.'
+        message: `Role "${role?.name || 'Unknown'}" deleted successfully.`
       });
     } catch (error) {
       setStatus({
@@ -363,7 +390,7 @@ const UsersAndRoles = () => {
     setSelectedRoleId(role.id);
     setIsEditingRole(true);
     setShowRoleModal(true);
-    console.log('Role modal should be open now');
+    console.log('Role modal should be open now, showRoleModal:', true);
   };
 
   const handleNewRole = () => {
@@ -569,6 +596,21 @@ const UsersAndRoles = () => {
               >
                 <PlusIcon />
                 Create First Role
+              </button>
+            </div>
+          ) : filteredRoles.length === 0 && debouncedRoleSearch ? (
+            <div className="roles-empty">
+              <div className="roles-empty-icon">
+                <SearchIcon />
+              </div>
+              <h3>No roles found</h3>
+              <p>No roles match your search term "{debouncedRoleSearch}".</p>
+              <button
+                type="button"
+                className="btn btn--secondary"
+                onClick={() => setRoleSearchTerm('')}
+              >
+                Clear Search
               </button>
             </div>
           ) : (
