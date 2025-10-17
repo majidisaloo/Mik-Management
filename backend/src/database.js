@@ -2845,12 +2845,12 @@ const initializeDatabase = async (databasePath) => {
       let firmwareVersion = routerosBaseline.firmwareVersion;
 
       if (routerosBaseline.apiEnabled) {
-        // Try multiple connection methods
+        // Try multiple connection methods - prioritize working ports based on diagnostics
         const connectionMethods = [
+          { protocol: 'http', port: 80 }, // Prioritize HTTP port 80 since it works
           { protocol: 'https', port: 443 },
-          { protocol: 'http', port: 80 },
-          { protocol: 'https', port: routerosBaseline.apiPort || 443 },
-          { protocol: 'http', port: routerosBaseline.apiPort || 80 }
+          { protocol: 'http', port: routerosBaseline.apiPort || 80 },
+          { protocol: 'https', port: routerosBaseline.apiPort || 443 }
         ];
 
         for (const method of connectionMethods) {
@@ -2895,17 +2895,60 @@ const initializeDatabase = async (databasePath) => {
         }
       }
 
-      // SSH connection test (simplified for now)
+      // SSH connection test
       let sshStatus = 'disabled';
       let sshError = null;
       let sshOutput = null;
 
       if (routerosBaseline.sshEnabled) {
-        // For now, we'll simulate SSH status based on API status
-        // In a real implementation, you would use an SSH library like ssh2
-        sshStatus = apiStatus === 'online' ? 'online' : 'offline';
-        sshError = apiStatus === 'offline' ? 'SSH connection failed' : null;
-        sshOutput = sshStatus === 'online' ? 'SSH connection successful' : null;
+        try {
+          // Test SSH connection using net.Socket
+          const net = require('net');
+          const sshPort = routerosBaseline.sshPort || 22;
+          
+          console.log(`Testing SSH connection to ${host}:${sshPort}`);
+          
+          const sshTest = new Promise((resolve) => {
+            const socket = new net.Socket();
+            const timeout = 5000; // 5 second timeout
+            
+            socket.setTimeout(timeout);
+            
+            socket.on('connect', () => {
+              console.log(`✅ SSH connection successful to ${host}:${sshPort}`);
+              socket.destroy();
+              resolve({ success: true, message: 'SSH port is open and accessible' });
+            });
+            
+            socket.on('timeout', () => {
+              console.log(`❌ SSH connection timeout to ${host}:${sshPort}`);
+              socket.destroy();
+              resolve({ success: false, message: 'SSH connection timeout' });
+            });
+            
+            socket.on('error', (err) => {
+              console.log(`❌ SSH connection error to ${host}:${sshPort}: ${err.message}`);
+              resolve({ success: false, message: `SSH connection failed: ${err.message}` });
+            });
+            
+            socket.connect(sshPort, host);
+          });
+          
+          const sshResult = await sshTest;
+          
+          if (sshResult.success) {
+            sshStatus = 'online';
+            sshOutput = 'SSH port is accessible. Connection test successful.';
+          } else {
+            sshStatus = 'offline';
+            sshError = sshResult.message;
+          }
+          
+        } catch (error) {
+          console.log(`❌ SSH test error: ${error.message}`);
+          sshStatus = 'offline';
+          sshError = `SSH test failed: ${error.message}`;
+        }
       }
 
       const connectivity = sanitizeConnectivity(

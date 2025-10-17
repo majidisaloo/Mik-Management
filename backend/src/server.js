@@ -2490,7 +2490,7 @@ const bootstrap = async () => {
         });
 
         // Test 2: Port availability
-        const testPorts = [443, 80, 8728, 8729, port].filter(p => p).filter((v, i, a) => a.indexOf(v) === i);
+        const testPorts = [443, 80, 22, 8728, 8729, port].filter(p => p).filter((v, i, a) => a.indexOf(v) === i);
         
         for (const testPort of testPorts) {
           diagnostics.tests.push({
@@ -2500,12 +2500,21 @@ const bootstrap = async () => {
           });
         }
 
-        // Test 3: HTTP/HTTPS endpoints
+        // Test SSH connectivity
+        if (username && password) {
+          diagnostics.tests.push({
+            name: 'SSH Connection Test',
+            status: 'running',
+            details: `Testing SSH connection to ${host}:22`
+          });
+        }
+
+        // Test 3: HTTP/HTTPS endpoints - prioritize working ports
         const endpoints = [
+          { protocol: 'http', port: 80, path: '/rest/system/resource' }, // Prioritize HTTP port 80
           { protocol: 'https', port: 443, path: '/rest/system/resource' },
-          { protocol: 'http', port: 80, path: '/rest/system/resource' },
-          { protocol: 'https', port: port || 443, path: '/rest/system/resource' },
-          { protocol: 'http', port: port || 80, path: '/rest/system/resource' }
+          { protocol: 'http', port: port || 80, path: '/rest/system/resource' },
+          { protocol: 'https', port: port || 443, path: '/rest/system/resource' }
         ];
 
         let successfulConnection = null;
@@ -2624,6 +2633,72 @@ const bootstrap = async () => {
               }
             } catch (error) {
               // Skip alternative endpoint errors
+            }
+          }
+        }
+
+        // Test SSH connectivity
+        if (username && password) {
+          try {
+            const net = require('net');
+            const sshPort = 22;
+            
+            const sshTest = new Promise((resolve) => {
+              const socket = new net.Socket();
+              const timeout = 5000;
+              
+              socket.setTimeout(timeout);
+              
+              socket.on('connect', () => {
+                socket.destroy();
+                resolve({ success: true, message: 'SSH port is open and accessible' });
+              });
+              
+              socket.on('timeout', () => {
+                socket.destroy();
+                resolve({ success: false, message: 'SSH connection timeout' });
+              });
+              
+              socket.on('error', (err) => {
+                resolve({ success: false, message: `SSH connection failed: ${err.message}` });
+              });
+              
+              socket.connect(sshPort, host);
+            });
+            
+            const sshResult = await sshTest;
+            
+            // Update SSH test result
+            const sshTestIndex = diagnostics.tests.findIndex(t => t.name === 'SSH Connection Test');
+            if (sshTestIndex !== -1) {
+              diagnostics.tests[sshTestIndex] = {
+                name: 'SSH Connection Test',
+                status: sshResult.success ? 'success' : 'failed',
+                details: sshResult.success ? 
+                  `✅ SSH connection successful to ${host}:${sshPort}` : 
+                  `❌ SSH connection failed: ${sshResult.message}`,
+                data: {
+                  host,
+                  port: sshPort,
+                  success: sshResult.success,
+                  message: sshResult.message
+                }
+              };
+            }
+            
+          } catch (error) {
+            const sshTestIndex = diagnostics.tests.findIndex(t => t.name === 'SSH Connection Test');
+            if (sshTestIndex !== -1) {
+              diagnostics.tests[sshTestIndex] = {
+                name: 'SSH Connection Test',
+                status: 'error',
+                details: `❌ SSH test error: ${error.message}`,
+                data: {
+                  host,
+                  port: 22,
+                  error: error.message
+                }
+              };
             }
           }
         }
