@@ -494,7 +494,7 @@ const Groups = () => {
               <div className="flex items-center gap-4">
                 <button
                   type="button"
-                  className="btn btn--secondary btn--md"
+                  className="btn btn--secondary btn--md flex items-center justify-center min-w-[120px] h-10 px-4"
                   onClick={() => {
                     // Expand all groups
                     const allGroupIds = new Set();
@@ -514,7 +514,7 @@ const Groups = () => {
                 </button>
                 <button
                   type="button"
-                  className="btn btn--primary btn--md"
+                  className="btn btn--primary btn--md flex items-center justify-center min-w-[120px] h-10 px-4 gap-2"
                   onClick={handleNewGroup}
                 >
                   <PlusIcon />
