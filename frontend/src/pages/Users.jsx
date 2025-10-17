@@ -65,17 +65,17 @@ const Users = () => {
 
   // User form
   const [userForm, setUserForm] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    passwordConfirmation: '',
-    roleIds: []
+  firstName: '',
+  lastName: '',
+  email: '',
+  password: '',
+  passwordConfirmation: '',
+  roleIds: []
   });
 
   // Role form
   const [roleForm, setRoleForm] = useState({
-    name: '',
+  name: '',
     description: '',
     permissions: []
   });
@@ -105,29 +105,29 @@ const Users = () => {
   }, [users, searchTerm, filterRole]);
 
   const loadUsers = async () => {
-    try {
-      setLoading(true);
+      try {
+        setLoading(true);
       const response = await fetch('/api/users');
 
       if (!response.ok) {
-        throw new Error('Unable to load users.');
-      }
+          throw new Error('Unable to load users.');
+        }
 
       const payload = await response.json();
       // API returns { users: [...] } structure
       const usersArray = payload.users || payload;
       setUsers(Array.isArray(usersArray) ? usersArray : []);
-      setStatus({ type: '', message: '' });
-    } catch (error) {
+        setStatus({ type: '', message: '' });
+      } catch (error) {
       setUsers([]);
-      setStatus({
-        type: 'error',
+        setStatus({
+          type: 'error',
         message: error.message || 'Unable to load users.'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
   const loadRoles = async () => {
     try {
@@ -165,8 +165,8 @@ const Users = () => {
           type: 'error',
           message: 'Passwords do not match.'
         });
-        return;
-      }
+      return;
+    }
 
       const response = await fetch('/api/users', {
         method: 'POST',
@@ -283,7 +283,7 @@ const Users = () => {
     }
   };
 
-  if (loading) {
+    if (loading) {
     return (
       <div className="users-page">
         <div className="users-header">
@@ -304,7 +304,7 @@ const Users = () => {
         <div className="users-header">
           <h1 className="users-title">Users & Roles</h1>
           <p className="users-description">Manage system users and their permissions.</p>
-        </div>
+              </div>
         <div className="users-error">
           <div className="users-error-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -312,10 +312,10 @@ const Users = () => {
               <line x1="15" y1="9" x2="9" y2="15"/>
               <line x1="9" y1="9" x2="15" y2="15"/>
             </svg>
-          </div>
+              </div>
           <div className="users-error-title">Error Loading Users</div>
           <div className="users-error-description">{status.message}</div>
-        </div>
+            </div>
       </div>
     );
   }
@@ -328,23 +328,23 @@ const Users = () => {
       </div>
 
       <div className="users-actions">
-        <button
-          type="button"
+              <button
+                type="button"
           className="users-action-btn users-action-btn--secondary"
           onClick={handleNewRole}
-        >
+              >
           <ShieldIcon />
           New Role
-        </button>
-        <button
-          type="button"
+              </button>
+              <button
+                type="button"
           className="users-action-btn users-action-btn--primary"
           onClick={handleNewUser}
         >
           <UserIcon />
           New User
-        </button>
-      </div>
+              </button>
+            </div>
 
       <div className="users-filters">
         <div className="users-search">
@@ -370,7 +370,7 @@ const Users = () => {
               </option>
             ))}
           </select>
-        </div>
+    </div>
       </div>
 
       {filteredUsers.length === 0 ? (
@@ -378,7 +378,7 @@ const Users = () => {
           <div className="users-empty">
             <div className="users-empty-icon">
               <UserIcon />
-            </div>
+        </div>
             <div className="users-empty-title">No users found</div>
             <div className="users-empty-description">
               {searchTerm || filterRole
@@ -393,10 +393,10 @@ const Users = () => {
               >
                 <PlusIcon />
                 Create Your First User
-              </button>
-            )}
-          </div>
+            </button>
+          )}
         </div>
+      </div>
       ) : (
         <div className="users-content">
           <table className="users-table">
@@ -438,21 +438,21 @@ const Users = () => {
                   </td>
                   <td className="users-table-cell">
                     <div className="users-actions-cell">
-                      <button
-                        type="button"
+        <button
+          type="button"
                         className="users-action-icon"
                         title="Edit user"
                       >
                         <EditIcon />
-                      </button>
-                      <button
-                        type="button"
+        </button>
+        <button
+          type="button"
                         className="users-action-icon users-action-icon--danger"
                         title="Delete user"
                       >
                         <TrashIcon />
-                      </button>
-                    </div>
+        </button>
+      </div>
                   </td>
                 </tr>
               ))}
@@ -463,7 +463,7 @@ const Users = () => {
 
       {/* User Modal */}
       {showUserModal && (
-        <Modal
+      <Modal
           open={showUserModal}
           onClose={() => {
             console.log('User Modal onClose called');
@@ -474,62 +474,62 @@ const Users = () => {
           }}
           title={isEditing ? 'Edit User' : 'Create User'}
         >
-          <div className="space-y-4">
+          <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="form-group">
                 <label htmlFor="user-first-name" className="form-label">
                   First Name *
                 </label>
-                <input
+            <input
                   id="user-first-name"
                   type="text"
                   className="form-input"
                   value={userForm.firstName}
                   onChange={(e) => setUserForm({ ...userForm, firstName: e.target.value })}
                   placeholder="Enter first name"
-                  required
-                />
+              required
+            />
               </div>
 
               <div className="form-group">
                 <label htmlFor="user-last-name" className="form-label">
                   Last Name *
-                </label>
-                <input
+          </label>
+            <input
                   id="user-last-name"
                   type="text"
                   className="form-input"
                   value={userForm.lastName}
                   onChange={(e) => setUserForm({ ...userForm, lastName: e.target.value })}
                   placeholder="Enter last name"
-                  required
-                />
+              required
+            />
               </div>
             </div>
 
             <div className="form-group">
               <label htmlFor="user-email" className="form-label">
                 Email Address *
-              </label>
-              <input
+          </label>
+            <input
                 id="user-email"
-                type="email"
+              type="email"
                 className="form-input"
                 value={userForm.email}
                 onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
                 placeholder="Enter email address"
-                required
-              />
+              required
+            />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="form-group">
                 <label htmlFor="user-password" className="form-label">
                   Password {!isEditing && '*'}
-                </label>
-                <input
+          </label>
+            <input
                   id="user-password"
-                  type="password"
+              type="password"
                   className="form-input"
                   value={userForm.password}
                   onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
@@ -541,10 +541,10 @@ const Users = () => {
               <div className="form-group">
                 <label htmlFor="user-password-confirmation" className="form-label">
                   Confirm Password {!isEditing && '*'}
-                </label>
-                <input
+          </label>
+            <input
                   id="user-password-confirmation"
-                  type="password"
+              type="password"
                   className="form-input"
                   value={userForm.passwordConfirmation}
                   onChange={(e) => setUserForm({ ...userForm, passwordConfirmation: e.target.value })}
@@ -552,8 +552,8 @@ const Users = () => {
                   required={!isEditing}
                 />
               </div>
-            </div>
           </div>
+        </form>
 
           <div className="modal__footer">
             <button
@@ -576,12 +576,12 @@ const Users = () => {
               {isEditing ? 'Update User' : 'Create User'}
             </button>
           </div>
-        </Modal>
+      </Modal>
       )}
 
       {/* Role Modal */}
       {showRoleModal && (
-        <Modal
+      <Modal
           open={showRoleModal}
           onClose={() => {
             console.log('Role Modal onClose called');
@@ -590,11 +590,11 @@ const Users = () => {
           }}
           title="Create Role"
         >
-          <div className="space-y-4">
+          <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
             <div className="form-group">
               <label htmlFor="role-name" className="form-label">
                 Role Name *
-              </label>
+            </label>
               <input
                 id="role-name"
                 type="text"
@@ -609,7 +609,7 @@ const Users = () => {
             <div className="form-group">
               <label htmlFor="role-description" className="form-label">
                 Description
-              </label>
+            </label>
               <textarea
                 id="role-description"
                 className="form-input form-textarea"
@@ -633,7 +633,7 @@ const Users = () => {
                   { key: 'settings', label: 'Settings' }
                 ].map((permission) => (
                   <label key={permission.key} className="flex items-center gap-2">
-                    <input
+              <input
                       type="checkbox"
                       checked={roleForm.permissions.includes(permission.key)}
                       onChange={(e) => {
@@ -652,11 +652,11 @@ const Users = () => {
                       className="rounded border-primary text-primary focus:ring-focus"
                     />
                     <span className="text-sm">{permission.label}</span>
-                  </label>
+            </label>
                 ))}
               </div>
             </div>
-          </div>
+          </form>
 
           <div className="modal__footer">
             <button
@@ -677,7 +677,7 @@ const Users = () => {
               Create Role
             </button>
           </div>
-        </Modal>
+      </Modal>
       )}
 
       {/* Status Messages */}
