@@ -23,6 +23,10 @@ export const UpdateProvider = ({ children }) => {
     if (!autoCheckEnabled) return;
 
     try {
+      console.log(`=== Frontend Update Check ===`);
+      console.log(`Channel: ${updateChannel}`);
+      console.log(`Auto-check enabled: ${autoCheckEnabled}`);
+      
       const response = await fetch('/api/check-updates', {
         method: 'POST',
         headers: {
@@ -32,6 +36,8 @@ export const UpdateProvider = ({ children }) => {
       });
 
       const data = await response.json();
+      console.log('Update check response:', data);
+      
       if (response.ok) {
         const previousUpdateAvailable = updateInfo?.updateAvailable;
         setUpdateInfo(data);

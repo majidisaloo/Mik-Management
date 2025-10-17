@@ -174,6 +174,9 @@ const Settings = () => {
   const checkForUpdates = async () => {
     try {
       setUpdateLoading(true);
+      console.log(`=== Manual Update Check ===`);
+      console.log(`Channel: ${updateChannel}`);
+      
       const response = await fetch('/api/check-updates', {
         method: 'POST',
         headers: {
@@ -183,6 +186,8 @@ const Settings = () => {
       });
 
       const data = await response.json();
+      console.log('Manual check response:', data);
+      
       if (response.ok) {
         setUpdateInfo(data);
         if (data.updateAvailable) {

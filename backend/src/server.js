@@ -24,13 +24,36 @@ const getCommitCount = async () => {
 const getLatestCommitCount = async () => {
   try {
     const { execSync } = await import('child_process');
-    // Fetch latest from remote
-    execSync('git fetch origin main', { encoding: 'utf8' });
-    const count = execSync('git rev-list --count origin/main', { encoding: 'utf8' }).trim();
-    return parseInt(count, 10);
+    
+    // Try multiple methods to get latest commit count
+    let count = 0;
+    
+    try {
+      // Method 1: Fetch and count origin/main
+      execSync('git fetch origin main', { encoding: 'utf8', timeout: 10000 });
+      const remoteCount = execSync('git rev-list --count origin/main', { encoding: 'utf8' }).trim();
+      count = parseInt(remoteCount, 10);
+      console.log('Remote commit count:', count);
+    } catch (fetchError) {
+      console.log('Fetch failed, trying local HEAD:', fetchError.message);
+      
+      try {
+        // Method 2: Use local HEAD
+        const localCount = execSync('git rev-list --count HEAD', { encoding: 'utf8' }).trim();
+        count = parseInt(localCount, 10);
+        console.log('Local commit count:', count);
+      } catch (localError) {
+        console.log('Local count failed, using current count:', localError.message);
+        // Method 3: Use current count as fallback
+        count = getCommitCount();
+      }
+    }
+    
+    return count;
   } catch (error) {
     console.error('Error getting latest commit count:', error);
-    return 0;
+    // Fallback to current commit count
+    return getCommitCount();
   }
 };
 
@@ -1396,6 +1419,11 @@ const bootstrap = async () => {
         const body = await parseJsonBody(req);
         const channel = body?.channel || 'stable';
         
+        console.log(`=== Update Check Request ===`);
+        console.log(`Channel: ${channel}`);
+        console.log(`Current commit count: ${currentCommitCount}`);
+        console.log(`Current version: ${currentVersion}`);
+        
         // Check for updates based on channel
         let latestVersion = null;
         let updateAvailable = false;
@@ -1404,6 +1432,8 @@ const bootstrap = async () => {
         if (channel === 'beta') {
           // For beta, check latest commit count
           const latestCommitCount = await getLatestCommitCount();
+          console.log(`Update check - Current: ${currentCommitCount}, Latest: ${latestCommitCount}`);
+          
           if (latestCommitCount > currentCommitCount) {
             latestVersion = `${formatVersion(latestCommitCount)}-beta`;
             updateAvailable = true;
@@ -1413,6 +1443,15 @@ const bootstrap = async () => {
               channel: 'beta',
               commitCount: latestCommitCount,
               updateSize: latestCommitCount - currentCommitCount
+            };
+            console.log(`Update available: ${currentVersion} -> ${latestVersion}`);
+          } else {
+            console.log('No updates available for beta channel');
+            updateInfo = {
+              currentVersion,
+              latestVersion: `${currentVersion}-beta`,
+              channel: 'beta',
+              message: 'You are up to date!'
             };
           }
         } else {
