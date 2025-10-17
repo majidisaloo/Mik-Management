@@ -56,10 +56,12 @@ const DeviceDetails = () => {
         throw new Error('Device not found');
       }
       const payload = await response.json();
+      console.log('Initial device data:', payload);
+      console.log('API Output:', payload.routeros?.apiOutput);
       setDevice(payload);
       
-      // Auto-test connection to get fresh data (always run if device has API enabled)
-      if (payload && payload.routeros?.apiEnabled) {
+      // Auto-test connection to get fresh data (always run)
+      if (payload) {
         console.log('Auto-testing connection for fresh data...');
         try {
           const testResponse = await fetch(`/api/mikrotiks/${id}/test-connectivity`, {
@@ -71,7 +73,10 @@ const DeviceDetails = () => {
 
           if (testResponse.ok) {
             const testResult = await testResponse.json();
+            console.log('Test connectivity result:', testResult);
             if (testResult.mikrotik) {
+              console.log('Updated device data:', testResult.mikrotik);
+              console.log('Updated API Output:', testResult.mikrotik.routeros?.apiOutput);
               setDevice(testResult.mikrotik);
               console.log('Auto-connection test successful, device data updated');
             }
@@ -79,27 +84,6 @@ const DeviceDetails = () => {
         } catch (testErr) {
           console.log('Auto-connection test failed:', testErr);
           // Don't show error for auto-test, just use cached data
-        }
-      } else if (payload && !payload.routeros?.apiOutput) {
-        // If no API data available, try to get it anyway
-        console.log('No API data found, attempting to fetch...');
-        try {
-          const testResponse = await fetch(`/api/mikrotiks/${id}/test-connectivity`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          });
-
-          if (testResponse.ok) {
-            const testResult = await testResponse.json();
-            if (testResult.mikrotik) {
-              setDevice(testResult.mikrotik);
-              console.log('Connection test successful, device data updated');
-            }
-          }
-        } catch (testErr) {
-          console.log('Connection test failed:', testErr);
         }
       }
     } catch (error) {
