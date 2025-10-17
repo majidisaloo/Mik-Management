@@ -57,6 +57,30 @@ const DeviceDetails = () => {
       }
       const payload = await response.json();
       setDevice(payload);
+      
+      // Auto-test connection to get fresh data
+      if (payload && payload.routeros?.apiEnabled) {
+        console.log('Auto-testing connection for fresh data...');
+        try {
+          const testResponse = await fetch(`/api/mikrotiks/${id}/test-connectivity`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (testResponse.ok) {
+            const testResult = await testResponse.json();
+            if (testResult.mikrotik) {
+              setDevice(testResult.mikrotik);
+              console.log('Auto-connection test successful, device data updated');
+            }
+          }
+        } catch (testErr) {
+          console.log('Auto-connection test failed:', testErr);
+          // Don't show error for auto-test, just use cached data
+        }
+      }
     } catch (error) {
       setError(error.message);
     } finally {
@@ -501,13 +525,18 @@ const DeviceDetails = () => {
                 </span>
               </div>
             </div>
-            <div className="px-6 py-4">
-              <div className="bg-gray-50 rounded-md p-4">
-                <pre className="text-xs text-gray-600 whitespace-pre-wrap">
-                  {device.routeros?.sshOutput || 'No SSH data available\n\nClick "Test Connection" to fetch real data from the device.'}
-                </pre>
-              </div>
-            </div>
+                <div className="px-6 py-4">
+                  <div className="bg-gray-50 rounded-md p-4">
+                    <pre className="text-xs text-gray-600 whitespace-pre-wrap">
+                      {device.connectivity?.ssh?.status === 'online' 
+                        ? `SSH Connection: ✅ ONLINE\nPort: 22\nStatus: Accessible\nLast Checked: ${device.connectivity?.ssh?.lastCheckedAt ? formatDateTime(device.connectivity.ssh.lastCheckedAt) : 'Unknown'}`
+                        : device.connectivity?.ssh?.status === 'offline'
+                        ? `SSH Connection: ❌ OFFLINE\nError: ${device.connectivity?.ssh?.lastError || 'Connection failed'}\nLast Checked: ${device.connectivity?.ssh?.lastCheckedAt ? formatDateTime(device.connectivity.ssh.lastCheckedAt) : 'Unknown'}`
+                        : 'No SSH data available\n\nClick "Test Connection" to fetch real data from the device.'
+                      }
+                    </pre>
+                  </div>
+                </div>
           </div>
         </div>
       </div>
