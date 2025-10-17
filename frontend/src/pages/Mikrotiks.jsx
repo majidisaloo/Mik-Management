@@ -230,10 +230,6 @@ const Mikrotiks = () => {
     return roots;
   }, [groups]);
 
-  const selectedDevice = useMemo(
-    () => (selectedId ? devices.find((device) => device.id === selectedId) : null),
-    [devices, selectedId]
-  );
 
   const filteredDevices = useMemo(() => {
     let filtered = devices;
