@@ -420,7 +420,7 @@ const Mikrotiks = () => {
   const handleTestConnectivity = async (device) => {
     try {
       setTestingDevice(device.id);
-      const response = await fetch(`/api/mikrotiks/${device.id}/test`, {
+      const response = await fetch(`/api/mikrotiks/${device.id}/test-connectivity`, {
         method: 'POST'
       });
 
