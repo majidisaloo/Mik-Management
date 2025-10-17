@@ -485,6 +485,7 @@ const UsersAndRoles = () => {
   }
 
   return (
+    <>
     <div className="users-roles-page">
       <div className="users-roles-header">
         <h1 className="users-roles-title">Users & Roles</h1>
@@ -1003,7 +1004,8 @@ const UsersAndRoles = () => {
         </button>
       </div>
     )}
-  </>;
+    </>
+  );
 };
 
 export default UsersAndRoles;
