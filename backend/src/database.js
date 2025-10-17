@@ -2121,9 +2121,10 @@ const initializeDatabase = async (databasePath) => {
       return state.roles.map((role) => ({ ...role, permissions: sanitizePermissions(role.permissions) }));
     },
 
-    async createRole({ name, permissions }) {
+    async createRole({ name, description, permissions }) {
       const state = await load();
       const normalizedName = name.trim();
+      const normalizedDescription = description ? description.trim() : '';
       const duplicate = state.roles.find((role) => role.name.toLowerCase() === normalizedName.toLowerCase());
 
       if (duplicate) {
@@ -2136,6 +2137,7 @@ const initializeDatabase = async (databasePath) => {
       const role = {
         id: nextId,
         name: normalizedName,
+        description: normalizedDescription,
         permissions: sanitizePermissions(permissions),
         createdAt: timestamp,
         updatedAt: timestamp

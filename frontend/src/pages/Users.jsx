@@ -212,6 +212,7 @@ const Users = () => {
         },
         body: JSON.stringify({
           name: roleForm.name,
+          description: roleForm.description,
           permissions: roleForm.permissions
         })
       });

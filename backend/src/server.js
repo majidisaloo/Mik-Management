@@ -1568,9 +1568,10 @@ const bootstrap = async () => {
 
     const handleCreateRole = async () => {
       const body = await parseJsonBody(req);
-      const { name, permissions } = body ?? {};
+      const { name, description, permissions } = body ?? {};
 
       const normalizedName = normalizeString(name);
+      const normalizedDescription = normalizeString(description);
 
       if (!normalizedName) {
         sendJson(res, 400, { message: 'Role name is required.' });
@@ -1580,6 +1581,7 @@ const bootstrap = async () => {
       try {
         const result = await db.createRole({
           name: normalizedName,
+          description: normalizedDescription,
           permissions: parsePermissions(permissions)
         });
 

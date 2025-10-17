@@ -186,7 +186,8 @@ const Groups = () => {
       }
 
       const payload = await response.json();
-      setGroups(Array.isArray(payload) ? payload : []);
+      // Backend returns { groups: mapped, tree, ordered }
+      setGroups(Array.isArray(payload.groups) ? payload.groups : []);
       setStatus({ type: '', message: '' });
     } catch (error) {
       setGroups([]);
