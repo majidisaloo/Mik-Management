@@ -650,6 +650,7 @@ const Users = () => {
                 ))}
               </div>
             </div>
+          </div>
 
           <div className="modal__footer">
             <button
