@@ -675,7 +675,7 @@ const Mikrotiks = () => {
         </div>
       </div>
 
-              {device.tags && (
+              {device.tags && typeof device.tags === 'string' && device.tags.trim() && (
                 <div className="mb-4">
                   <div className="flex flex-wrap gap-1">
                     {device.tags.split(',').map((tag, index) => (
