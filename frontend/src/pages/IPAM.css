@@ -1,0 +1,211 @@
+/* IPAM page specific styles */
+
+/* IPAM configuration cards */
+.ipam-config-card {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.ipam-config-card:hover {
+  border-color: var(--primary-200);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* IPAM status badge */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.status-badge--success {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.status-badge--error {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.status-badge--warning {
+  background: #fef3c7;
+  color: #d97706;
+  border: 1px solid #fed7aa;
+}
+
+.status-badge--info {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+
+/* Dark mode status badges */
+[data-theme="dark"] .status-badge--success {
+  background: #14532d;
+  color: #bbf7d0;
+  border-color: #166534;
+}
+
+[data-theme="dark"] .status-badge--error {
+  background: #7f1d1d;
+  color: #fecaca;
+  border-color: #dc2626;
+}
+
+[data-theme="dark"] .status-badge--warning {
+  background: #78350f;
+  color: #fed7aa;
+  border-color: #d97706;
+}
+
+[data-theme="dark"] .status-badge--info {
+  background: #1e3a8a;
+  color: #bfdbfe;
+  border-color: #2563eb;
+}
+
+/* IPAM action buttons */
+.ipam-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.ipam-actions .btn {
+  padding: 6px;
+  min-width: auto;
+  height: 32px;
+}
+
+/* IPAM form improvements */
+.ipam-form .form-group {
+  margin-bottom: 16px;
+}
+
+.ipam-form .form-label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.ipam-form .form-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--surface-elevated);
+  color: var(--primary);
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.ipam-form .form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-100);
+}
+
+.ipam-form .form-select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 8px center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  padding-right: 32px;
+}
+
+/* Dark mode form inputs */
+[data-theme="dark"] .ipam-form .form-input {
+  background: var(--surface-elevated);
+  border-color: var(--border-color);
+  color: var(--primary);
+}
+
+[data-theme="dark"] .ipam-form .form-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-200);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .ipam-config-card {
+    padding: 12px;
+  }
+  
+  .ipam-actions {
+    flex-wrap: wrap;
+    gap: 2px;
+  }
+  
+  .ipam-actions .btn {
+    padding: 4px;
+    height: 28px;
+  }
+  
+  .status-badge {
+    padding: 3px 6px;
+    font-size: 9px;
+  }
+}
+
+/* Empty state styling */
+.ipam-empty-state {
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.ipam-empty-state svg {
+  width: 48px;
+  height: 48px;
+  color: var(--tertiary);
+  margin: 0 auto 16px;
+}
+
+.ipam-empty-state h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--primary);
+  margin: 0 0 8px 0;
+}
+
+.ipam-empty-state p {
+  color: var(--tertiary);
+  margin: 0 0 24px 0;
+}
+
+/* Loading state */
+.ipam-loading {
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.ipam-loading .spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-color);
+  border-top: 3px solid var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.ipam-loading p {
+  color: var(--tertiary);
+  margin: 0;
+}
