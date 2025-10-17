@@ -498,28 +498,81 @@
   color: var(--text-primary);
 }
 
-/* Status Messages */
+/* Status Messages - Toast Notifications */
 .status-message {
   position: fixed;
   top: 1rem;
   right: 1rem;
-  padding: 1rem 1.5rem;
+  padding: 0.75rem 1rem;
   border-radius: 0.5rem;
   font-weight: 500;
-  z-index: 1000;
-  max-width: 400px;
+  font-size: 0.875rem;
+  z-index: 9999;
+  max-width: 350px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  animation: slideInRight 0.3s ease-out;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .status-message--success {
-  background: var(--success-50);
-  color: var(--success-700);
-  border: 1px solid var(--success-200);
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
 }
 
 .status-message--error {
-  background: var(--error-50);
-  color: var(--error-700);
-  border: 1px solid var(--error-200);
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.status-message::before {
+  content: '';
+  width: 4px;
+  height: 100%;
+  border-radius: 2px;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.status-message--success::before {
+  background: #22c55e;
+}
+
+.status-message--error::before {
+  background: #ef4444;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.status-message__close {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  margin-left: auto;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+  line-height: 1;
+}
+
+.status-message__close:hover {
+  opacity: 1;
 }
 
 /* Loading */

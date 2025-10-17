@@ -58,7 +58,7 @@ const DeviceDetails = () => {
       const payload = await response.json();
       setDevice(payload);
       
-      // Auto-test connection to get fresh data
+      // Auto-test connection to get fresh data (always run if device has API enabled)
       if (payload && payload.routeros?.apiEnabled) {
         console.log('Auto-testing connection for fresh data...');
         try {
@@ -79,6 +79,27 @@ const DeviceDetails = () => {
         } catch (testErr) {
           console.log('Auto-connection test failed:', testErr);
           // Don't show error for auto-test, just use cached data
+        }
+      } else if (payload && !payload.routeros?.apiOutput) {
+        // If no API data available, try to get it anyway
+        console.log('No API data found, attempting to fetch...');
+        try {
+          const testResponse = await fetch(`/api/mikrotiks/${id}/test-connectivity`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (testResponse.ok) {
+            const testResult = await testResponse.json();
+            if (testResult.mikrotik) {
+              setDevice(testResult.mikrotik);
+              console.log('Connection test successful, device data updated');
+            }
+          }
+        } catch (testErr) {
+          console.log('Connection test failed:', testErr);
         }
       }
     } catch (error) {

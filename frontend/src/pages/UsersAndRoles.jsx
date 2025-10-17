@@ -92,6 +92,17 @@ const UsersAndRoles = () => {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', message: '' });
 
+  // Auto-dismiss status messages
+  useEffect(() => {
+    if (status.message) {
+      const timer = setTimeout(() => {
+        setStatus({ type: '', message: '' });
+      }, 4000); // Auto-dismiss after 4 seconds
+
+      return () => clearTimeout(timer);
+    }
+  }, [status.message]);
+
   // Users state
   const [users, setUsers] = useState([]);
   const [userSearchTerm, setUserSearchTerm] = useState('');
@@ -977,14 +988,22 @@ const UsersAndRoles = () => {
           </div>
         </Modal>
 
-      {/* Status Messages */}
-      {status.message && (
-        <div className={`status-message status-message--${status.type}`}>
-          {status.message}
-        </div>
-      )}
     </div>
-  );
+    
+    {/* Status Messages - Outside main container for proper positioning */}
+    {status.message && (
+      <div className={`status-message status-message--${status.type}`}>
+        <span>{status.message}</span>
+        <button
+          onClick={() => setStatus({ type: '', message: '' })}
+          className="status-message__close"
+          aria-label="Close notification"
+        >
+          ×
+        </button>
+      </div>
+    )}
+  </>;
 };
 
 export default UsersAndRoles;
