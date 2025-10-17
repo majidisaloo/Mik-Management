@@ -2845,32 +2845,53 @@ const initializeDatabase = async (databasePath) => {
       let firmwareVersion = routerosBaseline.firmwareVersion;
 
       if (routerosBaseline.apiEnabled) {
-        try {
-          const apiUrl = `https://${host}:${routerosBaseline.apiPort || 8729}/rest/system/resource`;
-          const auth = Buffer.from(`${routerosBaseline.apiUsername || 'admin'}:${routerosBaseline.apiPassword || ''}`).toString('base64');
-          
-          const response = await fetch(apiUrl, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Basic ${auth}`,
-              'Content-Type': 'application/json'
-            },
-            // For testing with self-signed certificates
-            rejectUnauthorized: false
-          });
+        // Try multiple connection methods
+        const connectionMethods = [
+          { protocol: 'https', port: 443 },
+          { protocol: 'http', port: 80 },
+          { protocol: 'https', port: routerosBaseline.apiPort || 443 },
+          { protocol: 'http', port: routerosBaseline.apiPort || 80 }
+        ];
 
-          if (response.ok) {
-            const data = await response.json();
-            apiStatus = 'online';
-            firmwareVersion = data[0]?.version || firmwareVersion;
-            apiOutput = JSON.stringify(data[0], null, 2);
-          } else {
-            apiStatus = 'offline';
-            apiError = `HTTP ${response.status}: ${response.statusText}`;
+        for (const method of connectionMethods) {
+          try {
+            const apiUrl = `${method.protocol}://${host}:${method.port}/rest/system/resource`;
+            const auth = Buffer.from(`${routerosBaseline.apiUsername || 'admin'}:${routerosBaseline.apiPassword || ''}`).toString('base64');
+            
+            console.log(`Testing MikroTik API connection to: ${apiUrl}`);
+            console.log(`Using credentials: ${routerosBaseline.apiUsername || 'admin'}:${'*'.repeat((routerosBaseline.apiPassword || '').length)}`);
+            
+            const response = await fetch(apiUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Basic ${auth}`,
+                'Content-Type': 'application/json'
+              },
+              // For testing with self-signed certificates
+              rejectUnauthorized: false,
+              timeout: 10000 // 10 second timeout
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              apiStatus = 'online';
+              firmwareVersion = data[0]?.version || firmwareVersion;
+              apiOutput = JSON.stringify(data[0], null, 2);
+              console.log(`✅ MikroTik API connection successful via ${method.protocol}:${method.port}. Firmware: ${firmwareVersion}`);
+              break; // Success, exit the loop
+            } else {
+              console.log(`❌ MikroTik API connection failed via ${method.protocol}:${method.port}: HTTP ${response.status}: ${response.statusText}`);
+            }
+          } catch (error) {
+            console.log(`❌ MikroTik API connection error via ${method.protocol}:${method.port}: ${error.message}`);
           }
-        } catch (error) {
+        }
+
+        // If all methods failed, set error status
+        if (apiStatus !== 'online') {
           apiStatus = 'offline';
-          apiError = error.message;
+          apiError = 'All connection methods failed. Check if MikroTik REST API is enabled and accessible.';
+          console.log(`❌ All MikroTik API connection methods failed for ${host}`);
         }
       }
 

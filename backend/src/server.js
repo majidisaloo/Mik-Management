@@ -2051,6 +2051,7 @@ const bootstrap = async () => {
       }
 
       try {
+        console.log(`Testing connectivity for MikroTik device ID: ${deviceId}`);
         const result = await db.testMikrotikConnectivity(deviceId);
 
         if (!result.success && result.reason === 'not-found') {
@@ -2062,6 +2063,7 @@ const bootstrap = async () => {
           throw new Error('Unable to refresh connectivity.');
         }
 
+        console.log(`Connectivity test result:`, result);
         const groups = await db.listGroups();
         sendJson(res, 200, {
           message: 'Connectivity refreshed successfully.',
@@ -2461,6 +2463,59 @@ const bootstrap = async () => {
       } catch (error) {
         console.error('List firewall error', error);
         sendJson(res, 500, { message: 'Unable to load firewall configuration.' });
+      }
+    };
+
+    const handleTestMikrotikConnection = async () => {
+      const body = await parseJsonBody(req);
+      const { host, port, username, password, protocol } = body;
+
+      if (!host) {
+        sendJson(res, 400, { message: 'Host is required.' });
+        return;
+      }
+
+      try {
+        const testPort = port || (protocol === 'http' ? 80 : 443);
+        const testProtocol = protocol || 'https';
+        const apiUrl = `${testProtocol}://${host}:${testPort}/rest/system/resource`;
+        const auth = Buffer.from(`${username || 'admin'}:${password || ''}`).toString('base64');
+        
+        console.log(`Testing direct MikroTik API connection to: ${apiUrl}`);
+        
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/json'
+          },
+          rejectUnauthorized: false,
+          timeout: 10000
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          sendJson(res, 200, {
+            success: true,
+            message: 'Connection successful',
+            data: data[0],
+            firmwareVersion: data[0]?.version,
+            url: apiUrl
+          });
+        } else {
+          sendJson(res, 400, {
+            success: false,
+            message: `Connection failed: HTTP ${response.status}: ${response.statusText}`,
+            url: apiUrl
+          });
+        }
+      } catch (error) {
+        console.error('Direct MikroTik connection test error:', error);
+        sendJson(res, 500, {
+          success: false,
+          message: `Connection error: ${error.message}`,
+          error: error.message
+        });
       }
     };
 
@@ -3219,6 +3274,12 @@ const bootstrap = async () => {
 
       if (method === 'GET' && (canonicalPath === '/api/firewall' || resourcePath === '/firewall')) {
         await handleListFirewall();
+        return;
+      }
+
+      // Test MikroTik connection endpoint
+      if (method === 'POST' && (canonicalPath === '/api/test-mikrotik-connection' || resourcePath === '/test-mikrotik-connection')) {
+        await handleTestMikrotikConnection();
         return;
       }
 
