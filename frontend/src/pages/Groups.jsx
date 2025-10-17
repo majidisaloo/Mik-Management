@@ -441,18 +441,40 @@ const Groups = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-    <div>
+        <div>
           <h1 className="text-3xl font-bold text-primary">Mik-Groups</h1>
           <p className="text-tertiary mt-2">Organize your MikroTik devices into hierarchical groups.</p>
         </div>
-        <button
-          type="button"
-          className="btn btn--primary"
-          onClick={handleNewGroup}
-        >
-          <PlusIcon />
-          New Group
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="btn btn--secondary"
+            onClick={() => {
+              // Expand all groups
+              const allGroupIds = new Set();
+              const collectIds = (nodes) => {
+                nodes.forEach(node => {
+                  if (node.children && node.children.length > 0) {
+                    allGroupIds.add(node.id);
+                    collectIds(node.children);
+                  }
+                });
+              };
+              collectIds(filteredGroups);
+              setExpandedGroups(allGroupIds);
+            }}
+          >
+            Expand All
+          </button>
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={handleNewGroup}
+          >
+            <PlusIcon />
+            New Group
+          </button>
+        </div>
       </div>
 
       {/* Status Message */}
@@ -484,12 +506,30 @@ const Groups = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {filteredGroups.length > 0 ? (
                   filteredGroups.map((node) => renderGroupNode(node))
                 ) : (
-                  <div className="text-center py-8 text-tertiary">
-                    {searchTerm ? 'No groups found matching your search.' : 'No groups created yet.'}
+                  <div className="text-center py-12 text-tertiary">
+                    <div className="mb-4">
+                      <FolderIcon />
+                    </div>
+                    <h3 className="text-lg font-medium text-secondary mb-2">
+                      {searchTerm ? 'No groups found' : 'No groups created yet'}
+                    </h3>
+                    <p className="text-sm mb-4">
+                      {searchTerm ? 'Try adjusting your search terms.' : 'Create your first group to organize your devices.'}
+                    </p>
+                    {!searchTerm && (
+                      <button
+                        type="button"
+                        className="btn btn--primary btn--sm"
+                        onClick={handleNewGroup}
+                      >
+                        <PlusIcon />
+                        Create First Group
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

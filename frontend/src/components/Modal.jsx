@@ -30,28 +30,6 @@ const Modal = ({ title, description, children, actions, onClose, open = false })
       return undefined;
     }
 
-    const previouslyFocused = document.activeElement;
-    const dialog = dialogRef.current;
-
-    // Focus management with better handling
-    if (dialog && !hasFocusedRef.current) {
-      // Only focus on initial open, not on every re-render
-      const focusable = dialog.querySelector(
-        'input:not([readonly]):not([disabled]), select:not([disabled]), textarea:not([readonly]):not([disabled]), button:not(.modal__close):not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
-      );
-
-      if (focusable) {
-        // Use setTimeout to ensure the modal is fully rendered
-        setTimeout(() => {
-          focusable.focus();
-        }, 0);
-      } else {
-        dialog.focus();
-      }
-      
-      hasFocusedRef.current = true;
-    }
-
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -63,12 +41,28 @@ const Modal = ({ title, description, children, actions, onClose, open = false })
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-
-      if (previouslyFocused && previouslyFocused.focus) {
-        previouslyFocused.focus();
-      }
     };
   }, [onClose, open]);
+
+  // Separate effect for initial focus only
+  useEffect(() => {
+    if (!open) return;
+
+    const dialog = dialogRef.current;
+    if (dialog && !hasFocusedRef.current) {
+      const focusable = dialog.querySelector(
+        'input:not([readonly]):not([disabled]), select:not([disabled]), textarea:not([readonly]):not([disabled])'
+      );
+
+      if (focusable) {
+        // Use setTimeout to ensure the modal is fully rendered
+        setTimeout(() => {
+          focusable.focus();
+        }, 100);
+        hasFocusedRef.current = true;
+      }
+    }
+  }, [open]); // Only run when modal opens, not on every re-render
 
   const handleBackdropClick = (event) => {
     if (event.target === event.currentTarget) {

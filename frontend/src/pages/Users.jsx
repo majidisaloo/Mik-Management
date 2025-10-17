@@ -157,6 +157,7 @@ const Users = () => {
       return;
     }
 
+    console.log('Loading users and roles...');
     loadUsers();
     loadRoles();
   }, [navigate, user]);
