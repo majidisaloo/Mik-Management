@@ -1109,6 +1109,32 @@ const mapTunnel = (tunnel, groups, mikrotiks) => {
   };
 };
 
+const mapRoute = (route, groups, mikrotiks) => {
+  const group = route.groupId ? groups.find((entry) => entry.id === route.groupId) : null;
+  const device = route.deviceId ? mikrotiks.find((device) => device.id === route.deviceId) : null;
+
+  return {
+    id: route.id,
+    name: route.name,
+    groupId: route.groupId ?? null,
+    groupName: group ? group.name : null,
+    deviceId: route.deviceId ?? null,
+    deviceName: device ? device.name : null,
+    destination: route.destination ?? '',
+    gateway: route.gateway ?? '',
+    interface: route.interface ?? '',
+    distance: route.distance ?? 1,
+    scope: route.scope ?? 30,
+    targetScope: route.targetScope ?? 10,
+    status: route.status ?? 'active',
+    enabled: Boolean(route.enabled),
+    tags: Array.isArray(route.tags) ? [...route.tags] : [],
+    notes: typeof route.notes === 'string' ? route.notes : '',
+    createdAt: route.createdAt,
+    updatedAt: route.updatedAt
+  };
+};
+
 const buildGroupTree = (groups) => {
   const nodeLookup = new Map();
 
@@ -2400,6 +2426,44 @@ const bootstrap = async () => {
       }
     };
 
+    const handleListRoutes = async () => {
+      try {
+        const [routes, groups, mikrotiks] = await Promise.all([
+          db.listRoutes(),
+          db.listGroups(),
+          db.listMikrotiks()
+        ]);
+
+        sendJson(res, 200, {
+          routes: routes.map((route) => mapRoute(route, groups, mikrotiks)),
+          groups: groups.map(mapGroup),
+          mikrotiks: mikrotiks.map((device) => mapMikrotik(device, groups))
+        });
+      } catch (error) {
+        console.error('List routes error', error);
+        sendJson(res, 500, { message: 'Unable to load routes.' });
+      }
+    };
+
+    const handleListFirewall = async () => {
+      try {
+        const [filters, addressLists, groups] = await Promise.all([
+          db.listFirewallFilters(),
+          db.listAddressLists(),
+          db.listGroups()
+        ]);
+
+        sendJson(res, 200, {
+          filters: filters.map((filter) => mapFirewallFilter(filter, groups)),
+          addressLists: addressLists.map((list) => mapAddressList(list, groups)),
+          groups: groups.map(mapGroup)
+        });
+      } catch (error) {
+        console.error('List firewall error', error);
+        sendJson(res, 500, { message: 'Unable to load firewall configuration.' });
+      }
+    };
+
     const handleCreateTunnel = async () => {
       const body = await parseJsonBody(req);
       const {
@@ -3145,6 +3209,16 @@ const bootstrap = async () => {
 
       if (method === 'GET' && (canonicalPath === '/api/tunnels' || resourcePath === '/tunnels')) {
         await handleListTunnels();
+        return;
+      }
+
+      if (method === 'GET' && (canonicalPath === '/api/routes' || resourcePath === '/routes')) {
+        await handleListRoutes();
+        return;
+      }
+
+      if (method === 'GET' && (canonicalPath === '/api/firewall' || resourcePath === '/firewall')) {
+        await handleListFirewall();
         return;
       }
 

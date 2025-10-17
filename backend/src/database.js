@@ -27,11 +27,13 @@ const defaultState = () => ({
   lastTunnelId: 0,
   lastAddressListId: 0,
   lastFirewallFilterId: 0,
+  lastRouteId: 0,
   users: [],
   roles: [],
   groups: [],
   mikrotiks: [],
   tunnels: [],
+  routes: [],
   addressLists: [],
   firewallFilters: []
 });
@@ -1798,6 +1800,19 @@ const ensureStateShape = async (databaseFile) => {
     mutated = true;
   }
 
+  if (!Array.isArray(normalized.routes)) {
+    normalized.routes = [];
+    mutated = true;
+  }
+
+  if (!Number.isInteger(normalized.lastRouteId)) {
+    normalized.lastRouteId = normalized.routes.reduce(
+      (max, route) => Math.max(max, Number.parseInt(route.id, 10) || 0),
+      0
+    );
+    mutated = true;
+  }
+
   let nextTunnelIdSeed = Math.max(
     Number.isInteger(normalized.lastTunnelId) ? normalized.lastTunnelId : 0,
     normalized.tunnels.reduce((max, tunnel) => Math.max(max, Number.parseInt(tunnel.id, 10) || 0), 0)
@@ -2823,42 +2838,78 @@ const initializeDatabase = async (databasePath) => {
       const host = normalizeOptionalText(existing.host);
       const lowered = host.toLowerCase();
 
-      const simulateOffline = lowered.includes('offline') || lowered.includes('down');
-      const apiOffline = simulateOffline || lowered.includes('api-down');
-      const sshOffline = simulateOffline || lowered.includes('ssh-down');
+      // Real MikroTik API connection test
+      let apiStatus = 'disabled';
+      let apiError = null;
+      let apiOutput = null;
+      let firmwareVersion = routerosBaseline.firmwareVersion;
+
+      if (routerosBaseline.apiEnabled) {
+        try {
+          const apiUrl = `https://${host}:${routerosBaseline.apiPort || 8729}/rest/system/resource`;
+          const auth = Buffer.from(`${routerosBaseline.apiUsername || 'admin'}:${routerosBaseline.apiPassword || ''}`).toString('base64');
+          
+          const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Basic ${auth}`,
+              'Content-Type': 'application/json'
+            },
+            // For testing with self-signed certificates
+            rejectUnauthorized: false
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            apiStatus = 'online';
+            firmwareVersion = data[0]?.version || firmwareVersion;
+            apiOutput = JSON.stringify(data[0], null, 2);
+          } else {
+            apiStatus = 'offline';
+            apiError = `HTTP ${response.status}: ${response.statusText}`;
+          }
+        } catch (error) {
+          apiStatus = 'offline';
+          apiError = error.message;
+        }
+      }
+
+      // SSH connection test (simplified for now)
+      let sshStatus = 'disabled';
+      let sshError = null;
+      let sshOutput = null;
+
+      if (routerosBaseline.sshEnabled) {
+        // For now, we'll simulate SSH status based on API status
+        // In a real implementation, you would use an SSH library like ssh2
+        sshStatus = apiStatus === 'online' ? 'online' : 'offline';
+        sshError = apiStatus === 'offline' ? 'SSH connection failed' : null;
+        sshOutput = sshStatus === 'online' ? 'SSH connection successful' : null;
+      }
 
       const connectivity = sanitizeConnectivity(
         {
           api: {
-            status: routerosBaseline.apiEnabled ? (apiOffline ? 'offline' : 'online') : 'disabled',
+            status: apiStatus,
             lastCheckedAt: timestamp,
-            lastError:
-              routerosBaseline.apiEnabled && apiOffline ? 'API host unreachable' : existing.connectivity?.api?.lastError ?? null
+            lastError: apiError
           },
           ssh: {
-            status: routerosBaseline.sshEnabled ? (sshOffline ? 'offline' : 'online') : 'disabled',
+            status: sshStatus,
             lastCheckedAt: timestamp,
-            lastError:
-              routerosBaseline.sshEnabled && sshOffline
-                ? 'SSH negotiation failed'
-                : existing.connectivity?.ssh?.lastError ?? null,
-            fingerprint:
-              routerosBaseline.sshEnabled && !sshOffline
-                ? generateHostFingerprint(existing.host)
-                : existing.connectivity?.ssh?.fingerprint ?? null
+            lastError: sshError,
+            fingerprint: sshStatus === 'online' ? generateHostFingerprint(existing.host) : null
           }
         },
         routerosBaseline
       );
 
-      const simulatedVersion =
-        routerosBaseline.apiEnabled || routerosBaseline.sshEnabled
-          ? lowered.includes('legacy') || lowered.includes('old')
-            ? '6.49.10'
-            : TARGET_ROUTEROS_VERSION
-          : routerosBaseline.firmwareVersion;
-
-      const normalizedRouteros = { ...routerosBaseline, firmwareVersion: simulatedVersion };
+      const normalizedRouteros = { 
+        ...routerosBaseline, 
+        firmwareVersion: firmwareVersion,
+        apiOutput: apiOutput,
+        sshOutput: sshOutput
+      };
       const status = deriveDeviceStatus(existing.status, normalizedRouteros);
 
       const record = {
@@ -3248,6 +3299,75 @@ const initializeDatabase = async (databasePath) => {
         ...tunnel,
         tags: Array.isArray(tunnel.tags) ? [...tunnel.tags] : []
       }));
+    },
+
+    async listRoutes() {
+      const state = await load();
+      return state.routes.map((route) => ({
+        ...route,
+        tags: Array.isArray(route.tags) ? [...route.tags] : []
+      }));
+    },
+
+    async createRoute({
+      name,
+      groupId,
+      deviceId,
+      destination,
+      gateway,
+      interface: interfaceName,
+      distance,
+      scope,
+      targetScope,
+      enabled,
+      tags,
+      notes
+    }) {
+      const state = await load();
+
+      const normalizedName = normalizeText(name);
+      if (!normalizedName) {
+        return { success: false, reason: 'name-required' };
+      }
+
+      const normalizedGroupId = Number.isInteger(groupId) ? groupId : null;
+      const normalizedDeviceId = Number.isInteger(deviceId) ? deviceId : null;
+      const normalizedDestination = normalizeOptionalText(destination);
+      const normalizedGateway = normalizeOptionalText(gateway);
+      const normalizedInterface = normalizeOptionalText(interfaceName);
+      const normalizedDistance = Number.isInteger(distance) ? distance : 1;
+      const normalizedScope = Number.isInteger(scope) ? scope : 30;
+      const normalizedTargetScope = Number.isInteger(targetScope) ? targetScope : 10;
+      const normalizedEnabled = Boolean(enabled);
+      const normalizedTags = Array.isArray(tags) ? tags.filter((tag) => typeof tag === 'string' && tag.trim()) : [];
+      const normalizedNotes = typeof notes === 'string' ? notes : '';
+
+      const timestamp = new Date().toISOString();
+      const id = (++state.lastRouteId).toString();
+
+      const route = {
+        id,
+        name: normalizedName,
+        groupId: normalizedGroupId,
+        deviceId: normalizedDeviceId,
+        destination: normalizedDestination,
+        gateway: normalizedGateway,
+        interface: normalizedInterface,
+        distance: normalizedDistance,
+        scope: normalizedScope,
+        targetScope: normalizedTargetScope,
+        status: 'active',
+        enabled: normalizedEnabled,
+        tags: normalizedTags,
+        notes: normalizedNotes,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      };
+
+      state.routes.push(route);
+      await persist(state);
+
+      return { success: true, route };
     },
 
     async createTunnel({
