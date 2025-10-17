@@ -110,6 +110,12 @@ const formatDateTime = (value) => {
     return '—';
   }
 
+  // Handle object values
+  if (typeof value === 'object') {
+    console.log('formatDateTime received object:', value);
+    return '—';
+  }
+
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return '—';
@@ -122,6 +128,19 @@ const formatDateTime = (value) => {
     hour: '2-digit',
     minute: '2-digit'
   });
+};
+
+const safeRender = (value, fallback = '—') => {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+  
+  if (typeof value === 'object') {
+    console.log('safeRender received object:', value);
+    return fallback;
+  }
+  
+  return String(value);
 };
 
 const Mikrotiks = () => {
@@ -242,6 +261,10 @@ const Mikrotiks = () => {
       }
       
       console.log('Devices array:', devicesArray);
+      if (devicesArray.length > 0) {
+        console.log('First device object:', devicesArray[0]);
+        console.log('Device keys:', Object.keys(devicesArray[0]));
+      }
       setDevices(devicesArray);
         setStatus({ type: '', message: '' });
       } catch (error) {
@@ -633,8 +656,8 @@ const Mikrotiks = () => {
                     <DeviceIcon />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-primary">{device.name}</h3>
-                    <p className="text-sm text-tertiary">{device.host}</p>
+                    <h3 className="font-semibold text-primary">{safeRender(device.name, 'Unknown Device')}</h3>
+                    <p className="text-sm text-tertiary">{safeRender(device.host, 'No Host')}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <div className="flex items-center gap-1">
                         <div className={`w-2 h-2 rounded-full ${device.routeros?.apiEnabled === true ? 'bg-green-500' : 'bg-red-500'}`}></div>
@@ -661,7 +684,11 @@ const Mikrotiks = () => {
         </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-tertiary">Firmware:</span>
-                  <span className="text-secondary">{typeof device.routeros?.firmwareVersion === 'string' ? device.routeros.firmwareVersion : 'Unknown'}</span>
+                  <span className="text-secondary">
+                    {device.routeros?.firmwareVersion && typeof device.routeros.firmwareVersion === 'string' 
+                      ? device.routeros.firmwareVersion 
+                      : 'Unknown'}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-tertiary">API:</span>
@@ -672,7 +699,7 @@ const Mikrotiks = () => {
                 <div className="flex justify-between text-sm">
                   <span className="text-tertiary">Created:</span>
                   <span className="text-secondary">{formatDateTime(device.createdAt)}</span>
-        </div>
+                </div>
       </div>
 
               {device.tags && typeof device.tags === 'string' && device.tags.trim() && (
