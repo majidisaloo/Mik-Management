@@ -27,10 +27,10 @@ www-data ALL=(ALL) NOPASSWD: /usr/bin/git tag --sort=-version:refname
 www-data ALL=(ALL) NOPASSWD: /usr/bin/npm install
 www-data ALL=(ALL) NOPASSWD: /usr/bin/npm run build
 www-data ALL=(ALL) NOPASSWD: /usr/bin/npm run dev
-www-data ALL=(ALL) NOPASSWD: /bin/chown -R www-data:www-data /opt/mik-management/*
-www-data ALL=(ALL) NOPASSWD: /bin/chown -R www-data:www-data /opt/mik-management/backend/*
-www-data ALL=(ALL) NOPASSWD: /bin/chown -R www-data:www-data /opt/mik-management/frontend/*
-www-data ALL=(ALL) NOPASSWD: /bin/chown -R www-data:www-data /opt/mik-management/frontend/dist/*
+www-data ALL=(ALL) NOPASSWD: /bin/chown -R www-data:www-data /opt/mik-management/
+www-data ALL=(ALL) NOPASSWD: /bin/chown -R www-data:www-data /opt/mik-management/backend/
+www-data ALL=(ALL) NOPASSWD: /bin/chown -R www-data:www-data /opt/mik-management/frontend/
+www-data ALL=(ALL) NOPASSWD: /bin/chown -R www-data:www-data /opt/mik-management/frontend/dist/
 www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart mik-management-backend
 www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart mik-management-frontend
 www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart nginx
