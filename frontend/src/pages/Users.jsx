@@ -237,8 +237,7 @@ const Users = () => {
     }
   };
 
-  const handleNewUser = (e) => {
-    e.preventDefault();
+  const handleNewUser = () => {
     console.log('handleNewUser called');
     setUserForm(emptyUserForm());
     setIsEditing(false);
@@ -247,8 +246,7 @@ const Users = () => {
     console.log('showUserModal set to true');
   };
 
-  const handleNewRole = (e) => {
-    e.preventDefault();
+  const handleNewRole = () => {
     console.log('handleNewRole called');
     setRoleForm(emptyRoleForm());
     setShowRoleModal(true);
@@ -487,10 +485,7 @@ const Users = () => {
                   type="text"
                   className="form-input"
                   value={userForm.firstName}
-                  onChange={(e) => {
-                    e.preventDefault();
-                    setUserForm({ ...userForm, firstName: e.target.value });
-                  }}
+                  onChange={(e) => setUserForm({ ...userForm, firstName: e.target.value })}
                   placeholder="Enter first name"
                   required
                 />
@@ -505,10 +500,7 @@ const Users = () => {
                   type="text"
                   className="form-input"
                   value={userForm.lastName}
-                  onChange={(e) => {
-                    e.preventDefault();
-                    setUserForm({ ...userForm, lastName: e.target.value });
-                  }}
+                  onChange={(e) => setUserForm({ ...userForm, lastName: e.target.value })}
                   placeholder="Enter last name"
                   required
                 />
@@ -524,10 +516,7 @@ const Users = () => {
                 type="email"
                 className="form-input"
                 value={userForm.email}
-                onChange={(e) => {
-                  e.preventDefault();
-                  setUserForm({ ...userForm, email: e.target.value });
-                }}
+                onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
                 placeholder="Enter email address"
                 required
               />
@@ -543,10 +532,7 @@ const Users = () => {
                   type="password"
                   className="form-input"
                   value={userForm.password}
-                  onChange={(e) => {
-                    e.preventDefault();
-                    setUserForm({ ...userForm, password: e.target.value });
-                  }}
+                  onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
                   placeholder={isEditing ? 'Leave blank to keep current' : 'Enter password'}
                   required={!isEditing}
                 />
@@ -561,10 +547,7 @@ const Users = () => {
                   type="password"
                   className="form-input"
                   value={userForm.passwordConfirmation}
-                  onChange={(e) => {
-                    e.preventDefault();
-                    setUserForm({ ...userForm, passwordConfirmation: e.target.value });
-                  }}
+                  onChange={(e) => setUserForm({ ...userForm, passwordConfirmation: e.target.value })}
                   placeholder={isEditing ? 'Leave blank to keep current' : 'Confirm password'}
                   required={!isEditing}
                 />
@@ -617,10 +600,7 @@ const Users = () => {
                 type="text"
                 className="form-input"
                 value={roleForm.name}
-                onChange={(e) => {
-                  e.preventDefault();
-                  setRoleForm({ ...roleForm, name: e.target.value });
-                }}
+                onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })}
                 placeholder="Enter role name"
                 required
               />
@@ -634,10 +614,7 @@ const Users = () => {
                 id="role-description"
                 className="form-input form-textarea"
                 value={roleForm.description}
-                onChange={(e) => {
-                  e.preventDefault();
-                  setRoleForm({ ...roleForm, description: e.target.value });
-                }}
+                onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })}
                 placeholder="Enter role description"
                 rows="3"
               />
