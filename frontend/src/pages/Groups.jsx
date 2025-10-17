@@ -328,7 +328,7 @@ const Groups = () => {
 
   const renderGroupNode = (node, depth = 0) => {
     const indent = depth * 24;
-    
+
     return (
       <div key={node.id} className="group-node">
         <div 
@@ -356,8 +356,8 @@ const Groups = () => {
               >
                 <EditIcon />
               </button>
-              <button
-                type="button"
+            <button
+              type="button"
                 className="btn btn--ghost btn--sm text-error"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -366,7 +366,7 @@ const Groups = () => {
                 aria-label={`Delete ${node.name}`}
               >
                 <TrashIcon />
-              </button>
+            </button>
             </div>
           </div>
         </div>
@@ -401,7 +401,7 @@ const Groups = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
+    <div>
           <h1 className="text-3xl font-bold text-primary">Mik-Groups</h1>
           <p className="text-tertiary mt-2">Organize your MikroTik devices into hierarchical groups.</p>
         </div>
@@ -436,7 +436,7 @@ const Groups = () => {
             </div>
             <div className="card__body">
               <div className="mb-4">
-                <input
+            <input
                   type="text"
                   className="form-input"
                   placeholder="Search groups..."
@@ -464,7 +464,7 @@ const Groups = () => {
               <h2 className="card__title">Group Details</h2>
             </div>
             <div className="card__body">
-              {selectedGroup ? (
+            {selectedGroup ? (
                 <div className="space-y-4">
                   <div>
                     <h3 className="font-semibold text-primary">{selectedGroup.name}</h3>
@@ -510,24 +510,24 @@ const Groups = () => {
                       Delete
                     </button>
                   </div>
-                </div>
+                  </div>
               ) : (
                 <div className="text-center py-8 text-tertiary">
                   <FolderIcon />
                   <p className="mt-2">Select a group to view details</p>
-                </div>
-              )}
+              </div>
+            )}
             </div>
           </div>
         </div>
       </div>
 
       {/* Create/Edit Modal */}
-      <Modal
+        <Modal
         title={isEditing ? 'Edit Group' : 'Create New Group'}
         description={isEditing ? 'Update the group information below.' : 'Create a new group to organize your MikroTik devices.'}
         open={showModal}
-        onClose={() => {
+          onClose={() => {
           setShowModal(false);
           setForm(emptyGroupForm);
           setIsEditing(false);
@@ -545,17 +545,17 @@ const Groups = () => {
               setSelectedId(null);
             }}
           >
-            Cancel
+                Cancel
           </button>,
-          <button
+              <button
             key="submit"
-            type="submit"
+                type="submit"
             form="group-form"
             className="btn btn--primary"
             disabled={!form.name.trim()}
           >
             {isEditing ? 'Update Group' : 'Create Group'}
-          </button>
+              </button>
         ]}
       >
         <form id="group-form" onSubmit={handleSubmit} className="space-y-4">
@@ -563,15 +563,15 @@ const Groups = () => {
             <label htmlFor="group-name" className="form-label">
               Group Name *
             </label>
-            <input
+              <input
               id="group-name"
               type="text"
               className="form-input"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="Enter group name"
-              required
-            />
+                required
+              />
           </div>
 
           <div className="form-group">
@@ -592,10 +592,10 @@ const Groups = () => {
                     {group.name}
                   </option>
                 ))}
-            </select>
+              </select>
           </div>
-        </form>
-      </Modal>
+          </form>
+        </Modal>
     </div>
   );
 };

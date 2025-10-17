@@ -1,845 +1,142 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import Modal from '../components/Modal.jsx';
-import { useAuth } from '../context/AuthContext.jsx';
+import React from 'react';
+import { useUsers } from './Users.hooks';
+import { useUserForm } from './Users.forms';
+import { UserModal, RoleModal } from './Users.components';
 import './Users.css';
 
-// Modern Icons
-const PlusIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-  </svg>
-);
-
-const EditIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const TrashIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <polyline points="3,6 5,6 21,6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const UserIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2" />
-  </svg>
-);
-
-const ShieldIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const ChevronDownIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <polyline points="6,9 12,15 18,9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const SearchIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="11" cy="11" r="8"/>
-    <path d="m21 21-4.35-4.35"/>
-  </svg>
-);
-
-const RoleDropdown = ({ roles, selectedIds, onToggle, disabled = false, placeholder = 'Assign roles' }) => {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef(null);
-
-  useEffect(() => {
-    const handleClick = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-
-    const handleKey = (e) => {
-      if (e.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleKey);
-
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, [open]);
-
-  const selectedRoles = roles.filter((role) => selectedIds.includes(role.id));
-  const summary = selectedRoles.length
-    ? selectedRoles.map((role) => (
-        <span key={role.id} className="px-2 py-1 bg-primary-50 text-primary-700 text-xs rounded-full">
-          {role.name}
-        </span>
-      ))
-    : [
-        <span key="placeholder" className="text-tertiary text-sm">
-          {placeholder}
-        </span>
-      ];
-
-  return (
-    <div className="relative" ref={containerRef}>
-      <button
-        type="button"
-        className={`w-full flex items-center justify-between gap-2 p-3 border rounded-lg text-left transition-colors ${
-          disabled
-            ? 'bg-tertiary bg-opacity-20 border-tertiary text-tertiary cursor-not-allowed'
-            : 'bg-surface-primary border-primary hover:border-secondary focus:border-focus focus:outline-none focus:ring-2 focus:ring-focus focus:ring-opacity-20'
-        }`}
-        onClick={() => !disabled && setOpen(!open)}
-        disabled={disabled}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-      >
-        <div className="flex flex-wrap gap-1 min-h-[20px]">{summary}</div>
-        <ChevronDownIcon />
-      </button>
-
-      {open && !disabled && (
-        <div className="absolute z-dropdown w-full mt-1 bg-surface-elevated border border-primary rounded-lg shadow-lg max-h-60 overflow-y-auto">
-          {roles.map((role) => {
-            const isSelected = selectedIds.includes(role.id);
-            return (
-              <button
-                key={role.id}
-                type="button"
-                className={`w-full flex items-center gap-3 p-3 text-left hover:bg-surface-secondary transition-colors ${
-                  isSelected ? 'bg-primary-50 text-primary-700' : 'text-secondary'
-                }`}
-                onClick={() => onToggle(role.id)}
-              >
-              <input
-                type="checkbox"
-                  checked={isSelected}
-                  onChange={() => {}}
-                  className="rounded border-primary text-primary focus:ring-focus"
-                />
-                <div className="flex-1">
-                  <div className="font-medium">{role.name}</div>
-                  {role.description && (
-                    <div className="text-sm text-tertiary">{role.description}</div>
-        )}
-      </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-};
-
 const Users = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const {
+    users,
+    roles,
+    loading,
+    status,
+    setStatus,
+    handleCreateUser,
+    handleCreateRole
+  } = useUsers();
 
-  // State
-  const [users, setUsers] = useState([]);
-  const [roles, setRoles] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterRole, setFilterRole] = useState('');
-  const [showUserModal, setShowUserModal] = useState(false);
-  const [showRoleModal, setShowRoleModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [selectedId, setSelectedId] = useState(null);
-  const [status, setStatus] = useState({ type: '', message: '' });
+  const {
+    userForm,
+    setUserForm,
+    roleForm,
+    setRoleForm,
+    showUserModal,
+    showRoleModal,
+    handleNewUser,
+    handleNewRole,
+    handleCloseUserModal,
+    handleCloseRoleModal
+  } = useUserForm();
 
-  // User form
-  const [userForm, setUserForm] = useState({
-  firstName: '',
-  lastName: '',
-  email: '',
-  password: '',
-  passwordConfirmation: '',
-  roleIds: []
-  });
-
-  // Role form
-  const [roleForm, setRoleForm] = useState({
-  name: '',
-    description: '',
-    permissions: []
-  });
-
-  // Filter users
-  const filteredUsers = useMemo(() => {
-    let filtered = users;
-
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (user) =>
-          user.firstName.toLowerCase().includes(term) ||
-          user.lastName.toLowerCase().includes(term) ||
-          user.email.toLowerCase().includes(term) ||
-          user.roles.some((role) => role.name.toLowerCase().includes(term))
-      );
-    }
-
-    if (filterRole) {
-      filtered = filtered.filter((user) =>
-        user.roles.some((role) => role.id === filterRole)
-      );
-    }
-
-    return filtered;
-  }, [users, searchTerm, filterRole]);
-
-  const loadUsers = async () => {
-      try {
-        setLoading(true);
-      const response = await fetch('/api/users');
-
-      if (!response.ok) {
-          throw new Error('Unable to load users.');
-        }
-
-      const payload = await response.json();
-      setUsers(Array.isArray(payload) ? payload : []);
-        setStatus({ type: '', message: '' });
-      } catch (error) {
-      setUsers([]);
-        setStatus({
-          type: 'error',
-        message: error.message || 'Unable to load users.'
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-  const loadRoles = async () => {
+  const handleUserSubmit = async (e) => {
+    e.preventDefault();
     try {
-      const response = await fetch('/api/roles');
-
-      if (!response.ok) {
-        throw new Error('Unable to load roles.');
-      }
-
-      const payload = await response.json();
-      setRoles(Array.isArray(payload) ? payload : []);
+      await handleCreateUser(userForm);
+      handleCloseUserModal();
     } catch (error) {
-      console.error('Failed to load roles:', error);
-      setRoles([]);
+      // Error already handled in hook
     }
   };
 
-  useEffect(() => {
-    if (!user) {
-      navigate('/login', { replace: true });
-      return;
-    }
-
-    loadUsers();
-    loadRoles();
-  }, [navigate, user]);
-
-  const handleCreateUser = async () => {
+  const handleRoleSubmit = async (e) => {
+    e.preventDefault();
     try {
-      const response = await fetch('/api/users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(userForm)
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.message || 'Unable to create user.');
-      }
-
-      setUserForm(emptyUserForm());
-      setShowUserModal(false);
-      await loadUsers();
-      setStatus({
-        type: 'success',
-        message: 'User created successfully.'
-      });
+      await handleCreateRole(roleForm);
+      handleCloseRoleModal();
     } catch (error) {
-      setStatus({
-        type: 'error',
-        message: error.message || 'Unable to create user.'
-      });
+      // Error already handled in hook
     }
   };
-
-  const handleUpdateUser = async () => {
-    try {
-      const response = await fetch(`/api/users/${selectedId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(userForm)
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.message || 'Unable to update user.');
-      }
-
-      setUserForm(emptyUserForm());
-      setShowUserModal(false);
-      setIsEditing(false);
-      setSelectedId(null);
-      await loadUsers();
-      setStatus({
-        type: 'success',
-        message: 'User updated successfully.'
-      });
-    } catch (error) {
-      setStatus({
-        type: 'error',
-        message: error.message || 'Unable to update user.'
-      });
-    }
-  };
-
-  const handleDeleteUser = async () => {
-    try {
-      const response = await fetch(`/api/users/${selectedId}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        const payload = await response.json();
-        throw new Error(payload.message || 'Unable to delete user.');
-      }
-
-      setSelectedId(null);
-      await loadUsers();
-      setStatus({
-        type: 'success',
-        message: 'User deleted successfully.'
-      });
-    } catch (error) {
-      setStatus({
-        type: 'error',
-        message: error.message || 'Unable to delete user.'
-      });
-    }
-  };
-
-  const handleCreateRole = async () => {
-    try {
-      const response = await fetch('/api/roles', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(roleForm)
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.message || 'Unable to create role.');
-      }
-
-      setRoleForm(emptyRoleForm());
-      setShowRoleModal(false);
-      await loadRoles();
-      setStatus({
-        type: 'success',
-        message: 'Role created successfully.'
-      });
-    } catch (error) {
-      setStatus({
-        type: 'error',
-        message: error.message || 'Unable to create role.'
-      });
-    }
-  };
-
-  const handleEditUser = (user) => {
-    setUserForm({
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      password: '',
-      passwordConfirmation: '',
-      roleIds: user.roles.map((role) => role.id)
-    });
-    setIsEditing(true);
-    setSelectedId(user.id);
-    setShowUserModal(true);
-  };
-
-  const handleDeleteClick = (userId) => {
-    setSelectedId(userId);
-  };
-
-  const handleNewUser = () => {
-    setUserForm(emptyUserForm());
-    setIsEditing(false);
-    setSelectedId(null);
-    setShowUserModal(true);
-  };
-
-  const handleNewRole = () => {
-    setRoleForm(emptyRoleForm());
-    setShowRoleModal(true);
-  };
-
-  const handleRoleToggle = (roleId) => {
-    setUserForm({
-      ...userForm,
-      roleIds: userForm.roleIds.includes(roleId)
-        ? userForm.roleIds.filter((id) => id !== roleId)
-        : [...userForm.roleIds, roleId]
-    });
-  };
-
-  const emptyUserForm = () => ({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    passwordConfirmation: '',
-    roleIds: []
-  });
-
-  const emptyRoleForm = () => ({
-    name: '',
-    description: '',
-    permissions: []
-  });
-
-  const getInitials = (firstName, lastName) => {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-  };
-
-  const getRoleBadgeClass = (roleName) => {
-    switch (roleName.toLowerCase()) {
-      case 'admin':
-        return 'users-role-badge--admin';
-      case 'moderator':
-        return 'users-role-badge--moderator';
-      default:
-        return 'users-role-badge--user';
-    }
-  };
-
-    if (loading) {
-    return (
-      <div className="users-page">
-        <div className="users-header">
-          <h1 className="users-title">Users & Roles</h1>
-          <p className="users-description">Manage system users and their permissions.</p>
-        </div>
-        <div className="users-loading">
-          <div className="users-loading-spinner"></div>
-          <p>Loading users...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (status.type === 'error') {
-    return (
-      <div className="users-page">
-        <div className="users-header">
-          <h1 className="users-title">Users & Roles</h1>
-          <p className="users-description">Manage system users and their permissions.</p>
-              </div>
-        <div className="users-error">
-          <div className="users-error-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="15" y1="9" x2="9" y2="15"/>
-              <line x1="9" y1="9" x2="15" y2="15"/>
-            </svg>
-              </div>
-          <div className="users-error-title">Error Loading Users</div>
-          <div className="users-error-description">{status.message}</div>
-            </div>
-      </div>
-    );
-  }
 
   return (
     <div className="users-page">
+      {/* Header */}
       <div className="users-header">
         <h1 className="users-title">Users & Roles</h1>
-        <p className="users-description">Manage system users and their permissions.</p>
-      </div>
-
-      <div className="users-actions">
-        <button
-          type="button"
-          className="users-action-btn users-action-btn--secondary"
-          onClick={handleNewRole}
-        >
-          <ShieldIcon />
-          New Role
-        </button>
-        <button
-          type="button"
-          className="users-action-btn users-action-btn--primary"
-          onClick={handleNewUser}
-        >
-          <UserIcon />
-          New User
-        </button>
-            </div>
-
-      <div className="users-filters">
-        <div className="users-search">
-          <SearchIcon />
-          <input
-            type="text"
-            placeholder="Search by name, email, or role..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="users-search-input"
-          />
+        <div className="users-actions">
+          <button onClick={handleNewRole} className="users-btn users-btn--secondary">
+            New Role
+          </button>
+          <button onClick={handleNewUser} className="users-btn users-btn--primary">
+            New User
+          </button>
         </div>
-        <div className="users-filter">
-          <select
-            value={filterRole}
-            onChange={(e) => setFilterRole(e.target.value)}
-            className="users-filter-select"
-          >
-            <option value="">All Roles</option>
-            {roles.map((role) => (
-              <option key={role.id} value={role.id}>
-                {role.name}
-              </option>
-            ))}
-          </select>
-    </div>
       </div>
 
-      {filteredUsers.length === 0 ? (
-        <div className="users-content">
+      {/* Search and Filter */}
+      <div className="users-search">
+        <input
+          type="text"
+          placeholder="Search users..."
+          className="users-search-input"
+        />
+        <select className="users-filter-select">
+          <option value="">All Roles</option>
+          {roles.map((role) => (
+            <option key={role.id} value={role.id}>
+              {role.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Content */}
+      <div className="users-content">
+        {loading ? (
+          <div className="users-loading">Loading...</div>
+        ) : users.length === 0 ? (
           <div className="users-empty">
-            <div className="users-empty-icon">
-              <UserIcon />
-        </div>
-            <div className="users-empty-title">No users found</div>
-            <div className="users-empty-description">
-              {searchTerm || filterRole
-                ? 'No users match your search criteria.'
-                : 'Get started by creating your first user.'}
-            </div>
-            {!searchTerm && !filterRole && (
-              <button
-                type="button"
-                className="users-empty-action"
-                onClick={handleNewUser}
-              >
-                <PlusIcon />
-                Create Your First User
+            <p>No users found. Create your first user to get started.</p>
+            <button onClick={handleNewUser} className="users-btn users-btn--primary">
+              Create Your First User
             </button>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="users-list">
+            {users.map((user) => (
+              <div key={user.id} className="users-item">
+                <div className="users-item-info">
+                  <h3 className="users-item-name">
+                    {user.firstName} {user.lastName}
+                  </h3>
+                  <p className="users-item-email">{user.email}</p>
+                </div>
+                <div className="users-item-actions">
+                  <button className="users-btn users-btn--ghost">Edit</button>
+                  <button className="users-btn users-btn--danger">Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-      ) : (
-        <div className="users-content">
-          <table className="users-table">
-            <thead className="users-table-header">
-              <tr>
-                <th>User</th>
-                <th>Email</th>
-                <th>Roles</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="users-table-row">
-                  <td className="users-table-cell">
-                    <div className="flex items-center gap-3">
-                      <div className="users-avatar">
-                        {getInitials(user.firstName, user.lastName)}
-                      </div>
-                      <div>
-                        <div className="users-table-cell--primary">
-                          {user.firstName} {user.lastName}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="users-table-cell">{user.email}</td>
-                  <td className="users-table-cell">
-                    <div className="flex flex-wrap gap-1">
-                      {user.roles.map((role) => (
-                        <span
-                          key={role.id}
-                          className={`users-role-badge ${getRoleBadgeClass(role.name)}`}
-                        >
-                          {role.name}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="users-table-cell">
-                    <div className="users-actions-cell">
-        <button
-          type="button"
-                        className="users-action-icon"
-                        onClick={() => handleEditUser(user)}
-                        title="Edit user"
-                      >
-                        <EditIcon />
-        </button>
-        <button
-          type="button"
-                        className="users-action-icon users-action-icon--danger"
-                        onClick={() => handleDeleteClick(user.id)}
-                        title="Delete user"
-                      >
-                        <TrashIcon />
-        </button>
-      </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
 
-      {/* User Modal */}
-      <Modal
-        isOpen={showUserModal}
-        onClose={() => {
-          setShowUserModal(false);
-          setUserForm(emptyUserForm());
-          setIsEditing(false);
-          setSelectedId(null);
-        }}
-        title={isEditing ? 'Edit User' : 'Create User'}
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="form-group">
-              <label htmlFor="user-first-name" className="form-label">
-                First Name *
-              </label>
-            <input
-                id="user-first-name"
-                type="text"
-                className="form-input"
-                value={userForm.firstName}
-                onChange={(e) => setUserForm({ ...userForm, firstName: e.target.value })}
-                placeholder="Enter first name"
-              required
-            />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="user-last-name" className="form-label">
-                Last Name *
-          </label>
-            <input
-                id="user-last-name"
-                type="text"
-                className="form-input"
-                value={userForm.lastName}
-                onChange={(e) => setUserForm({ ...userForm, lastName: e.target.value })}
-                placeholder="Enter last name"
-              required
-            />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="user-email" className="form-label">
-              Email Address *
-          </label>
-            <input
-              id="user-email"
-              type="email"
-              className="form-input"
-              value={userForm.email}
-              onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-              placeholder="Enter email address"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="form-group">
-              <label htmlFor="user-password" className="form-label">
-                Password {!isEditing && '*'}
-          </label>
-            <input
-                id="user-password"
-              type="password"
-                className="form-input"
-                value={userForm.password}
-                onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                placeholder={isEditing ? 'Leave blank to keep current' : 'Enter password'}
-                required={!isEditing}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="user-password-confirmation" className="form-label">
-                Confirm Password {!isEditing && '*'}
-          </label>
-            <input
-                id="user-password-confirmation"
-              type="password"
-                className="form-input"
-                value={userForm.passwordConfirmation}
-                onChange={(e) => setUserForm({ ...userForm, passwordConfirmation: e.target.value })}
-                placeholder={isEditing ? 'Leave blank to keep current' : 'Confirm password'}
-                required={!isEditing}
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Roles</label>
-            <RoleDropdown
-              roles={roles}
-              selectedIds={userForm.roleIds}
-              onToggle={handleRoleToggle}
-              placeholder="Select roles"
-            />
-          </div>
-        </div>
-
-        <div className="modal__footer">
-          <button
-            type="button"
-            className="btn btn--secondary"
-            onClick={() => {
-              setShowUserModal(false);
-              setUserForm(emptyUserForm());
-              setIsEditing(false);
-              setSelectedId(null);
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={isEditing ? handleUpdateUser : handleCreateUser}
-          >
-            {isEditing ? 'Update User' : 'Create User'}
-          </button>
-        </div>
-      </Modal>
-
-      {/* Role Modal */}
-      <Modal
-        isOpen={showRoleModal}
-        onClose={() => {
-          setShowRoleModal(false);
-          setRoleForm(emptyRoleForm());
-        }}
-        title="Create Role"
-      >
-        <div className="space-y-4">
-          <div className="form-group">
-            <label htmlFor="role-name" className="form-label">
-              Role Name *
-            </label>
-              <input
-              id="role-name"
-              type="text"
-              className="form-input"
-              value={roleForm.name}
-              onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })}
-              placeholder="Enter role name"
-                required
-              />
-            </div>
-
-          <div className="form-group">
-            <label htmlFor="role-description" className="form-label">
-              Description
-            </label>
-            <textarea
-              id="role-description"
-              className="form-input form-textarea"
-              value={roleForm.description}
-              onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })}
-              placeholder="Enter role description"
-              rows="3"
-            />
-          </div>
-        </div>
-
-        <div className="modal__footer">
-          <button
-            type="button"
-            className="btn btn--secondary"
-            onClick={() => {
-              setShowRoleModal(false);
-              setRoleForm(emptyRoleForm());
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={handleCreateRole}
-          >
-            Create Role
-          </button>
-        </div>
-      </Modal>
-
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={!!selectedId && !showUserModal}
-        onClose={() => setSelectedId(null)}
-        title="Delete User"
-      >
-        <p>Are you sure you want to delete this user? This action cannot be undone.</p>
-        <div className="modal__footer">
-          <button
-            type="button"
-            className="btn btn--secondary"
-            onClick={() => setSelectedId(null)}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn--danger"
-            onClick={handleDeleteUser}
-          >
-            Delete User
-          </button>
-        </div>
-      </Modal>
-
-      {/* Status Messages */}
+      {/* Status */}
       {status.message && (
-        <div className={`fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
-          status.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' :
-          status.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' :
-          'bg-blue-50 text-blue-700 border border-blue-200'
-        }`}>
+        <div className={`users-status users-status--${status.type}`}>
           {status.message}
         </div>
       )}
+
+      {/* Modals */}
+      <UserModal
+        open={showUserModal}
+        onClose={handleCloseUserModal}
+        userForm={userForm}
+        setUserForm={setUserForm}
+        roles={roles}
+        onSubmit={handleUserSubmit}
+        isEditing={false}
+      />
+      
+      <RoleModal
+        open={showRoleModal}
+        onClose={handleCloseRoleModal}
+        roleForm={roleForm}
+        setRoleForm={setRoleForm}
+        onSubmit={handleRoleSubmit}
+        isEditing={false}
+      />
     </div>
   );
 };

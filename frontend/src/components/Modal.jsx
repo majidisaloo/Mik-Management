@@ -20,7 +20,7 @@ const renderActions = (actions) => {
   return actions;
 };
 
-const Modal = ({ title, description, children, actions, onClose, open = true }) => {
+const Modal = ({ title, description, children, actions, onClose, open = false }) => {
   const dialogRef = useRef(null);
 
   useEffect(() => {
@@ -69,14 +69,14 @@ const Modal = ({ title, description, children, actions, onClose, open = true }) 
 
   const labelId = `${title?.replace(/\s+/g, '-').toLowerCase() || 'modal'}-heading`;
 
+  const renderedActions = renderActions(actions);
+
   if (!open) {
     return null;
   }
 
-  const renderedActions = renderActions(actions);
-
   return (
-    <div className="modal" role="dialog" aria-modal="true" aria-labelledby={labelId} onClick={handleBackdropClick}>
+    <div className="modal modal--open" role="dialog" aria-modal="true" aria-labelledby={labelId} onClick={handleBackdropClick}>
       <div className="modal__dialog" ref={dialogRef} tabIndex={-1}>
         <div className="modal__header">
           <div>

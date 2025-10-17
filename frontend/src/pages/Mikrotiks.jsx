@@ -144,8 +144,8 @@ const Mikrotiks = () => {
   }, [devices, searchTerm, filterGroup]);
 
   const loadDevices = async () => {
-    try {
-      setLoading(true);
+      try {
+        setLoading(true);
       const response = await fetch('/api/mikrotiks');
 
       if (!response.ok) {
@@ -154,17 +154,17 @@ const Mikrotiks = () => {
 
       const payload = await response.json();
       setDevices(Array.isArray(payload) ? payload : []);
-      setStatus({ type: '', message: '' });
-    } catch (error) {
+        setStatus({ type: '', message: '' });
+      } catch (error) {
       setDevices([]);
-      setStatus({
-        type: 'error',
+        setStatus({
+          type: 'error',
         message: error.message || 'Unable to load MikroTik devices.'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
   const loadGroups = async () => {
     try {
@@ -357,7 +357,7 @@ const Mikrotiks = () => {
           <div>
             <h1 className="text-3xl font-bold text-primary">MikroTik Devices</h1>
             <p className="text-tertiary mt-2">Manage and monitor your MikroTik router infrastructure.</p>
-          </div>
+        </div>
         </div>
         <div className="card">
           <div className="card__body">
@@ -365,10 +365,10 @@ const Mikrotiks = () => {
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="h-20 bg-tertiary bg-opacity-20 rounded-lg animate-pulse"></div>
               ))}
-            </div>
+                </div>
+                </div>
+                  </div>
           </div>
-        </div>
-      </div>
     );
   }
 
@@ -388,7 +388,7 @@ const Mikrotiks = () => {
           <PlusIcon />
           Add Device
         </button>
-      </div>
+        </div>
 
       {/* Status Message */}
       {status.message && (
@@ -398,7 +398,7 @@ const Mikrotiks = () => {
             : 'bg-success-50 border-success-200 text-success-700'
         }`}>
           {status.message}
-        </div>
+          </div>
       )}
 
       {/* Filters */}
@@ -407,7 +407,7 @@ const Mikrotiks = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="search" className="form-label">Search Devices</label>
-              <input
+            <input
                 id="search"
                 type="text"
                 className="form-input"
@@ -415,7 +415,7 @@ const Mikrotiks = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-            </div>
+        </div>
             <div>
               <label htmlFor="group-filter" className="form-label">Filter by Group</label>
               <select
@@ -431,10 +431,10 @@ const Mikrotiks = () => {
                   </option>
                 ))}
               </select>
-            </div>
+          </div>
+      </div>
           </div>
         </div>
-      </div>
 
       {/* Devices Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -450,11 +450,11 @@ const Mikrotiks = () => {
                     <h3 className="font-semibold text-primary">{device.name}</h3>
                     <p className="text-sm text-tertiary">{device.host}</p>
                   </div>
-                </div>
+                  </div>
                 <span className={`status-badge ${getStatusColor(device.status)}`}>
                   {device.status || 'Unknown'}
                 </span>
-              </div>
+        </div>
 
               <div className="space-y-2 mb-4">
                 <div className="flex justify-between text-sm">
@@ -462,7 +462,7 @@ const Mikrotiks = () => {
                   <span className="text-secondary">
                     {device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}
                   </span>
-                </div>
+        </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-tertiary">Firmware:</span>
                   <span className="text-secondary">{device.routeros?.firmwareVersion || 'Unknown'}</span>
@@ -476,8 +476,8 @@ const Mikrotiks = () => {
                 <div className="flex justify-between text-sm">
                   <span className="text-tertiary">Created:</span>
                   <span className="text-secondary">{formatDateTime(device.createdAt)}</span>
-                </div>
-              </div>
+        </div>
+      </div>
 
               {device.tags && (
                 <div className="mb-4">
@@ -519,9 +519,9 @@ const Mikrotiks = () => {
                 >
                   <TrashIcon />
                 </button>
+                </div>
               </div>
-            </div>
-          </div>
+              </div>
         ))}
       </div>
 
@@ -551,11 +551,11 @@ const Mikrotiks = () => {
       )}
 
       {/* Create/Edit Modal */}
-      <Modal
+        <Modal
         title={isEditing ? 'Edit Device' : 'Add New Device'}
         description={isEditing ? 'Update the device configuration below.' : 'Add a new MikroTik device to your network.'}
         open={showModal}
-        onClose={() => {
+          onClose={() => {
           setShowModal(false);
           setForm(emptyDeviceForm());
           setIsEditing(false);
@@ -573,17 +573,17 @@ const Mikrotiks = () => {
               setSelectedId(null);
             }}
           >
-            Cancel
+                Cancel
           </button>,
-          <button
+              <button
             key="submit"
-            type="submit"
+                type="submit"
             form="device-form"
             className="btn btn--primary"
             disabled={!form.name.trim() || !form.host.trim()}
           >
             {isEditing ? 'Update Device' : 'Add Device'}
-          </button>
+              </button>
         ]}
       >
         <form id="device-form" onSubmit={handleSubmit} className="space-y-6">
@@ -595,7 +595,7 @@ const Mikrotiks = () => {
               <div className="form-group">
                 <label htmlFor="device-name" className="form-label">
                   Device Name *
-                </label>
+            </label>
                 <input
                   id="device-name"
                   type="text"
@@ -610,7 +610,7 @@ const Mikrotiks = () => {
               <div className="form-group">
                 <label htmlFor="device-host" className="form-label">
                   Host Address *
-                </label>
+            </label>
                 <input
                   id="device-host"
                   type="text"
@@ -645,7 +645,7 @@ const Mikrotiks = () => {
             <div className="form-group">
               <label htmlFor="device-tags" className="form-label">
                 Tags
-              </label>
+            </label>
               <input
                 id="device-tags"
                 type="text"
@@ -659,7 +659,7 @@ const Mikrotiks = () => {
             <div className="form-group">
               <label htmlFor="device-notes" className="form-label">
                 Notes
-              </label>
+            </label>
               <textarea
                 id="device-notes"
                 className="form-input form-textarea"
@@ -686,7 +686,7 @@ const Mikrotiks = () => {
                   })}
                 />
                 <span className="form-label mb-0">Enable RouterOS API</span>
-              </label>
+            </label>
             </div>
 
             {form.routeros.apiEnabled && (
@@ -694,7 +694,7 @@ const Mikrotiks = () => {
                 <div className="form-group">
                   <label htmlFor="api-port" className="form-label">
                     API Port
-                  </label>
+            </label>
                   <input
                     id="api-port"
                     type="number"
@@ -711,8 +711,8 @@ const Mikrotiks = () => {
                 <div className="form-group">
                   <label htmlFor="api-username" className="form-label">
                     Username
-                  </label>
-                  <input
+            </label>
+              <input
                     id="api-username"
                     type="text"
                     className="form-input"
@@ -728,7 +728,7 @@ const Mikrotiks = () => {
                 <div className="form-group">
                   <label htmlFor="api-password" className="form-label">
                     Password
-                  </label>
+            </label>
                   <input
                     id="api-password"
                     type="password"
@@ -745,7 +745,7 @@ const Mikrotiks = () => {
                 <div className="form-group">
                   <label htmlFor="api-timeout" className="form-label">
                     Timeout (ms)
-                  </label>
+            </label>
                   <input
                     id="api-timeout"
                     type="number"
@@ -757,12 +757,12 @@ const Mikrotiks = () => {
                     })}
                     placeholder="5000"
                   />
-                </div>
+            </div>
               </div>
             )}
           </div>
-        </form>
-      </Modal>
+          </form>
+        </Modal>
     </div>
   );
 };

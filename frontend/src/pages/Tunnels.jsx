@@ -164,27 +164,27 @@ const Tunnels = () => {
   }, [tunnels, searchTerm, filterStatus, filterType]);
 
   const loadTunnels = async () => {
-    try {
-      setLoading(true);
+      try {
+        setLoading(true);
       const response = await fetch('/api/tunnels');
 
-      if (!response.ok) {
-        throw new Error('Unable to load tunnels.');
-      }
+        if (!response.ok) {
+          throw new Error('Unable to load tunnels.');
+        }
 
-      const payload = await response.json();
+        const payload = await response.json();
       setTunnels(Array.isArray(payload) ? payload : []);
-      setStatus({ type: '', message: '' });
-    } catch (error) {
+        setStatus({ type: '', message: '' });
+      } catch (error) {
       setTunnels([]);
-      setStatus({
-        type: 'error',
+        setStatus({
+          type: 'error',
         message: error.message || 'Unable to load tunnels.'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
   const loadDevices = async () => {
     try {
@@ -411,8 +411,8 @@ const Tunnels = () => {
           <div>
             <h1 className="text-3xl font-bold text-primary">Tunnels</h1>
             <p className="text-tertiary mt-2">Manage inter-site tunnels and connectivity.</p>
-          </div>
-        </div>
+            </div>
+              </div>
         <div className="card">
           <div className="card__body">
             <div className="space-y-4">
@@ -426,7 +426,7 @@ const Tunnels = () => {
     );
   }
 
-  return (
+    return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -501,10 +501,10 @@ const Tunnels = () => {
                   </option>
                 ))}
               </select>
-            </div>
           </div>
-        </div>
-      </div>
+              </div>
+              </div>
+            </div>
 
       {/* Tunnels Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -515,12 +515,12 @@ const Tunnels = () => {
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-primary-50 rounded-lg">
                     <TunnelIcon />
-                  </div>
+              </div>
                   <div>
                     <h3 className="font-semibold text-primary">{tunnel.name}</h3>
                     <p className="text-sm text-tertiary">{tunnel.type}</p>
-                  </div>
-                </div>
+            </div>
+          </div>
                 <span className={`status-badge ${getStatusColor(tunnel.status)}`}>
                   {tunnel.status || 'Unknown'}
                 </span>
@@ -556,7 +556,7 @@ const Tunnels = () => {
                   <span className="text-tertiary">Created:</span>
                   <span className="text-secondary">{formatDateTime(tunnel.createdAt)}</span>
                 </div>
-              </div>
+          </div>
 
               {tunnel.comment && (
                 <div className="mb-4">
@@ -572,21 +572,21 @@ const Tunnels = () => {
                         {tag.trim()}
                       </span>
                     ))}
-                  </div>
+            </div>
                 </div>
               )}
 
               <div className="flex gap-2">
-                <button
-                  type="button"
+                  <button
+                    type="button"
                   className="btn btn--secondary btn--sm flex-1"
                   onClick={() => handleEdit(tunnel)}
-                >
+                  >
                   <EditIcon />
                   Edit
-                </button>
-                <button
-                  type="button"
+                  </button>
+              <button
+                type="button"
                   className="btn btn--ghost btn--sm"
                   onClick={() => handleTestTunnel(tunnel)}
                   disabled={testingTunnel === tunnel.id}
@@ -596,19 +596,19 @@ const Tunnels = () => {
                   ) : (
                     <TestIcon />
                   )}
-                </button>
-                <button
-                  type="button"
+              </button>
+                  <button
+                    type="button"
                   className="btn btn--danger btn--sm"
                   onClick={() => handleDelete(tunnel)}
-                >
+                  >
                   <TrashIcon />
-                </button>
+                  </button>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+                </div>
+              ))}
+            </div>
 
       {filteredTunnels.length === 0 && (
         <div className="card">
@@ -622,17 +622,17 @@ const Tunnels = () => {
               }
             </p>
             {!searchTerm && !filterStatus && !filterType && (
-              <button
-                type="button"
+                  <button
+                    type="button"
                 className="btn btn--primary mt-4"
                 onClick={handleNewTunnel}
-              >
+                  >
                 <PlusIcon />
                 Create Your First Tunnel
-              </button>
+                  </button>
             )}
-          </div>
-        </div>
+                </div>
+            </div>
       )}
 
       {/* Create/Edit Modal */}
@@ -647,9 +647,9 @@ const Tunnels = () => {
           setSelectedId(null);
         }}
         actions={[
-          <button
+                    <button
             key="cancel"
-            type="button"
+                      type="button"
             className="btn btn--ghost"
             onClick={() => {
               setShowModal(false);
@@ -660,7 +660,7 @@ const Tunnels = () => {
           >
             Cancel
           </button>,
-          <button
+                <button
             key="submit"
             type="submit"
             form="tunnel-form"
@@ -668,7 +668,7 @@ const Tunnels = () => {
             disabled={!form.name.trim() || !form.sourceDeviceId || !form.targetDeviceId}
           >
             {isEditing ? 'Update Tunnel' : 'Create Tunnel'}
-          </button>
+                </button>
         ]}
       >
         <form id="tunnel-form" onSubmit={handleSubmit} className="space-y-6">
@@ -680,8 +680,8 @@ const Tunnels = () => {
               <div className="form-group">
                 <label htmlFor="tunnel-name" className="form-label">
                   Tunnel Name *
-                </label>
-                <input
+                    </label>
+                      <input
                   id="tunnel-name"
                   type="text"
                   className="form-input"
@@ -695,7 +695,7 @@ const Tunnels = () => {
               <div className="form-group">
                 <label htmlFor="tunnel-type" className="form-label">
                   Tunnel Type *
-                </label>
+                    </label>
                 <select
                   id="tunnel-type"
                   className="form-input form-select"
@@ -709,8 +709,8 @@ const Tunnels = () => {
                     </option>
                   ))}
                 </select>
-              </div>
             </div>
+          </div>
 
             <div className="form-group">
               <label htmlFor="tunnel-status" className="form-label">
@@ -728,8 +728,8 @@ const Tunnels = () => {
                   </option>
                 ))}
               </select>
+              </div>
             </div>
-          </div>
 
           {/* Device Configuration */}
           <div className="space-y-4">
@@ -739,8 +739,8 @@ const Tunnels = () => {
               <div className="form-group">
                 <label htmlFor="source-device" className="form-label">
                   Source Device *
-                </label>
-                <select
+            </label>
+              <select
                   id="source-device"
                   className="form-input form-select"
                   value={form.sourceDeviceId}
@@ -753,13 +753,13 @@ const Tunnels = () => {
                       {device.name} ({device.host})
                     </option>
                   ))}
-                </select>
-              </div>
+              </select>
+          </div>
 
               <div className="form-group">
                 <label htmlFor="target-device" className="form-label">
                   Target Device *
-                </label>
+                  </label>
                 <select
                   id="target-device"
                   className="form-input form-select"
@@ -774,15 +774,15 @@ const Tunnels = () => {
                     </option>
                   ))}
                 </select>
-              </div>
             </div>
+          </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="form-group">
                 <label htmlFor="source-interface" className="form-label">
                   Source Interface
-                </label>
-                <input
+                  </label>
+                    <input
                   id="source-interface"
                   type="text"
                   className="form-input"
@@ -795,8 +795,8 @@ const Tunnels = () => {
               <div className="form-group">
                 <label htmlFor="target-interface" className="form-label">
                   Target Interface
-                </label>
-                <input
+                  </label>
+                    <input
                   id="target-interface"
                   type="text"
                   className="form-input"
@@ -804,15 +804,15 @@ const Tunnels = () => {
                   onChange={(e) => setForm({ ...form, targetInterface: e.target.value })}
                   placeholder="e.g., ether1"
                 />
-              </div>
             </div>
+          </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="form-group">
                 <label htmlFor="source-address" className="form-label">
                   Source Address
-                </label>
-                <input
+                  </label>
+                    <input
                   id="source-address"
                   type="text"
                   className="form-input"
@@ -825,8 +825,8 @@ const Tunnels = () => {
               <div className="form-group">
                 <label htmlFor="target-address" className="form-label">
                   Target Address
-                </label>
-                <input
+                  </label>
+                    <input
                   id="target-address"
                   type="text"
                   className="form-input"
@@ -834,7 +834,7 @@ const Tunnels = () => {
                   onChange={(e) => setForm({ ...form, targetAddress: e.target.value })}
                   placeholder="e.g., 192.168.2.1"
                 />
-              </div>
+                </div>
             </div>
           </div>
 
@@ -846,10 +846,10 @@ const Tunnels = () => {
               <div className="form-group">
                 <label htmlFor="tunnel-mtu" className="form-label">
                   MTU
-                </label>
-                <input
+                  </label>
+                    <input
                   id="tunnel-mtu"
-                  type="number"
+                      type="number"
                   className="form-input"
                   value={form.mtu}
                   onChange={(e) => setForm({ ...form, mtu: e.target.value })}
@@ -860,8 +860,8 @@ const Tunnels = () => {
               <div className="form-group">
                 <label htmlFor="tunnel-keepalive" className="form-label">
                   Keepalive
-                </label>
-                <input
+                  </label>
+                    <input
                   id="tunnel-keepalive"
                   type="text"
                   className="form-input"
@@ -875,7 +875,7 @@ const Tunnels = () => {
             <div className="form-group">
               <label htmlFor="tunnel-comment" className="form-label">
                 Comment
-              </label>
+                  </label>
               <textarea
                 id="tunnel-comment"
                 className="form-input form-textarea"
@@ -884,13 +884,13 @@ const Tunnels = () => {
                 placeholder="Additional notes about this tunnel..."
                 rows={3}
               />
-            </div>
+                </div>
 
             <div className="form-group">
               <label htmlFor="tunnel-tags" className="form-label">
                 Tags
-              </label>
-              <input
+                  </label>
+                    <input
                 id="tunnel-tags"
                 type="text"
                 className="form-input"
@@ -898,8 +898,8 @@ const Tunnels = () => {
                 onChange={(e) => setForm({ ...form, tags: e.target.value })}
                 placeholder="e.g., production, backup, critical"
               />
-            </div>
-          </div>
+                </div>
+              </div>
         </form>
       </Modal>
     </div>

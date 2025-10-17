@@ -711,7 +711,7 @@ a:hover {
   background: var(--bg-overlay);
   display: flex;
   align-items: center;
-    justify-content: center;
+  justify-content: center;
   z-index: var(--z-modal);
   padding: var(--space-4);
   opacity: 0;
@@ -720,6 +720,12 @@ a:hover {
 }
 
 .modal--open {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Modal when open */
+.modal[open] {
   opacity: 1;
   visibility: visible;
 }
