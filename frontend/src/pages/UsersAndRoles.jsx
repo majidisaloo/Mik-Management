@@ -354,6 +354,7 @@ const UsersAndRoles = () => {
   };
 
   const handleEditRole = (role) => {
+    console.log('handleEditRole called with:', role);
     setRoleForm({
       name: role.name || '',
       description: role.description || '',
@@ -362,6 +363,7 @@ const UsersAndRoles = () => {
     setSelectedRoleId(role.id);
     setIsEditingRole(true);
     setShowRoleModal(true);
+    console.log('Role modal should be open now');
   };
 
   const handleNewRole = () => {

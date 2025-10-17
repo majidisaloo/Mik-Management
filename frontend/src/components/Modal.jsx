@@ -29,7 +29,8 @@ const Modal = ({ title, description, children, actions, onClose, open = false })
     }
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
+      // Only handle Escape key, ignore all other keys to prevent input interference
+      if (event.key === 'Escape' && event.target === document.body) {
         event.preventDefault();
         onClose();
       }

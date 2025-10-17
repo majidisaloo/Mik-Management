@@ -90,7 +90,15 @@ const Groups = () => {
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [expandedGroups, setExpandedGroups] = useState(new Set());
+  // Load expanded state from sessionStorage
+  const [expandedGroups, setExpandedGroups] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('groups-expanded');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
 
   const groupLookup = useMemo(() => {
     const lookup = new Map();
@@ -337,82 +345,121 @@ const Groups = () => {
       } else {
         newSet.add(groupId);
       }
+      
+      // Save to sessionStorage
+      try {
+        sessionStorage.setItem('groups-expanded', JSON.stringify([...newSet]));
+      } catch (error) {
+        console.warn('Failed to save expanded state:', error);
+      }
+      
       return newSet;
     });
   };
 
   const renderGroupNode = (node, depth = 0) => {
-    const indent = depth * 24;
     const hasChildren = node.children && node.children.length > 0;
     const isExpanded = expandedGroups.has(node.id);
+    const isSelected = selectedId === node.id;
 
     return (
-      <div key={node.id} className="group-node">
-        <div 
-          className={`group-item group-item--compact ${selectedId === node.id ? 'group-item--selected' : ''}`}
-          style={{ paddingLeft: `${indent + 12}px` }}
+      <div key={node.id} className="tree-node" data-depth={depth}>
+        <div
+          className={`tree-item ${isSelected ? 'tree-item--selected' : ''}`}
           onClick={() => setSelectedId(node.id)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              setSelectedId(node.id);
+            } else if (e.key === 'ArrowRight' && hasChildren && !isExpanded) {
+              e.preventDefault();
+              toggleExpanded(node.id);
+            } else if (e.key === 'ArrowLeft' && hasChildren && isExpanded) {
+              e.preventDefault();
+              toggleExpanded(node.id);
+            }
+          }}
+          tabIndex={0}
+          role="treeitem"
+          aria-expanded={hasChildren ? isExpanded : undefined}
+          aria-selected={isSelected}
         >
-          <div className="flex items-center gap-2">
-            {/* Expand/Collapse Button */}
+          {/* Tree lines and indentation */}
+          <div className="tree-indent">
+            {Array.from({ length: depth }, (_, i) => (
+              <div key={i} className="tree-line"></div>
+            ))}
+          </div>
+
+          {/* Expand/Collapse Button */}
+          <div className="tree-toggle">
             {hasChildren ? (
               <button
                 type="button"
-                className="expand-button"
+                className={`tree-expand ${isExpanded ? 'tree-expand--expanded' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   toggleExpanded(node.id);
                 }}
                 title={isExpanded ? 'Collapse' : 'Expand'}
+                aria-label={isExpanded ? 'Collapse' : 'Expand'}
               >
-                {isExpanded ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M18 15l-6-6-6 6"/>
-                  </svg>
-                ) : (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M9 18l6-6-6-6"/>
-                  </svg>
-                )}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 18l6-6-6-6"/>
+                </svg>
               </button>
             ) : (
-              <div className="expand-spacer"></div>
+              <div className="tree-spacer"></div>
             )}
-            
+          </div>
+
+          {/* Folder Icon */}
+          <div className="tree-icon">
             <FolderIcon />
-            <div className="flex-1 min-w-0">
-              <h3 className="font-medium text-primary text-sm truncate">{node.name}</h3>
-              <p className="text-xs text-tertiary">
-                {node.children?.length || 0} sub-groups • {formatDateTime(node.createdAt)}
-              </p>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleEdit(node);
-                }}
-                aria-label={`Edit ${node.name}`}
-              >
-                <EditIcon />
-              </button>
-            <button
-              type="button"
-                className="btn btn--ghost btn--sm text-error"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelete(node);
-                }}
-                aria-label={`Delete ${node.name}`}
-              >
-                <TrashIcon />
-            </button>
+          </div>
+
+          {/* Group Info */}
+          <div className="tree-content">
+            <div className="tree-name">{node.name}</div>
+            <div className="tree-meta">
+              {node.children?.length || 0} sub-groups • {formatDateTime(node.createdAt)}
             </div>
           </div>
+
+          {/* Actions */}
+          <div className="tree-actions">
+            <button
+              type="button"
+              className="tree-action"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEdit(node);
+              }}
+              aria-label={`Edit ${node.name}`}
+              title="Edit"
+            >
+              <EditIcon />
+            </button>
+            <button
+              type="button"
+              className="tree-action tree-action--danger"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(node);
+              }}
+              aria-label={`Delete ${node.name}`}
+              title="Delete"
+            >
+              <TrashIcon />
+            </button>
+          </div>
         </div>
-        {hasChildren && isExpanded && node.children?.map((child) => renderGroupNode(child, depth + 1))}
+
+        {/* Children */}
+        {hasChildren && isExpanded && (
+          <div className="tree-children">
+            {node.children?.map((child) => renderGroupNode(child, depth + 1))}
+          </div>
+        )}
       </div>
     );
   };
@@ -498,44 +545,44 @@ const Groups = () => {
               <h2 className="card__title">Groups Hierarchy</h2>
               <p className="card__subtitle">Click on a group to view details</p>
             </div>
-            <div className="card__body">
-              <div className="mb-4">
-            <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Search groups..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                {filteredGroups.length > 0 ? (
-                  filteredGroups.map((node) => renderGroupNode(node))
-                ) : (
-                  <div className="text-center py-12 text-tertiary">
-                    <div className="mb-4">
-                      <FolderIcon />
-                    </div>
-                    <h3 className="text-lg font-medium text-secondary mb-2">
-                      {searchTerm ? 'No groups found' : 'No groups created yet'}
-                    </h3>
-                    <p className="text-sm mb-4">
-                      {searchTerm ? 'Try adjusting your search terms.' : 'Create your first group to organize your devices.'}
-                    </p>
-                    {!searchTerm && (
-                      <button
-                        type="button"
-                        className="btn btn--primary btn--sm"
-                        onClick={handleNewGroup}
-                      >
-                        <PlusIcon />
-                        Create First Group
-                      </button>
-                    )}
+                <div className="card__body">
+                  <div className="mb-4">
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Search groups..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
                   </div>
-                )}
-              </div>
-            </div>
+                  {filteredGroups.length > 0 ? (
+                    <div className="tree-container">
+                      {filteredGroups.map((node) => renderGroupNode(node))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-tertiary">
+                      <div className="mb-4">
+                        <FolderIcon />
+                      </div>
+                      <h3 className="text-lg font-medium text-secondary mb-2">
+                        {searchTerm ? 'No groups found' : 'No groups created yet'}
+                      </h3>
+                      <p className="text-sm mb-4">
+                        {searchTerm ? 'Try adjusting your search terms.' : 'Create your first group to organize your devices.'}
+                      </p>
+                      {!searchTerm && (
+                        <button
+                          type="button"
+                          className="btn btn--primary btn--sm"
+                          onClick={handleNewGroup}
+                        >
+                          <PlusIcon />
+                          Create First Group
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
           </div>
         </div>
 
