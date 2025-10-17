@@ -1,0 +1,125 @@
+/* Settings page - Services status styles */
+
+/* Service card */
+.service-card {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.service-card:hover {
+  border-color: var(--primary-200);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Service icon */
+.service-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--primary-50);
+  border-radius: 8px;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+/* Service name */
+.service-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--primary);
+  margin: 0;
+  line-height: 1.2;
+}
+
+/* Service description */
+.service-description {
+  font-size: 14px;
+  color: var(--tertiary);
+  margin: 0;
+  line-height: 1.2;
+}
+
+/* Status badge */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: capitalize;
+  flex-shrink: 0;
+}
+
+.status-badge--success {
+  background: var(--success-50);
+  color: var(--success-700);
+  border: 1px solid var(--success-200);
+}
+
+.status-badge--error {
+  background: var(--error-50);
+  color: var(--error-700);
+  border: 1px solid var(--error-200);
+}
+
+.status-badge--warning {
+  background: var(--warning-50);
+  color: var(--warning-700);
+  border: 1px solid var(--warning-200);
+}
+
+.status-badge--info {
+  background: var(--info-50);
+  color: var(--info-700);
+  border: 1px solid var(--info-200);
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .service-card {
+  background: var(--surface-elevated-dark);
+  border-color: var(--border-color-dark);
+}
+
+[data-theme="dark"] .service-card:hover {
+  border-color: var(--primary-300);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .service-icon {
+  background: var(--primary-900);
+  color: var(--primary-200);
+}
+
+[data-theme="dark"] .service-name {
+  color: var(--primary-light);
+}
+
+[data-theme="dark"] .service-description {
+  color: var(--tertiary-light);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .service-card {
+    padding: 12px;
+  }
+  
+  .service-icon {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .service-name {
+    font-size: 14px;
+  }
+  
+  .service-description {
+    font-size: 12px;
+  }
+}

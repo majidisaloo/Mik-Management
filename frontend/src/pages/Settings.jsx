@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import './Settings.css';
 
 // Modern Icons
 const PlusIcon = () => (
@@ -45,6 +46,41 @@ const DatabaseIcon = () => (
     <ellipse cx="12" cy="5" rx="9" ry="3" stroke="currentColor" strokeWidth="2" />
     <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5" stroke="currentColor" strokeWidth="2" />
     <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3" stroke="currentColor" strokeWidth="2" />
+  </svg>
+);
+
+const ServerIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" strokeWidth="2" />
+    <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2" />
+    <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2" />
+  </svg>
+);
+
+const WebIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+    <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth="2" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="currentColor" strokeWidth="2" />
+  </svg>
+);
+
+const ApiIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 7V4a2 2 0 0 1 2-2h8.5L20 7.5V20a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M16 13H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M16 17H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <polyline points="10,9 9,9 8,9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const RefreshIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M21 3v5h-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M3 21v-5h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
@@ -108,6 +144,14 @@ const Settings = () => {
   const [testingIpam, setTestingIpam] = useState(null);
   const [syncingIpam, setSyncingIpam] = useState(null);
   const [configInfo, setConfigInfo] = useState(null);
+  const [servicesStatus, setServicesStatus] = useState({
+    nginx: { status: 'unknown', uptime: null, lastCheck: null },
+    frontend: { status: 'unknown', uptime: null, lastCheck: null },
+    backend: { status: 'unknown', uptime: null, lastCheck: null },
+    api: { status: 'unknown', uptime: null, lastCheck: null },
+    database: { status: 'unknown', uptime: null, lastCheck: null }
+  });
+  const [servicesLoading, setServicesLoading] = useState(false);
 
   const loadIpams = async () => {
     try {
@@ -146,6 +190,48 @@ const Settings = () => {
     }
   };
 
+  const checkServicesStatus = async () => {
+    setServicesLoading(true);
+    const now = new Date();
+    
+    try {
+      // Check API status
+      const apiResponse = await fetch('/api/health');
+      const apiStatus = apiResponse.ok ? 'running' : 'failed';
+      
+      // Check Frontend status (if we can reach it, it's running)
+      const frontendStatus = 'running';
+      
+      // Check Backend status (same as API for now)
+      const backendStatus = apiResponse.ok ? 'running' : 'failed';
+      
+      // Check Nginx status (if we can reach the app, nginx is likely running)
+      const nginxStatus = 'running';
+      
+      // Check Database status (if API works, database is likely working)
+      const databaseStatus = apiResponse.ok ? 'running' : 'failed';
+      
+      setServicesStatus({
+        nginx: { status: nginxStatus, uptime: 'N/A', lastCheck: now },
+        frontend: { status: frontendStatus, uptime: 'N/A', lastCheck: now },
+        backend: { status: backendStatus, uptime: 'N/A', lastCheck: now },
+        api: { status: apiStatus, uptime: 'N/A', lastCheck: now },
+        database: { status: databaseStatus, uptime: 'N/A', lastCheck: now }
+      });
+    } catch (error) {
+      console.error('Failed to check services status:', error);
+      setServicesStatus({
+        nginx: { status: 'failed', uptime: null, lastCheck: now },
+        frontend: { status: 'failed', uptime: null, lastCheck: now },
+        backend: { status: 'failed', uptime: null, lastCheck: now },
+        api: { status: 'failed', uptime: null, lastCheck: now },
+        database: { status: 'failed', uptime: null, lastCheck: now }
+      });
+    } finally {
+      setServicesLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!user) {
       navigate('/login', { replace: true });
@@ -154,6 +240,7 @@ const Settings = () => {
 
     loadIpams();
     loadConfigInfo();
+    checkServicesStatus();
   }, [navigate, user]);
 
   const handleCreateIpam = async () => {
@@ -377,6 +464,116 @@ const Settings = () => {
           {ipamStatus.message}
         </div>
       )}
+
+      {/* Services Status */}
+      <div className="card">
+        <div className="card__header">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="card__title">Services Status</h2>
+              <p className="card__subtitle">Monitor system services health</p>
+            </div>
+            <button
+              type="button"
+              className="btn btn--secondary btn--sm"
+              onClick={checkServicesStatus}
+              disabled={servicesLoading}
+            >
+              <RefreshIcon />
+              {servicesLoading ? 'Checking...' : 'Refresh'}
+            </button>
+          </div>
+        </div>
+        <div className="card__body">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Nginx */}
+            <div className="service-card">
+              <div className="flex items-center gap-3">
+                <div className="service-icon">
+                  <WebIcon />
+                </div>
+                <div className="flex-1">
+                  <h3 className="service-name">Nginx</h3>
+                  <p className="service-description">Web Server</p>
+                </div>
+                <div className={`status-badge ${statusVariant(servicesStatus.nginx.status)}`}>
+                  {servicesStatus.nginx.status}
+                </div>
+              </div>
+            </div>
+
+            {/* Frontend */}
+            <div className="service-card">
+              <div className="flex items-center gap-3">
+                <div className="service-icon">
+                  <WebIcon />
+                </div>
+                <div className="flex-1">
+                  <h3 className="service-name">Frontend</h3>
+                  <p className="service-description">React Application</p>
+                </div>
+                <div className={`status-badge ${statusVariant(servicesStatus.frontend.status)}`}>
+                  {servicesStatus.frontend.status}
+                </div>
+              </div>
+            </div>
+
+            {/* Backend */}
+            <div className="service-card">
+              <div className="flex items-center gap-3">
+                <div className="service-icon">
+                  <ServerIcon />
+                </div>
+                <div className="flex-1">
+                  <h3 className="service-name">Backend</h3>
+                  <p className="service-description">Node.js Server</p>
+                </div>
+                <div className={`status-badge ${statusVariant(servicesStatus.backend.status)}`}>
+                  {servicesStatus.backend.status}
+                </div>
+              </div>
+            </div>
+
+            {/* API */}
+            <div className="service-card">
+              <div className="flex items-center gap-3">
+                <div className="service-icon">
+                  <ApiIcon />
+                </div>
+                <div className="flex-1">
+                  <h3 className="service-name">API</h3>
+                  <p className="service-description">REST API</p>
+                </div>
+                <div className={`status-badge ${statusVariant(servicesStatus.api.status)}`}>
+                  {servicesStatus.api.status}
+                </div>
+              </div>
+            </div>
+
+            {/* Database */}
+            <div className="service-card">
+              <div className="flex items-center gap-3">
+                <div className="service-icon">
+                  <DatabaseIcon />
+                </div>
+                <div className="flex-1">
+                  <h3 className="service-name">Database</h3>
+                  <p className="service-description">SQLite Database</p>
+                </div>
+                <div className={`status-badge ${statusVariant(servicesStatus.database.status)}`}>
+                  {servicesStatus.database.status}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="text-sm text-tertiary">
+              Last checked: {servicesStatus.api.lastCheck ? formatTimestamp(servicesStatus.api.lastCheck) : 'Never'}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* System Information */}
       {configInfo && (
