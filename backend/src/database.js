@@ -2824,6 +2824,182 @@ const initializeDatabase = async (databasePath) => {
       return { success: true };
     },
 
+    async getMikrotikInterfaces(id) {
+      const state = await load();
+      const index = state.mikrotiks.findIndex((device) => device.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      const existing = state.mikrotiks[index];
+      const routerosBaseline = sanitizeRouteros(existing.routeros, defaultRouterosOptions());
+      const host = normalizeOptionalText(existing.host);
+
+      if (!routerosBaseline.apiEnabled) {
+        return { success: false, reason: 'api-disabled' };
+      }
+
+      try {
+        // Try to fetch interfaces from MikroTik API
+        const apiUrl = `http://${host}:${routerosBaseline.apiPort || 80}/rest/interface`;
+        const auth = Buffer.from(`${routerosBaseline.apiUsername || 'admin'}:${routerosBaseline.apiPassword || ''}`).toString('base64');
+        
+        console.log(`Fetching interfaces from: ${apiUrl}`);
+        
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/json'
+          },
+          rejectUnauthorized: false,
+          timeout: 10000
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`Interfaces API Response:`, JSON.stringify(data, null, 2));
+          
+          const interfaces = Array.isArray(data) ? data : [];
+          return { 
+            success: true, 
+            interfaces: interfaces.map(iface => ({
+              name: iface.name || '',
+              type: iface.type || '',
+              macAddress: iface.macAddress || '',
+              arp: iface.arp || 'disabled',
+              mtu: iface.mtu || '',
+              comment: iface.comment || ''
+            }))
+          };
+        } else {
+          console.log(`Failed to fetch interfaces: HTTP ${response.status}`);
+          return { success: false, reason: 'api-error', message: `HTTP ${response.status}` };
+        }
+      } catch (error) {
+        console.error('Error fetching interfaces:', error);
+        return { success: false, reason: 'connection-error', message: error.message };
+      }
+    },
+
+    async getMikrotikIpAddresses(id) {
+      const state = await load();
+      const index = state.mikrotiks.findIndex((device) => device.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      const existing = state.mikrotiks[index];
+      const routerosBaseline = sanitizeRouteros(existing.routeros, defaultRouterosOptions());
+      const host = normalizeOptionalText(existing.host);
+
+      if (!routerosBaseline.apiEnabled) {
+        return { success: false, reason: 'api-disabled' };
+      }
+
+      try {
+        // Try to fetch IP addresses from MikroTik API
+        const apiUrl = `http://${host}:${routerosBaseline.apiPort || 80}/rest/ip/address`;
+        const auth = Buffer.from(`${routerosBaseline.apiUsername || 'admin'}:${routerosBaseline.apiPassword || ''}`).toString('base64');
+        
+        console.log(`Fetching IP addresses from: ${apiUrl}`);
+        
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/json'
+          },
+          rejectUnauthorized: false,
+          timeout: 10000
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`IP Addresses API Response:`, JSON.stringify(data, null, 2));
+          
+          const ipAddresses = Array.isArray(data) ? data : [];
+          return { 
+            success: true, 
+            ipAddresses: ipAddresses.map(ip => ({
+              address: ip.address || '',
+              network: ip.network || '',
+              interface: ip.interface || '',
+              disabled: ip.disabled || false,
+              comment: ip.comment || ''
+            }))
+          };
+        } else {
+          console.log(`Failed to fetch IP addresses: HTTP ${response.status}`);
+          return { success: false, reason: 'api-error', message: `HTTP ${response.status}` };
+        }
+      } catch (error) {
+        console.error('Error fetching IP addresses:', error);
+        return { success: false, reason: 'connection-error', message: error.message };
+      }
+    },
+
+    async getMikrotikRoutes(id) {
+      const state = await load();
+      const index = state.mikrotiks.findIndex((device) => device.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      const existing = state.mikrotiks[index];
+      const routerosBaseline = sanitizeRouteros(existing.routeros, defaultRouterosOptions());
+      const host = normalizeOptionalText(existing.host);
+
+      if (!routerosBaseline.apiEnabled) {
+        return { success: false, reason: 'api-disabled' };
+      }
+
+      try {
+        // Try to fetch routes from MikroTik API
+        const apiUrl = `http://${host}:${routerosBaseline.apiPort || 80}/rest/ip/route`;
+        const auth = Buffer.from(`${routerosBaseline.apiUsername || 'admin'}:${routerosBaseline.apiPassword || ''}`).toString('base64');
+        
+        console.log(`Fetching routes from: ${apiUrl}`);
+        
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/json'
+          },
+          rejectUnauthorized: false,
+          timeout: 10000
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`Routes API Response:`, JSON.stringify(data, null, 2));
+          
+          const routes = Array.isArray(data) ? data : [];
+          return { 
+            success: true, 
+            routes: routes.map(route => ({
+              dstAddress: route.dstAddress || '',
+              gateway: route.gateway || '',
+              outInterface: route.outInterface || '',
+              distance: route.distance || '',
+              active: route.active || false,
+              comment: route.comment || ''
+            }))
+          };
+        } else {
+          console.log(`Failed to fetch routes: HTTP ${response.status}`);
+          return { success: false, reason: 'api-error', message: `HTTP ${response.status}` };
+        }
+      } catch (error) {
+        console.error('Error fetching routes:', error);
+        return { success: false, reason: 'connection-error', message: error.message };
+      }
+    },
+
     async testMikrotikConnectivity(id) {
       const state = await load();
       const index = state.mikrotiks.findIndex((device) => device.id === id);

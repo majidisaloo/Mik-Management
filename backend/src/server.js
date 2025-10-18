@@ -2284,6 +2284,96 @@ const bootstrap = async () => {
       }
     };
 
+    const handleGetMikrotikInterfaces = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        console.log(`Fetching interfaces for MikroTik device ID: ${deviceId}`);
+        const result = await db.getMikrotikInterfaces(deviceId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to fetch interfaces.');
+        }
+
+        console.log(`Interfaces fetch result:`, result);
+        sendJson(res, 200, {
+          message: 'Interfaces fetched successfully.',
+          interfaces: result.interfaces || []
+        });
+      } catch (error) {
+        console.error('Get Mikrotik interfaces error', error);
+        sendJson(res, 500, { message: 'Unable to fetch interfaces right now.' });
+      }
+    };
+
+    const handleGetMikrotikIpAddresses = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        console.log(`Fetching IP addresses for MikroTik device ID: ${deviceId}`);
+        const result = await db.getMikrotikIpAddresses(deviceId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to fetch IP addresses.');
+        }
+
+        console.log(`IP addresses fetch result:`, result);
+        sendJson(res, 200, {
+          message: 'IP addresses fetched successfully.',
+          ipAddresses: result.ipAddresses || []
+        });
+      } catch (error) {
+        console.error('Get Mikrotik IP addresses error', error);
+        sendJson(res, 500, { message: 'Unable to fetch IP addresses right now.' });
+      }
+    };
+
+    const handleGetMikrotikRoutes = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        console.log(`Fetching routes for MikroTik device ID: ${deviceId}`);
+        const result = await db.getMikrotikRoutes(deviceId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to fetch routes.');
+        }
+
+        console.log(`Routes fetch result:`, result);
+        sendJson(res, 200, {
+          message: 'Routes fetched successfully.',
+          routes: result.routes || []
+        });
+      } catch (error) {
+        console.error('Get Mikrotik routes error', error);
+        sendJson(res, 500, { message: 'Unable to fetch routes right now.' });
+      }
+    };
+
     const handleListFirewallInventory = async () => {
       try {
         const [addressLists, filters, groups, mikrotiks] = await Promise.all([
@@ -3687,6 +3777,21 @@ const bootstrap = async () => {
 
         if (method === 'POST' && action === 'test-connectivity') {
           await handleTestMikrotikConnectivity(deviceId);
+          return;
+        }
+
+        if (method === 'GET' && action === 'interfaces') {
+          await handleGetMikrotikInterfaces(deviceId);
+          return;
+        }
+
+        if (method === 'GET' && action === 'ip-addresses') {
+          await handleGetMikrotikIpAddresses(deviceId);
+          return;
+        }
+
+        if (method === 'GET' && action === 'routes') {
+          await handleGetMikrotikRoutes(deviceId);
           return;
         }
       }

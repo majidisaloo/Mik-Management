@@ -26,6 +26,59 @@ const ArrowLeftIcon = () => (
   </svg>
 );
 
+const TestConnectionIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c1.3 0 2.52.28 3.64.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const DiagnosticsIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const InterfaceIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" strokeWidth="2" />
+    <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2" />
+    <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2" />
+  </svg>
+);
+
+const IPIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+    <path d="M8 12h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M12 8v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const RouteIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 3h18v18H3zM8 8h8v8H8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const ConfigIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const LogsIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <polyline points="10,9 9,9 8,9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const DeviceDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -37,6 +90,11 @@ const DeviceDetails = () => {
   const [testingConnection, setTestingConnection] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnosticResults, setDiagnosticResults] = useState(null);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [interfaces, setInterfaces] = useState([]);
+  const [ipAddresses, setIpAddresses] = useState([]);
+  const [routes, setRoutes] = useState([]);
+  const [loadingData, setLoadingData] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -225,6 +283,100 @@ const DeviceDetails = () => {
     }
   };
 
+  const fetchInterfaces = async () => {
+    if (!device) return;
+    
+    setLoadingData(true);
+    try {
+      const response = await fetch(`/api/mikrotiks/${device.id}/interfaces`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setInterfaces(result.interfaces || []);
+      } else {
+        console.error('Failed to fetch interfaces');
+        setInterfaces([]);
+      }
+    } catch (err) {
+      console.error('Error fetching interfaces:', err);
+      setInterfaces([]);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  const fetchIpAddresses = async () => {
+    if (!device) return;
+    
+    setLoadingData(true);
+    try {
+      const response = await fetch(`/api/mikrotiks/${device.id}/ip-addresses`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setIpAddresses(result.ipAddresses || []);
+      } else {
+        console.error('Failed to fetch IP addresses');
+        setIpAddresses([]);
+      }
+    } catch (err) {
+      console.error('Error fetching IP addresses:', err);
+      setIpAddresses([]);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  const fetchRoutes = async () => {
+    if (!device) return;
+    
+    setLoadingData(true);
+    try {
+      const response = await fetch(`/api/mikrotiks/${device.id}/routes`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setRoutes(result.routes || []);
+      } else {
+        console.error('Failed to fetch routes');
+        setRoutes([]);
+      }
+    } catch (err) {
+      console.error('Error fetching routes:', err);
+      setRoutes([]);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    
+    // Fetch data when switching to specific tabs
+    if (tab === 'interfaces' && interfaces.length === 0) {
+      fetchInterfaces();
+    } else if (tab === 'ip' && ipAddresses.length === 0) {
+      fetchIpAddresses();
+    } else if (tab === 'routes' && routes.length === 0) {
+      fetchRoutes();
+    }
+  };
+
   if (loading) {
     return (
       <div className="device-details-page">
@@ -274,57 +426,136 @@ const DeviceDetails = () => {
             </div>
           </div>
         </div>
+        
+        {/* Connection Test & Diagnostics Cards */}
+        <div className="flex items-center gap-4">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-50 rounded-lg">
+                <TestConnectionIcon />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-900">Test Connection</h3>
+                <p className="text-xs text-gray-500">Check device connectivity</p>
+              </div>
               <button
                 onClick={handleTestConnection}
                 disabled={testingConnection}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                className="ml-4 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {testingConnection ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin -ml-1 mr-1 h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                     Testing...
                   </>
                 ) : (
-                  'Test Connection'
-                )}
-              </button>
-              <button
-                onClick={handleRunDiagnostics}
-                disabled={testingConnection}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {testingConnection ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Running Diagnostics...
-                  </>
-                ) : (
-                  'Run Diagnostics'
+                  'Test'
                 )}
               </button>
             </div>
+          </div>
+          
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-50 rounded-lg">
+                <DiagnosticsIcon />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-900">Run Diagnostics</h3>
+                <p className="text-xs text-gray-500">Advanced connection tests</p>
+              </div>
+              <button
+                onClick={handleRunDiagnostics}
+                disabled={testingConnection}
+                className="ml-4 inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {testingConnection ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-1 h-3 w-3 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Running...
+                  </>
+                ) : (
+                  'Diagnose'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Tabs Navigation */}
       <div className="border-b border-gray-200 mb-6">
         <nav className="-mb-px flex space-x-8">
-          <button className="py-2 px-1 border-b-2 border-primary text-primary font-medium text-sm">
+          <button 
+            onClick={() => handleTabChange('overview')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+              activeTab === 'overview' 
+                ? 'border-primary text-primary' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <NetworkIcon />
             Overview
           </button>
-          <button className="py-2 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm">
+          <button 
+            onClick={() => handleTabChange('interfaces')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+              activeTab === 'interfaces' 
+                ? 'border-primary text-primary' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <InterfaceIcon />
             Interfaces
           </button>
-          <button className="py-2 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm">
+          <button 
+            onClick={() => handleTabChange('ip')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+              activeTab === 'ip' 
+                ? 'border-primary text-primary' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <IPIcon />
+            IP Addresses
+          </button>
+          <button 
+            onClick={() => handleTabChange('routes')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+              activeTab === 'routes' 
+                ? 'border-primary text-primary' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <RouteIcon />
+            Routes
+          </button>
+          <button 
+            onClick={() => handleTabChange('configuration')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+              activeTab === 'configuration' 
+                ? 'border-primary text-primary' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <ConfigIcon />
             Configuration
           </button>
-          <button className="py-2 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm">
+          <button 
+            onClick={() => handleTabChange('logs')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+              activeTab === 'logs' 
+                ? 'border-primary text-primary' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <LogsIcon />
             Logs
           </button>
         </nav>
@@ -399,8 +630,9 @@ const DeviceDetails = () => {
             </div>
           )}
 
-          {/* Overview Tab Content */}
-          <div className="space-y-6">
+          {/* Tab Content */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
         {/* Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white p-6 rounded-lg border shadow-sm">
@@ -545,6 +777,314 @@ const DeviceDetails = () => {
           </div>
         </div>
       </div>
+    )}
+
+    {/* Interfaces Tab */}
+    {activeTab === 'interfaces' && (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg border shadow-sm">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium text-gray-900">Network Interfaces</h3>
+              <button
+                onClick={fetchInterfaces}
+                disabled={loadingData}
+                className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
+              >
+                {loadingData ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-1 h-3 w-3 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading...
+                  </>
+                ) : (
+                  'Refresh'
+                )}
+              </button>
+            </div>
+          </div>
+          <div className="px-6 py-4">
+            {loadingData ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-gray-500">Loading interfaces...</p>
+              </div>
+            ) : interfaces.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MAC Address</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MTU</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Comment</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {interfaces.map((iface, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {iface.name || '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {iface.type || '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                          {iface.macAddress || '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {iface.mtu || '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            iface.arp === 'enabled' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {iface.arp === 'enabled' ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {iface.comment || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <InterfaceIcon />
+                <h3 className="text-lg font-semibold text-gray-900 mt-4">No interfaces found</h3>
+                <p className="text-gray-500 mt-2">Interface information will be displayed here when available.</p>
+                <button
+                  onClick={fetchInterfaces}
+                  className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                >
+                  Load Interfaces
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* IP Addresses Tab */}
+    {activeTab === 'ip' && (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg border shadow-sm">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium text-gray-900">IP Addresses</h3>
+              <button
+                onClick={fetchIpAddresses}
+                disabled={loadingData}
+                className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
+              >
+                {loadingData ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-1 h-3 w-3 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading...
+                  </>
+                ) : (
+                  'Refresh'
+                )}
+              </button>
+            </div>
+          </div>
+          <div className="px-6 py-4">
+            {loadingData ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-gray-500">Loading IP addresses...</p>
+              </div>
+            ) : ipAddresses.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Network</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Interface</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Comment</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {ipAddresses.map((ip, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 font-mono">
+                          {ip.address || '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                          {ip.network || '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {ip.interface || '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            ip.disabled === false ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {ip.disabled === false ? 'Active' : 'Disabled'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {ip.comment || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <IPIcon />
+                <h3 className="text-lg font-semibold text-gray-900 mt-4">No IP addresses found</h3>
+                <p className="text-gray-500 mt-2">IP address information will be displayed here when available.</p>
+                <button
+                  onClick={fetchIpAddresses}
+                  className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                >
+                  Load IP Addresses
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Routes Tab */}
+    {activeTab === 'routes' && (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg border shadow-sm">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium text-gray-900">Routing Table</h3>
+              <button
+                onClick={fetchRoutes}
+                disabled={loadingData}
+                className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
+              >
+                {loadingData ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-1 h-3 w-3 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading...
+                  </>
+                ) : (
+                  'Refresh'
+                )}
+              </button>
+            </div>
+          </div>
+          <div className="px-6 py-4">
+            {loadingData ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-gray-500">Loading routes...</p>
+              </div>
+            ) : routes.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Destination</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gateway</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Interface</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distance</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {routes.map((route, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 font-mono">
+                          {route.dstAddress || '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                          {route.gateway || '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {route.outInterface || '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {route.distance || '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            route.active === true ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {route.active === true ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <RouteIcon />
+                <h3 className="text-lg font-semibold text-gray-900 mt-4">No routes found</h3>
+                <p className="text-gray-500 mt-2">Routing table information will be displayed here when available.</p>
+                <button
+                  onClick={fetchRoutes}
+                  className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                >
+                  Load Routes
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Configuration Tab */}
+    {activeTab === 'configuration' && (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg border shadow-sm">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">Device Configuration</h3>
+          </div>
+          <div className="px-6 py-4">
+            <div className="text-center py-8">
+              <ConfigIcon />
+              <h3 className="text-lg font-semibold text-gray-900 mt-4">Configuration Management</h3>
+              <p className="text-gray-500 mt-2">Device configuration options will be available here.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Logs Tab */}
+    {activeTab === 'logs' && (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg border shadow-sm">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">Device Logs</h3>
+          </div>
+          <div className="px-6 py-4">
+            <div className="text-center py-8">
+              <LogsIcon />
+              <h3 className="text-lg font-semibold text-gray-900 mt-4">System Logs</h3>
+              <p className="text-gray-500 mt-2">Device logs and system information will be displayed here.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 };
