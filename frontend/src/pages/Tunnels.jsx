@@ -458,8 +458,8 @@ const Tunnels = () => {
       {/* Filters */}
       <div className="card">
         <div className="card__body">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
+          <div className="flex flex-col sm:flex-row gap-4 items-end">
+            <div className="flex-1 min-w-0">
               <label htmlFor="search" className="form-label">Search Tunnels</label>
               <input
                 id="search"
@@ -470,7 +470,7 @@ const Tunnels = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <div>
+            <div className="w-full sm:w-48">
               <label htmlFor="status-filter" className="form-label">Filter by Status</label>
               <select
                 id="status-filter"
@@ -486,7 +486,7 @@ const Tunnels = () => {
                 ))}
               </select>
             </div>
-            <div>
+            <div className="w-full sm:w-48">
               <label htmlFor="type-filter" className="form-label">Filter by Type</label>
               <select
                 id="type-filter"
@@ -501,10 +501,10 @@ const Tunnels = () => {
                   </option>
                 ))}
               </select>
-          </div>
-              </div>
-              </div>
             </div>
+          </div>
+        </div>
+      </div>
 
       {/* Tunnels Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
