@@ -1491,7 +1491,7 @@ const bootstrap = async () => {
         const sudoPrefix = useSudo ? 'sudo -n' : '';
         
         // Pull latest changes
-        const gitCommand = `${sudoPrefix} git pull origin main`;
+        const gitCommand = `${sudoPrefix} git pull origin ${channel}`;
         execSync(gitCommand, { cwd: process.cwd() });
         
         // Install backend dependencies

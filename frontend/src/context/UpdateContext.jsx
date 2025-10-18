@@ -11,7 +11,7 @@ export const useUpdate = () => {
 };
 
 export const UpdateProvider = ({ children }) => {
-  const [updateChannel, setUpdateChannel] = useState('stable');
+  const [updateChannel, setUpdateChannel] = useState('beta');
   const [updateInfo, setUpdateInfo] = useState({
     currentVersion: null, // Will be loaded from API
     updateAvailable: false,
