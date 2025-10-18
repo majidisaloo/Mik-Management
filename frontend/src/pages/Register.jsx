@@ -59,6 +59,8 @@ const Register = () => {
   const [status, setStatus] = useState({ type: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(evaluatePasswordStrength(''));
+  const [hasUsers, setHasUsers] = useState(false);
+  const [checkingUsers, setCheckingUsers] = useState(true);
 
   useEffect(() => {
     if (user) {
@@ -66,6 +68,28 @@ const Register = () => {
       return;
     }
   }, [user, navigate]);
+
+  // Check if users exist
+  useEffect(() => {
+    const checkUsers = async () => {
+      try {
+        const response = await fetch('/api/users');
+        if (response.ok) {
+          const users = await response.json();
+          setHasUsers(Array.isArray(users) && users.length > 0);
+        } else {
+          setHasUsers(false);
+        }
+      } catch (error) {
+        console.error('Failed to check users:', error);
+        setHasUsers(false);
+      } finally {
+        setCheckingUsers(false);
+      }
+    };
+
+    checkUsers();
+  }, []);
 
   useEffect(() => {
     const strength = evaluatePasswordStrength(form.password);
@@ -168,11 +192,17 @@ const Register = () => {
               <p className="register-subtitle">Join MikroManage to get started</p>
             </div>
 
-            <div className="register-info">
-              Registration is limited to the first administrator. Please sign in with an existing account.
-            </div>
+            {checkingUsers ? (
+              <div className="register-info">
+                Checking registration availability...
+              </div>
+            ) : hasUsers ? (
+              <div className="register-info">
+                Registration is limited to the first administrator. Please sign in with an existing account.
+              </div>
+            ) : null}
 
-            <form onSubmit={handleSubmit} className="register-form">
+            <form onSubmit={handleSubmit} className="register-form" style={{ display: checkingUsers || hasUsers ? 'none' : 'block' }}>
               {status.message && (
                 <div className={`register-status register-status--${status.type}`}>
                   {status.message}
@@ -318,14 +348,16 @@ const Register = () => {
               </div>
             </form>
 
-            <div className="register-card-footer">
-              <div className="register-divider">
-                <span>Already have an account?</span>
+            {!checkingUsers && (
+              <div className="register-card-footer">
+                <div className="register-divider">
+                  <span>{hasUsers ? 'Already have an account?' : 'Already have an account?'}</span>
+                </div>
+                <a href="/" className="register-login-link">
+                  Sign In
+                </a>
               </div>
-              <a href="/" className="register-login-link">
-                Sign In
-              </a>
-            </div>
+            )}
           </div>
         </div>
       </main>
