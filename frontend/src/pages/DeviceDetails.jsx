@@ -190,12 +190,18 @@ const DeviceDetails = () => {
   const getConnectionStatus = (device) => {
     const active = device.routeros?.apiEnabled === true || device.routeros?.sshEnabled === true;
     
-    // Check both device.status and connectivity status
-    const statusConnected = device.status && typeof device.status === 'string' && 
-      ['up', 'online', 'connected'].includes(device.status.toLowerCase());
+    // Check device status (handle both object and string formats)
+    let statusConnected = false;
+    if (typeof device.status === 'object' && device.status !== null) {
+      // Handle object status from backend API
+      statusConnected = device.status.updateStatus === 'updated';
+    } else if (typeof device.status === 'string') {
+      // Handle string status (legacy)
+      statusConnected = ['up', 'online', 'connected', 'updated'].includes(device.status.toLowerCase());
+    }
     
-    const apiConnected = device.connectivity?.api?.status === 'online';
-    const sshConnected = device.connectivity?.ssh?.status === 'online';
+    const apiConnected = device.connectivity?.api?.status === 'up' || device.connectivity?.api?.status === 'connected' || device.connectivity?.api?.status === 'online';
+    const sshConnected = device.connectivity?.ssh?.status === 'up' || device.connectivity?.ssh?.status === 'connected' || device.connectivity?.ssh?.status === 'online';
     
     const connected = statusConnected || apiConnected || sshConnected;
     

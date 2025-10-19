@@ -251,7 +251,7 @@ const Mikrotiks = () => {
   const loadDevices = async () => {
       try {
         setLoading(true);
-      const response = await fetch('/api/mikrotiks');
+      const response = await fetch(`/api/mikrotiks?t=${Date.now()}`);
 
       if (!response.ok) {
         throw new Error('Unable to load MikroTik devices.');
@@ -324,6 +324,13 @@ const Mikrotiks = () => {
 
     loadDevices();
     loadGroups();
+    
+    // Auto-refresh data every 30 seconds
+    const interval = setInterval(() => {
+      loadDevices();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, [navigate, user]);
 
   const handleCreateDevice = async () => {
@@ -420,6 +427,8 @@ const Mikrotiks = () => {
   const handleTestConnectivity = async (device) => {
     try {
       setTestingDevice(device.id);
+      setStatus({ type: 'info', message: `Testing connectivity for ${device.name}...` });
+      
       const response = await fetch(`/api/mikrotiks/${device.id}/test-connectivity`, {
         method: 'POST'
       });
@@ -430,9 +439,13 @@ const Mikrotiks = () => {
       }
 
       const result = await response.json();
+      
+      // Refresh the devices list to show updated connectivity status
+      await loadDevices();
+      
       setStatus({
         type: result.success ? 'success' : 'error',
-        message: result.message || (result.success ? 'Connection successful!' : 'Connection failed.')
+        message: result.message || (result.success ? 'Connection test completed successfully!' : 'Connection test failed.')
       });
     } catch (error) {
       setStatus({
@@ -548,28 +561,40 @@ const Mikrotiks = () => {
   };
 
   const getStatusColor = (status) => {
-    // Handle object status
+    // Handle object status (from backend API)
     if (typeof status === 'object' && status !== null) {
-      console.log('getStatusColor received object:', status);
-      return 'status-badge--info';
+      const updateStatus = status.updateStatus || 'unknown';
+      switch (updateStatus.toLowerCase()) {
+        case 'updated':
+        case 'connected':
+          return 'status-badge--success';
+        case 'pending':
+          return 'status-badge--warning';
+        case 'unknown':
+        default:
+          return 'status-badge--error';
+      }
     }
     
-    // Handle string status
+    // Handle string status (legacy or direct string)
     const statusStr = String(status).toLowerCase();
     switch (statusStr) {
       case 'up': 
       case 'online':
       case 'connected':
+      case 'updated':
         return 'status-badge--success';
       case 'down': 
       case 'offline':
       case 'disconnected':
+      case 'unknown':
         return 'status-badge--error';
       case 'maintenance': 
       case 'maintenance mode':
+      case 'pending':
         return 'status-badge--warning';
       default: 
-        return 'status-badge--info';
+        return 'status-badge--error';
     }
   };
 
@@ -604,14 +629,29 @@ const Mikrotiks = () => {
           <h1 className="text-3xl font-bold text-primary">MikroTik Devices</h1>
           <p className="text-tertiary mt-2">Manage and monitor your MikroTik router infrastructure.</p>
         </div>
-        <button
-          type="button"
-          className="btn btn--primary"
-          onClick={handleNewDevice}
-        >
-          <PlusIcon />
-          Add Device
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={() => {
+              loadDevices();
+              setStatus({ type: 'success', message: 'Data refreshed successfully!' });
+              setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+            }}
+            title="Refresh data"
+          >
+            <RefreshIcon />
+            Refresh
+          </button>
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={handleNewDevice}
+          >
+            <PlusIcon />
+            Add Device
+          </button>
+        </div>
         </div>
 
       {/* Status Message */}
@@ -619,6 +659,8 @@ const Mikrotiks = () => {
         <div className={`p-4 rounded-xl border ${
           status.type === 'error' 
             ? 'bg-error-50 border-error-200 text-error-700' 
+            : status.type === 'info'
+            ? 'bg-blue-50 border-blue-200 text-blue-700'
             : 'bg-success-50 border-success-200 text-success-700'
         }`}>
           {status.message}
@@ -678,127 +720,157 @@ const Mikrotiks = () => {
         </div>
 
       {/* Devices Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-        {filteredDevices.map((device) => (
-          <div key={device.id} className="card cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02]" onClick={() => handleDeviceClick(device)}>
-            <div className="card__body p-4">
-              {/* Header with device info and action buttons */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className="p-1.5 bg-primary-50 rounded-lg flex-shrink-0">
-                    <DeviceIcon />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-3">
+        {filteredDevices.map((device) => {
+          // Determine connection statuses
+          const apiConfigured = device.routeros?.apiEnabled && device.routeros?.apiUsername && device.routeros?.apiPassword;
+          const sshConfigured = device.routeros?.sshEnabled && device.routeros?.sshUsername && device.routeros?.sshPassword;
+          
+          // Get actual connection status from connectivity data
+          const apiConnected = device.connectivity?.api?.status === 'up' || device.connectivity?.api?.status === 'connected' || device.connectivity?.api?.status === 'online';
+          const sshConnected = device.connectivity?.ssh?.status === 'up' || device.connectivity?.ssh?.status === 'connected' || device.connectivity?.ssh?.status === 'online';
+          
+          // Determine ping status based on any successful connection
+          const pingStatus = (apiConnected || sshConnected) ? 'up' : 'down';
+          
+          return (
+            <div key={device.id} className="card hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
+              <div className="card__body p-3">
+                {/* Header with device info and action buttons */}
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="p-1 bg-primary-50 rounded-lg flex-shrink-0">
+                      <DeviceIcon />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-primary text-sm truncate" title={safeRender(device.name, 'Unknown Device')}>
+                        {safeRender(device.name, 'Unknown Device')}
+                      </h3>
+                      <p className="text-xs text-tertiary truncate" title={safeRender(device.host, 'No Host')}>
+                        {safeRender(device.host, 'No Host')}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-primary text-sm truncate" title={safeRender(device.name, 'Unknown Device')}>
-                      {safeRender(device.name, 'Unknown Device')}
-                    </h3>
-                    <p className="text-xs text-tertiary truncate" title={safeRender(device.host, 'No Host')}>
-                      {safeRender(device.host, 'No Host')}
-                    </p>
+                  
+                  {/* Action buttons in top-right */}
+                  <div className="flex items-center gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      className="p-1 text-tertiary hover:text-primary hover:bg-primary-50 rounded transition-colors"
+                      onClick={() => handleEdit(device)}
+                      title="Edit Device"
+                    >
+                      <EditIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className="p-1 text-tertiary hover:text-primary hover:bg-primary-50 rounded transition-colors"
+                      onClick={() => handleTestConnectivity(device)}
+                      disabled={testingDevice === device.id}
+                      title="Test Connection"
+                    >
+                      {testingDevice === device.id ? (
+                        <RefreshIcon />
+                      ) : (
+                        <TestIcon />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="p-1 text-tertiary hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                      onClick={() => handleDelete(device)}
+                      title="Delete Device"
+                    >
+                      <TrashIcon />
+                    </button>
                   </div>
                 </div>
-                
-                {/* Action buttons in top-right */}
-                <div className="flex items-center gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    className="p-1.5 text-tertiary hover:text-primary hover:bg-primary-50 rounded transition-colors"
-                    onClick={() => handleEdit(device)}
-                    title="Edit Device"
-                  >
-                    <EditIcon />
-                  </button>
-                  <button
-                    type="button"
-                    className="p-1.5 text-tertiary hover:text-primary hover:bg-primary-50 rounded transition-colors"
-                    onClick={() => handleTestConnectivity(device)}
-                    disabled={testingDevice === device.id}
-                    title="Test Connection"
-                  >
-                    {testingDevice === device.id ? (
-                      <RefreshIcon />
-                    ) : (
-                      <TestIcon />
+
+                {/* Status indicators - compact row */}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    {/* Ping Status */}
+                    <div className="flex items-center gap-1 group cursor-help" title={`Ping: ${pingStatus === 'up' ? 'Connected' : pingStatus === 'down' ? 'Disconnected' : 'Unknown'}`}>
+                      <div className={`w-2 h-2 rounded-full transition-colors ${
+                        pingStatus === 'up' ? 'bg-green-500 group-hover:bg-green-400' : 
+                        pingStatus === 'down' ? 'bg-red-500 group-hover:bg-red-400' : 
+                        'bg-gray-400 group-hover:bg-gray-300'
+                      }`}></div>
+                      <span className="text-xs text-tertiary">Ping</span>
+                    </div>
+                    
+                    {/* API Status - only show if configured */}
+                    {apiConfigured && (
+                      <div className="flex items-center gap-1 group cursor-help" title={`API: ${apiConnected ? 'Connected' : 'Disconnected'}`}>
+                        <div className={`w-2 h-2 rounded-full transition-colors ${apiConnected ? 'bg-green-500 group-hover:bg-green-400' : 'bg-red-500 group-hover:bg-red-400'}`}></div>
+                        <span className="text-xs text-tertiary">API</span>
+                      </div>
                     )}
-                  </button>
-                  <button
-                    type="button"
-                    className="p-1.5 text-tertiary hover:text-primary hover:bg-primary-50 rounded transition-colors"
-                    onClick={() => handleSSHConnection(device)}
-                    title="SSH Connection"
-                  >
-                    <SSHIcon />
-                  </button>
-                  <button
-                    type="button"
-                    className="p-1.5 text-tertiary hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                    onClick={() => handleDelete(device)}
-                    title="Delete Device"
-                  >
-                    <TrashIcon />
-                  </button>
-                </div>
-              </div>
-
-              {/* Status and connection indicators */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1">
-                    <div className={`w-1.5 h-1.5 rounded-full ${device.routeros?.apiEnabled === true ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                    <span className="text-xs text-tertiary">API</span>
+                    
+                    {/* SSH Status - show if configured or enabled */}
+                    {(sshConfigured || device.routeros?.sshEnabled) && (
+                      <div className="flex items-center gap-1 group cursor-help" title={`SSH: ${sshConnected ? 'Connected' : 'Disconnected'} (${device.routeros?.sshEnabled ? 'Enabled' : 'Disabled'})`}>
+                        <div className={`w-2 h-2 rounded-full transition-colors ${
+                          device.routeros?.sshEnabled 
+                            ? (sshConnected ? 'bg-green-500 group-hover:bg-green-400' : 'bg-red-500 group-hover:bg-red-400')
+                            : 'bg-gray-400 group-hover:bg-gray-300'
+                        }`}></div>
+                        <span className="text-xs text-tertiary">SSH</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-1">
-                    <div className={`w-1.5 h-1.5 rounded-full ${device.routeros?.sshEnabled === true ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                    <span className="text-xs text-tertiary">SSH</span>
+                  
+                  {/* Device Status Badge */}
+                  <span className={`status-badge status-badge--sm ${getStatusColor(device.status)}`} title={
+                    typeof device.status === 'object' && device.status !== null 
+                      ? `Update Status: ${device.status.updateStatus || 'unknown'}`
+                      : 'Device status unknown'
+                  }>
+                    {typeof device.status === 'object' && device.status !== null 
+                      ? (device.status.updateStatus || 'unknown').toUpperCase()
+                      : typeof device.status === 'string' 
+                        ? device.status.toUpperCase() 
+                        : 'UNKNOWN'}
+                  </span>
+                </div>
+
+                {/* Device details in compact format */}
+                <div className="space-y-1 mb-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-tertiary">Group:</span>
+                    <span className="text-secondary truncate ml-2" title={device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}>
+                      {device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-tertiary">Firmware:</span>
+                    <span className={`truncate ml-2 ${device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() ? 'text-secondary' : 'text-red-500'}`} title={device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() ? device.routeros.firmwareVersion : 'Firmware version not detected - run connection test'}>
+                      {device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() 
+                        ? device.routeros.firmwareVersion 
+                        : 'Not detected'}
+                    </span>
                   </div>
                 </div>
-                <span className={`status-badge status-badge--sm ${getStatusColor(device.status)}`}>
-                  {typeof device.status === 'string' ? device.status.toUpperCase() : 'UNKNOWN'}
-                </span>
-              </div>
 
-              {/* Device details in compact format */}
-              <div className="space-y-1.5 mb-3">
-                <div className="flex justify-between text-xs">
-                  <span className="text-tertiary">Group:</span>
-                  <span className="text-secondary truncate ml-2" title={device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}>
-                    {device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-tertiary">Firmware:</span>
-                  <span className="text-secondary truncate ml-2" title={device.routeros?.firmwareVersion && typeof device.routeros.firmwareVersion === 'string' ? device.routeros.firmwareVersion : 'Unknown'}>
-                    {device.routeros?.firmwareVersion && typeof device.routeros.firmwareVersion === 'string' 
-                      ? device.routeros.firmwareVersion 
-                      : 'Unknown'}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-tertiary">Created:</span>
-                  <span className="text-secondary truncate ml-2" title={formatDateTime(device.createdAt)}>
-                    {formatDateTime(device.createdAt)}
-                  </span>
-                </div>
+                {/* Tags - compact */}
+                {device.tags && typeof device.tags === 'string' && device.tags.trim() && (
+                  <div className="flex flex-wrap gap-1">
+                    {device.tags.split(',').slice(0, 2).map((tag, index) => (
+                      <span key={index} className="px-1.5 py-0.5 bg-tertiary bg-opacity-20 text-xs rounded-full truncate max-w-[60px]" title={tag.trim()}>
+                        {tag.trim()}
+                      </span>
+                    ))}
+                    {device.tags.split(',').length > 2 && (
+                      <span className="px-1.5 py-0.5 bg-tertiary bg-opacity-20 text-xs rounded-full">
+                        +{device.tags.split(',').length - 2}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
-
-              {/* Tags */}
-              {device.tags && typeof device.tags === 'string' && device.tags.trim() && (
-                <div className="flex flex-wrap gap-1">
-                  {device.tags.split(',').slice(0, 3).map((tag, index) => (
-                    <span key={index} className="px-1.5 py-0.5 bg-tertiary bg-opacity-20 text-xs rounded-full truncate max-w-[80px]" title={tag.trim()}>
-                      {tag.trim()}
-                    </span>
-                  ))}
-                  {device.tags.split(',').length > 3 && (
-                    <span className="px-1.5 py-0.5 bg-tertiary bg-opacity-20 text-xs rounded-full">
-                      +{device.tags.split(',').length - 3}
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {filteredDevices.length === 0 && (

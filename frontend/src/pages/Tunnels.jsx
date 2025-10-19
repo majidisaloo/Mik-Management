@@ -458,7 +458,7 @@ const Tunnels = () => {
       {/* Filters */}
       <div className="card">
         <div className="card__body">
-          <div className="flex flex-col sm:flex-row gap-4 items-end">
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-end">
             <div className="flex-1 min-w-0">
               <label htmlFor="search" className="form-label">Search Tunnels</label>
               <input
@@ -470,37 +470,39 @@ const Tunnels = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <div className="w-full sm:w-48">
-              <label htmlFor="status-filter" className="form-label">Filter by Status</label>
-              <select
-                id="status-filter"
-                className="form-input form-select"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-              >
-                <option value="">All Statuses</option>
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="w-full sm:w-48">
-              <label htmlFor="type-filter" className="form-label">Filter by Type</label>
-              <select
-                id="type-filter"
-                className="form-input form-select"
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-              >
-                <option value="">All Types</option>
-                {tunnelTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+            <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+              <div className="w-full sm:w-40">
+                <label htmlFor="status-filter" className="form-label">Filter by Status</label>
+                <select
+                  id="status-filter"
+                  className="form-input form-select"
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                >
+                  <option value="">All Statuses</option>
+                  {statusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="w-full sm:w-40">
+                <label htmlFor="type-filter" className="form-label">Filter by Type</label>
+                <select
+                  id="type-filter"
+                  className="form-input form-select"
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                >
+                  <option value="">All Types</option>
+                  {tunnelTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         </div>

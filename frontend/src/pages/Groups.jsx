@@ -99,6 +99,8 @@ const Groups = () => {
       return new Set();
     }
   });
+  // State for managing expanded parent groups in modal
+  const [expandedParentGroups, setExpandedParentGroups] = useState(new Set());
 
   const groupLookup = useMemo(() => {
     const lookup = new Map();
@@ -357,6 +359,61 @@ const Groups = () => {
     });
   };
 
+  const toggleParentExpanded = (groupId) => {
+    setExpandedParentGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupId)) {
+        newSet.delete(groupId);
+      } else {
+        newSet.add(groupId);
+      }
+      return newSet;
+    });
+  };
+
+  const renderParentGroupOptions = (nodes, depth = 0) => {
+    return nodes
+      .filter((group) => group.id !== selectedId) // Don't show current group as parent
+      .map((node) => {
+        const hasChildren = node.children && node.children.length > 0;
+        const isExpanded = expandedParentGroups.has(node.id);
+        const isSelected = form.parentId === node.id;
+
+        return (
+          <div key={node.id} className="parent-group-option" style={{ marginLeft: `${depth * 20}px` }}>
+            <div className="parent-group-item-container">
+              {hasChildren && (
+                <button
+                  type="button"
+                  className="parent-group-toggle"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleParentExpanded(node.id);
+                  }}
+                >
+                  {isExpanded ? '−' : '+'}
+                </button>
+              )}
+              {!hasChildren && <div className="parent-group-spacer"></div>}
+              
+              <div 
+                className={`parent-group-item ${isSelected ? 'selected' : ''}`}
+                onClick={() => setForm({ ...form, parentId: node.id })}
+              >
+                <span className="parent-group-name">{node.name}</span>
+              </div>
+            </div>
+            
+            {hasChildren && isExpanded && (
+              <div className="parent-group-children">
+                {renderParentGroupOptions(node.children, depth + 1)}
+              </div>
+            )}
+          </div>
+        );
+      });
+  };
+
   const renderGroupNode = (node, depth = 0) => {
     const hasChildren = node.children && node.children.length > 0;
     const isExpanded = expandedGroups.has(node.id);
@@ -496,21 +553,39 @@ const Groups = () => {
                   type="button"
                   className="btn btn--secondary"
                   onClick={() => {
-                    // Expand all groups
-                    const allGroupIds = new Set();
-                    const collectIds = (nodes) => {
-                      nodes.forEach(node => {
-                        if (node.children && node.children.length > 0) {
-                          allGroupIds.add(node.id);
-                          collectIds(node.children);
-                        }
-                      });
-                    };
-                    collectIds(filteredGroups);
-                    setExpandedGroups(allGroupIds);
+                    // Toggle between expand all and collapse all
+                    const hasExpandedGroups = expandedGroups.size > 0;
+                    
+                    if (hasExpandedGroups) {
+                      // Collapse all
+                      setExpandedGroups(new Set());
+                      try {
+                        sessionStorage.setItem('groups-expanded', JSON.stringify([]));
+                      } catch (error) {
+                        console.warn('Failed to save expanded state:', error);
+                      }
+                    } else {
+                      // Expand all groups
+                      const allGroupIds = new Set();
+                      const collectIds = (nodes) => {
+                        nodes.forEach(node => {
+                          if (node.children && node.children.length > 0) {
+                            allGroupIds.add(node.id);
+                            collectIds(node.children);
+                          }
+                        });
+                      };
+                      collectIds(filteredGroups);
+                      setExpandedGroups(allGroupIds);
+                      try {
+                        sessionStorage.setItem('groups-expanded', JSON.stringify([...allGroupIds]));
+                      } catch (error) {
+                        console.warn('Failed to save expanded state:', error);
+                      }
+                    }
                   }}
                 >
-                  Expand All
+                  {expandedGroups.size > 0 ? 'Collapse All' : 'Expand All'}
                 </button>
                 <button
                   type="button"
@@ -539,13 +614,13 @@ const Groups = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {/* Groups Tree */}
-        <div className="lg:col-span-2">
+        <div>
           <div className="card">
             <div className="card__header">
               <h2 className="card__title">Groups Hierarchy</h2>
-              <p className="card__subtitle">Click on a group to view details</p>
+              <p className="card__subtitle">Organize your MikroTik devices into hierarchical groups</p>
             </div>
                 <div className="card__body">
                   <div className="mb-4">
@@ -588,73 +663,6 @@ const Groups = () => {
           </div>
         </div>
 
-        {/* Group Details */}
-        <div className="lg:col-span-1">
-          <div className="card">
-            <div className="card__header">
-              <h2 className="card__title">Group Details</h2>
-              <p className="card__subtitle">View and manage group information</p>
-            </div>
-            <div className="card__body">
-            {selectedGroup ? (
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold text-primary">{selectedGroup.name}</h3>
-                    <p className="text-sm text-tertiary">Group Information</p>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <div className="p-3 bg-surface-elevated rounded-lg border">
-                      <label className="text-sm font-medium text-secondary block mb-1">Created</label>
-                      <p className="text-sm text-tertiary">{formatDateTime(selectedGroup.createdAt)}</p>
-                    </div>
-                    
-                    <div className="p-3 bg-surface-elevated rounded-lg border">
-                      <label className="text-sm font-medium text-secondary block mb-1">Sub-groups</label>
-                      <p className="text-sm text-tertiary">{directChildren.length} sub-groups</p>
-                    </div>
-                    
-                    {selectedGroup.parentId && (
-                      <div className="p-3 bg-surface-elevated rounded-lg border">
-                        <label className="text-sm font-medium text-secondary block mb-1">Parent Group</label>
-                        <p className="text-sm text-tertiary">
-                          {groupLookup.get(selectedGroup.parentId)?.name || 'Unknown'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2 pt-4 border-t">
-                    <button
-                      type="button"
-                      className="btn btn--secondary btn--sm flex-1"
-                      onClick={() => handleEdit(selectedGroup)}
-                    >
-                      <EditIcon />
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--danger btn--sm flex-1"
-                      onClick={() => handleDelete(selectedGroup)}
-                    >
-                      <TrashIcon />
-                      Delete
-                    </button>
-                  </div>
-                  </div>
-              ) : (
-                <div className="text-center py-12 text-tertiary">
-                  <div className="mb-4">
-                    <FolderIcon />
-                  </div>
-                  <h3 className="text-lg font-medium text-secondary mb-2">Select a Group</h3>
-                  <p className="text-sm">Choose a group from the hierarchy to view its details.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Create/Edit Modal */}
@@ -713,21 +721,20 @@ const Groups = () => {
             <label htmlFor="group-parent" className="form-label">
               Parent Group
             </label>
-            <select
-              id="group-parent"
-              className="form-input form-select"
-              value={form.parentId}
-              onChange={(e) => setForm({ ...form, parentId: e.target.value })}
-            >
-              <option value="">No parent (root group)</option>
-              {groups
-                .filter((group) => group.id !== selectedId)
-                .map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
+            <div className="parent-group-selector">
+              <div 
+                className="parent-group-option"
+                onClick={() => setForm({ ...form, parentId: '' })}
+              >
+                <div className="parent-group-item-container">
+                  <div className="parent-group-spacer"></div>
+                  <div className={`parent-group-item ${form.parentId === '' ? 'selected' : ''}`}>
+                    <span className="parent-group-name">No parent (root group)</span>
+                  </div>
+                </div>
+              </div>
+              {renderParentGroupOptions(groupTree, 0)}
+            </div>
           </div>
           </form>
         </Modal>

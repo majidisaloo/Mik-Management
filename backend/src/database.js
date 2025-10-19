@@ -277,7 +277,11 @@ const deriveDeviceStatus = (status = {}, routeros = defaultRouterosOptions()) =>
   const version = normalizeOptionalText(routeros.firmwareVersion ?? '');
 
   if (!version) {
-    normalized.updateStatus = 'unknown';
+    // If no version but we have connectivity, set to connected
+    normalized.updateStatus = 'connected';
+    if (!normalized.lastAuditAt) {
+      normalized.lastAuditAt = new Date().toISOString();
+    }
     return normalized;
   }
 
@@ -2836,51 +2840,72 @@ const initializeDatabase = async (databasePath) => {
       const routerosBaseline = sanitizeRouteros(existing.routeros, defaultRouterosOptions());
       const host = normalizeOptionalText(existing.host);
 
-      if (!routerosBaseline.apiEnabled) {
-        return { success: false, reason: 'api-disabled' };
-      }
-
-      try {
-        // Try to fetch interfaces from MikroTik API
-        const apiUrl = `http://${host}:${routerosBaseline.apiPort || 80}/rest/interface`;
-        const auth = Buffer.from(`${routerosBaseline.apiUsername || 'admin'}:${routerosBaseline.apiPassword || ''}`).toString('base64');
-        
-        console.log(`Fetching interfaces from: ${apiUrl}`);
-        
-        const response = await fetch(apiUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${auth}`,
-            'Content-Type': 'application/json'
-          },
-          rejectUnauthorized: false,
-          timeout: 10000
+      // Try multiple connection methods - API first, then HTTP/HTTPS
+      const connectionMethods = [];
+      
+      if (routerosBaseline.apiEnabled) {
+        connectionMethods.push({
+          type: 'api',
+          protocol: 'http',
+          port: routerosBaseline.apiPort || 80,
+          path: '/rest/interface',
+          auth: Buffer.from(`${routerosBaseline.apiUsername || 'admin'}:${routerosBaseline.apiPassword || ''}`).toString('base64')
         });
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log(`Interfaces API Response:`, JSON.stringify(data, null, 2));
-          
-          const interfaces = Array.isArray(data) ? data : [];
-          return { 
-            success: true, 
-            interfaces: interfaces.map(iface => ({
-              name: iface.name || '',
-              type: iface.type || '',
-              macAddress: iface.macAddress || '',
-              arp: iface.arp || 'disabled',
-              mtu: iface.mtu || '',
-              comment: iface.comment || ''
-            }))
-          };
-        } else {
-          console.log(`Failed to fetch interfaces: HTTP ${response.status}`);
-          return { success: false, reason: 'api-error', message: `HTTP ${response.status}` };
-        }
-      } catch (error) {
-        console.error('Error fetching interfaces:', error);
-        return { success: false, reason: 'connection-error', message: error.message };
       }
+      
+      // Add HTTP/HTTPS fallback methods
+      connectionMethods.push(
+        { type: 'http', protocol: 'http', port: 80, path: '/rest/interface', auth: null },
+        { type: 'http', protocol: 'https', port: 443, path: '/rest/interface', auth: null },
+        { type: 'http', protocol: 'http', port: 8080, path: '/rest/interface', auth: null },
+        { type: 'http', protocol: 'https', port: 8443, path: '/rest/interface', auth: null }
+      );
+
+      for (const method of connectionMethods) {
+        try {
+          const url = `${method.protocol}://${host}:${method.port}${method.path}`;
+          console.log(`Trying to fetch interfaces from: ${url} (${method.type})`);
+          
+          const headers = {
+            'Content-Type': 'application/json'
+          };
+          
+          if (method.auth) {
+            headers['Authorization'] = `Basic ${method.auth}`;
+          }
+          
+          const response = await fetch(url, {
+            method: 'GET',
+            headers,
+            rejectUnauthorized: false,
+            timeout: 10000
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`Interfaces ${method.type.toUpperCase()} Response:`, JSON.stringify(data, null, 2));
+            
+            const interfaces = Array.isArray(data) ? data : [];
+            return { 
+              success: true, 
+              interfaces: interfaces.map(iface => ({
+                name: iface.name || '',
+                type: iface.type || '',
+                macAddress: iface.macAddress || '',
+                arp: iface.arp || 'disabled',
+                mtu: iface.mtu || '',
+                comment: iface.comment || ''
+              }))
+            };
+          } else {
+            console.log(`Failed to fetch interfaces via ${method.type}: HTTP ${response.status}`);
+          }
+        } catch (error) {
+          console.log(`Error fetching interfaces via ${method.type}: ${error.message}`);
+        }
+      }
+
+      return { success: false, reason: 'connection-error', message: 'All connection methods failed' };
     },
 
     async getMikrotikIpAddresses(id) {
@@ -2895,50 +2920,71 @@ const initializeDatabase = async (databasePath) => {
       const routerosBaseline = sanitizeRouteros(existing.routeros, defaultRouterosOptions());
       const host = normalizeOptionalText(existing.host);
 
-      if (!routerosBaseline.apiEnabled) {
-        return { success: false, reason: 'api-disabled' };
-      }
-
-      try {
-        // Try to fetch IP addresses from MikroTik API
-        const apiUrl = `http://${host}:${routerosBaseline.apiPort || 80}/rest/ip/address`;
-        const auth = Buffer.from(`${routerosBaseline.apiUsername || 'admin'}:${routerosBaseline.apiPassword || ''}`).toString('base64');
-        
-        console.log(`Fetching IP addresses from: ${apiUrl}`);
-        
-        const response = await fetch(apiUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${auth}`,
-            'Content-Type': 'application/json'
-          },
-          rejectUnauthorized: false,
-          timeout: 10000
+      // Try multiple connection methods - API first, then HTTP/HTTPS
+      const connectionMethods = [];
+      
+      if (routerosBaseline.apiEnabled) {
+        connectionMethods.push({
+          type: 'api',
+          protocol: 'http',
+          port: routerosBaseline.apiPort || 80,
+          path: '/rest/ip/address',
+          auth: Buffer.from(`${routerosBaseline.apiUsername || 'admin'}:${routerosBaseline.apiPassword || ''}`).toString('base64')
         });
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log(`IP Addresses API Response:`, JSON.stringify(data, null, 2));
-          
-          const ipAddresses = Array.isArray(data) ? data : [];
-          return { 
-            success: true, 
-            ipAddresses: ipAddresses.map(ip => ({
-              address: ip.address || '',
-              network: ip.network || '',
-              interface: ip.interface || '',
-              disabled: ip.disabled || false,
-              comment: ip.comment || ''
-            }))
-          };
-        } else {
-          console.log(`Failed to fetch IP addresses: HTTP ${response.status}`);
-          return { success: false, reason: 'api-error', message: `HTTP ${response.status}` };
-        }
-      } catch (error) {
-        console.error('Error fetching IP addresses:', error);
-        return { success: false, reason: 'connection-error', message: error.message };
       }
+      
+      // Add HTTP/HTTPS fallback methods
+      connectionMethods.push(
+        { type: 'http', protocol: 'http', port: 80, path: '/rest/ip/address', auth: null },
+        { type: 'http', protocol: 'https', port: 443, path: '/rest/ip/address', auth: null },
+        { type: 'http', protocol: 'http', port: 8080, path: '/rest/ip/address', auth: null },
+        { type: 'http', protocol: 'https', port: 8443, path: '/rest/ip/address', auth: null }
+      );
+
+      for (const method of connectionMethods) {
+        try {
+          const url = `${method.protocol}://${host}:${method.port}${method.path}`;
+          console.log(`Trying to fetch IP addresses from: ${url} (${method.type})`);
+          
+          const headers = {
+            'Content-Type': 'application/json'
+          };
+          
+          if (method.auth) {
+            headers['Authorization'] = `Basic ${method.auth}`;
+          }
+          
+          const response = await fetch(url, {
+            method: 'GET',
+            headers,
+            rejectUnauthorized: false,
+            timeout: 10000
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`IP Addresses ${method.type.toUpperCase()} Response:`, JSON.stringify(data, null, 2));
+            
+            const ipAddresses = Array.isArray(data) ? data : [];
+            return { 
+              success: true, 
+              ipAddresses: ipAddresses.map(ip => ({
+                address: ip.address || '',
+                network: ip.network || '',
+                interface: ip.interface || '',
+                disabled: ip.disabled || false,
+                comment: ip.comment || ''
+              }))
+            };
+          } else {
+            console.log(`Failed to fetch IP addresses via ${method.type}: HTTP ${response.status}`);
+          }
+        } catch (error) {
+          console.log(`Error fetching IP addresses via ${method.type}: ${error.message}`);
+        }
+      }
+
+      return { success: false, reason: 'connection-error', message: 'All connection methods failed' };
     },
 
     async getMikrotikRoutes(id) {
@@ -2953,51 +2999,72 @@ const initializeDatabase = async (databasePath) => {
       const routerosBaseline = sanitizeRouteros(existing.routeros, defaultRouterosOptions());
       const host = normalizeOptionalText(existing.host);
 
-      if (!routerosBaseline.apiEnabled) {
-        return { success: false, reason: 'api-disabled' };
-      }
-
-      try {
-        // Try to fetch routes from MikroTik API
-        const apiUrl = `http://${host}:${routerosBaseline.apiPort || 80}/rest/ip/route`;
-        const auth = Buffer.from(`${routerosBaseline.apiUsername || 'admin'}:${routerosBaseline.apiPassword || ''}`).toString('base64');
-        
-        console.log(`Fetching routes from: ${apiUrl}`);
-        
-        const response = await fetch(apiUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${auth}`,
-            'Content-Type': 'application/json'
-          },
-          rejectUnauthorized: false,
-          timeout: 10000
+      // Try multiple connection methods - API first, then HTTP/HTTPS
+      const connectionMethods = [];
+      
+      if (routerosBaseline.apiEnabled) {
+        connectionMethods.push({
+          type: 'api',
+          protocol: 'http',
+          port: routerosBaseline.apiPort || 80,
+          path: '/rest/ip/route',
+          auth: Buffer.from(`${routerosBaseline.apiUsername || 'admin'}:${routerosBaseline.apiPassword || ''}`).toString('base64')
         });
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log(`Routes API Response:`, JSON.stringify(data, null, 2));
-          
-          const routes = Array.isArray(data) ? data : [];
-          return { 
-            success: true, 
-            routes: routes.map(route => ({
-              dstAddress: route.dstAddress || '',
-              gateway: route.gateway || '',
-              outInterface: route.outInterface || '',
-              distance: route.distance || '',
-              active: route.active || false,
-              comment: route.comment || ''
-            }))
-          };
-        } else {
-          console.log(`Failed to fetch routes: HTTP ${response.status}`);
-          return { success: false, reason: 'api-error', message: `HTTP ${response.status}` };
-        }
-      } catch (error) {
-        console.error('Error fetching routes:', error);
-        return { success: false, reason: 'connection-error', message: error.message };
       }
+      
+      // Add HTTP/HTTPS fallback methods
+      connectionMethods.push(
+        { type: 'http', protocol: 'http', port: 80, path: '/rest/ip/route', auth: null },
+        { type: 'http', protocol: 'https', port: 443, path: '/rest/ip/route', auth: null },
+        { type: 'http', protocol: 'http', port: 8080, path: '/rest/ip/route', auth: null },
+        { type: 'http', protocol: 'https', port: 8443, path: '/rest/ip/route', auth: null }
+      );
+
+      for (const method of connectionMethods) {
+        try {
+          const url = `${method.protocol}://${host}:${method.port}${method.path}`;
+          console.log(`Trying to fetch routes from: ${url} (${method.type})`);
+          
+          const headers = {
+            'Content-Type': 'application/json'
+          };
+          
+          if (method.auth) {
+            headers['Authorization'] = `Basic ${method.auth}`;
+          }
+          
+          const response = await fetch(url, {
+            method: 'GET',
+            headers,
+            rejectUnauthorized: false,
+            timeout: 10000
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`Routes ${method.type.toUpperCase()} Response:`, JSON.stringify(data, null, 2));
+            
+            const routes = Array.isArray(data) ? data : [];
+            return { 
+              success: true, 
+              routes: routes.map(route => ({
+                dstAddress: route.dstAddress || '',
+                gateway: route.gateway || '',
+                outInterface: route.outInterface || '',
+                distance: route.distance || '',
+                active: route.active || false,
+                comment: route.comment || ''
+              }))
+            };
+          } else {
+            console.log(`Failed to fetch routes via ${method.type}: HTTP ${response.status}`);
+          }
+        } catch (error) {
+          console.log(`Error fetching routes via ${method.type}: ${error.message}`);
+        }
+      }
+
+      return { success: false, reason: 'connection-error', message: 'All connection methods failed' };
     },
 
     async testMikrotikConnectivity(id) {
@@ -3116,6 +3183,48 @@ const initializeDatabase = async (databasePath) => {
           if (sshResult.success) {
             sshStatus = 'online';
             sshOutput = 'SSH port is accessible. Connection test successful.';
+            
+            // If API failed but SSH succeeded, try to get firmware version via HTTP/HTTPS
+            if (apiStatus !== 'online' && !firmwareVersion) {
+              console.log(`🔍 API failed but SSH succeeded, trying HTTP/HTTPS for firmware version...`);
+              
+              // Try HTTP/HTTPS endpoints to get system resource info
+              const httpEndpoints = [
+                { protocol: 'http', port: 80, path: '/rest/system/resource' },
+                { protocol: 'https', port: 443, path: '/rest/system/resource' },
+                { protocol: 'http', port: 8080, path: '/rest/system/resource' },
+                { protocol: 'https', port: 8443, path: '/rest/system/resource' }
+              ];
+              
+              for (const endpoint of httpEndpoints) {
+                try {
+                  const httpUrl = `${endpoint.protocol}://${host}:${endpoint.port}${endpoint.path}`;
+                  console.log(`Trying HTTP/HTTPS endpoint: ${httpUrl}`);
+                  
+                  const response = await fetch(httpUrl, {
+                    method: 'GET',
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    rejectUnauthorized: false,
+                    timeout: 5000
+                  });
+                  
+                  if (response.ok) {
+                    const data = await response.json();
+                    console.log(`🔍 HTTP Response for ${httpUrl}:`, JSON.stringify(data, null, 2));
+                    
+                    if (data && (data[0]?.version || data?.version)) {
+                      firmwareVersion = data[0]?.version || data?.version;
+                      console.log(`✅ Firmware version detected via HTTP: ${firmwareVersion}`);
+                      break;
+                    }
+                  }
+                } catch (error) {
+                  console.log(`❌ HTTP endpoint ${endpoint.protocol}:${endpoint.port} failed: ${error.message}`);
+                }
+              }
+            }
           } else {
             sshStatus = 'offline';
             sshError = sshResult.message;
@@ -3151,13 +3260,38 @@ const initializeDatabase = async (databasePath) => {
         apiOutput: apiOutput,
         sshOutput: sshOutput
       };
-      // Set device status based on API connectivity
-      const status = apiStatus === 'online' ? 'connected' : existing.status;
+      
+      // Derive device status based on connectivity and firmware version
+      let deviceStatus = existing.status || {};
+      
+      // If we have any successful connection (API or SSH), update the status
+      if (apiStatus === 'online' || sshStatus === 'online') {
+        // If we have a firmware version, derive the update status
+        if (firmwareVersion && firmwareVersion.trim()) {
+          deviceStatus = deriveDeviceStatus(deviceStatus, normalizedRouteros);
+        } else {
+          // We have connectivity but no firmware version yet - set to connected but unknown update status
+          deviceStatus = {
+            ...deviceStatus,
+            updateStatus: 'connected',
+            lastAuditAt: timestamp
+          };
+        }
+      } else {
+        // No successful connections - keep existing status or set to unknown
+        if (!deviceStatus.updateStatus) {
+          deviceStatus = {
+            ...deviceStatus,
+            updateStatus: 'unknown',
+            lastAuditAt: timestamp
+          };
+        }
+      }
 
       const record = {
         ...existing,
         routeros: normalizedRouteros,
-        status,
+        status: deviceStatus,
         connectivity,
         updatedAt: timestamp
       };

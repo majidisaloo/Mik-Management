@@ -70,7 +70,7 @@ const Modal = ({ title, description, children, actions, onClose, open = false })
           <div>
             <h2 id={labelId} className="modal__title">{title}</h2>
             {description && (
-              <p className="modal__description text-tertiary text-sm mt-1">{description}</p>
+              <p className="modal__description text-tertiary text-sm mt-0">{description}</p>
             )}
           </div>
           <button 
