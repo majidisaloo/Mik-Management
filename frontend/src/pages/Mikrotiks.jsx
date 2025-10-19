@@ -230,6 +230,7 @@ const Mikrotiks = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGroup, setFilterGroup] = useState('');
   const [testingDevice, setTestingDevice] = useState(null);
+  const [pingPopup, setPingPopup] = useState({ show: false, device: null, logs: [] });
   const [expandedGroups, setExpandedGroups] = useState(() => {
     try {
       const saved = sessionStorage.getItem('mikrotiks-groups-expanded');
@@ -530,18 +531,66 @@ const Mikrotiks = () => {
   // Test ping for a device using independent ping service
   const handleTestPing = async (device) => {
     console.log('Testing ping for device:', device.name, 'Host:', device.host);
+    
+    // Open ping popup with initial logs
+    const initialLogs = [
+      `🔍 Starting ping test for device: ${device.name}`,
+      `📍 Target IP: ${device.host}`,
+      `⏰ Time: ${new Date().toLocaleTimeString()}`,
+      `🚀 Initiating ping request...`
+    ];
+    
+    setPingPopup({
+      show: true,
+      device: device,
+      logs: initialLogs
+    });
+    
     try {
       // Use IP address for ping instead of hostname
       const pingTarget = device.host.includes('.') ? device.host : device.host;
       console.log('Ping target:', pingTarget);
       
+      // Add log for ping target
+      setPingPopup(prev => ({
+        ...prev,
+        logs: [...prev.logs, `🎯 Ping target confirmed: ${pingTarget}`]
+      }));
+      
       const pingResult = await pingService.pingHost(pingTarget);
       console.log('Ping result:', pingResult);
+      
+      // Add result logs
+      const resultLogs = [
+        `✅ Ping request completed`,
+        `📊 Result: ${pingResult.success ? 'SUCCESS' : 'FAILED'}`,
+        `⏱️ Response time: ${pingResult.time}`,
+        `📝 Details: ${pingResult.success ? 'Host is reachable' : pingResult.error || 'Unknown error'}`
+      ];
+      
+      setPingPopup(prev => ({
+        ...prev,
+        logs: [...prev.logs, ...resultLogs]
+      }));
+      
       // Force re-render to show updated ping result
       setTestingDevice(prev => prev === device.id ? null : device.id);
       setTimeout(() => setTestingDevice(null), 100);
     } catch (error) {
       console.error('Ping test error:', error);
+      
+      // Add error logs
+      const errorLogs = [
+        `❌ Ping test failed with error`,
+        `🔍 Error type: ${error.name || 'Unknown'}`,
+        `📝 Error message: ${error.message || 'No message available'}`,
+        `🛠️ Troubleshooting: Check network connectivity and IP address`
+      ];
+      
+      setPingPopup(prev => ({
+        ...prev,
+        logs: [...prev.logs, ...errorLogs]
+      }));
     }
   };
 
@@ -2234,6 +2283,201 @@ const Mikrotiks = () => {
           </form>
         </Modal>
       </div>
+
+      {/* Ping Test Popup */}
+      {pingPopup.show && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '1rem',
+            padding: '2rem',
+            maxWidth: '600px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '1.5rem',
+              paddingBottom: '1rem',
+              borderBottom: '2px solid #f3f4f6'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem'
+              }}>
+                <div style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  borderRadius: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <svg style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 style={{
+                    fontSize: '1.25rem',
+                    fontWeight: '700',
+                    color: '#1f2937',
+                    margin: 0
+                  }}>
+                    Ping Test Results
+                  </h3>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    margin: 0
+                  }}>
+                    {pingPopup.device?.name} ({pingPopup.device?.host})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPingPopup({ show: false, device: null, logs: [] })}
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  background: '#f3f4f6',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#e5e7eb';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = '#f3f4f6';
+                }}
+              >
+                <svg style={{ width: '1rem', height: '1rem', color: '#6b7280' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Logs Container */}
+            <div style={{
+              backgroundColor: '#1f2937',
+              borderRadius: '0.75rem',
+              padding: '1rem',
+              maxHeight: '400px',
+              overflowY: 'auto',
+              fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
+              fontSize: '0.875rem',
+              lineHeight: '1.5'
+            }}>
+              {pingPopup.logs.map((log, index) => (
+                <div
+                  key={index}
+                  style={{
+                    color: log.includes('❌') ? '#ef4444' : 
+                           log.includes('✅') ? '#10b981' : 
+                           log.includes('🔍') || log.includes('📍') || log.includes('🎯') ? '#3b82f6' :
+                           log.includes('⏰') || log.includes('⏱️') ? '#f59e0b' :
+                           log.includes('📊') || log.includes('📝') ? '#8b5cf6' :
+                           log.includes('🚀') ? '#06b6d4' : '#d1d5db',
+                    marginBottom: '0.5rem',
+                    padding: '0.25rem 0',
+                    borderLeft: log.includes('❌') ? '3px solid #ef4444' :
+                               log.includes('✅') ? '3px solid #10b981' : '3px solid transparent',
+                    paddingLeft: '0.75rem'
+                  }}
+                >
+                  {log}
+                </div>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              marginTop: '1.5rem',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '0.75rem'
+            }}>
+              <button
+                onClick={() => setPingPopup({ show: false, device: null, logs: [] })}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-1px)';
+                  e.target.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = 'none';
+                }}
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  if (pingPopup.device) {
+                    handleTestPing(pingPopup.device);
+                  }
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-1px)';
+                  e.target.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = 'none';
+                }}
+              >
+                Test Again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
