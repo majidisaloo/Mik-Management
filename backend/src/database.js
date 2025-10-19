@@ -3299,7 +3299,41 @@ const initializeDatabase = async (databasePath) => {
       state.mikrotiks[index] = record;
       await persist(state);
 
-      return { success: true, mikrotik: record };
+      // Determine overall success based on connectivity
+      let overallSuccess = false;
+      let successMessage = '';
+      
+      if (apiStatus === 'online' && sshStatus === 'online') {
+        overallSuccess = true;
+        successMessage = 'Both API and SSH connections successful';
+      } else if (apiStatus === 'online' && sshStatus === 'disabled') {
+        overallSuccess = true;
+        successMessage = 'API connection successful (SSH disabled)';
+      } else if (sshStatus === 'online' && apiStatus === 'disabled') {
+        overallSuccess = true;
+        successMessage = 'SSH connection successful (API disabled)';
+      } else if (apiStatus === 'online' && sshStatus === 'offline') {
+        overallSuccess = false;
+        successMessage = 'API connected but SSH failed (both enabled)';
+      } else if (sshStatus === 'online' && apiStatus === 'offline') {
+        overallSuccess = false;
+        successMessage = 'SSH connected but API failed (both enabled)';
+      } else if (apiStatus === 'offline' && sshStatus === 'offline') {
+        overallSuccess = false;
+        successMessage = 'Both API and SSH connections failed';
+      } else if (apiStatus === 'disabled' && sshStatus === 'disabled') {
+        overallSuccess = false;
+        successMessage = 'Both API and SSH are disabled';
+      } else {
+        overallSuccess = false;
+        successMessage = 'Connection test completed with mixed results';
+      }
+
+      return { 
+        success: overallSuccess, 
+        message: successMessage,
+        mikrotik: record 
+      };
     },
 
     async listAddressLists() {
