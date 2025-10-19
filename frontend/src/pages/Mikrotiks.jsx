@@ -1049,6 +1049,8 @@ const Mikrotiks = () => {
             return 'N/A';
           };
           
+          const pingTime = getPingTime();
+          
           return (
             <div 
               key={device.id} 
@@ -1157,12 +1159,12 @@ const Mikrotiks = () => {
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.125rem'
+                        gap: '0.25rem'
                   }} onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
                       style={{
-                        padding: '0.25rem',
+                        padding: '0.375rem',
                         color: '#6b7280',
                         background: 'transparent',
                         border: 'none',
@@ -1188,16 +1190,16 @@ const Mikrotiks = () => {
                       aria-label={`Edit device ${device.name}`}
                     >
                       <div style={{
-                        width: '0.5rem',
-                        height: '0.5rem',
+                        width: '1rem',
+                        height: '1rem',
                         background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                        borderRadius: '0.125rem',
+                        borderRadius: '0.25rem',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         transition: 'transform 0.3s ease'
                       }}>
-                        <svg style={{ width: '0.375rem', height: '0.375rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg style={{ width: '0.625rem', height: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </div>
@@ -1205,7 +1207,7 @@ const Mikrotiks = () => {
                     <button
                       type="button"
                       style={{
-                        padding: '0.25rem',
+                        padding: '0.375rem',
                         color: '#6b7280',
                         background: 'transparent',
                         border: 'none',
@@ -1237,21 +1239,21 @@ const Mikrotiks = () => {
                       aria-label={`Test connection for device ${device.name}`}
                     >
                       <div style={{
-                        width: '0.5rem',
-                        height: '0.5rem',
+                        width: '1rem',
+                        height: '1rem',
                         background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        borderRadius: '0.125rem',
+                        borderRadius: '0.25rem',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         transition: 'transform 0.3s ease'
                       }}>
                       {testingDevice === device.id ? (
-                          <svg style={{ width: '0.375rem', height: '0.375rem', color: 'white', animation: 'spin 1s linear infinite' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg style={{ width: '0.625rem', height: '0.625rem', color: 'white', animation: 'spin 1s linear infinite' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                           </svg>
                       ) : (
-                          <svg style={{ width: '0.375rem', height: '0.375rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg style={{ width: '0.625rem', height: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
                           </svg>
                       )}
@@ -1260,7 +1262,7 @@ const Mikrotiks = () => {
                     <button
                       type="button"
                       style={{
-                        padding: '0.25rem',
+                        padding: '0.375rem',
                         color: '#6b7280',
                         background: 'transparent',
                         border: 'none',
@@ -1286,16 +1288,16 @@ const Mikrotiks = () => {
                       aria-label={`View details for device ${device.name}`}
                     >
                       <div style={{
-                        width: '0.5rem',
-                        height: '0.5rem',
+                        width: '1rem',
+                        height: '1rem',
                         background: 'linear-gradient(135deg, #8b5cf6 0%, #4f46e5 100%)',
-                        borderRadius: '0.125rem',
+                        borderRadius: '0.25rem',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         transition: 'transform 0.3s ease'
                       }}>
-                        <svg style={{ width: '0.375rem', height: '0.375rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg style={{ width: '0.625rem', height: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         </svg>
@@ -1304,7 +1306,7 @@ const Mikrotiks = () => {
                     <button
                       type="button"
                       style={{
-                        padding: '0.25rem',
+                        padding: '0.375rem',
                         color: '#6b7280',
                         background: 'transparent',
                         border: 'none',
@@ -1330,16 +1332,16 @@ const Mikrotiks = () => {
                       aria-label={`Delete device ${device.name}`}
                     >
                       <div style={{
-                        width: '0.5rem',
-                        height: '0.5rem',
+                        width: '1rem',
+                        height: '1rem',
                         background: 'linear-gradient(135deg, #ef4444 0%, #ec4899 100%)',
-                        borderRadius: '0.125rem',
+                        borderRadius: '0.25rem',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         transition: 'transform 0.3s ease'
                       }}>
-                        <svg style={{ width: '0.375rem', height: '0.375rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg style={{ width: '0.625rem', height: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </div>
@@ -1366,7 +1368,7 @@ const Mikrotiks = () => {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem'
-                    }} title={`Ping: ${getPingTime()}`}>
+                    }} title={`Ping: ${pingTime}`}>
                       <div style={{
                         width: '0.75rem',
                         height: '0.75rem',
@@ -1380,7 +1382,7 @@ const Mikrotiks = () => {
                         fontWeight: '500',
                         color: '#374151'
                       }}>
-                        Ping: {getPingTime()}
+                        Ping: {pingTime}
                       </span>
                     </div>
                     
