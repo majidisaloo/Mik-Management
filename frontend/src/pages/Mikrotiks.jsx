@@ -231,7 +231,9 @@ const Mikrotiks = () => {
   const [filterGroup, setFilterGroup] = useState('');
   const [testingDevice, setTestingDevice] = useState(null);
   const [pingPopup, setPingPopup] = useState({ show: false, device: null, logs: [] });
+  const [connectivityPopup, setConnectivityPopup] = useState({ show: false, device: null, logs: [] });
   const [pingLoading, setPingLoading] = useState(new Set());
+  const [connectivityLoading, setConnectivityLoading] = useState(new Set());
   const [expandedGroups, setExpandedGroups] = useState(() => {
     try {
       const saved = sessionStorage.getItem('mikrotiks-groups-expanded');
@@ -393,16 +395,38 @@ const Mikrotiks = () => {
     return () => clearInterval(interval);
   }, [navigate, user]);
 
-  // Set initial ping loading state when devices are loaded
+  // Set initial loading states and run auto tests when devices are loaded
   useEffect(() => {
     if (devices.length > 0) {
       const deviceHosts = devices.map(device => device.host);
-      setPingLoading(new Set(deviceHosts));
+      const deviceIds = devices.map(device => device.id);
       
-      // Clear loading state after 3 seconds
+      // Set loading states
+      setPingLoading(new Set(deviceHosts));
+      setConnectivityLoading(new Set(deviceIds));
+      
+      // Run auto ping tests for all devices
+      deviceHosts.forEach(host => {
+        setTimeout(() => {
+          pingService.pingHostFresh(host);
+        }, 1000); // Stagger the requests
+      });
+      
+      // Run auto connectivity tests for all devices
+      deviceIds.forEach(id => {
+        const device = devices.find(d => d.id === id);
+        if (device) {
+          setTimeout(() => {
+            handleTestConnectivity(device);
+          }, 2000); // Stagger the requests
+        }
+      });
+      
+      // Clear loading states after 5 seconds
       setTimeout(() => {
         setPingLoading(new Set());
-      }, 3000);
+        setConnectivityLoading(new Set());
+      }, 5000);
     }
   }, [devices.length]);
 
@@ -498,6 +522,25 @@ const Mikrotiks = () => {
   };
 
   const handleTestConnectivity = async (device) => {
+    console.log('Testing connectivity for device:', device.name, 'Host:', device.host);
+    
+    // Set loading state for this device
+    setConnectivityLoading(prev => new Set([...prev, device.id]));
+    
+    // Open connectivity popup with initial logs
+    const initialLogs = [
+      `🔍 Starting connectivity test for device: ${device.name}`,
+      `📍 Target IP: ${device.host}`,
+      `⏰ Time: ${new Date().toLocaleTimeString()}`,
+      `🚀 Initiating connectivity test...`
+    ];
+    
+    setConnectivityPopup({
+      show: true,
+      device: device,
+      logs: initialLogs
+    });
+    
     try {
       setTestingDevice(device.id);
       
@@ -511,6 +554,21 @@ const Mikrotiks = () => {
       }
 
       const result = await response.json();
+      
+      // Add result logs
+      const resultLogs = [
+        `✅ Connectivity test completed`,
+        `📊 Result: ${result.success ? 'SUCCESS' : 'FAILED'}`,
+        `🔗 API Status: ${result.mikrotik?.routeros?.apiEnabled ? 'Enabled' : 'Disabled'}`,
+        `🔐 SSH Status: ${result.mikrotik?.routeros?.sshEnabled ? 'Enabled' : 'Disabled'}`,
+        `📡 Firmware: ${result.mikrotik?.routeros?.firmwareVersion || 'Not detected'}`,
+        `📝 Details: ${result.mikrotik?.routeros?.sshOutput || 'No details available'}`
+      ];
+      
+      setConnectivityPopup(prev => ({
+        ...prev,
+        logs: [...prev.logs, ...resultLogs]
+      }));
       
       // Refresh the devices list to show updated connectivity status
       await loadDevices();
@@ -527,6 +585,21 @@ const Mikrotiks = () => {
       }, 3000);
       
     } catch (error) {
+      console.error('Connectivity test error:', error);
+      
+      // Add error logs
+      const errorLogs = [
+        `❌ Connectivity test failed`,
+        `🔍 Error type: ${error.name || 'Unknown'}`,
+        `📝 Error message: ${error.message || 'No message available'}`,
+        `🛠️ Troubleshooting: Check device configuration and network connectivity`
+      ];
+      
+      setConnectivityPopup(prev => ({
+        ...prev,
+        logs: [...prev.logs, ...errorLogs]
+      }));
+      
       // Show error message with red hover effect
       setStatus({
         type: 'error',
@@ -539,6 +612,12 @@ const Mikrotiks = () => {
       }, 5000);
     } finally {
       setTestingDevice(null);
+      // Clear loading state for this device
+      setConnectivityLoading(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(device.id);
+        return newSet;
+      });
     }
   };
 
@@ -2489,6 +2568,201 @@ const Mikrotiks = () => {
                 style={{
                   padding: '0.75rem 1.5rem',
                   background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-1px)';
+                  e.target.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = 'none';
+                }}
+              >
+                Test Again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Connectivity Test Popup */}
+      {connectivityPopup.show && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '1rem',
+            padding: '2rem',
+            maxWidth: '600px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '1.5rem',
+              paddingBottom: '1rem',
+              borderBottom: '2px solid #f3f4f6'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem'
+              }}>
+                <div style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  borderRadius: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <svg style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 style={{
+                    fontSize: '1.25rem',
+                    fontWeight: '700',
+                    color: '#1f2937',
+                    margin: 0
+                  }}>
+                    Connectivity Test Results
+                  </h3>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    margin: 0
+                  }}>
+                    {connectivityPopup.device?.name} ({connectivityPopup.device?.host})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setConnectivityPopup({ show: false, device: null, logs: [] })}
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  background: '#f3f4f6',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#e5e7eb';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = '#f3f4f6';
+                }}
+              >
+                <svg style={{ width: '1rem', height: '1rem', color: '#6b7280' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Logs Container */}
+            <div style={{
+              backgroundColor: '#1f2937',
+              borderRadius: '0.75rem',
+              padding: '1rem',
+              maxHeight: '400px',
+              overflowY: 'auto',
+              fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
+              fontSize: '0.875rem',
+              lineHeight: '1.5'
+            }}>
+              {connectivityPopup.logs.map((log, index) => (
+                <div
+                  key={index}
+                  style={{
+                    color: log.includes('❌') ? '#ef4444' : 
+                           log.includes('✅') ? '#10b981' : 
+                           log.includes('🔍') || log.includes('📍') || log.includes('🎯') ? '#3b82f6' :
+                           log.includes('⏰') || log.includes('⏱️') ? '#f59e0b' :
+                           log.includes('📊') || log.includes('📝') ? '#8b5cf6' :
+                           log.includes('🚀') ? '#06b6d4' : '#d1d5db',
+                    marginBottom: '0.5rem',
+                    padding: '0.25rem 0',
+                    borderLeft: log.includes('❌') ? '3px solid #ef4444' :
+                               log.includes('✅') ? '3px solid #10b981' : '3px solid transparent',
+                    paddingLeft: '0.75rem'
+                  }}
+                >
+                  {log}
+                </div>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              marginTop: '1.5rem',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '0.75rem'
+            }}>
+              <button
+                onClick={() => setConnectivityPopup({ show: false, device: null, logs: [] })}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-1px)';
+                  e.target.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = 'none';
+                }}
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  if (connectivityPopup.device) {
+                    handleTestConnectivity(connectivityPopup.device);
+                  }
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '0.75rem',
