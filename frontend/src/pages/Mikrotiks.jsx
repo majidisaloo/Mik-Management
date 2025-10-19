@@ -632,11 +632,11 @@ const Mikrotiks = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">MikroTik Devices</h1>
             <p className="text-gray-600 mt-2">Manage and monitor your MikroTik router infrastructure.</p>
-          </div>
+        </div>
           <div className="flex items-center gap-3">
             <div className="h-10 w-20 bg-gray-200 rounded-lg animate-pulse"></div>
             <div className="h-10 w-24 bg-gray-200 rounded-lg animate-pulse"></div>
-          </div>
+        </div>
         </div>
 
         {/* Search Section Skeleton */}
@@ -669,8 +669,8 @@ const Mikrotiks = () => {
                   <div className="flex items-center gap-1">
                     {[...Array(4)].map((_, j) => (
                       <div key={j} className="w-8 h-8 bg-gray-200 rounded-lg animate-pulse"></div>
-                    ))}
-                  </div>
+              ))}
+                </div>
                 </div>
               </div>
               <div className="p-4">
@@ -700,49 +700,73 @@ const Mikrotiks = () => {
               </div>
             </div>
           ))}
-        </div>
-      </div>
+                  </div>
+          </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      {/* Modern Header with Glassmorphism */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-indigo-600/10"></div>
+        <div className="relative backdrop-blur-sm bg-white/80 border-b border-white/20 shadow-xl">
+          <div className="max-w-7xl mx-auto px-6 py-8">
       <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
         <div>
-          <h1 className="text-3xl font-bold text-primary">MikroTik Devices</h1>
-          <p className="text-tertiary mt-2">Manage and monitor your MikroTik router infrastructure.</p>
+                    <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 via-blue-800 to-purple-800 bg-clip-text text-transparent">
+                      MikroTik Devices
+                    </h1>
+                    <p className="text-gray-600 text-lg font-medium">Manage and monitor your network infrastructure</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-            onClick={() => {
-              loadDevices();
-              setStatus({ type: 'success', message: 'Data refreshed successfully!' });
-              setTimeout(() => setStatus({ type: '', message: '' }), 3000);
-            }}
-            title="Refresh data"
-            aria-label="Refresh device list"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Refresh
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow-md"
-            onClick={handleNewDevice}
-            aria-label="Add new device"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Add Device
-          </button>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+        <button
+          type="button"
+                  className="group relative inline-flex items-center gap-3 px-6 py-3 text-sm font-semibold text-gray-700 bg-white/70 backdrop-blur-sm border border-white/30 rounded-2xl hover:bg-white/90 hover:border-white/50 focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                  onClick={() => {
+                    loadDevices();
+                    setStatus({ type: 'success', message: 'Data refreshed successfully!' });
+                    setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+                  }}
+                  title="Refresh data"
+                  aria-label="Refresh device list"
+                >
+                  <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center group-hover:rotate-180 transition-transform duration-500">
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </div>
+                  <span className="font-semibold">Refresh</span>
+                </button>
+                <button
+                  type="button"
+                  className="group relative inline-flex items-center gap-3 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 border border-transparent rounded-2xl hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-blue-500/30 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+          onClick={handleNewDevice}
+                  aria-label="Add new device"
+                >
+                  <div className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                  </div>
+                  <span className="font-semibold">Add Device</span>
+        </button>
+              </div>
+            </div>
+          </div>
         </div>
         </div>
+
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
 
       {/* Status Message with Enhanced Hover Effects */}
       {status.message && (
@@ -765,7 +789,7 @@ const Mikrotiks = () => {
             )}
             <span className="font-medium">{status.message}</span>
           </div>
-        </div>
+          </div>
       )}
 
       {/* Success Alert */}
@@ -785,55 +809,69 @@ const Mikrotiks = () => {
         </div>
       )}
 
-      {/* Search and Filters */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 mt-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
-              Search Devices
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input
+      {/* Modern Search and Filters */}
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-indigo-500/5 rounded-3xl"></div>
+        <div className="relative backdrop-blur-sm bg-white/60 border border-white/30 rounded-3xl p-8 shadow-xl">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="space-y-3">
+              <label htmlFor="search" className="block text-sm font-bold text-gray-800 uppercase tracking-wide">
+                🔍 Search Devices
+              </label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center group-focus-within:scale-110 transition-transform duration-300">
+                    <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                </div>
+            <input
                 id="search"
                 type="text"
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="block w-full pl-14 pr-4 py-4 bg-white/80 backdrop-blur-sm border border-white/40 rounded-2xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500/50 sm:text-sm font-medium placeholder-gray-500 transition-all duration-300 shadow-lg focus:shadow-xl"
                 placeholder="Search by name, host, or tags..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                aria-label="Search devices"
-                aria-describedby="search-help"
+                  aria-label="Search devices"
+                  aria-describedby="search-help"
               />
+        </div>
             </div>
+            <div className="space-y-3">
+              <label htmlFor="group-filter" className="block text-sm font-bold text-gray-800 uppercase tracking-wide">
+                🏷️ Filter by Group
+              </label>
+              <div className="relative">
+              <select
+                id="group-filter"
+                  className="block w-full px-4 py-4 bg-white/80 backdrop-blur-sm border border-white/40 rounded-2xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500/50 sm:text-sm font-medium transition-all duration-300 shadow-lg focus:shadow-xl appearance-none cursor-pointer"
+                value={filterGroup}
+                onChange={(e) => setFilterGroup(e.target.value)}
+                  aria-label="Filter devices by group"
+              >
+                <option value="">All Groups</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
+                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                  <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                    <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
           </div>
-          <div>
-            <label htmlFor="group-filter" className="block text-sm font-medium text-gray-700 mb-2">
-              Filter by Group
-            </label>
-            <select
-              id="group-filter"
-              className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              value={filterGroup}
-              onChange={(e) => setFilterGroup(e.target.value)}
-              aria-label="Filter devices by group"
-            >
-              <option value="">All Groups</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
-            </select>
+      </div>
           </div>
         </div>
-      </div>
 
-      {/* Devices Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
+      {/* Modern Devices Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6">
         {filteredDevices.map((device) => {
           // Determine connection statuses
           const apiConfigured = device.routeros?.apiEnabled && device.routeros?.apiUsername && device.routeros?.apiPassword;
@@ -865,71 +903,94 @@ const Mikrotiks = () => {
           };
           
           return (
-            <div key={device.id} className="bg-white rounded-xl border border-gray-200 hover:shadow-lg transition-all duration-200 overflow-hidden">
+            <div key={device.id} className="group relative bg-white/70 backdrop-blur-sm border border-white/30 rounded-3xl hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 overflow-hidden hover:-translate-y-2 hover:scale-[1.02]">
+              {/* Gradient overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              
               {/* Header section */}
-              <div className="p-4 border-b border-gray-100">
+              <div className="relative p-6 border-b border-white/20">
                 <div className="flex items-center justify-between">
-                  {/* Device info */}
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
-                      <span className="text-2xl">🖥️</span>
+                  {/* Modern device info */}
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <div className="w-16 h-16 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
+                        <span className="text-3xl">🖥️</span>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-lg text-gray-900">{safeRender(device.name, 'Unknown Device')}</h3>
-                      <p className="text-sm text-gray-500 font-mono">{safeRender(device.host, 'No Host')}</p>
+                      <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
+                        <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="font-bold text-xl text-gray-900 group-hover:text-blue-800 transition-colors duration-300">{safeRender(device.name, 'Unknown Device')}</h3>
+                      <p className="text-sm text-gray-600 font-mono bg-gray-100/50 px-3 py-1 rounded-lg">{safeRender(device.host, 'No Host')}</p>
                     </div>
                   </div>
                   
-                  {/* Action buttons - Clean and organized */}
-                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  {/* Modern action buttons */}
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                      className="group/btn p-3 text-gray-500 hover:text-blue-600 hover:bg-blue-50/80 rounded-2xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-500/20 hover:scale-110 hover:shadow-lg"
                       onClick={() => handleEdit(device)}
                       title="Edit Device"
                       aria-label={`Edit device ${device.name}`}
-                      style={{ fontSize: '18px', lineHeight: '1' }}
                     >
-                      ✏️
+                      <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center group-hover/btn:scale-110 transition-transform duration-300">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </div>
                     </button>
                     <button
                       type="button"
-                      className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="group/btn p-3 text-gray-500 hover:text-green-600 hover:bg-green-50/80 rounded-2xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-green-500/20 hover:scale-110 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => handleTestConnectivity(device)}
                       disabled={testingDevice === device.id}
                       title="Test Connection"
                       aria-label={`Test connection for device ${device.name}`}
-                      style={{ fontSize: '18px', lineHeight: '1' }}
                     >
+                      <div className="w-6 h-6 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center group-hover/btn:scale-110 transition-transform duration-300">
                       {testingDevice === device.id ? (
-                        <span style={{ animation: 'spin 1s linear infinite' }}>⚡</span>
+                          <svg className="w-4 h-4 text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
                       ) : (
-                        '🔥'
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
                       )}
+                      </div>
                     </button>
                     <button
                       type="button"
-                      className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1"
+                      className="group/btn p-3 text-gray-500 hover:text-purple-600 hover:bg-purple-50/80 rounded-2xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-purple-500/20 hover:scale-110 hover:shadow-lg"
                       onClick={() => handleDeviceClick(device)}
                       title="View Device Details"
                       aria-label={`View details for device ${device.name}`}
-                      style={{ fontSize: '18px', lineHeight: '1' }}
                     >
-                      👁️
+                      <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center group-hover/btn:scale-110 transition-transform duration-300">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      </div>
                     </button>
                     <button
                       type="button"
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                      className="group/btn p-3 text-gray-500 hover:text-red-600 hover:bg-red-50/80 rounded-2xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-red-500/20 hover:scale-110 hover:shadow-lg"
                       onClick={() => handleDelete(device)}
                       title="Delete Device"
                       aria-label={`Delete device ${device.name}`}
-                      style={{ fontSize: '18px', lineHeight: '1' }}
                     >
-                      🗑️
+                      <div className="w-6 h-6 bg-gradient-to-br from-red-500 to-pink-600 rounded-lg flex items-center justify-center group-hover/btn:scale-110 transition-transform duration-300">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </div>
                     </button>
                   </div>
+                  </div>
                 </div>
-              </div>
 
               {/* Status section */}
               <div className="p-4">
@@ -969,58 +1030,76 @@ const Mikrotiks = () => {
                     )}
                   </div>
                   
-                  {/* Device Status Badge */}
-                  <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  {/* Modern Device Status Badge */}
+                  <div className="relative">
+                    <div className={`px-4 py-2 rounded-2xl text-sm font-bold shadow-lg transition-all duration-300 ${
                     typeof device.status === 'object' && device.status !== null 
-                      ? (device.status.updateStatus === 'connected' ? 'bg-green-100 text-green-800' : 
-                         device.status.updateStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-                         'bg-red-100 text-red-800')
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
+                        ? (device.status.updateStatus === 'connected' ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-green-500/30' : 
+                           device.status.updateStatus === 'pending' ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-yellow-500/30' : 
+                           'bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-red-500/30')
+                        : 'bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-gray-500/30'
+                    }`}>
                     {typeof device.status === 'object' && device.status !== null 
                       ? (device.status.updateStatus || 'unknown').toUpperCase()
                       : typeof device.status === 'string' 
                         ? device.status.toUpperCase() 
                         : 'UNKNOWN'}
+                    </div>
+                    {typeof device.status === 'object' && device.status !== null && device.status.updateStatus === 'connected' && (
+                      <div className="absolute inset-0 px-4 py-2 rounded-2xl bg-green-400 animate-pulse opacity-30"></div>
+                    )}
                   </div>
                 </div>
 
-                {/* Device details */}
-                <div className="mt-3 pt-3 border-t border-gray-100">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-500">Group:</span>
-                      <p className="font-medium text-gray-900 truncate" title={device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}>
-                        {device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Firmware:</span>
-                      <p className={`font-medium truncate ${device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() ? 'text-gray-900' : 'text-red-500'}`} title={device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() ? device.routeros.firmwareVersion : 'Firmware version not detected'}>
-                        {device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() 
-                          ? device.routeros.firmwareVersion 
-                          : 'Not detected'}
-                      </p>
-                    </div>
+                {/* Modern Device details */}
+                <div className="relative mt-4 pt-4 border-t border-white/20">
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Group</span>
+                      <div className="bg-gradient-to-r from-blue-50 to-purple-50 px-3 py-2 rounded-xl border border-blue-100">
+                        <p className="font-bold text-gray-800 truncate" title={device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}>
+                      {device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}
+                        </p>
                   </div>
-                  
-                  {/* Tags */}
-                  {device.tags && typeof device.tags === 'string' && device.tags.trim() && (
-                    <div className="mt-3">
-                      <div className="flex flex-wrap gap-1">
-                        {device.tags.split(',').slice(0, 3).map((tag, index) => (
-                          <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full" title={tag.trim()}>
-                            {tag.trim()}
-                          </span>
-                        ))}
-                        {device.tags.split(',').length > 3 && (
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                            +{device.tags.split(',').length - 3}
-                          </span>
-                        )}
-                      </div>
                     </div>
-                  )}
+                    <div className="space-y-2">
+                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Firmware</span>
+                      <div className={`px-3 py-2 rounded-xl border ${
+                        device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim()
+                          ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-100' 
+                          : 'bg-gradient-to-r from-red-50 to-pink-50 border-red-100'
+                      }`}>
+                        <p className={`font-bold truncate ${
+                          device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim()
+                            ? 'text-gray-800' 
+                            : 'text-red-600'
+                        }`} title={device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() ? device.routeros.firmwareVersion : 'Firmware version not detected'}>
+                      {device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() 
+                        ? device.routeros.firmwareVersion 
+                        : 'Not detected'}
+                        </p>
+                      </div>
+                  </div>
+                </div>
+
+                  {/* Modern Tags */}
+                {device.tags && typeof device.tags === 'string' && device.tags.trim() && (
+                    <div className="mt-4">
+                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">Tags</span>
+                      <div className="flex flex-wrap gap-2">
+                        {device.tags.split(',').slice(0, 3).map((tag, index) => (
+                          <span key={index} className="px-3 py-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs font-bold rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105" title={tag.trim()}>
+                        {tag.trim()}
+                      </span>
+                    ))}
+                        {device.tags.split(',').length > 3 && (
+                          <span className="px-3 py-1 bg-gradient-to-r from-gray-500 to-gray-600 text-white text-xs font-bold rounded-full shadow-lg">
+                            +{device.tags.split(',').length - 3}
+                      </span>
+                    )}
+                      </div>
+                  </div>
+                )}
                 </div>
               </div>
             </div>
@@ -1029,48 +1108,56 @@ const Mikrotiks = () => {
       </div>
 
       {filteredDevices.length === 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
-            <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-indigo-500/5 rounded-3xl"></div>
+          <div className="relative backdrop-blur-sm bg-white/60 border border-white/30 rounded-3xl p-16 text-center shadow-xl">
+            <div className="mx-auto w-32 h-32 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full flex items-center justify-center mb-8 relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full animate-pulse"></div>
+              <svg className="w-16 h-16 text-gray-400 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h3 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-blue-800 to-purple-800 bg-clip-text text-transparent mb-4">
+              {searchTerm || filterGroup ? 'No devices found' : 'No devices yet'}
+            </h3>
+            <p className="text-gray-600 text-lg mb-8 max-w-lg mx-auto leading-relaxed">
+              {searchTerm || filterGroup 
+                ? 'Try adjusting your search criteria or filters to find what you\'re looking for.' 
+                : 'Get started by adding your first MikroTik device to begin monitoring your network infrastructure.'
+              }
+            </p>
+            {!searchTerm && !filterGroup && (
+              <button
+                type="button"
+                className="group inline-flex items-center gap-3 px-8 py-4 text-lg font-bold text-white bg-gradient-to-r from-blue-600 to-purple-600 border border-transparent rounded-2xl hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-blue-500/30 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-1"
+                onClick={handleNewDevice}
+              >
+                <div className="w-6 h-6 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </div>
+                Add Your First Device
+              </button>
+            )}
+            {(searchTerm || filterGroup) && (
+              <button
+                type="button"
+                className="group inline-flex items-center gap-3 px-6 py-3 text-sm font-bold text-gray-700 bg-white/70 backdrop-blur-sm border border-white/40 rounded-2xl hover:bg-white/90 hover:border-white/60 focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                onClick={() => {
+                  setSearchTerm('');
+                  setFilterGroup('');
+                }}
+              >
+                <div className="w-5 h-5 bg-gradient-to-br from-gray-500 to-gray-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+                Clear Filters
+              </button>
+            )}
           </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            {searchTerm || filterGroup ? 'No devices found' : 'No devices yet'}
-          </h3>
-          <p className="text-gray-600 mb-6 max-w-md mx-auto">
-            {searchTerm || filterGroup 
-              ? 'Try adjusting your search criteria or filters to find what you\'re looking for.' 
-              : 'Get started by adding your first MikroTik device to begin monitoring your network infrastructure.'
-            }
-          </p>
-          {!searchTerm && !filterGroup && (
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow-md"
-              onClick={handleNewDevice}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              Add Your First Device
-            </button>
-          )}
-          {(searchTerm || filterGroup) && (
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-              onClick={() => {
-                setSearchTerm('');
-                setFilterGroup('');
-              }}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              Clear Filters
-            </button>
-          )}
         </div>
       )}
 
@@ -1388,7 +1475,7 @@ const Mikrotiks = () => {
       </div>
           </form>
         </Modal>
-
+      </div>
     </div>
   );
 };
