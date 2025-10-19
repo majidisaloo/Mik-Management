@@ -405,19 +405,20 @@ const Mikrotiks = () => {
       setPingLoading(new Set(deviceHosts));
       setConnectivityLoading(new Set(deviceIds));
       
-      // Run auto ping tests for all devices
+      // Run auto ping tests for all devices (background only, no popup)
       deviceHosts.forEach(host => {
         setTimeout(() => {
           pingService.pingHostFresh(host);
         }, 1000); // Stagger the requests
       });
       
-      // Run auto connectivity tests for all devices
+      // Run auto connectivity tests for all devices (background only, no popup)
       deviceIds.forEach(id => {
         const device = devices.find(d => d.id === id);
         if (device) {
           setTimeout(() => {
-            handleTestConnectivity(device);
+            // Run connectivity test in background without popup
+            runBackgroundConnectivityTest(device);
           }, 2000); // Stagger the requests
         }
       });
@@ -518,6 +519,27 @@ const Mikrotiks = () => {
         type: 'error',
         message: error.message || 'Unable to delete device.'
       });
+    }
+  };
+
+  // Run connectivity test in background without popup
+  const runBackgroundConnectivityTest = async (device) => {
+    try {
+      const response = await fetch(`/api/mikrotiks/${device.id}/test-connectivity`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Background connectivity test result:', result);
+        
+        // Refresh the devices list to show updated connectivity status
+        await loadDevices();
+      } else {
+        console.error('Background connectivity test failed for device:', device.name);
+      }
+    } catch (error) {
+      console.error('Background connectivity test error for device:', device.name, error);
     }
   };
 
