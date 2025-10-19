@@ -5,7 +5,16 @@ import crypto from 'crypto';
 import { spawn, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import initializeDatabase, { resolveDatabaseFile } from './database.js';
+import initializeDatabase, { 
+  resolveDatabaseFile
+} from './database.js';
+import { 
+  toggleMikrotikSafeMode,
+  getMikrotikUpdateInfo,
+  installMikrotikUpdate,
+  getMikrotikById,
+  addMikrotikIpAddress
+} from './database.js';
 import { ensureDatabaseConfig, getConfigFilePath } from './config.js';
 import getProjectVersion from './version.js';
 import { 
@@ -94,6 +103,23 @@ const formatVersion = (commitCount) => {
   const major = Math.floor(commitCount / 100);
   const minor = commitCount % 100;
   return `v${major}.${minor.toString().padStart(2, '0')}`;
+};
+
+const readRequestBody = (req) => {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(body));
+      } catch (error) {
+        reject(error);
+      }
+    });
+    req.on('error', reject);
+  });
 };
 
 const normalizeHeaderInit = (headersInit = {}) => {
@@ -1302,7 +1328,7 @@ const bootstrap = async () => {
   const databaseFile = resolveDatabaseFile(config.databasePath);
   const db = await initializeDatabase(config.databasePath);
 
-  const port = Number.parseInt(process.env.PORT ?? '4000', 10) || 4000;
+  const port = Number.parseInt(process.env.PORT ?? '5001', 10) || 5001;
   const version = getProjectVersion();
 
   const server = http.createServer(async (req, res) => {
@@ -2119,7 +2145,7 @@ const bootstrap = async () => {
       }
 
       try {
-        const device = await db.getMikrotikById(deviceId);
+        const device = await getMikrotikById(deviceId);
 
         if (!device) {
           sendJson(res, 404, { message: 'Mikrotik device not found.' });
@@ -2390,6 +2416,254 @@ const bootstrap = async () => {
       } catch (error) {
         console.error('Get Mikrotik routes error', error);
         sendJson(res, 500, { message: 'Unable to fetch routes right now.' });
+      }
+    };
+
+    const handleGetMikrotikFirewallRules = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        console.log(`Fetching firewall rules for MikroTik device ID: ${deviceId}`);
+        const result = await db.getMikrotikFirewallRules(deviceId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to fetch firewall rules.');
+        }
+
+        sendJson(res, 200, {
+          success: true,
+          rules: result.rules || []
+        });
+      } catch (error) {
+        console.error('Get Mikrotik firewall rules error', error);
+        sendJson(res, 500, { message: 'Unable to fetch firewall rules right now.' });
+      }
+    };
+
+    const handleAddMikrotikIpAddress = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        const body = await readRequestBody(req);
+        const { address, network, interface: interfaceName, comment } = body;
+
+        if (!address || !network || !interfaceName) {
+          sendJson(res, 400, { message: 'Address, network, and interface are required.' });
+          return;
+        }
+
+        console.log(`Adding IP address ${address} to MikroTik device ID: ${deviceId}`);
+        const result = await addMikrotikIpAddress(deviceId, {
+          address,
+          network,
+          interface: interfaceName,
+          comment: comment || ''
+        });
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to add IP address.');
+        }
+
+        sendJson(res, 201, {
+          message: 'IP address added successfully.',
+          ipAddress: result.ipAddress
+        });
+      } catch (error) {
+        console.error('Add Mikrotik IP address error', error);
+        sendJson(res, 500, { message: 'Unable to add IP address right now.' });
+      }
+    };
+
+    const handleGetMikrotikNatRules = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        console.log(`Fetching NAT rules for MikroTik device ID: ${deviceId}`);
+        const result = await db.getMikrotikNatRules(deviceId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to fetch NAT rules.');
+        }
+
+        sendJson(res, 200, {
+          success: true,
+          rules: result.rules || []
+        });
+      } catch (error) {
+        console.error('Get Mikrotik NAT rules error', error);
+        sendJson(res, 500, { message: 'Unable to fetch NAT rules right now.' });
+      }
+    };
+
+    const handleGetMikrotikMangleRules = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        console.log(`Fetching mangle rules for MikroTik device ID: ${deviceId}`);
+        const result = await db.getMikrotikMangleRules(deviceId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to fetch mangle rules.');
+        }
+
+        sendJson(res, 200, {
+          success: true,
+          rules: result.rules || []
+        });
+      } catch (error) {
+        console.error('Get Mikrotik mangle rules error', error);
+        sendJson(res, 500, { message: 'Unable to fetch mangle rules right now.' });
+      }
+    };
+
+    const handleGetMikrotikSystemLogs = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        console.log(`Fetching system logs for MikroTik device ID: ${deviceId}`);
+        const result = await db.getMikrotikSystemLogs(deviceId);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to fetch system logs.');
+        }
+
+        sendJson(res, 200, {
+          success: true,
+          logs: result.logs || []
+        });
+      } catch (error) {
+        console.error('Get Mikrotik system logs error', error);
+        sendJson(res, 500, { message: 'Unable to fetch system logs right now.' });
+      }
+    };
+
+    const handleToggleMikrotikSafeMode = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        const body = await getRequestBody(req);
+        const { enabled } = body;
+
+        if (typeof enabled !== 'boolean') {
+          sendJson(res, 400, { message: 'Enabled field must be a boolean.' });
+          return;
+        }
+
+        console.log(`Toggling safe mode for MikroTik device ID: ${deviceId}, enabled: ${enabled}`);
+        const result = await toggleMikrotikSafeMode(deviceId, enabled);
+
+        if (!result.success) {
+          throw new Error(result.message || 'Unable to toggle safe mode.');
+        }
+
+        sendJson(res, 200, {
+          success: true,
+          enabled: result.enabled,
+          message: result.message
+        });
+      } catch (error) {
+        console.error('Toggle Mikrotik safe mode error', error);
+        sendJson(res, 500, { message: 'Unable to toggle safe mode right now.' });
+      }
+    };
+
+    const handleGetMikrotikUpdateInfo = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        console.log(`Fetching update info for MikroTik device ID: ${deviceId}`);
+        const result = await getMikrotikUpdateInfo(deviceId);
+
+        if (!result.success) {
+          throw new Error(result.message || 'Unable to fetch update info.');
+        }
+
+        sendJson(res, 200, {
+          success: true,
+          ...result
+        });
+      } catch (error) {
+        console.error('Get Mikrotik update info error', error);
+        sendJson(res, 500, { message: 'Unable to fetch update info right now.' });
+      }
+    };
+
+    const handleInstallMikrotikUpdate = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        const body = await getRequestBody(req);
+        const { version } = body;
+
+        if (!version || typeof version !== 'string') {
+          sendJson(res, 400, { message: 'Version field is required and must be a string.' });
+          return;
+        }
+
+        console.log(`Installing update ${version} for MikroTik device ID: ${deviceId}`);
+        const result = await installMikrotikUpdate(deviceId, version);
+
+        if (!result.success) {
+          throw new Error(result.message || 'Unable to install update.');
+        }
+
+        sendJson(res, 200, {
+          success: true,
+          message: result.message,
+          newVersion: result.newVersion
+        });
+      } catch (error) {
+        console.error('Install Mikrotik update error', error);
+        sendJson(res, 500, { message: 'Unable to install update right now.' });
       }
     };
 
@@ -3886,8 +4160,48 @@ const bootstrap = async () => {
           return;
         }
 
+        if (method === 'POST' && action === 'ip-addresses') {
+          await handleAddMikrotikIpAddress(deviceId);
+          return;
+        }
+
         if (method === 'GET' && action === 'routes') {
           await handleGetMikrotikRoutes(deviceId);
+          return;
+        }
+
+        if (method === 'GET' && action === 'firewall') {
+          await handleGetMikrotikFirewallRules(deviceId);
+          return;
+        }
+
+        if (method === 'GET' && action === 'nat') {
+          await handleGetMikrotikNatRules(deviceId);
+          return;
+        }
+
+        if (method === 'GET' && action === 'mangle') {
+          await handleGetMikrotikMangleRules(deviceId);
+          return;
+        }
+
+        if (method === 'GET' && action === 'logs') {
+          await handleGetMikrotikSystemLogs(deviceId);
+          return;
+        }
+
+        if (method === 'POST' && action === 'safe-mode') {
+          await handleToggleMikrotikSafeMode(deviceId);
+          return;
+        }
+
+        if (method === 'GET' && action === 'update-info') {
+          await handleGetMikrotikUpdateInfo(deviceId);
+          return;
+        }
+
+        if (method === 'POST' && action === 'install-update') {
+          await handleInstallMikrotikUpdate(deviceId);
           return;
         }
       }

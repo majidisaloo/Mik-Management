@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal.jsx';
 import pingService from '../services/pingService.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
 
 // Modern Icons
 const PlusIcon = () => (
@@ -160,6 +161,7 @@ const safeRender = (value, fallback = '—') => {
 const Mikrotiks = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { theme } = useTheme();
 
   // Inject isolated CSS to prevent external interference
   useEffect(() => {
@@ -167,25 +169,47 @@ const Mikrotiks = () => {
     style.textContent = `
       .mikrotiks-page {
         min-height: 100vh;
-        background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 50%, #e0e7ff 100%);
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        transition: all 0.3s ease;
+      }
+      .mikrotiks-page[data-theme="light"] {
+        background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 50%, #e0e7ff 100%);
+        color: #1f2937;
+      }
+      .mikrotiks-page[data-theme="dark"] {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+        color: #f1f5f9;
       }
       .mikrotiks-page * {
         box-sizing: border-box;
       }
-      .mikrotiks-page .glassmorphism {
+      .mikrotiks-page[data-theme="light"] .glassmorphism {
         background: rgba(255, 255, 255, 0.8);
         backdrop-filter: blur(12px);
         border: 1px solid rgba(255, 255, 255, 0.2);
       }
-      .mikrotiks-page .gradient-text {
+      .mikrotiks-page[data-theme="dark"] .glassmorphism {
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .mikrotiks-page[data-theme="light"] .gradient-text {
         background: linear-gradient(135deg, #1f2937 0%, #1e40af 50%, #7c3aed 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
       }
-      .mikrotiks-page .modern-shadow {
+      .mikrotiks-page[data-theme="dark"] .gradient-text {
+        background: linear-gradient(135deg, #f1f5f9 0%, #60a5fa 50%, #a78bfa 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .mikrotiks-page[data-theme="light"] .modern-shadow {
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      }
+      .mikrotiks-page[data-theme="dark"] .modern-shadow {
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
       }
       .mikrotiks-page .hover-lift {
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -201,10 +225,16 @@ const Mikrotiks = () => {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.5; }
       }
+      .mikrotiks-page[data-theme="light"] input::placeholder {
+        color: #9ca3af;
+      }
+      .mikrotiks-page[data-theme="dark"] input::placeholder {
+        color: #64748b;
+      }
     `;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
-  }, []);
+  }, [theme]);
   const [devices, setDevices] = useState([]);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -576,6 +606,7 @@ const Mikrotiks = () => {
       }
 
       const result = await response.json();
+      console.log('Connectivity test result from backend:', result);
       
       // Add result logs
       const resultLogs = [
@@ -943,7 +974,7 @@ const Mikrotiks = () => {
   }
 
   return (
-    <div className="mikrotiks-page">
+    <div className="mikrotiks-page" data-theme={theme}>
       {/* Modern Header with Glassmorphism */}
       <div style={{ position: 'relative', overflow: 'hidden' }}>
         <div style={{ 
@@ -987,7 +1018,7 @@ const Mikrotiks = () => {
                       MikroTik Devices
                     </h1>
                     <p style={{ 
-                      color: '#6b7280', 
+                      color: theme === 'dark' ? '#94a3b8' : '#6b7280', 
                       fontSize: '1.125rem', 
                       fontWeight: '500', 
                       margin: 0 
@@ -1006,27 +1037,27 @@ const Mikrotiks = () => {
                     padding: '0.75rem 1.5rem',
                     fontSize: '0.875rem',
                     fontWeight: '600',
-                    color: '#374151',
-                    background: 'rgba(255, 255, 255, 0.7)',
+                    color: theme === 'dark' ? '#f1f5f9' : '#374151',
+                    background: theme === 'dark' ? 'rgba(15, 23, 42, 0.7)' : 'rgba(255, 255, 255, 0.7)',
                     backdropFilter: 'blur(12px)',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    border: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.3)',
                     borderRadius: '1rem',
                     cursor: 'pointer',
                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                    boxShadow: theme === 'dark' ? '0 10px 25px -5px rgba(0, 0, 0, 0.3)' : '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
                     outline: 'none'
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.background = 'rgba(255, 255, 255, 0.9)';
-                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                    e.target.style.background = theme === 'dark' ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+                    e.target.style.borderColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.5)';
                     e.target.style.transform = 'translateY(-2px)';
-                    e.target.style.boxShadow = '0 20px 40px -10px rgba(0, 0, 0, 0.15)';
+                    e.target.style.boxShadow = theme === 'dark' ? '0 20px 40px -10px rgba(0, 0, 0, 0.4)' : '0 20px 40px -10px rgba(0, 0, 0, 0.15)';
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.background = 'rgba(255, 255, 255, 0.7)';
-                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                    e.target.style.background = theme === 'dark' ? 'rgba(15, 23, 42, 0.7)' : 'rgba(255, 255, 255, 0.7)';
+                    e.target.style.borderColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.3)';
                     e.target.style.transform = 'translateY(0)';
-                    e.target.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.1)';
+                    e.target.style.boxShadow = theme === 'dark' ? '0 10px 25px -5px rgba(0, 0, 0, 0.3)' : '0 10px 25px -5px rgba(0, 0, 0, 0.1)';
                   }}
                   onClick={() => {
                     loadDevices();
@@ -1110,13 +1141,29 @@ const Mikrotiks = () => {
 
       {/* Status Message with Enhanced Hover Effects */}
       {status.message && (
-        <div className={`p-4 rounded-xl border transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
-          status.type === 'error' 
-            ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100 hover:border-red-300' 
+        <div style={{
+          padding: '1rem',
+          borderRadius: '0.75rem',
+          border: '1px solid',
+          transition: 'all 0.3s ease',
+          ...(status.type === 'error' 
+            ? {
+                backgroundColor: theme === 'dark' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(254, 242, 242, 1)',
+                borderColor: theme === 'dark' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(252, 165, 165, 1)',
+                color: theme === 'dark' ? '#fca5a5' : '#b91c1c'
+              }
             : status.type === 'info'
-            ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300'
-            : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300'
-        }`}>
+            ? {
+                backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(239, 246, 255, 1)',
+                borderColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(147, 197, 253, 1)',
+                color: theme === 'dark' ? '#93c5fd' : '#1d4ed8'
+              }
+            : {
+                backgroundColor: theme === 'dark' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(240, 253, 244, 1)',
+                borderColor: theme === 'dark' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(134, 239, 172, 1)',
+                color: theme === 'dark' ? '#86efac' : '#166534'
+              })
+        }}>
           <div className="flex items-center gap-2">
             {status.type === 'success' && (
               <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
@@ -1163,11 +1210,11 @@ const Mikrotiks = () => {
         <div style={{
           position: 'relative',
           backdropFilter: 'blur(12px)',
-          background: 'rgba(255, 255, 255, 0.85)',
-          border: '1px solid rgba(255, 255, 255, 0.4)',
+          background: theme === 'dark' ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+          border: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.4)',
           borderRadius: '1.5rem',
           padding: '1.5rem',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1)'
+          boxShadow: theme === 'dark' ? '0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05)' : '0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1)'
         }}>
           <div style={{
             display: 'flex',
@@ -1225,15 +1272,15 @@ const Mikrotiks = () => {
                     paddingRight: '1rem',
                     paddingTop: '0.875rem',
                     paddingBottom: '0.875rem',
-                    background: 'rgba(255, 255, 255, 0.9)',
+                    background: theme === 'dark' ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)',
                     backdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(255, 255, 255, 0.5)',
+                    border: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.5)',
                     borderRadius: '0.875rem',
                     fontSize: '0.875rem',
                     fontWeight: '500',
-                    color: '#374151',
+                    color: theme === 'dark' ? '#f1f5f9' : '#374151',
                     transition: 'all 0.3s ease',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    boxShadow: theme === 'dark' ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                     outline: 'none'
                   }}
                   onFocus={(e) => {
@@ -1267,7 +1314,7 @@ const Mikrotiks = () => {
                 display: 'block',
                 fontSize: '0.75rem',
                 fontWeight: '700',
-                color: '#374151',
+                color: theme === 'dark' ? '#e2e8f0' : '#374151',
                 textTransform: 'uppercase',
                 letterSpacing: '0.1em',
                 marginBottom: '0.5rem'
@@ -1287,15 +1334,15 @@ const Mikrotiks = () => {
                     paddingRight: '3.5rem',
                     paddingTop: '0.875rem',
                     paddingBottom: '0.875rem',
-                    background: 'rgba(255, 255, 255, 0.9)',
+                    background: theme === 'dark' ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)',
                     backdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(255, 255, 255, 0.5)',
+                    border: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.5)',
                     borderRadius: '0.875rem',
                     fontSize: '0.875rem',
                     fontWeight: '500',
-                    color: '#374151',
+                    color: theme === 'dark' ? '#f1f5f9' : '#374151',
                     transition: 'all 0.3s ease',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    boxShadow: theme === 'dark' ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                     outline: 'none',
                     cursor: 'pointer',
                     appearance: 'none'
@@ -1458,9 +1505,9 @@ const Mikrotiks = () => {
               key={device.id} 
               style={{
                 position: 'relative',
-                background: 'rgba(255, 255, 255, 0.7)',
+                background: theme === 'dark' ? 'rgba(15, 23, 42, 0.7)' : 'rgba(255, 255, 255, 0.7)',
                 backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
+                border: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.3)',
                 borderRadius: '1.5rem',
                 transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
                 overflow: 'hidden',
@@ -1488,7 +1535,7 @@ const Mikrotiks = () => {
               <div style={{
                 position: 'relative',
                 padding: '1rem',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+                borderBottom: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.2)'
               }}>
                 <div style={{
                   display: 'flex',
@@ -1541,15 +1588,15 @@ const Mikrotiks = () => {
                       <h3 style={{
                         fontWeight: 'bold',
                         fontSize: '1.25rem',
-                        color: '#111827',
+                        color: theme === 'dark' ? '#f1f5f9' : '#111827',
                         margin: 0,
                         transition: 'color 0.3s ease'
                       }}>{safeRender(device.name, 'Unknown Device')}</h3>
                       <p style={{
                         fontSize: '0.875rem',
-                        color: '#6b7280',
+                        color: theme === 'dark' ? '#94a3b8' : '#6b7280',
                         fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
-                        backgroundColor: 'rgba(243, 244, 246, 0.5)',
+                        backgroundColor: theme === 'dark' ? 'rgba(30, 41, 59, 0.5)' : 'rgba(243, 244, 246, 0.5)',
                         padding: '0.25rem 0.75rem',
                         borderRadius: '0.5rem',
                         margin: 0

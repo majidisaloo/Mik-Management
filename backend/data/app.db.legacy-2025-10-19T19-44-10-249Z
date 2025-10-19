@@ -1,0 +1,135 @@
+{
+  "lastUserId": 2,
+  "lastRoleId": 1,
+  "lastGroupId": 4,
+  "lastMikrotikId": 1,
+  "lastTunnelId": 0,
+  "lastAddressListId": 0,
+  "lastFirewallFilterId": 0,
+  "lastRouteId": 0,
+  "users": [
+    {
+      "id": 1,
+      "firstName": "Majid",
+      "lastName": "Isaloo",
+      "email": "m@m.com",
+      "passwordHash": "4477d2c490dce1e4aa8c9d3e432157b6:b0131817d5d1ed197c93de8fa9412065fa5506943bd7eae2b12de041659cec0b86c75e5f3a3739c59ac0feaac3eae7fc5a073c07697be7cfed3cab0b73c5bab9",
+      "createdAt": "2025-10-18T15:36:13.593Z",
+      "roles": [
+        1
+      ]
+    },
+    {
+      "id": 2,
+      "firstName": "Admin",
+      "lastName": "User",
+      "email": "admin@example.com",
+      "passwordHash": "$2b$10$81fDlvlB2ZVC009oA0uAJ.J7aQ2sW/FAMregtyjJixTNqH9AI8iZC",
+      "createdAt": "2025-10-19T19:37:17.036Z",
+      "roles": [
+        1
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "id": 1,
+      "name": "Administrator",
+      "permissions": {
+        "dashboard": true,
+        "users": true,
+        "roles": true,
+        "groups": true,
+        "mikrotiks": true,
+        "tunnels": true,
+        "settings": true
+      },
+      "createdAt": "2025-10-18T15:35:34.354Z",
+      "updatedAt": "2025-10-18T15:35:34.354Z"
+    }
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "name": "Mik-Group Root",
+      "parentId": null,
+      "createdAt": "2025-10-18T15:35:34.355Z",
+      "updatedAt": "2025-10-18T15:35:34.355Z"
+    },
+    {
+      "id": 2,
+      "name": "Datacenter",
+      "parentId": 1,
+      "createdAt": "2025-10-18T22:53:35.474Z",
+      "updatedAt": "2025-10-18T22:53:35.474Z"
+    },
+    {
+      "id": 3,
+      "name": "OVH",
+      "parentId": 2,
+      "createdAt": "2025-10-18T22:53:47.050Z",
+      "updatedAt": "2025-10-18T22:53:47.050Z"
+    },
+    {
+      "id": 4,
+      "name": "UK",
+      "parentId": 3,
+      "createdAt": "2025-10-18T22:58:04.813Z",
+      "updatedAt": "2025-10-18T22:58:04.813Z"
+    }
+  ],
+  "mikrotiks": [
+    {
+      "id": 1,
+      "name": "Test1-Iran",
+      "host": "localhost",
+      "groupId": 1,
+      "tags": [],
+      "notes": "",
+      "routeros": {
+        "apiEnabled": false,
+        "apiPort": 8728,
+        "apiSSL": false,
+        "apiUsername": "",
+        "apiPassword": "",
+        "verifyTLS": true,
+        "apiTimeout": 5000,
+        "apiRetries": 1,
+        "allowInsecureCiphers": false,
+        "preferredApiFirst": true,
+        "firmwareVersion": "7.12.1",
+        "sshEnabled": true,
+        "sshPort": 22,
+        "sshUsername": "admin",
+        "sshPassword": "urfDGV822",
+        "sshAcceptNewHostKeys": true,
+        "autoAcceptFingerprints": false
+      },
+      "status": {
+        "updateStatus": "pending",
+        "lastAuditAt": "2025-10-19T13:56:01.106Z"
+      },
+      "connectivity": {
+        "api": {
+          "status": "disabled",
+          "lastCheckedAt": "2025-10-19T19:44:10.247Z",
+          "lastError": null
+        },
+        "ssh": {
+          "status": "offline",
+          "lastCheckedAt": "2025-10-19T19:44:10.247Z",
+          "fingerprint": null,
+          "lastError": "Mock device - no real connection"
+        }
+      },
+      "createdAt": "2025-10-18T23:09:03.867Z",
+      "updatedAt": "2025-10-19T19:44:10.247Z"
+    }
+  ],
+  "tunnels": [],
+  "routes": [],
+  "addressLists": [],
+  "firewallFilters": [],
+  "ipams": [],
+  "lastIpamId": 0
+}
