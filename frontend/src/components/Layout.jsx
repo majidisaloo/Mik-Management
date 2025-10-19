@@ -270,165 +270,96 @@ const Layout = () => {
     <div className={`app-shell${user ? ' app-shell--authed' : ''}`}>
       {/* Only show main header if not on login page */}
       {location.pathname !== '/' && (
-        <header className="fixed top-0 left-0 right-0 z-40 h-16 bg-white/80 backdrop-blur-sm border-b border-white/20 shadow-xl">
-          <div className="h-full px-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <header className="app-header">
+          <div className="app-header-content">
+            <div className="app-header-left">
               {user && (
                 <button
                   type="button"
-                  className="md:hidden w-10 h-10 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center text-gray-600 hover:bg-white/80 hover:text-blue-600 transition-all duration-300"
+                  className="app-mobile-menu-btn"
                   onClick={toggleMobileMenu}
                   aria-label="Toggle menu"
                 >
                   {mobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
                 </button>
               )}
-              <Link to="/" className="flex items-center" aria-label="MikroManage home">
-                <BrandMark />
-              </Link>
+              <Link to="/" className="app-logo" aria-label="MikroManage home">
+          <BrandMark />
+        </Link>
             </div>
-            <div className="flex items-center gap-4">
-              {/* Theme Toggle */}
-              <button
-                type="button"
-                className="w-10 h-10 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center text-gray-600 hover:bg-white/80 hover:text-blue-600 transition-all duration-300"
-                onClick={toggleTheme}
-                aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-              >
-                {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-              </button>
+            <div className="app-header-right">
+              {renderThemeToggle('header')} {/* Always show theme toggle */}
               {user ? (
-                <button
-                  type="button"
-                  className="w-10 h-10 bg-red-50/80 backdrop-blur-sm border border-red-200/50 rounded-2xl flex items-center justify-center text-red-600 hover:bg-red-100/80 hover:text-red-700 transition-all duration-300"
-                  onClick={handleLogout}
-                  aria-label="Sign out"
-                >
-                  <LogoutIcon />
-                </button>
+                <div className="flex items-center gap-2">
+                  {renderLogoutButton('header')}
+                </div>
               ) : (
-                <nav className="flex items-center gap-3">
+                <nav className="app-auth-nav">
                   {meta.registrationOpen && location.pathname !== '/register' && (
-                    <Link 
-                      to="/register" 
-                      className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-semibold rounded-2xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl"
-                    >
+                    <Link to="/register" className="app-register-btn">
                       Register
                     </Link>
                   )}
-                  <Link 
-                    to="/" 
-                    className="px-4 py-2 bg-white/60 backdrop-blur-sm border border-white/30 text-gray-700 text-sm font-semibold rounded-2xl hover:bg-white/80 hover:text-blue-600 transition-all duration-300"
-                  >
-                    Login
+                  {/* Login button always visible when not authenticated */}
+                  <Link to="/" className="app-login-btn">
+                Login
                   </Link>
-                </nav>
-              )}
+            </nav>
+          )}
             </div>
-          </div>
-        </header>
+        </div>
+      </header>
       )}
 
       {user ? (
-        <div className="flex h-screen pt-16">
-          {/* Modern Sidebar with Glassmorphism */}
-          <aside className="w-64 bg-white/80 backdrop-blur-sm border-r border-white/20 shadow-xl flex-shrink-0">
-            <div className="flex flex-col h-full">
-              {/* Modern Navigation */}
-              <div className="flex-1 p-6">
-                {navigation.map((section) => (
-                  <div key={section.label ?? 'primary'} className="mb-8">
+        <div className="app-main-layout">
+          {/* Sidebar - Fixed width */}
+          <aside className="app-sidebar">
+            <div className="app-sidebar-content">
+              <div className="app-sidebar-nav">
+              {navigation.map((section) => (
+                  <div className="app-sidebar-group" key={section.label ?? 'primary'}>
                     {section.label && !sidebarCollapsed && (
-                      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 px-3">
-                        {section.label}
-                      </h3>
+                      <p className="app-sidebar-group-label">{section.label}</p>
                     )}
-                    <div className="space-y-2">
-                      {section.items.map((item) => {
-                        const Icon = item.icon;
-                        return (
-                          <NavLink
-                            key={item.to}
-                            to={item.to}
-                            className={({ isActive }) =>
-                              `group flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-300 ${
-                                isActive
-                                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/30'
-                                  : 'text-gray-700 hover:bg-white/60 hover:text-blue-600 hover:shadow-md'
-                              }`
-                            }
-                            onClick={() => setMobileMenuOpen(false)}
-                          >
-                            <div className={`w-5 h-5 flex items-center justify-center ${
-                              location.pathname === item.to ? 'text-white' : 'text-gray-500 group-hover:text-blue-600'
-                            }`}>
-                              <Icon />
-                            </div>
-                            <span>{item.label}</span>
-                          </NavLink>
-                        );
-                      })}
+                    <div className="space-y-1">
+                  {section.items.map((item) => renderNavEntry(item))}
                     </div>
                   </div>
                 ))}
-              </div>
-              
-              {/* Modern Footer */}
-              <div className="p-6 border-t border-white/20 bg-white/40 backdrop-blur-sm">
-                {/* Theme Toggle */}
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-gray-700 hover:bg-white/60 hover:text-blue-600 transition-all duration-300 mb-3"
-                  onClick={toggleTheme}
-                  aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                >
-                  <div className="w-5 h-5 flex items-center justify-center text-gray-500">
-                    {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-                  </div>
-                  <span>Dark mode</span>
-                </button>
                 
-                {/* Logout Button */}
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-red-600 hover:bg-red-50/80 hover:text-red-700 transition-all duration-300 mb-6"
-                  onClick={handleLogout}
-                  aria-label="Sign out"
-                >
-                  <div className="w-5 h-5 flex items-center justify-center text-red-500">
-                    <LogoutIcon />
-                  </div>
-                  <span>Sign out</span>
-                </button>
-                
-                {/* Version Info */}
-                <div className="text-center space-y-3">
-                  <div className="flex flex-col items-center space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-bold text-gray-800">V {betaVersion.replace(/^v/, '').replace('-beta', '')}</span>
-                      <span className="text-xs px-2 py-1 rounded-full bg-gradient-to-r from-orange-400 to-orange-500 text-white font-bold shadow-lg">
-                        BETA
-                      </span>
+                {/* Theme and Logout buttons */}
+                <div className="app-sidebar-footer">
+                  {renderThemeToggle('sidebar')}
+                  <div className="mt-2">{renderLogoutButton('sidebar')}</div>
+                  <div className="app-sidebar-version">
+                    <div className="flex flex-col items-center space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="app-version-display">V {betaVersion.replace(/^v/, '').replace('-beta', '')}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
+                          BETA
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Stable: V {stableVersion.replace(/^v/, '').replace('-beta', '')}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500 font-medium">
-                      Stable: V {stableVersion.replace(/^v/, '').replace('-beta', '')}
-                    </div>
+                    <button
+                      type="button"
+                      className="app-update-btn"
+                      onClick={() => window.location.href = '/settings?tab=updates'}
+                      aria-label="Check for updates"
+                    >
+                      <UpdateIcon />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300"
-                    onClick={() => window.location.href = '/settings?tab=updates'}
-                    aria-label="Check for updates"
-                  >
-                    <UpdateIcon />
-                  </button>
                 </div>
               </div>
             </div>
           </aside>
           
           {/* Main Content - Takes remaining space */}
-          <main className="flex-1 overflow-y-auto bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+          <main className="app-main-content">
             <Outlet />
           </main>
         </div>
@@ -442,99 +373,48 @@ const Layout = () => {
       {mobileMenuOpen && (
         <>
           <div
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+            className="app-mobile-sidebar-overlay app-mobile-sidebar-overlay--open"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-white/95 backdrop-blur-md border-r border-white/20 shadow-2xl">
-            <div className="flex flex-col h-full">
-              {/* Modern Mobile Navigation */}
-              <div className="flex-1 p-6">
+          <aside className="app-mobile-sidebar app-mobile-sidebar--open">
+            <div className="app-sidebar-content">
+              <div className="app-sidebar-nav">
                 {navigation.map((section) => (
-                  <div key={section.label ?? 'primary'} className="mb-8">
+                  <div className="app-sidebar-group" key={section.label ?? 'primary'}>
                     {section.label && !sidebarCollapsed && (
-                      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 px-3">
-                        {section.label}
-                      </h3>
+                      <p className="app-sidebar-group-label">{section.label}</p>
                     )}
-                    <div className="space-y-2">
-                      {section.items.map((item) => {
-                        const Icon = item.icon;
-                        return (
-                          <NavLink
-                            key={item.to}
-                            to={item.to}
-                            className={({ isActive }) =>
-                              `group flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-300 ${
-                                isActive
-                                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/30'
-                                  : 'text-gray-700 hover:bg-white/60 hover:text-blue-600 hover:shadow-md'
-                              }`
-                            }
-                            onClick={() => setMobileMenuOpen(false)}
-                          >
-                            <div className={`w-5 h-5 flex items-center justify-center ${
-                              location.pathname === item.to ? 'text-white' : 'text-gray-500 group-hover:text-blue-600'
-                            }`}>
-                              <Icon />
-                            </div>
-                            <span>{item.label}</span>
-                          </NavLink>
-                        );
-                      })}
+                    <div className="space-y-1">
+                      {section.items.map((item) => renderNavEntry(item))}
                     </div>
                   </div>
                 ))}
-              </div>
-              
-              {/* Modern Mobile Footer */}
-              <div className="p-6 border-t border-white/20 bg-white/40 backdrop-blur-sm">
-                {/* Theme Toggle */}
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-gray-700 hover:bg-white/60 hover:text-blue-600 transition-all duration-300 mb-3"
-                  onClick={toggleTheme}
-                  aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                >
-                  <div className="w-5 h-5 flex items-center justify-center text-gray-500">
-                    {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-                  </div>
-                  <span>Dark mode</span>
-                </button>
                 
-                {/* Logout Button */}
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-red-600 hover:bg-red-50/80 hover:text-red-700 transition-all duration-300 mb-6"
-                  onClick={handleLogout}
-                  aria-label="Sign out"
-                >
-                  <div className="w-5 h-5 flex items-center justify-center text-red-500">
-                    <LogoutIcon />
-                  </div>
-                  <span>Sign out</span>
-                </button>
-                
-                {/* Version Info */}
-                <div className="text-center space-y-3">
-                  <div className="flex flex-col items-center space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-bold text-gray-800">V {betaVersion.replace(/^v/, '').replace('-beta', '')}</span>
-                      <span className="text-xs px-2 py-1 rounded-full bg-gradient-to-r from-orange-400 to-orange-500 text-white font-bold shadow-lg">
-                        BETA
-                      </span>
+                {/* Theme and Logout buttons */}
+                <div className="app-sidebar-footer">
+                  {renderThemeToggle('sidebar')}
+                  <div className="mt-2">{renderLogoutButton('sidebar')}</div>
+                  <div className="app-sidebar-version">
+                    <div className="flex flex-col items-center space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="app-version-display">V {betaVersion.replace(/^v/, '').replace('-beta', '')}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
+                          BETA
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Stable: V {stableVersion.replace(/^v/, '').replace('-beta', '')}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500 font-medium">
-                      Stable: V {stableVersion.replace(/^v/, '').replace('-beta', '')}
-                    </div>
+                    <button
+                      type="button"
+                      className="app-update-btn"
+                      onClick={() => window.location.href = '/settings?tab=updates'}
+                      aria-label="Check for updates"
+                    >
+                      <UpdateIcon />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300"
-                    onClick={() => window.location.href = '/settings?tab=updates'}
-                    aria-label="Check for updates"
-                  >
-                    <UpdateIcon />
-                  </button>
                 </div>
               </div>
             </div>
