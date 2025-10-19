@@ -932,18 +932,37 @@ const parsePingLatency = (output) => {
     return null;
   }
 
-  const linuxMatch = output.match(/=\s*([^/]+)\/([^/]+)\/([^/]+)\/([^/\s]+)\s*ms/);
-  if (linuxMatch && linuxMatch[2]) {
-    const parsed = Number.parseFloat(linuxMatch[2]);
+  console.log('Parsing ping output:', output);
+
+  // Linux/macOS pattern: time=1.234ms or time<1ms
+  const linuxMatch = output.match(/time[<=]\s*([0-9.]+)ms/i);
+  if (linuxMatch && linuxMatch[1]) {
+    const parsed = Number.parseFloat(linuxMatch[1]);
     return Number.isFinite(parsed) ? parsed : null;
   }
 
+  // Linux/macOS pattern: = 1.234/2.345/3.456/4.567 ms
+  const linuxStatsMatch = output.match(/=\s*([^/]+)\/([^/]+)\/([^/]+)\/([^/\s]+)\s*ms/);
+  if (linuxStatsMatch && linuxStatsMatch[2]) {
+    const parsed = Number.parseFloat(linuxStatsMatch[2]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  // Windows pattern: Average = 1.234ms
   const winMatch = output.match(/Average =\s*([0-9.]+)ms/i);
   if (winMatch && winMatch[1]) {
     const parsed = Number.parseFloat(winMatch[1]);
     return Number.isFinite(parsed) ? parsed : null;
   }
 
+  // Generic pattern: any number followed by ms
+  const genericMatch = output.match(/([0-9.]+)\s*ms/i);
+  if (genericMatch && genericMatch[1]) {
+    const parsed = Number.parseFloat(genericMatch[1]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  console.log('No latency pattern matched');
   return null;
 };
 
