@@ -3354,32 +3354,69 @@ const bootstrap = async () => {
       }
 
       try {
-        const command = process.platform === 'win32' ? 'ping' : 'ping';
-        const args = process.platform === 'win32'
-          ? ['-n', '1', host]
-          : ['-c', '1', '-W', '2', host];
+        // Detect if host is IPv6
+        const isIPv6 = host.includes(':');
         
-        const outcome = await runProcess(command, args, {
-          timeout: 5000
+        let command, args;
+        
+        if (process.platform === 'win32') {
+          command = 'ping';
+          args = isIPv6 ? ['-6', '-n', '1', host] : ['-4', '-n', '1', host];
+        } else {
+          // macOS and Linux
+          if (isIPv6) {
+            // For macOS, IPv6 ping is not well supported, return error
+            if (process.platform === 'darwin') {
+              throw new Error('IPv6 ping is not supported on macOS. Please use IPv4 addresses.');
+            }
+            // Try ping6 command first, fallback to ping -6
+            command = 'ping6';
+            args = ['-c', '1', '-W', '2', host];
+          } else {
+            command = 'ping';
+            args = ['-c', '1', '-W', '2', host];
+          }
+        }
+        
+        console.log(`Ping command: ${command} ${args.join(' ')}`);
+        
+        let outcome = await runProcess(command, args, {
+          timeout: 10000
         });
         
+        // If ping6 fails and it's IPv6, try fallback to ping -6
+        if (!outcome.success && isIPv6 && command === 'ping6') {
+          console.log('ping6 failed, trying ping -6 fallback');
+          command = 'ping';
+          args = ['-6', '-c', '1', '-W', '2', host];
+          outcome = await runProcess(command, args, {
+            timeout: 10000
+          });
+        }
+        
         const output = (outcome.stdout || outcome.stderr || '').trim();
+        console.log('Ping output:', output);
+        
         const latencyMs = parsePingLatency(output);
         
         const result = {
           success: Boolean(outcome.success),
           time: latencyMs ? `${latencyMs}ms` : 'N/A',
           latencyMs: latencyMs ?? null,
-          output: output
+          output: output,
+          command: `${command} ${args.join(' ')}`,
+          isIPv6: isIPv6
         };
 
         sendJson(res, 200, result);
       } catch (error) {
         console.error('Simple ping error', error);
-        sendJson(res, 500, { 
+        sendJson(res, 200, { 
           success: false, 
           time: 'N/A', 
-          error: 'Ping failed' 
+          error: error.message || 'Ping failed',
+          command: command ? `${command} ${args.join(' ')}` : 'unknown',
+          isIPv6: isIPv6
         });
       }
     };
