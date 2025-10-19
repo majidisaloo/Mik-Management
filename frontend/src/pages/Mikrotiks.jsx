@@ -584,7 +584,7 @@ const Mikrotiks = () => {
         `🔗 API Status: ${result.mikrotik?.routeros?.apiEnabled ? 'Enabled' : 'Disabled'}`,
         `🔐 SSH Status: ${result.mikrotik?.routeros?.sshEnabled ? 'Enabled' : 'Disabled'}`,
         `📡 Firmware: ${result.mikrotik?.routeros?.firmwareVersion || 'Not detected'}`,
-        `📝 Details: ${result.mikrotik?.routeros?.sshOutput || 'No details available'}`
+        `📝 Details: ${result.message || 'No details available'}`
       ];
       
       setConnectivityPopup(prev => ({

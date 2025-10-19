@@ -3224,6 +3224,62 @@ const initializeDatabase = async (databasePath) => {
                   console.log(`❌ HTTP endpoint ${endpoint.protocol}:${endpoint.port} failed: ${error.message}`);
                 }
               }
+              
+              // If HTTP/HTTPS failed, try to get firmware version via SSH command
+              if (!firmwareVersion) {
+                console.log(`🔍 HTTP/HTTPS failed, trying SSH command for firmware version...`);
+                try {
+                  const { spawn } = await import('child_process');
+                  
+                  const sshCommand = spawn('ssh', [
+                    '-o', 'ConnectTimeout=10',
+                    '-o', 'StrictHostKeyChecking=no',
+                    '-o', 'UserKnownHostsFile=/dev/null',
+                    '-o', 'LogLevel=ERROR',
+                    `${routerosBaseline.sshUsername || 'admin'}@${host}`,
+                    '/system resource print'
+                  ], {
+                    timeout: 15000
+                  });
+                  
+                  let sshOutput = '';
+                  let sshError = '';
+                  
+                  sshCommand.stdout.on('data', (data) => {
+                    sshOutput += data.toString();
+                  });
+                  
+                  sshCommand.stderr.on('data', (data) => {
+                    sshError += data.toString();
+                  });
+                  
+                  await new Promise((resolve, reject) => {
+                    sshCommand.on('close', (code) => {
+                      if (code === 0) {
+                        resolve();
+                      } else {
+                        reject(new Error(`SSH command failed with code ${code}: ${sshError}`));
+                      }
+                    });
+                    
+                    sshCommand.on('error', (error) => {
+                      reject(error);
+                    });
+                  });
+                  
+                  // Parse firmware version from SSH output
+                  const versionMatch = sshOutput.match(/version:\s*([^\s\n]+)/i);
+                  if (versionMatch && versionMatch[1]) {
+                    firmwareVersion = versionMatch[1];
+                    console.log(`✅ Firmware version detected via SSH: ${firmwareVersion}`);
+                  } else {
+                    console.log(`❌ Could not parse firmware version from SSH output: ${sshOutput}`);
+                  }
+                  
+                } catch (error) {
+                  console.log(`❌ SSH command failed: ${error.message}`);
+                }
+              }
             }
           } else {
             sshStatus = 'offline';
