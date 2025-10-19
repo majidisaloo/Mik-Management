@@ -968,7 +968,7 @@ const Mikrotiks = () => {
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <div className="w-4 h-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded flex items-center justify-center group-focus-within:scale-110 transition-transform duration-300">
-                    <svg className="h-2.5 w-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg style={{ height: '0.625rem', width: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                   </div>
@@ -1006,7 +1006,7 @@ const Mikrotiks = () => {
               </select>
                 <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
                 <div className="w-4 h-4 bg-gradient-to-br from-purple-500 to-indigo-600 rounded flex items-center justify-center">
-                  <svg className="h-2.5 w-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg style={{ height: '0.625rem', width: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
@@ -1610,7 +1610,7 @@ const Mikrotiks = () => {
           <div className="relative backdrop-blur-sm bg-white/60 border border-white/30 rounded-3xl p-16 text-center shadow-xl">
             <div className="mx-auto w-32 h-32 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full flex items-center justify-center mb-8 relative">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full animate-pulse"></div>
-              <svg className="w-12 h-12 text-gray-400 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg style={{ width: '3rem', height: '3rem', color: '#9ca3af', position: 'relative', zIndex: 10 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </div>
@@ -1630,7 +1630,7 @@ const Mikrotiks = () => {
                 onClick={handleNewDevice}
               >
                 <div className="w-4 h-4 bg-white/20 rounded flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                  <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg style={{ width: '0.625rem', height: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
                 </div>
@@ -1647,7 +1647,7 @@ const Mikrotiks = () => {
                 }}
               >
                 <div className="w-4 h-4 bg-gradient-to-br from-gray-500 to-gray-600 rounded flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                  <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg style={{ width: '0.625rem', height: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </div>
