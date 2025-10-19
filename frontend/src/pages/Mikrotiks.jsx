@@ -644,7 +644,7 @@ const Mikrotiks = () => {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            className="btn btn--ghost"
+            className="btn btn--ghost hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 hover:scale-105"
             onClick={() => {
               loadDevices();
               setStatus({ type: 'success', message: 'Data refreshed successfully!' });
@@ -652,15 +652,19 @@ const Mikrotiks = () => {
             }}
             title="Refresh data"
           >
-            <RefreshIcon />
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
             Refresh
           </button>
           <button
             type="button"
-            className="btn btn--primary"
+            className="btn btn--primary hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl"
             onClick={handleNewDevice}
           >
-            <PlusIcon />
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
             Add Device
           </button>
         </div>
@@ -782,23 +786,29 @@ const Mikrotiks = () => {
                   <div className="flex items-center gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
-                      className="p-1 text-tertiary hover:text-primary hover:bg-primary-50 rounded transition-colors"
+                      className="p-2 text-tertiary hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 hover:scale-110"
                       onClick={() => handleEdit(device)}
                       title="Edit Device"
                     >
-                      <EditIcon />
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
                     </button>
                     <button
                       type="button"
-                      className="p-1 text-tertiary hover:text-green-600 hover:bg-green-50 rounded transition-colors group relative"
+                      className="p-2 text-tertiary hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-200 hover:scale-110 group relative"
                       onClick={() => handleTestConnectivity(device)}
                       disabled={testingDevice === device.id}
                       title="Test Connection - Click to refresh connectivity status"
                     >
                       {testingDevice === device.id ? (
-                        <RefreshIcon className="animate-spin" />
+                        <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
                       ) : (
-                        <TestIcon />
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
                       )}
                       {/* Enhanced hover tooltip */}
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20 pointer-events-none">
@@ -808,11 +818,13 @@ const Mikrotiks = () => {
                     </button>
                     <button
                       type="button"
-                      className="p-1 text-tertiary hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                      className="p-2 text-tertiary hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 hover:scale-110"
                       onClick={() => handleDelete(device)}
                       title="Delete Device"
                     >
-                      <TrashIcon />
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
                     </button>
                   </div>
                 </div>
