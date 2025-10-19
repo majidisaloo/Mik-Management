@@ -531,7 +531,11 @@ const Mikrotiks = () => {
   const handleTestPing = async (device) => {
     console.log('Testing ping for device:', device.name, 'Host:', device.host);
     try {
-      const pingResult = await pingService.pingHost(device.host);
+      // Use IP address for ping instead of hostname
+      const pingTarget = device.host.includes('.') ? device.host : device.host;
+      console.log('Ping target:', pingTarget);
+      
+      const pingResult = await pingService.pingHost(pingTarget);
       console.log('Ping result:', pingResult);
       // Force re-render to show updated ping result
       setTestingDevice(prev => prev === device.id ? null : device.id);
@@ -1040,7 +1044,7 @@ const Mikrotiks = () => {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by name, host, or tags..."
+                  placeholder="Search devices by name, IP address, or tags..."
                   style={{
                     width: '100%',
                     paddingLeft: '3.5rem',
@@ -1068,8 +1072,16 @@ const Mikrotiks = () => {
                     e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
                     e.target.style.transform = 'translateY(0)';
                   }}
-              />
+                />
+                <div style={{
+                  marginTop: '0.5rem',
+                  fontSize: '0.75rem',
+                  color: '#6b7280',
+                  fontStyle: 'italic'
+                }}>
+                  💡 Tip: Search by device name, IP address (192.168.1.1), or tags
         </div>
+              </div>
             </div>
 
             {/* Group Filter */}
@@ -1150,12 +1162,65 @@ const Mikrotiks = () => {
                   <svg style={{ width: '0.75rem', height: '0.75rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                   </svg>
-                </div>
-              </div>
           </div>
       </div>
+              <div style={{
+                marginTop: '0.5rem',
+                fontSize: '0.75rem',
+                color: '#6b7280',
+                fontStyle: 'italic'
+              }}>
+                🏷️ Filter devices by group category
           </div>
         </div>
+
+            {/* Clear Filters Button */}
+            {(searchTerm || filterGroup) && (
+              <div style={{
+                flex: '0 0 auto',
+                display: 'flex',
+                alignItems: 'flex-end'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setFilterGroup('');
+                  }}
+                  style={{
+                    padding: '0.875rem 1.5rem',
+                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.875rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.transform = 'translateY(-1px)';
+                    e.target.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+                  }}
+                >
+                  <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Clear Filters
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Modern Devices Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6">
@@ -1179,8 +1244,11 @@ const Mikrotiks = () => {
           
           // Calculate ping time - use real ping result if available, otherwise simulate
           const getPingTime = () => {
+            // Use IP address for ping cache lookup
+            const pingTarget = device.host.includes('.') ? device.host : device.host;
+            
             // Check if we have real ping result for this device from ping service
-            const cachedResult = pingService.getCachedResult(device.host);
+            const cachedResult = pingService.getCachedResult(pingTarget);
             if (cachedResult) {
               if (cachedResult.success) {
                 return cachedResult.time || 'N/A';
