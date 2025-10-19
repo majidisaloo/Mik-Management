@@ -3325,6 +3325,46 @@ const bootstrap = async () => {
       }
     };
 
+    const handleSimplePing = async () => {
+      const body = await parseJsonBody(req);
+      const host = body?.host;
+      
+      if (!host) {
+        sendJson(res, 400, { message: 'Host address is required.' });
+        return;
+      }
+
+      try {
+        const command = process.platform === 'win32' ? 'ping' : 'ping';
+        const args = process.platform === 'win32'
+          ? ['-n', '1', host]
+          : ['-c', '1', '-W', '2', host];
+        
+        const outcome = await runProcess(command, args, {
+          timeout: 5000
+        });
+        
+        const output = (outcome.stdout || outcome.stderr || '').trim();
+        const latencyMs = parsePingLatency(output);
+        
+        const result = {
+          success: Boolean(outcome.success),
+          time: latencyMs ? `${latencyMs}ms` : 'N/A',
+          latencyMs: latencyMs ?? null,
+          output: output
+        };
+
+        sendJson(res, 200, result);
+      } catch (error) {
+        console.error('Simple ping error', error);
+        sendJson(res, 500, { 
+          success: false, 
+          time: 'N/A', 
+          error: 'Ping failed' 
+        });
+      }
+    };
+
     const handleTracerouteDiagnostics = async () => {
       const body = await parseJsonBody(req);
       const targets = sanitizeDiagnosticTargets(body?.targets ?? body?.addresses ?? []);
@@ -3895,6 +3935,12 @@ const bootstrap = async () => {
 
       if (method === 'POST' && (canonicalPath === '/api/tools/ping' || resourcePath === '/tools/ping')) {
         await handlePingDiagnostics();
+        return;
+      }
+
+      // Simple ping endpoint for device ping testing
+      if (method === 'POST' && (canonicalPath === '/api/ping' || resourcePath === '/ping')) {
+        await handleSimplePing();
         return;
       }
 

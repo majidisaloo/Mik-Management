@@ -229,6 +229,7 @@ const Mikrotiks = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGroup, setFilterGroup] = useState('');
   const [testingDevice, setTestingDevice] = useState(null);
+  const [pingResults, setPingResults] = useState({});
   const [expandedGroups, setExpandedGroups] = useState(() => {
     try {
       const saved = sessionStorage.getItem('mikrotiks-groups-expanded');
@@ -524,6 +525,36 @@ const Mikrotiks = () => {
     } finally {
       setTestingDevice(null);
     }
+  };
+
+  // Real ping function using system ping
+  const performRealPing = async (host) => {
+    try {
+      const response = await fetch('/api/ping', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        return result;
+      } else {
+        return { success: false, time: 'N/A', error: 'Ping failed' };
+      }
+    } catch (error) {
+      console.error('Ping error:', error);
+      return { success: false, time: 'N/A', error: 'Network error' };
+    }
+  };
+
+  // Test ping for a device
+  const handleTestPing = async (device) => {
+    const pingResult = await performRealPing(device.host);
+    setPingResults(prev => ({
+      ...prev,
+      [device.id]: pingResult
+    }));
   };
 
   const handleSSHConnection = async (device) => {
@@ -1034,8 +1065,19 @@ const Mikrotiks = () => {
           // Determine ping status based on any successful connection
           const pingStatus = (apiConnected || actualSshConnected) ? 'up' : 'down';
           
-          // Calculate ping time (simplified - in real implementation, this would be actual ping measurement)
+          // Calculate ping time - use real ping result if available, otherwise simulate
           const getPingTime = () => {
+            // Check if we have real ping result for this device
+            if (pingResults[device.id]) {
+              const result = pingResults[device.id];
+              if (result.success) {
+                return result.time || 'N/A';
+              } else {
+                return 'N/A';
+              }
+            }
+            
+            // Fallback to simulated ping based on connection status
             if (pingStatus === 'up') {
               // Simulate ping time based on connection type
               if (apiConnected && actualSshConnected) {
@@ -1190,8 +1232,8 @@ const Mikrotiks = () => {
                       aria-label={`Edit device ${device.name}`}
                     >
                       <div style={{
-                        width: '1rem',
-                        height: '1rem',
+                        width: '1.5rem',
+                        height: '1.5rem',
                         background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                         borderRadius: '0.25rem',
                         display: 'flex',
@@ -1199,7 +1241,7 @@ const Mikrotiks = () => {
                         justifyContent: 'center',
                         transition: 'transform 0.3s ease'
                       }}>
-                        <svg style={{ width: '0.625rem', height: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg style={{ width: '0.875rem', height: '0.875rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </div>
@@ -1239,8 +1281,8 @@ const Mikrotiks = () => {
                       aria-label={`Test connection for device ${device.name}`}
                     >
                       <div style={{
-                        width: '1rem',
-                        height: '1rem',
+                        width: '1.5rem',
+                        height: '1.5rem',
                         background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         borderRadius: '0.25rem',
                         display: 'flex',
@@ -1253,7 +1295,7 @@ const Mikrotiks = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                           </svg>
                       ) : (
-                          <svg style={{ width: '0.625rem', height: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg style={{ width: '0.875rem', height: '0.875rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
                           </svg>
                       )}
@@ -1288,8 +1330,8 @@ const Mikrotiks = () => {
                       aria-label={`View details for device ${device.name}`}
                     >
                       <div style={{
-                        width: '1rem',
-                        height: '1rem',
+                        width: '1.5rem',
+                        height: '1.5rem',
                         background: 'linear-gradient(135deg, #8b5cf6 0%, #4f46e5 100%)',
                         borderRadius: '0.25rem',
                         display: 'flex',
@@ -1297,7 +1339,7 @@ const Mikrotiks = () => {
                         justifyContent: 'center',
                         transition: 'transform 0.3s ease'
                       }}>
-                        <svg style={{ width: '0.625rem', height: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg style={{ width: '0.875rem', height: '0.875rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         </svg>
@@ -1327,13 +1369,56 @@ const Mikrotiks = () => {
                         e.target.style.transform = 'scale(1)';
                         e.target.style.boxShadow = 'none';
                       }}
+                      onClick={() => handleTestPing(device)}
+                      title="Test Ping"
+                      aria-label={`Test ping for device ${device.name}`}
+                    >
+                      <div style={{
+                        width: '1.5rem',
+                        height: '1.5rem',
+                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                        borderRadius: '0.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'transform 0.3s ease'
+                      }}>
+                        <svg style={{ width: '0.875rem', height: '0.875rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      style={{
+                        padding: '0.375rem',
+                        color: '#6b7280',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: '0.375rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        outline: 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.color = '#ef4444';
+                        e.target.style.backgroundColor = '#fef2f2';
+                        e.target.style.transform = 'scale(1.1)';
+                        e.target.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.color = '#6b7280';
+                        e.target.style.backgroundColor = 'transparent';
+                        e.target.style.transform = 'scale(1)';
+                        e.target.style.boxShadow = 'none';
+                      }}
                       onClick={() => handleDelete(device)}
                       title="Delete Device"
                       aria-label={`Delete device ${device.name}`}
                     >
                       <div style={{
-                        width: '1rem',
-                        height: '1rem',
+                        width: '1.5rem',
+                        height: '1.5rem',
                         background: 'linear-gradient(135deg, #ef4444 0%, #ec4899 100%)',
                         borderRadius: '0.25rem',
                         display: 'flex',
@@ -1341,7 +1426,7 @@ const Mikrotiks = () => {
                         justifyContent: 'center',
                         transition: 'transform 0.3s ease'
                       }}>
-                        <svg style={{ width: '0.625rem', height: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg style={{ width: '0.875rem', height: '0.875rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </div>
