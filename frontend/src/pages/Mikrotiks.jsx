@@ -758,7 +758,7 @@ const Mikrotiks = () => {
           const sshConnected = device.connectivity?.ssh?.status === 'up' || device.connectivity?.ssh?.status === 'connected' || device.connectivity?.ssh?.status === 'online';
           
           // Override SSH status if it's explicitly offline or if SSH is disabled on the device
-          const actualSshConnected = (device.connectivity?.ssh?.status === 'offline' || !device.routeros?.sshEnabled) ? false : sshConnected;
+          const actualSshConnected = (device.connectivity?.ssh?.status === 'offline' || device.connectivity?.ssh?.status === 'disabled' || !device.routeros?.sshEnabled) ? false : sshConnected;
           
           // Determine ping status based on any successful connection
           const pingStatus = (apiConnected || actualSshConnected) ? 'up' : 'down';
@@ -869,7 +869,7 @@ const Mikrotiks = () => {
                     
                     {/* SSH Status - show if configured or enabled */}
                     {(sshConfigured || device.routeros?.sshEnabled) && (
-                      <div className="flex items-center gap-1 group cursor-help" title={`SSH: ${!device.routeros?.sshEnabled ? 'Disabled on device' : actualSshConnected ? 'Connected' : 'Disconnected'}`}>
+                      <div className="flex items-center gap-1 group cursor-help" title={`SSH: ${!device.routeros?.sshEnabled ? 'Disabled on device' : actualSshConnected ? 'Connected' : device.connectivity?.ssh?.status === 'offline' ? 'Offline (Connection refused)' : 'Disconnected'}`}>
                         <div className={`w-2 h-2 rounded-full transition-colors ${
                           !device.routeros?.sshEnabled 
                             ? 'bg-gray-400 group-hover:bg-gray-300'
