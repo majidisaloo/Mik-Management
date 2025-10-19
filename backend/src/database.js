@@ -2945,7 +2945,7 @@ const initializeDatabase = async (databasePath) => {
             },
             {
               name: 'EoipV6-Majid',
-              type: 'eoip',
+              type: 'eoipv6',
               macAddress: '00:11:22:33:44:58',
               arp: 'enabled',
               mtu: '1500',
@@ -2955,7 +2955,7 @@ const initializeDatabase = async (databasePath) => {
             },
             {
               name: 'GreV6-Majid',
-              type: 'gre',
+              type: 'grev6',
               macAddress: '00:11:22:33:44:59',
               arp: 'enabled',
               mtu: '1500',
@@ -2965,7 +2965,7 @@ const initializeDatabase = async (databasePath) => {
             },
             {
               name: 'ipipv6-tunnel1',
-              type: 'ipip',
+              type: 'ipipv6',
               macAddress: '00:11:22:33:44:60',
               arp: 'enabled',
               mtu: '1500',
@@ -5284,20 +5284,43 @@ async function addMikrotikIpAddress(deviceId, ipData) {
       };
     }
 
-    // Mock adding IP address
     console.log(`Adding IP address ${ipData.address} to device ${deviceId}`);
     
-    // Simulate API call to MikroTik
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Read current database
+    const databaseFile = resolveDatabaseFile('./data/app.db');
+    const state = await readDatabase(databaseFile);
     
+    // Find the device in the database
+    const deviceIndex = state.mikrotiks.findIndex(m => m.id === deviceId);
+    if (deviceIndex === -1) {
+      return {
+        success: false,
+        reason: 'not-found',
+        message: 'Device not found in database'
+      };
+    }
+
+    // Create new IP address entry
     const newIpAddress = {
       address: ipData.address,
-      network: ipData.network,
+      network: ipData.network || '',
       interface: ipData.interface,
       disabled: false,
       comment: ipData.comment || '',
       type: 'static'
     };
+
+    // Add to device's IP addresses
+    if (!state.mikrotiks[deviceIndex].routeros.ipAddresses) {
+      state.mikrotiks[deviceIndex].routeros.ipAddresses = [];
+    }
+    
+    state.mikrotiks[deviceIndex].routeros.ipAddresses.push(newIpAddress);
+    
+    // Save updated database
+    await writeDatabase(databaseFile, state);
+    
+    console.log(`IP address ${ipData.address} added successfully to device ${deviceId}`);
     
     return {
       success: true,

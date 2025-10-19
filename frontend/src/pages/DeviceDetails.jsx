@@ -119,9 +119,21 @@ const DeviceDetails = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [interfaces, setInterfaces] = useState([]);
   const [showAddIpModal, setShowAddIpModal] = useState(false);
+  const [formData, setFormData] = useState({
+    enabled: true,
+    comment: '',
+    address: '',
+    network: '',
+    networkEnabled: false,
+    interface: ''
+  });
   const [showAddInterfaceModal, setShowAddInterfaceModal] = useState(false);
   const [showAddRouteModal, setShowAddRouteModal] = useState(false);
   const [showAddFirewallModal, setShowAddFirewallModal] = useState(false);
+  const [showEditFirewallModal, setShowEditFirewallModal] = useState(false);
+  const [editingFirewallRule, setEditingFirewallRule] = useState(null);
+  const [showEditInterfaceModal, setShowEditInterfaceModal] = useState(false);
+  const [editingInterface, setEditingInterface] = useState(null);
   const [ipAddresses, setIpAddresses] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [firewallRules, setFirewallRules] = useState([]);
@@ -228,6 +240,21 @@ const DeviceDetails = () => {
       console.log('Initial device data:', payload);
       console.log('API Output:', payload.routeros?.apiOutput);
       setDevice(payload);
+      
+      // Load interfaces immediately after device is loaded
+      if (payload) {
+        console.log('Loading interfaces for device...');
+        try {
+          const interfacesResponse = await fetch(`/api/mikrotiks/${id}/interfaces`);
+          if (interfacesResponse.ok) {
+            const interfacesResult = await interfacesResponse.json();
+            setInterfaces(interfacesResult.interfaces || []);
+            console.log('Interfaces loaded:', interfacesResult.interfaces);
+          }
+        } catch (interfacesErr) {
+          console.log('Failed to load interfaces:', interfacesErr);
+        }
+      }
       
       // Auto-test connection to get fresh data (always run)
       if (payload) {
@@ -2650,7 +2677,8 @@ const DeviceDetails = () => {
                         }}>
                           <button
                             onClick={() => {
-                              alert('Edit Interface functionality will be implemented');
+                              setEditingInterface(iface);
+                              setShowEditInterfaceModal(true);
                             }}
                             style={{
                               display: 'inline-flex',
@@ -3050,30 +3078,36 @@ const DeviceDetails = () => {
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       <input
                         type="text"
-                        disabled
+                        disabled={!formData.networkEnabled}
+                        value={formData.network || ''}
+                        onChange={(e) => setFormData({...formData, network: e.target.value})}
                         style={{
                           flex: 1,
                           padding: '4px 8px',
                           border: '1px solid #ced4da',
                           borderRadius: '2px',
                           fontSize: '13px',
-                          backgroundColor: '#f8f9fa',
-                          color: '#6c757d'
+                          backgroundColor: formData.networkEnabled ? 'white' : '#f8f9fa',
+                          color: formData.networkEnabled ? '#495057' : '#6c757d'
                         }}
                       />
                       <input
                         type="checkbox"
+                        checked={formData.networkEnabled}
+                        onChange={(e) => setFormData({...formData, networkEnabled: e.target.checked})}
                         style={{
                           marginLeft: '8px',
                           width: '16px',
                           height: '16px'
                         }}
                       />
-                      <span style={{
-                        marginLeft: '4px',
-                        fontSize: '12px',
-                        color: '#495057'
-                      }}>+</span>
+                      {!formData.networkEnabled && (
+                        <span style={{
+                          marginLeft: '4px',
+                          fontSize: '12px',
+                          color: '#495057'
+                        }}>+</span>
+                      )}
                     </div>
                   </div>
 
@@ -3569,9 +3603,66 @@ const DeviceDetails = () => {
                     }}
                   >
                     <option value="">Select Interface</option>
-                    <option value="ether1">ether1</option>
-                    <option value="ether2">ether2</option>
-                    <option value="bridge">bridge</option>
+                    {interfaces.map((iface) => (
+                      <option key={iface.name} value={iface.name}>
+                        {iface.name} ({iface.comment || iface.type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#111827',
+                    marginBottom: '0.5rem'
+                  }}>Distance</label>
+                  <input
+                    type="number"
+                    placeholder="1"
+                    min="0"
+                    max="255"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      backgroundColor: 'white',
+                      color: '#111827',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#111827',
+                    marginBottom: '0.5rem'
+                  }}>Mark Route</label>
+                  <select
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      backgroundColor: 'white',
+                      color: '#111827',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    <option value="">Select Mark Route</option>
+                    <option value="main">main</option>
+                    <option value="Majid-VPN">Majid-VPN</option>
+                    <option value="Office">Office</option>
+                    <option value="test">test</option>
+                    <option value="vpn">vpn</option>
+                    <option value="backup">backup</option>
+                    <option value="load-balance">load-balance</option>
                   </select>
                 </div>
 
@@ -4023,7 +4114,9 @@ const DeviceDetails = () => {
               borderRadius: '1rem',
               padding: '2rem',
               width: '90%',
-              maxWidth: '500px',
+              maxWidth: '600px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
               border: '2px solid orange'
             }}>
@@ -4104,6 +4197,125 @@ const DeviceDetails = () => {
                   <input
                     type="text"
                     placeholder="192.168.1.0/24"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      backgroundColor: 'white',
+                      color: '#111827',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#111827',
+                    marginBottom: '0.5rem'
+                  }}>Source Address List</label>
+                  <input
+                    type="text"
+                    placeholder="src-list"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      backgroundColor: 'white',
+                      color: '#111827',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#111827',
+                    marginBottom: '0.5rem'
+                  }}>Destination Address</label>
+                  <input
+                    type="text"
+                    placeholder="10.0.0.0/8"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      backgroundColor: 'white',
+                      color: '#111827',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#111827',
+                    marginBottom: '0.5rem'
+                  }}>Destination Address List</label>
+                  <input
+                    type="text"
+                    placeholder="dst-list"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      backgroundColor: 'white',
+                      color: '#111827',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#111827',
+                    marginBottom: '0.5rem'
+                  }}>Protocol</label>
+                  <select
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      backgroundColor: 'white',
+                      color: '#111827',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    <option value="">Select Protocol</option>
+                    <option value="tcp">tcp</option>
+                    <option value="udp">udp</option>
+                    <option value="icmp">icmp</option>
+                    <option value="all">all</option>
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#111827',
+                    marginBottom: '0.5rem'
+                  }}>Port</label>
+                  <input
+                    type="text"
+                    placeholder="80,443,22"
                     style={{
                       width: '100%',
                       padding: '0.75rem',
@@ -4388,7 +4600,8 @@ const DeviceDetails = () => {
                         }}>
                           <button
                             onClick={() => {
-                              alert('Edit Firewall Rule functionality will be implemented');
+                              setEditingFirewallRule(rule);
+                              setShowEditFirewallModal(true);
                             }}
                             style={{
                               display: 'inline-flex',
@@ -4866,7 +5079,7 @@ const DeviceDetails = () => {
                   }}>
                     <tr>
                       <th style={{ 
-                        padding: '0.75rem 1.5rem', 
+                        padding: '0.75rem 1rem', 
                         textAlign: 'left', 
                         fontSize: '0.75rem', 
                         fontWeight: '500', 
@@ -4874,10 +5087,10 @@ const DeviceDetails = () => {
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
                         borderRight: `1px solid ${theme === 'dark' ? '#4b5563' : '#e5e7eb'}`,
-                        width: '15%'
+                        width: '10%'
                       }}>Chain</th>
                       <th style={{ 
-                        padding: '0.75rem 1.5rem', 
+                        padding: '0.75rem 1rem', 
                         textAlign: 'left', 
                         fontSize: '0.75rem', 
                         fontWeight: '500', 
@@ -4885,10 +5098,10 @@ const DeviceDetails = () => {
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
                         borderRight: `1px solid ${theme === 'dark' ? '#4b5563' : '#e5e7eb'}`,
-                        width: '15%'
+                        width: '10%'
                       }}>Action</th>
                       <th style={{ 
-                        padding: '0.75rem 1.5rem', 
+                        padding: '0.75rem 1rem', 
                         textAlign: 'left', 
                         fontSize: '0.75rem', 
                         fontWeight: '500', 
@@ -4897,9 +5110,9 @@ const DeviceDetails = () => {
                         letterSpacing: '0.05em',
                         borderRight: `1px solid ${theme === 'dark' ? '#4b5563' : '#e5e7eb'}`,
                         width: '12%'
-                      }}>Protocol</th>
+                      }}>Src Address</th>
                       <th style={{ 
-                        padding: '0.75rem 1.5rem', 
+                        padding: '0.75rem 1rem', 
                         textAlign: 'left', 
                         fontSize: '0.75rem', 
                         fontWeight: '500', 
@@ -4908,9 +5121,9 @@ const DeviceDetails = () => {
                         letterSpacing: '0.05em',
                         borderRight: `1px solid ${theme === 'dark' ? '#4b5563' : '#e5e7eb'}`,
                         width: '12%'
-                      }}>Port</th>
+                      }}>Src Address List</th>
                       <th style={{ 
-                        padding: '0.75rem 1.5rem', 
+                        padding: '0.75rem 1rem', 
                         textAlign: 'left', 
                         fontSize: '0.75rem', 
                         fontWeight: '500', 
@@ -4919,9 +5132,20 @@ const DeviceDetails = () => {
                         letterSpacing: '0.05em',
                         borderRight: `1px solid ${theme === 'dark' ? '#4b5563' : '#e5e7eb'}`,
                         width: '12%'
-                      }}>Mark</th>
+                      }}>Dst Address</th>
                       <th style={{ 
-                        padding: '0.75rem 1.5rem', 
+                        padding: '0.75rem 1rem', 
+                        textAlign: 'left', 
+                        fontSize: '0.75rem', 
+                        fontWeight: '500', 
+                        color: theme === 'dark' ? '#9ca3af' : '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        borderRight: `1px solid ${theme === 'dark' ? '#4b5563' : '#e5e7eb'}`,
+                        width: '12%'
+                      }}>Dst Address List</th>
+                      <th style={{ 
+                        padding: '0.75rem 1rem', 
                         textAlign: 'left', 
                         fontSize: '0.75rem', 
                         fontWeight: '500', 
@@ -4930,17 +5154,39 @@ const DeviceDetails = () => {
                         letterSpacing: '0.05em',
                         borderRight: `1px solid ${theme === 'dark' ? '#4b5563' : '#e5e7eb'}`,
                         width: '8%'
-                      }}>Actions</th>
+                      }}>Protocol</th>
                       <th style={{ 
-                        padding: '0.75rem 1.5rem', 
+                        padding: '0.75rem 1rem', 
                         textAlign: 'left', 
                         fontSize: '0.75rem', 
                         fontWeight: '500', 
                         color: theme === 'dark' ? '#9ca3af' : '#6b7280',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
-                        width: '26%'
-                      }}>Comment</th>
+                        borderRight: `1px solid ${theme === 'dark' ? '#4b5563' : '#e5e7eb'}`,
+                        width: '8%'
+                      }}>Port</th>
+                      <th style={{ 
+                        padding: '0.75rem 1rem', 
+                        textAlign: 'left', 
+                        fontSize: '0.75rem', 
+                        fontWeight: '500', 
+                        color: theme === 'dark' ? '#9ca3af' : '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        borderRight: `1px solid ${theme === 'dark' ? '#4b5563' : '#e5e7eb'}`,
+                        width: '8%'
+                      }}>Mark</th>
+                      <th style={{ 
+                        padding: '0.75rem 1rem', 
+                        textAlign: 'center', 
+                        fontSize: '0.75rem', 
+                        fontWeight: '500', 
+                        color: theme === 'dark' ? '#9ca3af' : '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        width: '8%'
+                      }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody style={{ 
@@ -4958,7 +5204,7 @@ const DeviceDetails = () => {
                         e.currentTarget.style.backgroundColor = theme === 'dark' ? '#1f2937' : '#ffffff';
                       }}>
                         <td style={{ 
-                          padding: '0.75rem 1.5rem', 
+                          padding: '0.75rem 1rem', 
                           fontSize: '0.875rem', 
                           fontWeight: '500',
                           color: theme === 'dark' ? '#f1f5f9' : '#111827',
@@ -4976,7 +5222,7 @@ const DeviceDetails = () => {
                           </span>
                         </td>
                         <td style={{ 
-                          padding: '0.75rem 1.5rem', 
+                          padding: '0.75rem 1rem', 
                           fontSize: '0.875rem',
                           borderRight: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`
                         }}>
@@ -4992,19 +5238,43 @@ const DeviceDetails = () => {
                           </span>
                         </td>
                         <td style={{ 
-                          padding: '0.75rem 1.5rem', 
+                          padding: '0.75rem 1rem', 
+                          fontSize: '0.875rem',
+                          color: theme === 'dark' ? '#d1d5db' : '#374151',
+                          borderRight: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`
+                        }}>{rule.srcAddress || '-'}</td>
+                        <td style={{ 
+                          padding: '0.75rem 1rem', 
+                          fontSize: '0.875rem',
+                          color: theme === 'dark' ? '#d1d5db' : '#374151',
+                          borderRight: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`
+                        }}>{rule.srcAddressList || '-'}</td>
+                        <td style={{ 
+                          padding: '0.75rem 1rem', 
+                          fontSize: '0.875rem',
+                          color: theme === 'dark' ? '#d1d5db' : '#374151',
+                          borderRight: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`
+                        }}>{rule.dstAddress || '-'}</td>
+                        <td style={{ 
+                          padding: '0.75rem 1rem', 
+                          fontSize: '0.875rem',
+                          color: theme === 'dark' ? '#d1d5db' : '#374151',
+                          borderRight: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`
+                        }}>{rule.dstAddressList || '-'}</td>
+                        <td style={{ 
+                          padding: '0.75rem 1rem', 
                           fontSize: '0.875rem',
                           color: theme === 'dark' ? '#d1d5db' : '#374151',
                           borderRight: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`
                         }}>{rule.protocol || '-'}</td>
                         <td style={{ 
-                          padding: '0.75rem 1.5rem', 
+                          padding: '0.75rem 1rem', 
                           fontSize: '0.875rem',
                           color: theme === 'dark' ? '#d1d5db' : '#374151',
                           borderRight: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`
                         }}>{rule.dstPort || '-'}</td>
                         <td style={{ 
-                          padding: '0.75rem 1.5rem', 
+                          padding: '0.75rem 1rem', 
                           fontSize: '0.875rem',
                           color: theme === 'dark' ? '#d1d5db' : '#374151',
                           borderRight: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`
@@ -5258,92 +5528,255 @@ const DeviceDetails = () => {
             {updateInfo ? (
               <div className="space-y-6">
                 {/* Current Version */}
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Current Version</h4>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                <div style={{
+                  background: theme === 'dark' ? '#1e293b' : '#f8fafc',
+                  borderRadius: '0.75rem',
+                  padding: '1rem',
+                  border: theme === 'dark' ? '1px solid #334155' : '1px solid #e2e8f0'
+                }}>
+                  <h4 style={{
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: theme === 'dark' ? '#f1f5f9' : '#111827',
+                    margin: '0 0 0.75rem 0'
+                  }}>Current Version</h4>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.75rem',
+                      fontWeight: '500',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                      color: 'white'
+                    }}>
                       {device?.routeros?.version || device?.routeros?.firmwareVersion || 'Unknown'}
                     </span>
-                    <span className="text-sm text-gray-500">RouterOS</span>
+                    <span style={{
+                      fontSize: '0.875rem',
+                      color: theme === 'dark' ? '#94a3b8' : '#6b7280'
+                    }}>RouterOS</span>
                   </div>
                 </div>
 
-                {/* Available Updates */}
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Available Updates</h4>
-                  <div className="space-y-3">
-                    {updateInfo.stableVersion && (
-                      <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-900">Stable</span>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                {/* Update Table */}
+                <div style={{
+                  background: theme === 'dark' ? '#1e293b' : 'white',
+                  borderRadius: '0.75rem',
+                  border: theme === 'dark' ? '1px solid #334155' : '1px solid #e2e8f0',
+                  overflow: 'hidden'
+                }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{
+                        background: theme === 'dark' ? '#0f172a' : '#f8fafc',
+                        borderBottom: `1px solid ${theme === 'dark' ? '#334155' : '#e2e8f0'}`
+                      }}>
+                        <th style={{
+                          padding: '1rem 1.5rem',
+                          textAlign: 'left',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          color: theme === 'dark' ? '#94a3b8' : '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          width: '20%'
+                        }}>Type</th>
+                        <th style={{
+                          padding: '1rem 1.5rem',
+                          textAlign: 'left',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          color: theme === 'dark' ? '#94a3b8' : '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          width: '25%'
+                        }}>Version</th>
+                        <th style={{
+                          padding: '1rem 1.5rem',
+                          textAlign: 'left',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          color: theme === 'dark' ? '#94a3b8' : '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          width: '35%'
+                        }}>Description</th>
+                        <th style={{
+                          padding: '1rem 1.5rem',
+                          textAlign: 'center',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          color: theme === 'dark' ? '#94a3b8' : '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          width: '20%'
+                        }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {updateInfo.stableVersion && (
+                        <tr style={{
+                          borderBottom: `1px solid ${theme === 'dark' ? '#334155' : '#e2e8f0'}`
+                        }}>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            fontWeight: '500',
+                            color: theme === 'dark' ? '#f1f5f9' : '#111827'
+                          }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '0.375rem',
+                              fontSize: '0.75rem',
+                              fontWeight: '500',
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              color: 'white'
+                            }}>Stable</span>
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            color: theme === 'dark' ? '#e2e8f0' : '#374151'
+                          }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '9999px',
+                              fontSize: '0.75rem',
+                              fontWeight: '500',
+                              background: theme === 'dark' ? '#065f46' : '#d1fae5',
+                              color: theme === 'dark' ? '#6ee7b7' : '#065f46'
+                            }}>
                               {updateInfo.stableVersion}
                             </span>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">Recommended for production use</p>
-                        </div>
-                        {updateInfo.stableVersion !== (device?.routeros?.version || device?.routeros?.firmwareVersion) && (
-                          <button
-                            onClick={installUpdate}
-                            disabled={updateLoading}
-                            style={{
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            color: theme === 'dark' ? '#94a3b8' : '#6b7280'
+                          }}>
+                            Recommended for production use
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            textAlign: 'center'
+                          }}>
+                            {updateInfo.stableVersion !== (device?.routeros?.version || device?.routeros?.firmwareVersion) ? (
+                              <button
+                                onClick={installUpdate}
+                                disabled={updateLoading}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  padding: '0.375rem 0.75rem',
+                                  borderRadius: '0.375rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '500',
+                                  border: 'none',
+                                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                  color: 'white',
+                                  cursor: updateLoading ? 'not-allowed' : 'pointer',
+                                  opacity: updateLoading ? 0.5 : 1,
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
+                                {updateLoading ? 'Installing...' : 'Install'}
+                              </button>
+                            ) : (
+                              <span style={{
+                                fontSize: '0.75rem',
+                                color: theme === 'dark' ? '#94a3b8' : '#6b7280'
+                              }}>Current</span>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                      
+                      {updateInfo.betaVersion && (
+                        <tr>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            fontWeight: '500',
+                            color: theme === 'dark' ? '#f1f5f9' : '#111827'
+                          }}>
+                            <span style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              padding: '0.375rem 0.75rem',
+                              padding: '0.25rem 0.5rem',
                               borderRadius: '0.375rem',
                               fontSize: '0.75rem',
                               fontWeight: '500',
-                              border: 'none',
-                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                              color: 'white',
-                              cursor: updateLoading ? 'not-allowed' : 'pointer',
-                              opacity: updateLoading ? 0.5 : 1,
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            {updateLoading ? 'Installing...' : 'Install'}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    
-                    {updateInfo.betaVersion && (
-                      <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-900">Beta</span>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                              color: 'white'
+                            }}>Beta</span>
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            color: theme === 'dark' ? '#e2e8f0' : '#374151'
+                          }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '9999px',
+                              fontSize: '0.75rem',
+                              fontWeight: '500',
+                              background: theme === 'dark' ? '#92400e' : '#fef3c7',
+                              color: theme === 'dark' ? '#fbbf24' : '#92400e'
+                            }}>
                               {updateInfo.betaVersion}
                             </span>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">Latest features, may be unstable</p>
-                        </div>
-                        {updateInfo.betaVersion !== (device?.routeros?.version || device?.routeros?.firmwareVersion) && (
-                          <button
-                            onClick={installUpdate}
-                            disabled={updateLoading}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '0.375rem 0.75rem',
-                              borderRadius: '0.375rem',
-                              fontSize: '0.75rem',
-                              fontWeight: '500',
-                              border: 'none',
-                              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                              color: 'white',
-                              cursor: updateLoading ? 'not-allowed' : 'pointer',
-                              opacity: updateLoading ? 0.5 : 1,
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            {updateLoading ? 'Installing...' : 'Install Beta'}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            color: theme === 'dark' ? '#94a3b8' : '#6b7280'
+                          }}>
+                            Latest features, may be unstable
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            textAlign: 'center'
+                          }}>
+                            {updateInfo.betaVersion !== (device?.routeros?.version || device?.routeros?.firmwareVersion) ? (
+                              <button
+                                onClick={installUpdate}
+                                disabled={updateLoading}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  padding: '0.375rem 0.75rem',
+                                  borderRadius: '0.375rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '500',
+                                  border: 'none',
+                                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                  color: 'white',
+                                  cursor: updateLoading ? 'not-allowed' : 'pointer',
+                                  opacity: updateLoading ? 0.5 : 1,
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
+                                {updateLoading ? 'Installing...' : 'Install Beta'}
+                              </button>
+                            ) : (
+                              <span style={{
+                                fontSize: '0.75rem',
+                                color: theme === 'dark' ? '#94a3b8' : '#6b7280'
+                              }}>Current</span>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
 
                 {/* Update Status */}

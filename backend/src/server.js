@@ -2584,7 +2584,7 @@ const bootstrap = async () => {
       }
 
       try {
-        const body = await getRequestBody(req);
+        const body = await readRequestBody(req);
         const { enabled } = body;
 
         if (typeof enabled !== 'boolean') {

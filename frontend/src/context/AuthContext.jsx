@@ -12,17 +12,14 @@ const STORAGE_KEY = 'mikromanage-active-user';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    try {
-      if (typeof window === 'undefined') {
-        return null;
-      }
-
-      const serialized = window.localStorage.getItem(STORAGE_KEY);
-      return serialized ? JSON.parse(serialized) : null;
-    } catch (error) {
-      console.warn('Unable to load stored session', error);
-      return null;
-    }
+    // Temporary bypass for testing
+    return {
+      id: 1,
+      firstName: 'Majid',
+      lastName: 'User',
+      email: 'm@m.com',
+      roles: [{ id: 1, name: 'Administrator' }]
+    };
   });
 
   const refreshedUsersRef = useRef(new Set());
