@@ -13,8 +13,15 @@ import {
   getMikrotikUpdateInfo,
   installMikrotikUpdate,
   getMikrotikById,
-  addMikrotikIpAddress
+  addMikrotikIpAddress,
+  addSystemLog
 } from './database.js';
+import { 
+  applyFirewallRuleToGroup, 
+  createAddressList, 
+  getAddressLists, 
+  getGroupFirewallRules 
+} from './group-firewall.js';
 import { ensureDatabaseConfig, getConfigFilePath } from './config.js';
 import getProjectVersion from './version.js';
 import { 
@@ -4272,6 +4279,27 @@ const bootstrap = async () => {
         return;
       }
 
+      // Group Firewall API endpoints
+      if (method === 'GET' && (canonicalPath === '/api/group-firewall' || resourcePath === '/group-firewall')) {
+        await handleGetGroupFirewallRules();
+        return;
+      }
+
+      if (method === 'GET' && (canonicalPath === '/api/address-lists' || resourcePath === '/address-lists')) {
+        await handleGetAddressLists();
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/address-lists' || resourcePath === '/address-lists')) {
+        await handleCreateAddressList();
+        return;
+      }
+
+      if (method === 'POST' && (canonicalPath === '/api/group-firewall/apply' || resourcePath === '/group-firewall/apply')) {
+        await handleApplyFirewallRuleToGroup();
+        return;
+      }
+
       // Test MikroTik connection endpoint
       if (method === 'POST' && (canonicalPath === '/api/test-mikrotik-connection' || resourcePath === '/test-mikrotik-connection')) {
         await handleTestMikrotikConnection();
@@ -4333,6 +4361,75 @@ const bootstrap = async () => {
     console.log(`API server ready at http://0.0.0.0:${port}`);
   });
 };
+
+// Group Firewall Handler Functions
+async function handleGetGroupFirewallRules() {
+  try {
+    const result = await getGroupFirewallRules();
+    sendJson(res, 200, result);
+  } catch (error) {
+    console.error('Error getting group firewall rules:', error);
+    sendJson(res, 500, { message: 'Failed to get group firewall rules' });
+  }
+}
+
+async function handleGetAddressLists() {
+  try {
+    const result = await getAddressLists();
+    sendJson(res, 200, result);
+  } catch (error) {
+    console.error('Error getting address lists:', error);
+    sendJson(res, 500, { message: 'Failed to get address lists' });
+  }
+}
+
+async function handleCreateAddressList() {
+  try {
+    const body = await readRequestBody(req);
+    const { name, addresses, description } = body;
+    
+    if (!name || !addresses || !Array.isArray(addresses)) {
+      sendJson(res, 400, { message: 'Name and addresses array are required' });
+      return;
+    }
+    
+    const result = await createAddressList(name, addresses, description);
+    
+    if (result.success) {
+      sendJson(res, 201, result);
+    } else {
+      sendJson(res, 400, result);
+    }
+  } catch (error) {
+    console.error('Error creating address list:', error);
+    sendJson(res, 500, { message: 'Failed to create address list' });
+  }
+}
+
+async function handleApplyFirewallRuleToGroup() {
+  try {
+    const body = await readRequestBody(req);
+    const { groupId, ruleId } = body;
+    
+    if (!groupId || !ruleId) {
+      sendJson(res, 400, { message: 'Group ID and Rule ID are required' });
+      return;
+    }
+    
+    const result = await applyFirewallRuleToGroup(groupId, ruleId);
+    
+    if (result.success) {
+      // Add log entry for group firewall application
+      await addSystemLog(0, 'firewall', 'info', `Firewall rule ${ruleId} applied to group ${groupId}`);
+      sendJson(res, 200, result);
+    } else {
+      sendJson(res, 400, result);
+    }
+  } catch (error) {
+    console.error('Error applying firewall rule to group:', error);
+    sendJson(res, 500, { message: 'Failed to apply firewall rule to group' });
+  }
+}
 
 bootstrap().catch((error) => {
   console.error('Failed to start server', error);

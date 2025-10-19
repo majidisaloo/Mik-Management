@@ -1,405 +1,170 @@
 # Mik-Management
 
-Mik-Management delivers a React + Vite control panel backed by a lightweight Node.js API. Operators can register the first
-administrator, manage users, roles, Mik-Groups, Mikrotiks, and tunnels, and deploy the stack behind Nginx on Ubuntu without
-external database services.
+Mik-Management delivers a React + Vite control panel backed by a lightweight Node.js API for managing MikroTik devices.
 
-## Table of Contents
+## Quick Start
 
-- [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
-- [Getting Started](#getting-started)
-- [Ubuntu Deployment Quick Start](#ubuntu-deployment-quick-start)
-- [Production Deployment on Ubuntu with Nginx](#production-deployment-on-ubuntu-with-nginx)
-- [Systemd + Nginx Deployment (example configs)](#systemd--nginx-deployment-example-configs)
-- [Updating an Existing Installation](#updating-an-existing-installation)
-- [Fix Sudo Permissions for Update System](#fix-sudo-permissions-for-update-system)
-- [Troubleshooting](#troubleshooting)
-- [Operational Notes](#operational-notes)
-
-## Project Structure
-
-```
-Mik-Management/
-├── backend/   # Node.js API with file-backed storage
-└── frontend/  # Vite + React single-page application
-```
-
-## Prerequisites
-
-- Ubuntu 22.04 or newer (or another Debian-based distribution)
-- Node.js 18+ and npm 9+
-- `rpm` toolchain (install with `sudo apt update && sudo apt install rpm -y`)
-- Nginx for production deployments
-
-### Installing Node.js and npm on Ubuntu
-
-Use NodeSource to install an up-to-date Node.js release with npm:
-
+### Installation
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt update
-sudo apt install nodejs -y
-```
+# Install prerequisites
+sudo apt update && sudo apt install nginx nodejs npm rpm git -y
 
-Verify the installation:
-
-```bash
-node -v
-npm -v
-```
-
-## Getting Started
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/majidisaloo/Mik-Management.git
-   cd Mik-Management
-   ```
-2. Install API dependencies (the backend has no external packages, so this completes instantly):
-   ```bash
-   cd backend
-   npm install
-   ```
-3. Generate the data directory and configuration secrets:
-   ```bash
-   npm run prepare:db
-   ```
-4. Start the API (defaults to http://localhost:4000):
-   ```bash
-   npm run dev
-   ```
-5. In a new terminal, set up the web client:
-   ```bash
-   cd ../frontend
-   npm install
-   npm run dev
-   ```
-6. Visit http://localhost:5173. The **Login** page is shown first. Use the **Register** link to create the very first
-   administrator; the backend automatically disables public registration after this initial account. Further operators are added
-   through the Users & Roles workspace once you are signed in.
-
-## Ubuntu Deployment Quick Start
-
-The following commands install prerequisites, clone the project into `/opt/mik-management`, and start both services so the site
-is reachable at `http://<server-ip>/`.
-
-```bash
-sudo apt update
-sudo apt install nginx nodejs npm rpm -y
-
+# Clone and setup
 sudo rm -rf /opt/mik-management
 sudo git clone https://github.com/majidisaloo/Mik-Management.git /opt/mik-management
 
 # Backend setup
 cd /opt/mik-management/backend
-npm install
-npm run prepare:db
-
-# Create systemd service for backend
-sudo tee /etc/systemd/system/mik-management-backend.service <<'EOF'
-[Unit]
-Description=Mik-Management Backend API
-After=network.target
-
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=/opt/mik-management/backend
-ExecStart=/usr/bin/node src/server.js
-Environment=PORT=3000
-Environment=NODE_ENV=production
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Enable and start backend service
-sudo systemctl daemon-reload
-sudo systemctl enable mik-management-backend
-sudo systemctl start mik-management-backend
+npm install && npm run prepare:db
 
 # Frontend setup
-cd /opt/mik-management/frontend
-npm install
-npm run build
+cd ../frontend
+npm install && npm run build
 
-# Nginx configuration
-sudo tee /etc/nginx/sites-available/mik-management <<'NGINX'
-server {
-    listen 80;
-    server_name _;
+# Create services and start
+sudo cp deploy/mik-management-backend.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now mik-management-backend
 
-    root /opt/mik-management/frontend/dist;
-    index index.html;
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:3000/api/;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection keep-alive;
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 60s;
-    }
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-}
-NGINX
-
-sudo ln -sf /etc/nginx/sites-available/mik-management /etc/nginx/sites-enabled/mik-management
+# Configure Nginx
+sudo cp deploy/nginx.conf.example /etc/nginx/sites-available/mik-management
+sudo ln -sf /etc/nginx/sites-available/mik-management /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 
-# Verify services
-sudo systemctl status mik-management-backend
-sudo systemctl status nginx
+# Verify installation
 curl http://localhost/api/users
 ```
 
-## Production Deployment on Ubuntu with Nginx
+**Access**: Open `http://your-server-ip/` and register the first admin user.
 
-1. Install dependencies if they are not already present:
-   ```bash
-   sudo apt update
-   sudo apt install nginx nodejs npm rpm git -y
-   ```
-2. Clone or pull the latest code into `/opt/mik-management`:
-   ```bash
-   sudo mkdir -p /opt/mik-management
-   sudo chown "$USER":"$USER" /opt/mik-management
-   cd /opt/mik-management
-   git pull --ff-only || git clone https://github.com/majidisaloo/Mik-Management.git .
-   ```
-3. Prepare the backend:
-   ```bash
-   cd backend
-   npm install
-   npm run prepare:db
-   pm2 start src/server.js --name mik-api --update-env
-   pm2 save
-   ```
-4. Build the frontend:
-   ```bash
-   cd ../frontend
-   npm install
-   npm run build
-   ```
-5. Point Nginx at the compiled frontend and proxy `/api/` to the backend as shown in the quick-start section. Reload Nginx after
-   any change:
-   ```bash
-   sudo nginx -t && sudo systemctl reload nginx
-   ```
-6. Browse to `http://<server-ip>/` and sign in. Use the sidebar toggle to expand or collapse navigation. Management links (Users
-   & Roles, Mik-Groups, Mikrotiks, Tunnels, and Settings) appear only when the signed-in role grants the associated permission.
+## Updates
 
-## Updating an Existing Installation
-
-From `/opt/mik-management` on the server (systemd-managed backend):
-
+### From Version 1.x to Latest
 ```bash
 # Stop services
-sudo systemctl stop nginx
-sudo systemctl stop mik-management-backend
+sudo systemctl stop nginx mik-management-backend
+
+# Backup data
+sudo cp -r /opt/mik-management/backend/data /opt/mik-management-backup-$(date +%Y%m%d-%H%M%S)
 
 # Update code
 cd /opt/mik-management
-sudo git pull --ff-only
+sudo git fetch origin
+sudo git reset --hard origin/main
 
-# Fix ownership issues
-sudo chown -R root:root /opt/mik-management
-git config --global --add safe.directory /opt/mik-management
+# Fix permissions
 sudo chown -R www-data:www-data /opt/mik-management
-
-# Fix sudo permissions for update system (if needed)
 sudo ./fix-sudo-permissions.sh
 
-# Backend update
-cd backend
-npm install
-npm run prepare:db
-
-# Frontend update
-cd ../frontend
-npm install
-npm run build
+# Update dependencies
+cd backend && npm install && npm run prepare:db
+cd ../frontend && npm install && npm run build
 
 # Restart services
-sudo systemctl start mik-management-backend
-sudo systemctl start nginx
+sudo systemctl start mik-management-backend nginx
 
-# Verify services
+# Verify
 sudo systemctl status mik-management-backend --no-pager
-sudo systemctl status nginx --no-pager
 curl http://localhost/api/users
 ```
 
-## Fix Sudo Permissions for Update System
-
-If you encounter permission issues with the update system, run the fix permissions script:
-
+### Automated Update Script
 ```bash
-# From /opt/mik-management directory
+# Create update script
+sudo tee /opt/mik-management/update.sh <<'EOF'
+#!/bin/bash
+BRANCH=${1:-main}
+BACKUP_DIR="/opt/mik-management-backup-$(date +%Y%m%d-%H%M%S)"
+
+echo "Updating to branch: $BRANCH"
+sudo systemctl stop nginx mik-management-backend
+sudo cp -r /opt/mik-management/backend/data "$BACKUP_DIR"
+
+cd /opt/mik-management
+sudo git fetch origin
+sudo git reset --hard "origin/$BRANCH"
+sudo chown -R www-data:www-data /opt/mik-management
 sudo ./fix-sudo-permissions.sh
-```
 
-This script will:
-- Remove any existing sudoers configuration
-- Create a new sudoers file with proper syntax
-- Allow www-data to run git, npm, chown, and systemctl commands
-- Validate the sudoers syntax
+cd backend && npm install && npm run prepare:db
+cd ../frontend && npm install && npm run build
 
-**Alternative manual setup:**
-```bash
-sudo ./manual-sudoers-setup.sh
-```
-
-**Manual sudoers configuration:**
-```bash
-sudo tee /etc/sudoers.d/99-mik-management-www-data <<'EOF'
-# Allow www-data to run specific commands for Mik-Management updates
-www-data ALL=(ALL) NOPASSWD: /usr/bin/git
-www-data ALL=(ALL) NOPASSWD: /usr/bin/npm
-www-data ALL=(ALL) NOPASSWD: /bin/chown
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl
+sudo systemctl start mik-management-backend nginx
+echo "✅ Update completed!"
 EOF
 
-sudo chmod 440 /etc/sudoers.d/99-mik-management-www-data
-sudo visudo -c -f /etc/sudoers.d/99-mik-management-www-data
+sudo chmod +x /opt/mik-management/update.sh
+
+# Usage:
+# sudo /opt/mik-management/update.sh main    # Update to stable
+# sudo /opt/mik-management/update.sh beta    # Update to beta
+# sudo /opt/mik-management/update.sh stable  # Update to stable
 ```
+
+## Features
+
+- **Device Management**: Full MikroTik device management
+- **Real-time Logging**: System logs with MikroTik format
+- **Group Firewall**: Apply firewall rules to device groups
+- **IP Management**: Add, edit, manage IP addresses
+- **Route Management**: Manage routing tables
+- **Firewall Rules**: Comprehensive firewall management
+- **Safe Mode**: Emergency device protection
+- **Update System**: Built-in update mechanism
 
 ## Troubleshooting
 
-### Users not loading in frontend
-If users are not displayed in the Users & Roles page:
-
-1. **Check backend logs:**
-   ```bash
-   sudo journalctl -u mik-management-backend -f
-   ```
-
-2. **Test API directly:**
-   ```bash
-   curl http://localhost/api/users
-   curl http://localhost/api/roles
-   ```
-
-3. **Check frontend logs:**
-   ```bash
-   sudo journalctl -u mik-management-frontend -f
-   ```
-
-4. **Verify database:**
-   ```bash
-   ls -la /opt/mik-management/backend/data/
-   ```
-
-### Port conflicts
-If you get port conflicts:
-
-1. **Check what's using the port:**
-   ```bash
-   sudo netstat -tlnp | grep :3000
-   sudo netstat -tlnp | grep :5173
-   ```
-
-2. **Kill conflicting processes:**
-   ```bash
-   sudo pkill -f "node.*server.js"
-   sudo pkill -f "vite"
-   ```
-
-3. **Restart services:**
-   ```bash
-   sudo systemctl restart mik-management-backend
-   sudo systemctl restart mik-management-frontend
-   ```
-
-## Systemd + Nginx Deployment (example configs)
-
-This repo includes example configs to run the backend as a systemd service and proxy `/api` via Nginx.
-
-### Backend service (systemd)
-
-1) Copy the unit and adjust paths if needed:
-
+### Common Issues
 ```bash
-sudo cp deploy/mik-management-backend.service /etc/systemd/system/mik-management-backend.service
-```
-
-2) Reload, enable and start:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now mik-management-backend
+# Check services
 sudo systemctl status mik-management-backend --no-pager
+sudo systemctl status nginx --no-pager
+
+# Check logs
+sudo journalctl -u mik-management-backend -f
+
+# Restart services
+sudo systemctl restart mik-management-backend nginx
+
+# Fix permissions
+sudo chown -R www-data:www-data /opt/mik-management
+sudo ./fix-sudo-permissions.sh
+
+# Check API
+curl http://localhost/api/users
 ```
 
-3) Health checks (local):
-
+### Port Conflicts
 ```bash
-curl -sS -i http://127.0.0.1:4000/api/meta
-curl -sS -i http://127.0.0.1:4000/api/groups
-curl -sS -i http://127.0.0.1:4000/api/users
+sudo pkill -f "node.*server.js"
+sudo systemctl restart mik-management-backend
 ```
 
-### Nginx
-
-1) Copy the example config and set your domain and frontend build path:
-
+### Database Issues
 ```bash
-sudo cp deploy/nginx.conf.example /etc/nginx/sites-available/mik-management
-sudo ln -sf /etc/nginx/sites-available/mik-management /etc/nginx/sites-enabled/mik-management
-sudo nginx -t && sudo systemctl reload nginx
+sudo cp /opt/mik-management/backend/data/app.db /opt/mik-management/backend/data/app.db.backup
+sudo rm /opt/mik-management/backend/data/app.db
+cd /opt/mik-management/backend && npm run prepare:db
 ```
 
-2) Verify reverse proxy:
+## System Requirements
 
-```bash
-curl -sS -i http://YOUR_DOMAIN/api/meta
-```
+- **OS**: Ubuntu 20.04+ or compatible
+- **CPU**: 1 core (2+ recommended)
+- **RAM**: 512MB (2GB+ recommended)
+- **Storage**: 1GB free space
+- **Network**: Internet connection
 
-### Frontend build
+## Support
 
-```bash
-cd frontend
-npm ci
-npm run build
-```
+- **GitHub Issues**: [Report bugs and request features](https://github.com/majidisaloo/Mik-Management/issues)
+- **Documentation**: This README
+- **Community**: GitHub Discussions
 
-If the Dashboard shows “Metrics service is unavailable (502)”, confirm:
-- Backend is listening on port 4000
-- Nginx `location /api/` proxies to `http://127.0.0.1:4000/api/`
-- You are authenticated (cookies forwarded)
+## License
 
-### Handling `npm audit fix --force`
+MIT License - see LICENSE file for details.
 
-Some environments block outbound IPv6 traffic to the npm registry, which causes `npm audit fix --force` to fail with an
-`ENETUNREACH` error. When this happens, run the command with auditing disabled:
+---
 
-```bash
-NPM_CONFIG_AUDIT=false npm audit fix --force || echo "Audit skipped (registry unreachable)"
-```
-
-This still applies security patches when the registry is reachable while preventing the update process from aborting when the
-network is offline.
-
-## Operational Notes
-
-- **Persistent data** – `backend/data/app.db` stores all users, roles, groups, Mikrotiks, and tunnels. The `npm run prepare:db`
-  script creates the file if it does not exist and preserves existing content. Back up this directory before redeployments.
-- **Configuration secrets** – Generated salts and peppers live in `backend/config/runtime.json`. Keep this file private and
-  include it in backups so password hashes remain valid after redeployments.
-- **Registration guard** – Public registration is available only until the first user is created. Administrators add additional
-  operators from the Users & Roles workspace.
-- **Version badge** – The frontend footer displays the running build as `Version 0.<commit-count>` based on `/api/meta`. This
-  helps confirm which commit is deployed.
-- **Merge guidance** – See `MERGE_RESOLUTION_NOTES.md` for tips on accepting incoming or combined changes when syncing with the
-  upstream repository.
-
+**Thank you for using Mik-Management!** 🚀

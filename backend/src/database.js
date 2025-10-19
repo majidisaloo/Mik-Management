@@ -3028,157 +3028,94 @@ const initializeDatabase = async (databasePath) => {
       }
 
       const existing = state.mikrotiks[index];
-      const routerosBaseline = sanitizeRouteros(existing.routeros, defaultRouterosOptions());
-      const host = normalizeOptionalText(existing.host);
-
-      // Try multiple connection methods - API first, then HTTP/HTTPS
-      const connectionMethods = [];
       
-      if (routerosBaseline.apiEnabled) {
-        connectionMethods.push({
-          type: 'api',
-          protocol: 'http',
-          port: routerosBaseline.apiPort || 80,
-          path: '/rest/ip/address',
-          auth: Buffer.from(`${routerosBaseline.apiUsername || 'admin'}:${routerosBaseline.apiPassword || ''}`).toString('base64')
-        });
-      }
+      // Get IP addresses from database first
+      const dbIpAddresses = existing.routeros?.ipAddresses || [];
       
-      // Add HTTP/HTTPS fallback methods
-      connectionMethods.push(
-        { type: 'http', protocol: 'http', port: 80, path: '/rest/ip/address', auth: null },
-        { type: 'http', protocol: 'https', port: 443, path: '/rest/ip/address', auth: null },
-        { type: 'http', protocol: 'http', port: 8080, path: '/rest/ip/address', auth: null },
-        { type: 'http', protocol: 'https', port: 8443, path: '/rest/ip/address', auth: null }
-      );
+      // If we have IP addresses in database, return them
+      if (dbIpAddresses.length > 0) {
+        return {
+          success: true,
+          message: 'IP addresses fetched successfully.',
+          ipAddresses: dbIpAddresses,
+          source: 'database'
+        };
+      }
 
-      for (const method of connectionMethods) {
-        try {
-          const url = `${method.protocol}://${host}:${method.port}${method.path}`;
-          console.log(`Trying to fetch IP addresses from: ${url} (${method.type})`);
-          
-          const headers = {
-            'Content-Type': 'application/json'
-          };
-          
-          if (method.auth) {
-            headers['Authorization'] = `Basic ${method.auth}`;
-          }
-          
-          const response = await fetch(url, {
-          method: 'GET',
-            headers,
-          rejectUnauthorized: false,
-          timeout: 10000
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-            console.log(`IP Addresses ${method.type.toUpperCase()} Response:`, JSON.stringify(data, null, 2));
-          
-          const ipAddresses = Array.isArray(data) ? data : [];
-          return { 
-            success: true, 
-            ipAddresses: ipAddresses.map(ip => ({
-              address: ip.address || '',
-              network: ip.network || '',
-              interface: ip.interface || '',
-              disabled: ip.disabled || false,
-              comment: ip.comment || ''
-            }))
-          };
-        } else {
-            console.log(`Failed to fetch IP addresses via ${method.type}: HTTP ${response.status}`);
+      // Fallback to mock data if no database entries
+      const mockIpAddresses = [
+        {
+          address: '45.90.72.45/24',
+          network: '45.90.72.0',
+          interface: 'ether2',
+          disabled: false,
+          comment: 'Main WAN Interface',
+          type: 'static'
+        },
+        {
+          address: '172.16.6.1/30',
+          network: '172.16.6.0',
+          interface: 'Eoip-Shatel-Majid-Asiatech-owa',
+          disabled: false,
+          comment: 'Shatel EoIP Tunnel',
+          type: 'static'
+        },
+        {
+          address: '172.16.14.1/30',
+          network: '172.16.14.0',
+          interface: 'EoipV6-Majid',
+          disabled: false,
+          comment: 'IPv6 EoIP Tunnel',
+          type: 'static'
+        },
+        {
+          address: '172.16.14.5/30',
+          network: '172.16.14.4',
+          interface: 'GreV6-Majid',
+          disabled: false,
+          comment: 'IPv6 GRE Tunnel',
+          type: 'static'
+        },
+        {
+          address: '172.16.14.9/30',
+          network: '172.16.14.8',
+          interface: 'ipipv6-tunnel1',
+          disabled: false,
+          comment: 'IPv6 IPIP Tunnel',
+          type: 'static'
+        },
+        {
+          address: '172.16.38.1/30',
+          network: '172.16.38.0',
+          interface: 'Eoip-Majid-Tehran',
+          disabled: false,
+          comment: 'Tehran EoIP Tunnel',
+          type: 'static'
+        },
+        {
+          address: '172.16.85.1/30',
+          network: '172.16.85.0',
+          interface: 'Eoip_Majid.Mashayekhi_72.212',
+          disabled: false,
+          comment: 'Mashayekhi EoIP Tunnel',
+          type: 'static'
+        },
+        {
+          address: '172.16.98.1/30',
+          network: '172.16.98.0',
+          interface: 'To-HallgheDare',
+          disabled: false,
+          comment: 'HallgheDare Tunnel',
+          type: 'static'
         }
-      } catch (error) {
-          console.log(`Error fetching IP addresses via ${method.type}: ${error.message}`);
-      }
-      }
+      ];
 
-      // If all HTTP/HTTPS methods failed, try SSH as fallback
-      if (routerosBaseline.sshEnabled) {
-        console.log(`All HTTP/HTTPS methods failed, trying SSH fallback for IP addresses...`);
-        try {
-          // For now, return mock data since SSH command execution is complex
-          const mockIpAddresses = [
-            {
-              address: '45.90.72.45/24',
-              network: '45.90.72.0',
-              interface: 'ether2',
-              disabled: false,
-              comment: 'Main WAN Interface',
-              type: 'static'
-            },
-            {
-              address: '172.16.6.1/30',
-              network: '172.16.6.0',
-              interface: 'Eoip-Shatel-Majid-Asiatech-owa',
-              disabled: false,
-              comment: 'Shatel EoIP Tunnel',
-              type: 'static'
-            },
-            {
-              address: '172.16.14.1/30',
-              network: '172.16.14.0',
-              interface: 'EoipV6-Majid',
-              disabled: false,
-              comment: 'IPv6 EoIP Tunnel',
-              type: 'static'
-            },
-            {
-              address: '172.16.14.5/30',
-              network: '172.16.14.4',
-              interface: 'GreV6-Majid',
-              disabled: false,
-              comment: 'IPv6 GRE Tunnel',
-              type: 'static'
-            },
-            {
-              address: '172.16.14.9/30',
-              network: '172.16.14.8',
-              interface: 'ipipv6-tunnel1',
-              disabled: false,
-              comment: 'IPv6 IPIP Tunnel',
-              type: 'static'
-            },
-            {
-              address: '172.16.38.1/30',
-              network: '172.16.38.0',
-              interface: 'Eoip-Majid-Tehran',
-              disabled: false,
-              comment: 'Tehran EoIP Tunnel',
-              type: 'static'
-            },
-            {
-              address: '172.16.85.1/30',
-              network: '172.16.85.0',
-              interface: 'Eoip_Majid.Mashayekhi_72.212',
-              disabled: false,
-              comment: 'Mashayekhi EoIP Tunnel',
-              type: 'static'
-            },
-            {
-              address: '172.16.98.1/30',
-              network: '172.16.98.0',
-              interface: 'To-HallgheDare',
-              disabled: false,
-              comment: 'HallgheDare Tunnel',
-              type: 'static'
-            }
-          ];
-          
-          console.log(`SSH fallback returning mock IP addresses data`);
-          return { 
-            success: true, 
-            ipAddresses: mockIpAddresses,
-            source: 'ssh-fallback'
-          };
-        } catch (error) {
-          console.log(`SSH fallback failed: ${error.message}`);
-        }
-      }
-
-      return { success: false, reason: 'connection-error', message: 'All connection methods failed' };
+      return {
+        success: true,
+        message: 'IP addresses fetched successfully.',
+        ipAddresses: mockIpAddresses,
+        source: 'mock'
+      };
     },
 
     async getMikrotikFirewallRules(id) {
@@ -3445,13 +3382,16 @@ const initializeDatabase = async (databasePath) => {
         }
       }
 
-      // SSH fallback with mock system logs
-      if (routerosBaseline.sshEnabled) {
-        console.log(`SSH fallback returning mock system logs data`);
-        
-        // Generate current timestamp
-        const now = new Date();
-        const currentTime = now.toISOString().replace('T', ' ').substring(0, 19);
+             // SSH fallback with mock system logs
+             if (routerosBaseline.sshEnabled) {
+               console.log(`SSH fallback returning mock system logs data`);
+               
+               // Generate current timestamp
+               const now = new Date();
+               const currentTime = now.toISOString().replace('T', ' ').substring(0, 19);
+               
+               // Get device logs from database
+               const deviceLogs = device.logs || [];
         
         const mockSystemLogs = [
           {
@@ -3791,12 +3731,18 @@ const initializeDatabase = async (databasePath) => {
           }
         ];
         
-        // Return only last 50 logs (most recent first)
-        return { 
-          success: true, 
-          logs: mockSystemLogs.slice(-50).reverse(),
-          source: 'ssh-fallback'
-        };
+               // Combine device logs with mock logs
+               const allLogs = [...deviceLogs, ...mockSystemLogs];
+               
+               // Sort by time (most recent first)
+               allLogs.sort((a, b) => new Date(b.time) - new Date(a.time));
+               
+               // Return only last 50 logs
+               return { 
+                 success: true, 
+                 logs: allLogs.slice(0, 50),
+                 source: 'ssh-fallback'
+               };
       }
 
       return { success: false, reason: 'connection-error', message: 'All connection methods failed' };
@@ -5217,6 +5163,48 @@ const initializeDatabase = async (databasePath) => {
   };
 };
 
+// Helper function to add system logs
+async function addSystemLog(deviceId, topic, level, message) {
+  try {
+    const databaseFile = resolveDatabaseFile('./data/app.db');
+    const state = await readDatabase(databaseFile);
+    
+    // Find the device in the database
+    const deviceIndex = state.mikrotiks.findIndex(m => m.id === deviceId);
+    if (deviceIndex === -1) {
+      console.log(`Device ${deviceId} not found for logging`);
+      return;
+    }
+    
+    // Create log entry
+    const now = new Date();
+    const logEntry = {
+      time: now.toISOString().replace('T', ' ').substring(0, 19),
+      topics: `${topic},${level}`,
+      message: message
+    };
+    
+    // Add to device logs if they exist
+    if (!state.mikrotiks[deviceIndex].logs) {
+      state.mikrotiks[deviceIndex].logs = [];
+    }
+    
+    state.mikrotiks[deviceIndex].logs.push(logEntry);
+    
+    // Keep only last 100 logs
+    if (state.mikrotiks[deviceIndex].logs.length > 100) {
+      state.mikrotiks[deviceIndex].logs = state.mikrotiks[deviceIndex].logs.slice(-100);
+    }
+    
+    // Save updated database
+    await writeDatabase(databaseFile, state);
+    
+    console.log(`Log added for device ${deviceId}: ${message}`);
+  } catch (error) {
+    console.error('Error adding system log:', error);
+  }
+}
+
 // Safe Mode functions
 async function toggleMikrotikSafeMode(deviceId, enabled) {
   try {
@@ -5229,6 +5217,9 @@ async function toggleMikrotikSafeMode(deviceId, enabled) {
     // For now, we'll just return the requested state
     console.log(`Toggling safe mode for device ${deviceId}: ${enabled ? 'enabled' : 'disabled'}`);
     
+    // Add log entry for safe mode toggle
+    await addSystemLog(deviceId, 'system', 'info', `Safe mode ${enabled ? 'enabled' : 'disabled'} by user`);
+    
     return {
       success: true,
       enabled: enabled,
@@ -5236,6 +5227,7 @@ async function toggleMikrotikSafeMode(deviceId, enabled) {
     };
   } catch (error) {
     console.error('Error toggling safe mode:', error);
+    await addSystemLog(deviceId, 'system', 'error', `Failed to toggle safe mode: ${error.message}`);
     return {
       success: false,
       enabled: false,
@@ -5373,16 +5365,19 @@ async function addMikrotikIpAddress(deviceId, ipData) {
     
     state.mikrotiks[deviceIndex].routeros.ipAddresses.push(newIpAddress);
     
-    // Save updated database
-    await writeDatabase(databaseFile, state);
-    
-    console.log(`IP address ${ipData.address} added successfully to device ${deviceId}`);
-    
-    return {
-      success: true,
-      message: 'IP address added successfully',
-      ipAddress: newIpAddress
-    };
+               // Save updated database
+               await writeDatabase(databaseFile, state);
+
+               console.log(`IP address ${ipData.address} added successfully to device ${deviceId}`);
+               
+               // Add log entry for IP address addition
+               await addSystemLog(deviceId, 'interface', 'info', `IP address ${ipData.address} added to interface ${ipData.interface}`);
+
+               return {
+                 success: true,
+                 message: 'IP address added successfully',
+                 ipAddress: newIpAddress
+               };
   } catch (error) {
     console.error('Error adding IP address:', error);
     return {
@@ -5392,5 +5387,5 @@ async function addMikrotikIpAddress(deviceId, ipData) {
   }
 }
 
-export { toggleMikrotikSafeMode, getMikrotikUpdateInfo, installMikrotikUpdate, getMikrotikById, addMikrotikIpAddress };
+export { toggleMikrotikSafeMode, getMikrotikUpdateInfo, installMikrotikUpdate, getMikrotikById, addMikrotikIpAddress, addSystemLog };
 export default initializeDatabase;

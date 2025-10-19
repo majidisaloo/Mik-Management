@@ -1,0 +1,924 @@
+=== Group Firewall Management System ===
+Available Address Lists:
+- trusted-hosts: 192.168.1.0/24, 10.0.0.0/8, 172.16.0.0/12
+- blocked-sites: 8.8.8.8, 1.1.1.1
+- dmz-servers: 192.168.100.0/24
+
+Available Firewall Rules:
+- Allow Trusted to DMZ: accept from trusted-hosts to dmz-servers
+- Block Malicious Traffic: drop from blocked-sites to 
+- Allow Internal Communication: accept from 192.168.0.0/16 to 192.168.0.0/16
+API server ready at http://0.0.0.0:5001
+Adding IP address 192.168.1.100/24 to MikroTik device ID: 1
+Adding IP address 192.168.1.100/24 to device 1
+IP address 192.168.1.100/24 added successfully to device 1
+Log added for device 1: IP address 192.168.1.100/24 added to interface ether1
+Fetching IP addresses for MikroTik device ID: 1
+IP addresses fetch result: {
+  success: true,
+  message: 'IP addresses fetched successfully.',
+  ipAddresses: [
+    {
+      address: '192.168.1.100/24',
+      network: '192.168.1.0',
+      interface: 'ether1',
+      disabled: false,
+      comment: 'test',
+      type: 'static'
+    }
+  ],
+  source: 'database'
+}
+Fetching system logs for MikroTik device ID: 1
+SSH fallback returning mock system logs data
+=== Update Check Request ===
+Channel: beta
+Stable version: v3.48
+Beta version: v3.50
+Beta ahead: true
+=== Update Check Request ===
+Channel: beta
+Stable version: v3.48
+Beta version: v3.50
+Beta ahead: true
+=== Update Check Request ===
+Channel: beta
+Stable version: v3.48
+Beta version: v3.50
+Beta ahead: true
+=== Update Check Request ===
+Channel: beta
+Stable version: v3.48
+Beta version: v3.50
+Beta ahead: true
+Fetching interfaces for MikroTik device ID: 1
+Fetching IP addresses for MikroTik device ID: 1
+Trying to fetch interfaces from: http://45.90.72.45:80/rest/interface (http)
+Fetching routes for MikroTik device ID: 1
+IP addresses fetch result: {
+  success: true,
+  message: 'IP addresses fetched successfully.',
+  ipAddresses: [
+    {
+      address: '192.168.1.100/24',
+      network: '192.168.1.0',
+      interface: 'ether1',
+      disabled: false,
+      comment: 'test',
+      type: 'static'
+    }
+  ],
+  source: 'database'
+}
+Fetching firewall rules for MikroTik device ID: 1
+Fetching NAT rules for MikroTik device ID: 1
+Trying to fetch routes from: http://45.90.72.45:80/rest/ip/route (http)
+SSH fallback returning mock firewall rules data
+SSH fallback returning mock NAT rules data
+Fetching mangle rules for MikroTik device ID: 1
+Fetching system logs for MikroTik device ID: 1
+SSH fallback returning mock mangle rules data
+SSH fallback returning mock system logs data
+Fetching update info for MikroTik device ID: 1
+Fetching update info for device 1
+SSH fallback returning mock update info
+Error fetching routes via http: request to http://45.90.72.45/rest/ip/route failed, reason: connect ECONNREFUSED 45.90.72.45:80
+Trying to fetch routes from: https://45.90.72.45:443/rest/ip/route (http)
+Error fetching interfaces via http: request to http://45.90.72.45/rest/interface failed, reason: connect ECONNREFUSED 45.90.72.45:80
+Trying to fetch interfaces from: https://45.90.72.45:443/rest/interface (http)
+Error fetching routes via http: request to https://45.90.72.45/rest/ip/route failed, reason: connect ECONNREFUSED 45.90.72.45:443
+Trying to fetch routes from: http://45.90.72.45:8080/rest/ip/route (http)
+Error fetching interfaces via http: request to https://45.90.72.45/rest/interface failed, reason: connect ECONNREFUSED 45.90.72.45:443
+Trying to fetch interfaces from: http://45.90.72.45:8080/rest/interface (http)
+Error fetching routes via http: request to http://45.90.72.45:8080/rest/ip/route failed, reason: connect ECONNREFUSED 45.90.72.45:8080
+Trying to fetch routes from: https://45.90.72.45:8443/rest/ip/route (http)
+Error fetching interfaces via http: request to http://45.90.72.45:8080/rest/interface failed, reason: connect ECONNREFUSED 45.90.72.45:8080
+Trying to fetch interfaces from: https://45.90.72.45:8443/rest/interface (http)
+Error fetching routes via http: request to https://45.90.72.45:8443/rest/ip/route failed, reason: connect ECONNREFUSED 45.90.72.45:8443
+All HTTP/HTTPS methods failed, trying SSH fallback for routes...
+SSH fallback returning mock routes data
+Routes fetch result: {
+  success: true,
+  routes: [
+    {
+      dstAddress: '0.0.0.0/0',
+      gateway: '172.16.85.2',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Default Route via VPN',
+      type: 'AS',
+      mark: 'Majid-VPN'
+    },
+    {
+      dstAddress: '0.0.0.0/0',
+      gateway: 'Eoip-Shatel-Majid-Asiatech-owa',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Default Route via Shatel',
+      type: 'USHI',
+      mark: 'Office'
+    },
+    {
+      dstAddress: '0.0.0.0/0',
+      gateway: '45.90.72.1',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Default Route via WAN',
+      type: 'AS',
+      mark: 'main'
+    },
+    {
+      dstAddress: '8.8.8.8/32',
+      gateway: '172.16.85.2',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Google DNS via VPN',
+      type: 'AS',
+      mark: 'main'
+    },
+    {
+      dstAddress: '45.90.72.0/24',
+      gateway: 'ether2',
+      outInterface: '',
+      distance: '0',
+      active: true,
+      comment: 'Local WAN Network',
+      type: 'DAC',
+      mark: 'main'
+    },
+    {
+      dstAddress: '88.99.247.22/32',
+      gateway: '172.16.85.2',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Specific Host via VPN',
+      type: 'AS',
+      mark: 'Majid-VPN'
+    },
+    {
+      dstAddress: '151.80.194.95/32',
+      gateway: '192.168.78.2',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Specific Host via Office',
+      type: 'USHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '172.16.6.0/30',
+      gateway: 'Eoip-Shatel-Majid-Asiatech-owa',
+      outInterface: '',
+      distance: '0',
+      active: true,
+      comment: 'Shatel Tunnel Network',
+      type: 'DUCHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '172.16.14.0/30',
+      gateway: 'EoipV6-Majid',
+      outInterface: '',
+      distance: '0',
+      active: true,
+      comment: 'IPv6 EoIP Tunnel Network',
+      type: 'DUCHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '172.16.14.4/30',
+      gateway: 'GreV6-Majid',
+      outInterface: '',
+      distance: '0',
+      active: true,
+      comment: 'IPv6 GRE Tunnel Network',
+      type: 'DUCHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '172.16.14.8/30',
+      gateway: 'ipipv6-tunnel1',
+      outInterface: '',
+      distance: '0',
+      active: true,
+      comment: 'IPv6 IPIP Tunnel Network',
+      type: 'DUCHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '172.16.38.0/30',
+      gateway: 'Eoip-Majid-Tehran',
+      outInterface: '',
+      distance: '0',
+      active: true,
+      comment: 'Tehran EoIP Tunnel Network',
+      type: 'DUCHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '172.16.85.0/30',
+      gateway: 'Eoip_Majid.Mashayekhi_72.212',
+      outInterface: '',
+      distance: '0',
+      active: true,
+      comment: 'Mashayekhi EoIP Tunnel Network',
+      type: 'DAC',
+      mark: 'main'
+    },
+    {
+      dstAddress: '172.16.98.0/30',
+      gateway: 'To-HallgheDare',
+      outInterface: '',
+      distance: '0',
+      active: true,
+      comment: 'HallgheDare Tunnel Network',
+      type: 'DAC',
+      mark: 'main'
+    },
+    {
+      dstAddress: '178.22.121.3/32',
+      gateway: '172.16.100.1',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Specific Host via Office',
+      type: 'USHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '192.168.5.0/24',
+      gateway: '172.16.99.2',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Office Network via VPN',
+      type: 'USHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '192.168.17.0/24',
+      gateway: '172.16.38.2',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Office Network via Tehran',
+      type: 'USHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '192.168.100.0/24',
+      gateway: '172.16.99.2',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Office Network via VPN',
+      type: 'USHI',
+      mark: 'main'
+    }
+  ],
+  source: 'ssh-fallback'
+}
+Error fetching interfaces via http: request to https://45.90.72.45:8443/rest/interface failed, reason: connect ECONNREFUSED 45.90.72.45:8443
+All HTTP/HTTPS methods failed, trying SSH fallback for interfaces...
+SSH fallback returning mock interfaces data
+Interfaces fetch result: {
+  success: true,
+  interfaces: [
+    {
+      name: 'ether1',
+      type: 'ether',
+      macAddress: '00:11:22:33:44:55',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'WAN Interface',
+      disabled: false,
+      running: true
+    },
+    {
+      name: 'ether2',
+      type: 'ether',
+      macAddress: '00:11:22:33:44:56',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'Main WAN Interface',
+      disabled: false,
+      running: true
+    },
+    {
+      name: 'Eoip-Shatel-Majid-Asiatech-owa',
+      type: 'eoip',
+      macAddress: '00:11:22:33:44:57',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'Shatel EoIP Tunnel',
+      disabled: false,
+      running: true
+    },
+    {
+      name: 'EoipV6-Majid',
+      type: 'eoipv6',
+      macAddress: '00:11:22:33:44:58',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'IPv6 EoIP Tunnel',
+      disabled: false,
+      running: true
+    },
+    {
+      name: 'GreV6-Majid',
+      type: 'grev6',
+      macAddress: '00:11:22:33:44:59',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'IPv6 GRE Tunnel',
+      disabled: false,
+      running: true
+    },
+    {
+      name: 'ipipv6-tunnel1',
+      type: 'ipipv6',
+      macAddress: '00:11:22:33:44:60',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'IPv6 IPIP Tunnel',
+      disabled: false,
+      running: true
+    },
+    {
+      name: 'Eoip-Majid-Tehran',
+      type: 'eoip',
+      macAddress: '00:11:22:33:44:61',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'Tehran EoIP Tunnel',
+      disabled: false,
+      running: true
+    },
+    {
+      name: 'Eoip_Majid.Mashayekhi_72.212',
+      type: 'eoip',
+      macAddress: '00:11:22:33:44:62',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'Mashayekhi EoIP Tunnel',
+      disabled: false,
+      running: true
+    },
+    {
+      name: 'To-HallgheDare',
+      type: 'gre',
+      macAddress: '00:11:22:33:44:63',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'HallgheDare Tunnel',
+      disabled: false,
+      running: true
+    }
+  ],
+  source: 'ssh-fallback'
+}
+Fetching interfaces for MikroTik device ID: 1
+Fetching IP addresses for MikroTik device ID: 1
+Fetching routes for MikroTik device ID: 1
+Fetching firewall rules for MikroTik device ID: 1
+Fetching NAT rules for MikroTik device ID: 1
+Fetching mangle rules for MikroTik device ID: 1
+IP addresses fetch result: {
+  success: true,
+  message: 'IP addresses fetched successfully.',
+  ipAddresses: [
+    {
+      address: '192.168.1.100/24',
+      network: '192.168.1.0',
+      interface: 'ether1',
+      disabled: false,
+      comment: 'test',
+      type: 'static'
+    }
+  ],
+  source: 'database'
+}
+Trying to fetch interfaces from: http://45.90.72.45:80/rest/interface (http)
+Trying to fetch routes from: http://45.90.72.45:80/rest/ip/route (http)
+SSH fallback returning mock firewall rules data
+Fetching system logs for MikroTik device ID: 1
+SSH fallback returning mock NAT rules data
+SSH fallback returning mock mangle rules data
+SSH fallback returning mock system logs data
+Fetching update info for MikroTik device ID: 1
+Fetching update info for device 1
+SSH fallback returning mock update info
+Error fetching interfaces via http: request to http://45.90.72.45/rest/interface failed, reason: connect ECONNREFUSED 45.90.72.45:80
+Trying to fetch interfaces from: https://45.90.72.45:443/rest/interface (http)
+Error fetching routes via http: request to http://45.90.72.45/rest/ip/route failed, reason: connect ECONNREFUSED 45.90.72.45:80
+Trying to fetch routes from: https://45.90.72.45:443/rest/ip/route (http)
+Error fetching interfaces via http: request to https://45.90.72.45/rest/interface failed, reason: connect ECONNREFUSED 45.90.72.45:443
+Trying to fetch interfaces from: http://45.90.72.45:8080/rest/interface (http)
+Error fetching routes via http: request to https://45.90.72.45/rest/ip/route failed, reason: connect ECONNREFUSED 45.90.72.45:443
+Trying to fetch routes from: http://45.90.72.45:8080/rest/ip/route (http)
+Error fetching interfaces via http: request to http://45.90.72.45:8080/rest/interface failed, reason: connect ECONNREFUSED 45.90.72.45:8080
+Trying to fetch interfaces from: https://45.90.72.45:8443/rest/interface (http)
+Error fetching routes via http: request to http://45.90.72.45:8080/rest/ip/route failed, reason: connect ECONNREFUSED 45.90.72.45:8080
+Trying to fetch routes from: https://45.90.72.45:8443/rest/ip/route (http)
+Error fetching interfaces via http: request to https://45.90.72.45:8443/rest/interface failed, reason: connect ECONNREFUSED 45.90.72.45:8443
+All HTTP/HTTPS methods failed, trying SSH fallback for interfaces...
+SSH fallback returning mock interfaces data
+Interfaces fetch result: {
+  success: true,
+  interfaces: [
+    {
+      name: 'ether1',
+      type: 'ether',
+      macAddress: '00:11:22:33:44:55',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'WAN Interface',
+      disabled: false,
+      running: true
+    },
+    {
+      name: 'ether2',
+      type: 'ether',
+      macAddress: '00:11:22:33:44:56',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'Main WAN Interface',
+      disabled: false,
+      running: true
+    },
+    {
+      name: 'Eoip-Shatel-Majid-Asiatech-owa',
+      type: 'eoip',
+      macAddress: '00:11:22:33:44:57',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'Shatel EoIP Tunnel',
+      disabled: false,
+      running: true
+    },
+    {
+      name: 'EoipV6-Majid',
+      type: 'eoipv6',
+      macAddress: '00:11:22:33:44:58',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'IPv6 EoIP Tunnel',
+      disabled: false,
+      running: true
+    },
+    {
+      name: 'GreV6-Majid',
+      type: 'grev6',
+      macAddress: '00:11:22:33:44:59',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'IPv6 GRE Tunnel',
+      disabled: false,
+      running: true
+    },
+    {
+      name: 'ipipv6-tunnel1',
+      type: 'ipipv6',
+      macAddress: '00:11:22:33:44:60',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'IPv6 IPIP Tunnel',
+      disabled: false,
+      running: true
+    },
+    {
+      name: 'Eoip-Majid-Tehran',
+      type: 'eoip',
+      macAddress: '00:11:22:33:44:61',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'Tehran EoIP Tunnel',
+      disabled: false,
+      running: true
+    },
+    {
+      name: 'Eoip_Majid.Mashayekhi_72.212',
+      type: 'eoip',
+      macAddress: '00:11:22:33:44:62',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'Mashayekhi EoIP Tunnel',
+      disabled: false,
+      running: true
+    },
+    {
+      name: 'To-HallgheDare',
+      type: 'gre',
+      macAddress: '00:11:22:33:44:63',
+      arp: 'enabled',
+      mtu: '1500',
+      comment: 'HallgheDare Tunnel',
+      disabled: false,
+      running: true
+    }
+  ],
+  source: 'ssh-fallback'
+}
+Error fetching routes via http: request to https://45.90.72.45:8443/rest/ip/route failed, reason: connect ECONNREFUSED 45.90.72.45:8443
+All HTTP/HTTPS methods failed, trying SSH fallback for routes...
+SSH fallback returning mock routes data
+Routes fetch result: {
+  success: true,
+  routes: [
+    {
+      dstAddress: '0.0.0.0/0',
+      gateway: '172.16.85.2',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Default Route via VPN',
+      type: 'AS',
+      mark: 'Majid-VPN'
+    },
+    {
+      dstAddress: '0.0.0.0/0',
+      gateway: 'Eoip-Shatel-Majid-Asiatech-owa',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Default Route via Shatel',
+      type: 'USHI',
+      mark: 'Office'
+    },
+    {
+      dstAddress: '0.0.0.0/0',
+      gateway: '45.90.72.1',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Default Route via WAN',
+      type: 'AS',
+      mark: 'main'
+    },
+    {
+      dstAddress: '8.8.8.8/32',
+      gateway: '172.16.85.2',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Google DNS via VPN',
+      type: 'AS',
+      mark: 'main'
+    },
+    {
+      dstAddress: '45.90.72.0/24',
+      gateway: 'ether2',
+      outInterface: '',
+      distance: '0',
+      active: true,
+      comment: 'Local WAN Network',
+      type: 'DAC',
+      mark: 'main'
+    },
+    {
+      dstAddress: '88.99.247.22/32',
+      gateway: '172.16.85.2',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Specific Host via VPN',
+      type: 'AS',
+      mark: 'Majid-VPN'
+    },
+    {
+      dstAddress: '151.80.194.95/32',
+      gateway: '192.168.78.2',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Specific Host via Office',
+      type: 'USHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '172.16.6.0/30',
+      gateway: 'Eoip-Shatel-Majid-Asiatech-owa',
+      outInterface: '',
+      distance: '0',
+      active: true,
+      comment: 'Shatel Tunnel Network',
+      type: 'DUCHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '172.16.14.0/30',
+      gateway: 'EoipV6-Majid',
+      outInterface: '',
+      distance: '0',
+      active: true,
+      comment: 'IPv6 EoIP Tunnel Network',
+      type: 'DUCHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '172.16.14.4/30',
+      gateway: 'GreV6-Majid',
+      outInterface: '',
+      distance: '0',
+      active: true,
+      comment: 'IPv6 GRE Tunnel Network',
+      type: 'DUCHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '172.16.14.8/30',
+      gateway: 'ipipv6-tunnel1',
+      outInterface: '',
+      distance: '0',
+      active: true,
+      comment: 'IPv6 IPIP Tunnel Network',
+      type: 'DUCHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '172.16.38.0/30',
+      gateway: 'Eoip-Majid-Tehran',
+      outInterface: '',
+      distance: '0',
+      active: true,
+      comment: 'Tehran EoIP Tunnel Network',
+      type: 'DUCHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '172.16.85.0/30',
+      gateway: 'Eoip_Majid.Mashayekhi_72.212',
+      outInterface: '',
+      distance: '0',
+      active: true,
+      comment: 'Mashayekhi EoIP Tunnel Network',
+      type: 'DAC',
+      mark: 'main'
+    },
+    {
+      dstAddress: '172.16.98.0/30',
+      gateway: 'To-HallgheDare',
+      outInterface: '',
+      distance: '0',
+      active: true,
+      comment: 'HallgheDare Tunnel Network',
+      type: 'DAC',
+      mark: 'main'
+    },
+    {
+      dstAddress: '178.22.121.3/32',
+      gateway: '172.16.100.1',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Specific Host via Office',
+      type: 'USHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '192.168.5.0/24',
+      gateway: '172.16.99.2',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Office Network via VPN',
+      type: 'USHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '192.168.17.0/24',
+      gateway: '172.16.38.2',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Office Network via Tehran',
+      type: 'USHI',
+      mark: 'main'
+    },
+    {
+      dstAddress: '192.168.100.0/24',
+      gateway: '172.16.99.2',
+      outInterface: '',
+      distance: '1',
+      active: true,
+      comment: 'Office Network via VPN',
+      type: 'USHI',
+      mark: 'main'
+    }
+  ],
+  source: 'ssh-fallback'
+}
+Fetching IP addresses for MikroTik device ID: 1
+IP addresses fetch result: {
+  success: true,
+  message: 'IP addresses fetched successfully.',
+  ipAddresses: [
+    {
+      address: '192.168.1.100/24',
+      network: '192.168.1.0',
+      interface: 'ether1',
+      disabled: false,
+      comment: 'test',
+      type: 'static'
+    }
+  ],
+  source: 'database'
+}
+=== Update Check Request ===
+Channel: beta
+Stable version: v3.48
+Beta version: v3.50
+Beta ahead: true
+Testing connectivity for MikroTik device ID: 1
+Testing SSH connection to 45.90.72.45:22
+✅ SSH connection successful to 45.90.72.45:22
+Connectivity test result: {
+  success: true,
+  message: 'SSH connection successful (API disabled)',
+  mikrotik: {
+    id: 1,
+    name: 'Test1-Iran',
+    host: '45.90.72.45',
+    groupId: 1,
+    tags: [ 'test', 'iran' ],
+    notes: 'urfDGV822',
+    routeros: {
+      apiEnabled: false,
+      apiPort: 8728,
+      apiSSL: false,
+      apiUsername: '',
+      apiPassword: '',
+      verifyTLS: true,
+      apiTimeout: 5000,
+      apiRetries: 1,
+      allowInsecureCiphers: false,
+      preferredApiFirst: true,
+      firmwareVersion: '7.17.2',
+      sshEnabled: true,
+      sshPort: 22,
+      sshUsername: 'admin',
+      sshPassword: 'urfDGV822',
+      sshAcceptNewHostKeys: true,
+      autoAcceptFingerprints: false,
+      apiOutput: null,
+      sshOutput: 'SSH port is accessible. Connection test successful.'
+    },
+    status: {
+      updateStatus: 'updated',
+      lastAuditAt: '2025-10-19T20:29:10.897Z'
+    },
+    connectivity: { api: [Object], ssh: [Object] },
+    createdAt: '2025-10-19T19:50:50.121Z',
+    updatedAt: '2025-10-19T22:54:27.833Z',
+    logs: [ [Object] ]
+  }
+}
+Fetching system logs for MikroTik device ID: 1
+SSH fallback returning mock system logs data
+Testing connectivity for MikroTik device ID: 1
+Testing SSH connection to 45.90.72.45:22
+✅ SSH connection successful to 45.90.72.45:22
+Connectivity test result: {
+  success: true,
+  message: 'SSH connection successful (API disabled)',
+  mikrotik: {
+    id: 1,
+    name: 'Test1-Iran',
+    host: '45.90.72.45',
+    groupId: 1,
+    tags: [ 'test', 'iran' ],
+    notes: 'urfDGV822',
+    routeros: {
+      apiEnabled: false,
+      apiPort: 8728,
+      apiSSL: false,
+      apiUsername: '',
+      apiPassword: '',
+      verifyTLS: true,
+      apiTimeout: 5000,
+      apiRetries: 1,
+      allowInsecureCiphers: false,
+      preferredApiFirst: true,
+      firmwareVersion: '7.17.2',
+      sshEnabled: true,
+      sshPort: 22,
+      sshUsername: 'admin',
+      sshPassword: 'urfDGV822',
+      sshAcceptNewHostKeys: true,
+      autoAcceptFingerprints: false,
+      apiOutput: null,
+      sshOutput: 'SSH port is accessible. Connection test successful.'
+    },
+    status: {
+      updateStatus: 'updated',
+      lastAuditAt: '2025-10-19T20:29:10.897Z'
+    },
+    connectivity: { api: [Object], ssh: [Object] },
+    createdAt: '2025-10-19T19:50:50.121Z',
+    updatedAt: '2025-10-19T22:54:31.114Z',
+    logs: [ [Object] ]
+  }
+}
+Fetching system logs for MikroTik device ID: 1
+SSH fallback returning mock system logs data
+Testing connectivity for MikroTik device ID: 1
+Testing SSH connection to 45.90.72.45:22
+✅ SSH connection successful to 45.90.72.45:22
+Connectivity test result: {
+  success: true,
+  message: 'SSH connection successful (API disabled)',
+  mikrotik: {
+    id: 1,
+    name: 'Test1-Iran',
+    host: '45.90.72.45',
+    groupId: 1,
+    tags: [ 'test', 'iran' ],
+    notes: 'urfDGV822',
+    routeros: {
+      apiEnabled: false,
+      apiPort: 8728,
+      apiSSL: false,
+      apiUsername: '',
+      apiPassword: '',
+      verifyTLS: true,
+      apiTimeout: 5000,
+      apiRetries: 1,
+      allowInsecureCiphers: false,
+      preferredApiFirst: true,
+      firmwareVersion: '7.17.2',
+      sshEnabled: true,
+      sshPort: 22,
+      sshUsername: 'admin',
+      sshPassword: 'urfDGV822',
+      sshAcceptNewHostKeys: true,
+      autoAcceptFingerprints: false,
+      apiOutput: null,
+      sshOutput: 'SSH port is accessible. Connection test successful.'
+    },
+    status: {
+      updateStatus: 'updated',
+      lastAuditAt: '2025-10-19T20:29:10.897Z'
+    },
+    connectivity: { api: [Object], ssh: [Object] },
+    createdAt: '2025-10-19T19:50:50.121Z',
+    updatedAt: '2025-10-19T22:54:32.171Z',
+    logs: [ [Object] ]
+  }
+}
+Fetching system logs for MikroTik device ID: 1
+SSH fallback returning mock system logs data
+Testing connectivity for MikroTik device ID: 1
+Testing SSH connection to 45.90.72.45:22
+✅ SSH connection successful to 45.90.72.45:22
+Connectivity test result: {
+  success: true,
+  message: 'SSH connection successful (API disabled)',
+  mikrotik: {
+    id: 1,
+    name: 'Test1-Iran',
+    host: '45.90.72.45',
+    groupId: 1,
+    tags: [ 'test', 'iran' ],
+    notes: 'urfDGV822',
+    routeros: {
+      apiEnabled: false,
+      apiPort: 8728,
+      apiSSL: false,
+      apiUsername: '',
+      apiPassword: '',
+      verifyTLS: true,
+      apiTimeout: 5000,
+      apiRetries: 1,
+      allowInsecureCiphers: false,
+      preferredApiFirst: true,
+      firmwareVersion: '7.17.2',
+      sshEnabled: true,
+      sshPort: 22,
+      sshUsername: 'admin',
+      sshPassword: 'urfDGV822',
+      sshAcceptNewHostKeys: true,
+      autoAcceptFingerprints: false,
+      apiOutput: null,
+      sshOutput: 'SSH port is accessible. Connection test successful.'
+    },
+    status: {
+      updateStatus: 'updated',
+      lastAuditAt: '2025-10-19T20:29:10.897Z'
+    },
+    connectivity: { api: [Object], ssh: [Object] },
+    createdAt: '2025-10-19T19:50:50.121Z',
+    updatedAt: '2025-10-19T22:54:36.036Z',
+    logs: [ [Object] ]
+  }
+}
+Fetching system logs for MikroTik device ID: 1
+SSH fallback returning mock system logs data
+Fetching system logs for MikroTik device ID: 1
+SSH fallback returning mock system logs data
+Fetching system logs for MikroTik device ID: 1
+SSH fallback returning mock system logs data
