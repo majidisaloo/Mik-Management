@@ -972,56 +972,158 @@ const Mikrotiks = () => {
       )}
 
       {/* Modern Search and Filters */}
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-indigo-500/5 rounded-3xl"></div>
-        <div className="relative backdrop-blur-sm bg-white/60 border border-white/30 rounded-3xl p-8 shadow-xl">
+      <div style={{
+        position: 'relative',
+        marginBottom: '2rem'
+      }}>
+        <div style={{
+          position: 'absolute',
+          inset: '0',
+          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(147, 51, 234, 0.08) 50%, rgba(99, 102, 241, 0.08) 100%)',
+          borderRadius: '1.5rem'
+        }}></div>
+        <div style={{
+          position: 'relative',
+          backdropFilter: 'blur(12px)',
+          background: 'rgba(255, 255, 255, 0.85)',
+          border: '1px solid rgba(255, 255, 255, 0.4)',
+          borderRadius: '1.5rem',
+          padding: '1.5rem',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1)'
+        }}>
           <div style={{
             display: 'flex',
-            alignItems: 'center',
-            gap: '2rem',
+            alignItems: 'flex-end',
+            gap: '1.5rem',
             flexWrap: 'wrap'
           }}>
+            {/* Search Input */}
             <div style={{
               flex: '1',
-              minWidth: '300px'
+              minWidth: '320px'
             }}>
-              <label htmlFor="search" className="block text-sm font-bold text-gray-800 uppercase tracking-wide">
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: '700',
+                color: '#374151',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+                marginBottom: '0.5rem'
+              }}>
                 🔍 Search Devices
               </label>
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <div className="w-4 h-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded flex items-center justify-center group-focus-within:scale-110 transition-transform duration-300">
-                    <svg style={{ height: '0.625rem', width: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
+              <div style={{
+                position: 'relative'
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '1rem',
+                  transform: 'translateY(-50%)',
+                  width: '1.25rem',
+                  height: '1.25rem',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                  borderRadius: '0.375rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'transform 0.3s ease',
+                  zIndex: 1
+                }}>
+                  <svg style={{ width: '0.75rem', height: '0.75rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                 </div>
             <input
                 id="search"
                 type="text"
-                  className="block w-full pl-14 pr-4 py-4 bg-white/80 backdrop-blur-sm border border-white/40 rounded-2xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500/50 sm:text-sm font-medium placeholder-gray-500 transition-all duration-300 shadow-lg focus:shadow-xl"
-                placeholder="Search by name, host, or tags..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                  aria-label="Search devices"
-                  aria-describedby="search-help"
+                  placeholder="Search by name, host, or tags..."
+                  style={{
+                    width: '100%',
+                    paddingLeft: '3.5rem',
+                    paddingRight: '1rem',
+                    paddingTop: '0.875rem',
+                    paddingBottom: '0.875rem',
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    backdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(255, 255, 255, 0.5)',
+                    borderRadius: '0.875rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = 'rgba(59, 130, 246, 0.6)';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1), 0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                    e.target.style.transform = 'translateY(-1px)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                    e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+                    e.target.style.transform = 'translateY(0)';
+                  }}
               />
         </div>
             </div>
+
+            {/* Group Filter */}
             <div style={{
               flex: '0 0 auto',
-              minWidth: '200px'
+              minWidth: '220px'
             }}>
-              <label htmlFor="group-filter" className="block text-sm font-bold text-gray-800 uppercase tracking-wide">
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: '700',
+                color: '#374151',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+                marginBottom: '0.5rem'
+              }}>
                 🏷️ Filter by Group
               </label>
-              <div className="relative">
+              <div style={{
+                position: 'relative'
+              }}>
               <select
                 id="group-filter"
-                  className="block w-full px-4 py-4 bg-white/80 backdrop-blur-sm border border-white/40 rounded-2xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500/50 sm:text-sm font-medium transition-all duration-300 shadow-lg focus:shadow-xl appearance-none cursor-pointer"
                 value={filterGroup}
                 onChange={(e) => setFilterGroup(e.target.value)}
-                  aria-label="Filter devices by group"
+                  style={{
+                    width: '100%',
+                    paddingLeft: '1rem',
+                    paddingRight: '3.5rem',
+                    paddingTop: '0.875rem',
+                    paddingBottom: '0.875rem',
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    backdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(255, 255, 255, 0.5)',
+                    borderRadius: '0.875rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    appearance: 'none'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = 'rgba(59, 130, 246, 0.6)';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1), 0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                    e.target.style.transform = 'translateY(-1px)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                    e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+                    e.target.style.transform = 'translateY(0)';
+                  }}
               >
                 <option value="">All Groups</option>
                 {groups.map((group) => (
@@ -1030,12 +1132,24 @@ const Mikrotiks = () => {
                   </option>
                 ))}
               </select>
-                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                <div className="w-4 h-4 bg-gradient-to-br from-purple-500 to-indigo-600 rounded flex items-center justify-center">
-                  <svg style={{ height: '0.625rem', width: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  right: '1rem',
+                  transform: 'translateY(-50%)',
+                  width: '1.25rem',
+                  height: '1.25rem',
+                  background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                  borderRadius: '0.375rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
+                  zIndex: 1
+                }}>
+                  <svg style={{ width: '0.75rem', height: '0.75rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                   </svg>
-                </div>
                 </div>
               </div>
           </div>
@@ -1057,8 +1171,11 @@ const Mikrotiks = () => {
           // Override SSH status if it's explicitly offline or if SSH is disabled on the device
           const actualSshConnected = (device.connectivity?.ssh?.status === 'offline' || device.connectivity?.ssh?.status === 'disabled' || !device.routeros?.sshEnabled) ? false : sshConnected;
           
+          // Determine device connection status - only connected if API OR SSH is actually connected
+          const deviceConnected = apiConnected || actualSshConnected;
+          
           // Determine ping status based on any successful connection
-          const pingStatus = (apiConnected || actualSshConnected) ? 'up' : 'down';
+          const pingStatus = deviceConnected ? 'up' : 'down';
           
           // Calculate ping time - use real ping result if available, otherwise simulate
           const getPingTime = () => {
@@ -1509,8 +1626,8 @@ const Mikrotiks = () => {
                         }}>SSH</span>
                       </div>
                     )}
-                  </div>
-                  
+                    </div>
+                    
                   {/* Modern Device Status Badge */}
                   <div style={{ position: 'relative' }}>
                     <div style={{
@@ -1521,19 +1638,13 @@ const Mikrotiks = () => {
                       color: 'white',
                       boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
                       transition: 'all 0.3s ease',
-                      background: typeof device.status === 'object' && device.status !== null 
-                        ? (device.status.updateStatus === 'connected' ? 'linear-gradient(90deg, #10b981 0%, #059669 100%)' : 
-                           device.status.updateStatus === 'pending' ? 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)' : 
-                           'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)')
-                        : 'linear-gradient(90deg, #6b7280 0%, #4b5563 100%)'
+                      background: deviceConnected 
+                        ? 'linear-gradient(90deg, #10b981 0%, #059669 100%)' 
+                        : 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)'
                     }}>
-                    {typeof device.status === 'object' && device.status !== null 
-                      ? (device.status.updateStatus || 'unknown').toUpperCase()
-                      : typeof device.status === 'string' 
-                        ? device.status.toUpperCase() 
-                        : 'UNKNOWN'}
-                    </div>
-                    {typeof device.status === 'object' && device.status !== null && device.status.updateStatus === 'connected' && (
+                    {deviceConnected ? 'CONNECTED' : 'DISCONNECTED'}
+                      </div>
+                    {deviceConnected && (
                       <div style={{
                         position: 'absolute',
                         inset: 0,

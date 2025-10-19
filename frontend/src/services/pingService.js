@@ -16,15 +16,21 @@ class PingService {
     console.log(`Starting ping test for: ${host}`);
 
     try {
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch('/api/ping', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache'
         },
-        body: JSON.stringify({ host })
+        body: JSON.stringify({ host }),
+        signal: controller.signal
       });
       
+      clearTimeout(timeoutId);
       console.log(`Ping response status for ${host}:`, response.status);
       
       if (response.ok) {
@@ -49,10 +55,17 @@ class PingService {
     } catch (error) {
       console.error(`Ping network error for ${host}:`, error);
       
+      let errorMessage = 'Network error';
+      if (error.name === 'AbortError') {
+        errorMessage = 'Ping timeout';
+      } else if (error.message) {
+        errorMessage = 'Network error: ' + error.message;
+      }
+      
       const errorResult = { 
         success: false, 
         time: 'N/A', 
-        error: 'Network error: ' + error.message 
+        error: errorMessage
       };
       this.pingResults.set(host, errorResult);
       return errorResult;
