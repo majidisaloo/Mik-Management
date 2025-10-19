@@ -15,15 +15,15 @@ const BrandMark = () => {
           </defs>
           
           {/* MikroTik Text */}
-          <text x="0" y="132" font-family="Arial, sans-serif" font-size="120" font-weight="bold" fill="url(#mikrotikGradient)">
+          <text x="0" y="132" fontFamily="Arial, sans-serif" fontSize="120" fontWeight="bold" fill="url(#mikrotikGradient)">
             Mikr
             <tspan fill="url(#gearGradient)">O</tspan>
             Tik
           </text>
           
           {/* Wi-Fi signal lines above 'i' */}
-          <path d="M272 48 Q284 36 296 48" stroke="url(#mikrotikGradient)" stroke-width="12" fill="none" />
-          <path d="M272 36 Q284 24 296 36" stroke="url(#mikrotikGradient)" stroke-width="12" fill="none" />
+          <path d="M272 48 Q284 36 296 48" stroke="url(#mikrotikGradient)" strokeWidth="12" fill="none" />
+          <path d="M272 36 Q284 24 296 36" stroke="url(#mikrotikGradient)" strokeWidth="12" fill="none" />
           
           {/* Gear replacing the 'O' */}
           <g transform="translate(360, 96)">
