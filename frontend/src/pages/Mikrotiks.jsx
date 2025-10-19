@@ -652,9 +652,7 @@ const Mikrotiks = () => {
             }}
             title="Refresh data"
           >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            <span className="text-lg mr-2">🔄</span>
             Refresh
           </button>
           <button
@@ -662,9 +660,7 @@ const Mikrotiks = () => {
             className="btn btn--primary hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl"
             onClick={handleNewDevice}
           >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
+            <span className="text-lg mr-2">➕</span>
             Add Device
           </button>
         </div>
@@ -805,9 +801,7 @@ const Mikrotiks = () => {
                       onClick={() => handleEdit(device)}
                       title="Edit Device"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
+                      <span className="text-lg">✏️</span>
                     </button>
                     <button
                       type="button"
@@ -817,13 +811,9 @@ const Mikrotiks = () => {
                       title="Test Connection - Click to refresh connectivity status"
                     >
                       {testingDevice === device.id ? (
-                        <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
+                        <span className="text-lg animate-spin">⚡</span>
                       ) : (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+                        <span className="text-lg">🔥</span>
                       )}
                       {/* Enhanced hover tooltip */}
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20 pointer-events-none">
@@ -833,13 +823,19 @@ const Mikrotiks = () => {
                     </button>
                     <button
                       type="button"
+                      className="p-2 text-tertiary hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all duration-200 hover:scale-110"
+                      onClick={() => handleDeviceClick(device)}
+                      title="View Device Details"
+                    >
+                      <span className="text-lg">👁️</span>
+                    </button>
+                    <button
+                      type="button"
                       className="p-2 text-tertiary hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 hover:scale-110"
                       onClick={() => handleDelete(device)}
                       title="Delete Device"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
+                      <span className="text-lg">🗑️</span>
                     </button>
                   </div>
                 </div>
