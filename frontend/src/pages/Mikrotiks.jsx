@@ -627,22 +627,81 @@ const Mikrotiks = () => {
   if (loading) {
     return (
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-primary">MikroTik Devices</h1>
-            <p className="text-tertiary mt-2">Manage and monitor your MikroTik router infrastructure.</p>
-        </div>
-        </div>
-        <div className="card">
-          <div className="card__body">
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-20 bg-tertiary bg-opacity-20 rounded-lg animate-pulse"></div>
-              ))}
-                </div>
-                </div>
-                  </div>
+            <h1 className="text-3xl font-bold text-gray-900">MikroTik Devices</h1>
+            <p className="text-gray-600 mt-2">Manage and monitor your MikroTik router infrastructure.</p>
           </div>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-20 bg-gray-200 rounded-lg animate-pulse"></div>
+            <div className="h-10 w-24 bg-gray-200 rounded-lg animate-pulse"></div>
+          </div>
+        </div>
+
+        {/* Search Section Skeleton */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <div className="h-4 w-24 bg-gray-200 rounded animate-pulse mb-2"></div>
+              <div className="h-10 w-full bg-gray-200 rounded-lg animate-pulse"></div>
+            </div>
+            <div>
+              <div className="h-4 w-28 bg-gray-200 rounded animate-pulse mb-2"></div>
+              <div className="h-10 w-full bg-gray-200 rounded-lg animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Device Cards Skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="p-4 border-b border-gray-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gray-200 rounded-xl animate-pulse"></div>
+                    <div>
+                      <div className="h-5 w-24 bg-gray-200 rounded animate-pulse mb-1"></div>
+                      <div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {[...Array(4)].map((_, j) => (
+                      <div key={j} className="w-8 h-8 bg-gray-200 rounded-lg animate-pulse"></div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-gray-200 rounded-full animate-pulse"></div>
+                      <div className="h-4 w-16 bg-gray-200 rounded animate-pulse"></div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-gray-200 rounded-full animate-pulse"></div>
+                      <div className="h-4 w-8 bg-gray-200 rounded animate-pulse"></div>
+                    </div>
+                  </div>
+                  <div className="h-6 w-20 bg-gray-200 rounded-full animate-pulse"></div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="h-3 w-12 bg-gray-200 rounded animate-pulse mb-1"></div>
+                    <div className="h-4 w-16 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                  <div>
+                    <div className="h-3 w-16 bg-gray-200 rounded animate-pulse mb-1"></div>
+                    <div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 
@@ -664,6 +723,7 @@ const Mikrotiks = () => {
               setTimeout(() => setStatus({ type: '', message: '' }), 3000);
             }}
             title="Refresh data"
+            aria-label="Refresh device list"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -674,6 +734,7 @@ const Mikrotiks = () => {
             type="button"
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow-md"
             onClick={handleNewDevice}
+            aria-label="Add new device"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -744,6 +805,8 @@ const Mikrotiks = () => {
                 placeholder="Search by name, host, or tags..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                aria-label="Search devices"
+                aria-describedby="search-help"
               />
             </div>
           </div>
@@ -756,6 +819,7 @@ const Mikrotiks = () => {
               className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               value={filterGroup}
               onChange={(e) => setFilterGroup(e.target.value)}
+              aria-label="Filter devices by group"
             >
               <option value="">All Groups</option>
               {groups.map((group) => (
@@ -769,7 +833,7 @@ const Mikrotiks = () => {
       </div>
 
       {/* Devices Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
         {filteredDevices.map((device) => {
           // Determine connection statuses
           const apiConfigured = device.routeros?.apiEnabled && device.routeros?.apiUsername && device.routeros?.apiPassword;
@@ -820,19 +884,21 @@ const Mikrotiks = () => {
                   <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
                       onClick={() => handleEdit(device)}
                       title="Edit Device"
+                      aria-label={`Edit device ${device.name}`}
                       style={{ fontSize: '18px', lineHeight: '1' }}
                     >
                       ✏️
                     </button>
                     <button
                       type="button"
-                      className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-200"
+                      className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => handleTestConnectivity(device)}
                       disabled={testingDevice === device.id}
                       title="Test Connection"
+                      aria-label={`Test connection for device ${device.name}`}
                       style={{ fontSize: '18px', lineHeight: '1' }}
                     >
                       {testingDevice === device.id ? (
@@ -843,18 +909,20 @@ const Mikrotiks = () => {
                     </button>
                     <button
                       type="button"
-                      className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all duration-200"
+                      className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1"
                       onClick={() => handleDeviceClick(device)}
                       title="View Device Details"
+                      aria-label={`View details for device ${device.name}`}
                       style={{ fontSize: '18px', lineHeight: '1' }}
                     >
                       👁️
                     </button>
                     <button
                       type="button"
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
                       onClick={() => handleDelete(device)}
                       title="Delete Device"
+                      aria-label={`Delete device ${device.name}`}
                       style={{ fontSize: '18px', lineHeight: '1' }}
                     >
                       🗑️
@@ -961,27 +1029,48 @@ const Mikrotiks = () => {
       </div>
 
       {filteredDevices.length === 0 && (
-        <div className="card">
-          <div className="card__body text-center py-12">
-            <DeviceIcon />
-            <h3 className="text-lg font-semibold text-primary mt-4">No devices found</h3>
-            <p className="text-tertiary mt-2">
-              {searchTerm || filterGroup 
-                ? 'No devices match your current filters.' 
-                : 'Get started by adding your first MikroTik device.'
-              }
-            </p>
-            {!searchTerm && !filterGroup && (
-              <button
-                type="button"
-                className="btn btn--primary mt-4"
-                onClick={handleNewDevice}
-              >
-                <PlusIcon />
-                Add Your First Device
-              </button>
-            )}
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+            <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
           </div>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            {searchTerm || filterGroup ? 'No devices found' : 'No devices yet'}
+          </h3>
+          <p className="text-gray-600 mb-6 max-w-md mx-auto">
+            {searchTerm || filterGroup 
+              ? 'Try adjusting your search criteria or filters to find what you\'re looking for.' 
+              : 'Get started by adding your first MikroTik device to begin monitoring your network infrastructure.'
+            }
+          </p>
+          {!searchTerm && !filterGroup && (
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow-md"
+              onClick={handleNewDevice}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Add Your First Device
+            </button>
+          )}
+          {(searchTerm || filterGroup) && (
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+              onClick={() => {
+                setSearchTerm('');
+                setFilterGroup('');
+              }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Clear Filters
+            </button>
+          )}
         </div>
       )}
 
