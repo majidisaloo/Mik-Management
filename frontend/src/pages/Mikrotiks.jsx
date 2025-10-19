@@ -427,7 +427,6 @@ const Mikrotiks = () => {
   const handleTestConnectivity = async (device) => {
     try {
       setTestingDevice(device.id);
-      setStatus({ type: 'info', message: `Testing connectivity for ${device.name}...` });
       
       const response = await fetch(`/api/mikrotiks/${device.id}/test-connectivity`, {
         method: 'POST'
@@ -443,15 +442,28 @@ const Mikrotiks = () => {
       // Refresh the devices list to show updated connectivity status
       await loadDevices();
       
+      // Show success message with green hover effect
       setStatus({
-        type: result.success ? 'success' : 'error',
-        message: result.message || (result.success ? 'Connection test completed successfully!' : 'Connection test failed.')
+        type: 'success',
+        message: result.message || 'Connectivity refreshed successfully!'
       });
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => {
+        setStatus({ type: '', message: '' });
+      }, 3000);
+      
     } catch (error) {
+      // Show error message with red hover effect
       setStatus({
         type: 'error',
         message: error.message || 'Connection test failed.'
       });
+      
+      // Auto-hide error message after 5 seconds
+      setTimeout(() => {
+        setStatus({ type: '', message: '' });
+      }, 5000);
     } finally {
       setTestingDevice(null);
     }
@@ -654,17 +666,28 @@ const Mikrotiks = () => {
         </div>
         </div>
 
-      {/* Status Message */}
+      {/* Status Message with Enhanced Hover Effects */}
       {status.message && (
-        <div className={`p-4 rounded-xl border ${
+        <div className={`p-4 rounded-xl border transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
           status.type === 'error' 
-            ? 'bg-error-50 border-error-200 text-error-700' 
+            ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100 hover:border-red-300' 
             : status.type === 'info'
-            ? 'bg-blue-50 border-blue-200 text-blue-700'
-            : 'bg-success-50 border-success-200 text-success-700'
+            ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300'
+            : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300'
         }`}>
-          {status.message}
+          <div className="flex items-center gap-2">
+            {status.type === 'success' && (
+              <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+            )}
+            {status.type === 'error' && (
+              <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse"></div>
+            )}
+            {status.type === 'info' && (
+              <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse"></div>
+            )}
+            <span className="font-medium">{status.message}</span>
           </div>
+        </div>
       )}
 
       {/* Success Alert */}
@@ -767,16 +790,21 @@ const Mikrotiks = () => {
                     </button>
                     <button
                       type="button"
-                      className="p-1 text-tertiary hover:text-primary hover:bg-primary-50 rounded transition-colors"
+                      className="p-1 text-tertiary hover:text-green-600 hover:bg-green-50 rounded transition-colors group relative"
                       onClick={() => handleTestConnectivity(device)}
                       disabled={testingDevice === device.id}
-                      title="Test Connection"
+                      title="Test Connection - Click to refresh connectivity status"
                     >
                       {testingDevice === device.id ? (
-                        <RefreshIcon />
+                        <RefreshIcon className="animate-spin" />
                       ) : (
                         <TestIcon />
                       )}
+                      {/* Enhanced hover tooltip */}
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20 pointer-events-none">
+                        Test Connectivity
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                      </div>
                     </button>
                     <button
                       type="button"
