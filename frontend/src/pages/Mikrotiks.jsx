@@ -730,8 +730,11 @@ const Mikrotiks = () => {
           const apiConnected = device.connectivity?.api?.status === 'up' || device.connectivity?.api?.status === 'connected' || device.connectivity?.api?.status === 'online';
           const sshConnected = device.connectivity?.ssh?.status === 'up' || device.connectivity?.ssh?.status === 'connected' || device.connectivity?.ssh?.status === 'online';
           
+          // Override SSH status if it's explicitly offline
+          const actualSshConnected = device.connectivity?.ssh?.status === 'offline' ? false : sshConnected;
+          
           // Determine ping status based on any successful connection
-          const pingStatus = (apiConnected || sshConnected) ? 'up' : 'down';
+          const pingStatus = (apiConnected || actualSshConnected) ? 'up' : 'down';
           
           return (
             <div key={device.id} className="card hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
@@ -809,10 +812,10 @@ const Mikrotiks = () => {
                     
                     {/* SSH Status - show if configured or enabled */}
                     {(sshConfigured || device.routeros?.sshEnabled) && (
-                      <div className="flex items-center gap-1 group cursor-help" title={`SSH: ${sshConnected ? 'Connected' : 'Disconnected'} (${device.routeros?.sshEnabled ? 'Enabled' : 'Disabled'})`}>
+                      <div className="flex items-center gap-1 group cursor-help" title={`SSH: ${actualSshConnected ? 'Connected' : 'Disconnected'} (${device.routeros?.sshEnabled ? 'Enabled' : 'Disabled'})`}>
                         <div className={`w-2 h-2 rounded-full transition-colors ${
                           device.routeros?.sshEnabled 
-                            ? (sshConnected ? 'bg-green-500 group-hover:bg-green-400' : 'bg-red-500 group-hover:bg-red-400')
+                            ? (actualSshConnected ? 'bg-green-500 group-hover:bg-green-400' : 'bg-red-500 group-hover:bg-red-400')
                             : 'bg-gray-400 group-hover:bg-gray-300'
                         }`}></div>
                         <span className="text-xs text-tertiary">SSH</span>
