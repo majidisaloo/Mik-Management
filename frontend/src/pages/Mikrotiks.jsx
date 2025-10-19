@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-import './Mikrotiks.css';
 
 // Modern Icons
 const PlusIcon = () => (
@@ -160,6 +159,43 @@ const safeRender = (value, fallback = '—') => {
 const Mikrotiks = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Inject isolated CSS to prevent external interference
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      .mikrotiks-page {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 50%, #e0e7ff 100%);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      .mikrotiks-page * {
+        box-sizing: border-box;
+      }
+      .mikrotiks-page .glassmorphism {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .mikrotiks-page .gradient-text {
+        background: linear-gradient(135deg, #1f2937 0%, #1e40af 50%, #7c3aed 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .mikrotiks-page .modern-shadow {
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      }
+      .mikrotiks-page .hover-lift {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .mikrotiks-page .hover-lift:hover {
+        transform: translateY(-8px) scale(1.02);
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
   const [devices, setDevices] = useState([]);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -706,32 +742,91 @@ const Mikrotiks = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div className="mikrotiks-page">
       {/* Modern Header with Glassmorphism */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-indigo-600/10"></div>
-        <div className="relative backdrop-blur-sm bg-white/80 border-b border-white/20 shadow-xl">
-          <div className="max-w-7xl mx-auto px-6 py-8">
-      <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div style={{ position: 'relative', overflow: 'hidden' }}>
+        <div style={{ 
+          position: 'absolute', 
+          inset: 0, 
+          background: 'linear-gradient(90deg, rgba(37, 99, 235, 0.1) 0%, rgba(147, 51, 234, 0.1) 50%, rgba(79, 70, 229, 0.1) 100%)' 
+        }}></div>
+        <div className="glassmorphism" style={{ 
+          position: 'relative', 
+          borderBottom: '1px solid rgba(255, 255, 255, 0.2)', 
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' 
+        }}>
+          <div style={{ 
+            maxWidth: '80rem', 
+            margin: '0 auto', 
+            padding: '2rem 1.5rem' 
+          }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ 
+                    width: '3rem', 
+                    height: '3rem', 
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)', 
+                    borderRadius: '1rem', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' 
+                  }}>
+                    <svg style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                   </div>
         <div>
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 via-blue-800 to-purple-800 bg-clip-text text-transparent">
+                    <h1 className="gradient-text" style={{ 
+                      fontSize: '2.25rem', 
+                      fontWeight: 'bold', 
+                      margin: 0 
+                    }}>
                       MikroTik Devices
                     </h1>
-                    <p className="text-gray-600 text-lg font-medium">Manage and monitor your network infrastructure</p>
+                    <p style={{ 
+                      color: '#6b7280', 
+                      fontSize: '1.125rem', 
+                      fontWeight: '500', 
+                      margin: 0 
+                    }}>Manage and monitor your network infrastructure</p>
         </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <button
           type="button"
-                  className="group relative inline-flex items-center gap-3 px-6 py-3 text-sm font-semibold text-gray-700 bg-white/70 backdrop-blur-sm border border-white/30 rounded-2xl hover:bg-white/90 hover:border-white/50 focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                  style={{
+                    position: 'relative',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    padding: '0.75rem 1.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#374151',
+                    background: 'rgba(255, 255, 255, 0.7)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '1rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                    outline: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.background = 'rgba(255, 255, 255, 0.9)';
+                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                    e.target.style.transform = 'translateY(-2px)';
+                    e.target.style.boxShadow = '0 20px 40px -10px rgba(0, 0, 0, 0.15)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.background = 'rgba(255, 255, 255, 0.7)';
+                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.1)';
+                  }}
                   onClick={() => {
                     loadDevices();
                     setStatus({ type: 'success', message: 'Data refreshed successfully!' });
@@ -740,25 +835,69 @@ const Mikrotiks = () => {
                   title="Refresh data"
                   aria-label="Refresh device list"
                 >
-                    <div className="w-4 h-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded flex items-center justify-center group-hover:rotate-180 transition-transform duration-500">
-                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div style={{ 
+                      width: '1rem', 
+                      height: '1rem', 
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', 
+                      borderRadius: '0.25rem', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      transition: 'transform 0.5s ease'
+                    }}>
+                      <svg style={{ width: '0.625rem', height: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
                     </div>
-                  <span className="font-semibold">Refresh</span>
+                  <span style={{ fontWeight: '600' }}>Refresh</span>
                 </button>
                 <button
                   type="button"
-                  className="group relative inline-flex items-center gap-3 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 border border-transparent rounded-2xl hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-blue-500/30 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                  style={{
+                    position: 'relative',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    padding: '0.75rem 1.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: 'white',
+                    background: 'linear-gradient(90deg, #2563eb 0%, #8b5cf6 100%)',
+                    border: 'transparent',
+                    borderRadius: '1rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                    outline: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.background = 'linear-gradient(90deg, #1d4ed8 0%, #7c3aed 100%)';
+                    e.target.style.transform = 'translateY(-2px)';
+                    e.target.style.boxShadow = '0 20px 40px -10px rgba(0, 0, 0, 0.15)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.background = 'linear-gradient(90deg, #2563eb 0%, #8b5cf6 100%)';
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.1)';
+                  }}
           onClick={handleNewDevice}
                   aria-label="Add new device"
                 >
-                    <div className="w-4 h-4 bg-white/20 rounded flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div style={{ 
+                      width: '1rem', 
+                      height: '1rem', 
+                      background: 'rgba(255, 255, 255, 0.2)', 
+                      borderRadius: '0.25rem', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      transition: 'transform 0.3s ease'
+                    }}>
+                      <svg style={{ width: '0.625rem', height: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                       </svg>
                     </div>
-                  <span className="font-semibold">Add Device</span>
+                  <span style={{ fontWeight: '600' }}>Add Device</span>
         </button>
               </div>
             </div>
