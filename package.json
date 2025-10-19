@@ -1,6 +1,6 @@
 {
   "name": "mik-management",
-  "version": "1.0.0",
+  "version": "3.48.0",
   "description": "Simple registration site with installation guidance",
   "main": "server.js",
   "scripts": {

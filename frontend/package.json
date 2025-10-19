@@ -1,7 +1,7 @@
 {
   "name": "mik-management-frontend",
   "private": true,
-  "version": "0.0.1",
+  "version": "3.48.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
