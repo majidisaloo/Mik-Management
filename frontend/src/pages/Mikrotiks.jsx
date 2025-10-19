@@ -652,7 +652,7 @@ const Mikrotiks = () => {
             }}
             title="Refresh data"
           >
-            <span className="text-lg mr-2">🔄</span>
+            <span className="text-2xl mr-3">🔄</span>
             Refresh
           </button>
           <button
@@ -660,7 +660,7 @@ const Mikrotiks = () => {
             className="btn btn--primary hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl"
             onClick={handleNewDevice}
           >
-            <span className="text-lg mr-2">➕</span>
+            <span className="text-2xl mr-3">➕</span>
             Add Device
           </button>
         </div>
@@ -794,14 +794,14 @@ const Mikrotiks = () => {
                   </div>
                   
                   {/* Action buttons in top-right */}
-                  <div className="flex items-center gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-3 ml-2" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
                       className="p-2 text-tertiary hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 hover:scale-110"
                       onClick={() => handleEdit(device)}
                       title="Edit Device"
                     >
-                      <span className="text-lg">✏️</span>
+                      <span className="text-2xl">✏️</span>
                     </button>
                     <button
                       type="button"
@@ -811,9 +811,9 @@ const Mikrotiks = () => {
                       title="Test Connection - Click to refresh connectivity status"
                     >
                       {testingDevice === device.id ? (
-                        <span className="text-lg animate-spin">⚡</span>
+                        <span className="text-2xl animate-spin">⚡</span>
                       ) : (
-                        <span className="text-lg">🔥</span>
+                        <span className="text-2xl">🔥</span>
                       )}
                       {/* Enhanced hover tooltip */}
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20 pointer-events-none">
@@ -827,7 +827,7 @@ const Mikrotiks = () => {
                       onClick={() => handleDeviceClick(device)}
                       title="View Device Details"
                     >
-                      <span className="text-lg">👁️</span>
+                      <span className="text-2xl">👁️</span>
                     </button>
                     <button
                       type="button"
@@ -835,7 +835,7 @@ const Mikrotiks = () => {
                       onClick={() => handleDelete(device)}
                       title="Delete Device"
                     >
-                      <span className="text-lg">🗑️</span>
+                      <span className="text-2xl">🗑️</span>
                     </button>
                   </div>
                 </div>
