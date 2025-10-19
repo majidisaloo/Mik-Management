@@ -168,6 +168,19 @@ const Mikrotiks = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState(emptyDeviceForm());
   const [showModal, setShowModal] = useState(false);
+
+  // Add CSS for spin animation
+  React.useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGroup, setFilterGroup] = useState('');
@@ -651,16 +664,18 @@ const Mikrotiks = () => {
               setTimeout(() => setStatus({ type: '', message: '' }), 3000);
             }}
             title="Refresh data"
+            style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
           >
-            <span className="text-2xl mr-3">🔄</span>
+            <span style={{ fontSize: '24px', lineHeight: '1' }}>🔄</span>
             Refresh
           </button>
           <button
             type="button"
             className="btn btn--primary hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl"
             onClick={handleNewDevice}
+            style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
           >
-            <span className="text-2xl mr-3">➕</span>
+            <span style={{ fontSize: '24px', lineHeight: '1' }}>➕</span>
             Add Device
           </button>
         </div>
@@ -794,26 +809,28 @@ const Mikrotiks = () => {
                   </div>
                   
                   {/* Action buttons in top-right */}
-                  <div className="flex items-center gap-3 ml-2" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-4 ml-2" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
-                      className="p-2 text-tertiary hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 hover:scale-110"
+                      className="p-3 text-tertiary hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 hover:scale-110"
                       onClick={() => handleEdit(device)}
                       title="Edit Device"
+                      style={{ fontSize: '24px', lineHeight: '1', minWidth: '40px', minHeight: '40px' }}
                     >
-                      <span className="text-2xl">✏️</span>
+                      ✏️
                     </button>
                     <button
                       type="button"
-                      className="p-2 text-tertiary hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-200 hover:scale-110 group relative"
+                      className="p-3 text-tertiary hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-200 hover:scale-110 group relative"
                       onClick={() => handleTestConnectivity(device)}
                       disabled={testingDevice === device.id}
                       title="Test Connection - Click to refresh connectivity status"
+                      style={{ fontSize: '24px', lineHeight: '1', minWidth: '40px', minHeight: '40px' }}
                     >
                       {testingDevice === device.id ? (
-                        <span className="text-2xl animate-spin">⚡</span>
+                        <span style={{ animation: 'spin 1s linear infinite' }}>⚡</span>
                       ) : (
-                        <span className="text-2xl">🔥</span>
+                        '🔥'
                       )}
                       {/* Enhanced hover tooltip */}
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20 pointer-events-none">
@@ -823,19 +840,21 @@ const Mikrotiks = () => {
                     </button>
                     <button
                       type="button"
-                      className="p-2 text-tertiary hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all duration-200 hover:scale-110"
+                      className="p-3 text-tertiary hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all duration-200 hover:scale-110"
                       onClick={() => handleDeviceClick(device)}
                       title="View Device Details"
+                      style={{ fontSize: '24px', lineHeight: '1', minWidth: '40px', minHeight: '40px' }}
                     >
-                      <span className="text-2xl">👁️</span>
+                      👁️
                     </button>
                     <button
                       type="button"
-                      className="p-2 text-tertiary hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 hover:scale-110"
+                      className="p-3 text-tertiary hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 hover:scale-110"
                       onClick={() => handleDelete(device)}
                       title="Delete Device"
+                      style={{ fontSize: '24px', lineHeight: '1', minWidth: '40px', minHeight: '40px' }}
                     >
-                      <span className="text-2xl">🗑️</span>
+                      🗑️
                     </button>
                   </div>
                 </div>
