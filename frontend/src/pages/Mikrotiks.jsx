@@ -790,158 +790,159 @@ const Mikrotiks = () => {
           };
           
           return (
-            <div key={device.id} className="card hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-              <div className="card__body p-3">
-                {/* Header with device info and action buttons */}
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <div className="p-1 bg-primary-50 rounded-lg flex-shrink-0">
-                      <DeviceIcon />
+            <div key={device.id} className="bg-white rounded-xl border border-gray-200 hover:shadow-lg transition-all duration-200 overflow-hidden">
+              {/* Header section */}
+              <div className="p-4 border-b border-gray-100">
+                <div className="flex items-center justify-between">
+                  {/* Device info */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
+                      <span className="text-2xl">🖥️</span>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-semibold text-primary text-sm truncate" title={safeRender(device.name, 'Unknown Device')}>
-                        {safeRender(device.name, 'Unknown Device')}
-                      </h3>
-                      <p className="text-xs text-tertiary truncate" title={safeRender(device.host, 'No Host')}>
-                        {safeRender(device.host, 'No Host')}
-                      </p>
+                    <div>
+                      <h3 className="font-bold text-lg text-gray-900">{safeRender(device.name, 'Unknown Device')}</h3>
+                      <p className="text-sm text-gray-500 font-mono">{safeRender(device.host, 'No Host')}</p>
                     </div>
                   </div>
                   
-                  {/* Action buttons in top-right */}
-                  <div className="flex items-center gap-4 ml-2" onClick={(e) => e.stopPropagation()}>
+                  {/* Action buttons - Clean and organized */}
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
-                      className="p-3 text-tertiary hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 hover:scale-110"
+                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
                       onClick={() => handleEdit(device)}
                       title="Edit Device"
-                      style={{ fontSize: '24px', lineHeight: '1', minWidth: '40px', minHeight: '40px' }}
+                      style={{ fontSize: '18px', lineHeight: '1' }}
                     >
                       ✏️
                     </button>
                     <button
                       type="button"
-                      className="p-3 text-tertiary hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-200 hover:scale-110 group relative"
+                      className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-200"
                       onClick={() => handleTestConnectivity(device)}
                       disabled={testingDevice === device.id}
-                      title="Test Connection - Click to refresh connectivity status"
-                      style={{ fontSize: '24px', lineHeight: '1', minWidth: '40px', minHeight: '40px' }}
+                      title="Test Connection"
+                      style={{ fontSize: '18px', lineHeight: '1' }}
                     >
                       {testingDevice === device.id ? (
                         <span style={{ animation: 'spin 1s linear infinite' }}>⚡</span>
                       ) : (
                         '🔥'
                       )}
-                      {/* Enhanced hover tooltip */}
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20 pointer-events-none">
-                        Test Connectivity
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
-                      </div>
                     </button>
                     <button
                       type="button"
-                      className="p-3 text-tertiary hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all duration-200 hover:scale-110"
+                      className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all duration-200"
                       onClick={() => handleDeviceClick(device)}
                       title="View Device Details"
-                      style={{ fontSize: '24px', lineHeight: '1', minWidth: '40px', minHeight: '40px' }}
+                      style={{ fontSize: '18px', lineHeight: '1' }}
                     >
                       👁️
                     </button>
                     <button
                       type="button"
-                      className="p-3 text-tertiary hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 hover:scale-110"
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
                       onClick={() => handleDelete(device)}
                       title="Delete Device"
-                      style={{ fontSize: '24px', lineHeight: '1', minWidth: '40px', minHeight: '40px' }}
+                      style={{ fontSize: '18px', lineHeight: '1' }}
                     >
                       🗑️
                     </button>
                   </div>
                 </div>
+              </div>
 
-                {/* Status indicators - compact row */}
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
+              {/* Status section */}
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  {/* Status indicators */}
+                  <div className="flex items-center gap-4">
                     {/* Ping Status */}
-                    <div className="flex items-center gap-1 group cursor-help" title={`Ping: ${getPingTime()} - ${pingStatus === 'up' ? 'Connected' : pingStatus === 'down' ? 'Disconnected' : 'Unknown'}`}>
-                      <div className={`w-2 h-2 rounded-full transition-colors ${
-                        pingStatus === 'up' ? 'bg-green-500 group-hover:bg-green-400' : 
-                        pingStatus === 'down' ? 'bg-red-500 group-hover:bg-red-400' : 
-                        'bg-gray-400 group-hover:bg-gray-300'
+                    <div className="flex items-center gap-2" title={`Ping: ${getPingTime()}`}>
+                      <div className={`w-3 h-3 rounded-full ${
+                        pingStatus === 'up' ? 'bg-green-500' : 
+                        pingStatus === 'down' ? 'bg-red-500' : 
+                        'bg-gray-400'
                       }`}></div>
-                      <span className="text-xs text-tertiary">
+                      <span className="text-sm font-medium text-gray-700">
                         Ping: {getPingTime()}
                       </span>
                     </div>
                     
-                    {/* API Status - only show if configured */}
+                    {/* API Status */}
                     {apiConfigured && (
-                      <div className="flex items-center gap-1 group cursor-help" title={`API: ${apiConnected ? 'Connected' : 'Disconnected'}`}>
-                        <div className={`w-2 h-2 rounded-full transition-colors ${apiConnected ? 'bg-green-500 group-hover:bg-green-400' : 'bg-red-500 group-hover:bg-red-400'}`}></div>
-                        <span className="text-xs text-tertiary">API</span>
+                      <div className="flex items-center gap-2" title={`API: ${apiConnected ? 'Connected' : 'Disconnected'}`}>
+                        <div className={`w-3 h-3 rounded-full ${apiConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                        <span className="text-sm font-medium text-gray-700">API</span>
                       </div>
                     )}
                     
-                    {/* SSH Status - show if configured or enabled */}
+                    {/* SSH Status */}
                     {(sshConfigured || device.routeros?.sshEnabled) && (
-                      <div className="flex items-center gap-1 group cursor-help" title={`SSH: ${!device.routeros?.sshEnabled ? 'Disabled on device' : actualSshConnected ? 'Connected' : device.connectivity?.ssh?.status === 'offline' ? 'Offline (Connection refused)' : 'Disconnected'}`}>
-                        <div className={`w-2 h-2 rounded-full transition-colors ${
+                      <div className="flex items-center gap-2" title={`SSH: ${!device.routeros?.sshEnabled ? 'Disabled' : actualSshConnected ? 'Connected' : 'Disconnected'}`}>
+                        <div className={`w-3 h-3 rounded-full ${
                           !device.routeros?.sshEnabled 
-                            ? 'bg-gray-400 group-hover:bg-gray-300'
-                            : (actualSshConnected ? 'bg-green-500 group-hover:bg-green-400' : 'bg-red-500 group-hover:bg-red-400')
+                            ? 'bg-gray-400'
+                            : (actualSshConnected ? 'bg-green-500' : 'bg-red-500')
                         }`}></div>
-                        <span className="text-xs text-tertiary">SSH</span>
+                        <span className="text-sm font-medium text-gray-700">SSH</span>
                       </div>
                     )}
                   </div>
                   
                   {/* Device Status Badge */}
-                  <span className={`status-badge status-badge--sm ${getStatusColor(device.status)}`} title={
+                  <div className={`px-3 py-1 rounded-full text-xs font-medium ${
                     typeof device.status === 'object' && device.status !== null 
-                      ? `Update Status: ${device.status.updateStatus || 'unknown'}`
-                      : 'Device status unknown'
-                  }>
+                      ? (device.status.updateStatus === 'connected' ? 'bg-green-100 text-green-800' : 
+                         device.status.updateStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                         'bg-red-100 text-red-800')
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
                     {typeof device.status === 'object' && device.status !== null 
                       ? (device.status.updateStatus || 'unknown').toUpperCase()
                       : typeof device.status === 'string' 
                         ? device.status.toUpperCase() 
                         : 'UNKNOWN'}
-                  </span>
-                </div>
-
-                {/* Device details in compact format */}
-                <div className="space-y-1 mb-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-tertiary">Group:</span>
-                    <span className="text-secondary truncate ml-2" title={device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}>
-                      {device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-tertiary">Firmware:</span>
-                    <span className={`truncate ml-2 ${device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() ? 'text-secondary' : 'text-red-500'}`} title={device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() ? device.routeros.firmwareVersion : 'Firmware version not detected - run connection test'}>
-                      {device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() 
-                        ? device.routeros.firmwareVersion 
-                        : 'Not detected'}
-                    </span>
                   </div>
                 </div>
 
-                {/* Tags - compact */}
-                {device.tags && typeof device.tags === 'string' && device.tags.trim() && (
-                  <div className="flex flex-wrap gap-1">
-                    {device.tags.split(',').slice(0, 2).map((tag, index) => (
-                      <span key={index} className="px-1.5 py-0.5 bg-tertiary bg-opacity-20 text-xs rounded-full truncate max-w-[60px]" title={tag.trim()}>
-                        {tag.trim()}
-                      </span>
-                    ))}
-                    {device.tags.split(',').length > 2 && (
-                      <span className="px-1.5 py-0.5 bg-tertiary bg-opacity-20 text-xs rounded-full">
-                        +{device.tags.split(',').length - 2}
-                      </span>
-                    )}
+                {/* Device details */}
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Group:</span>
+                      <p className="font-medium text-gray-900 truncate" title={device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}>
+                        {device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Firmware:</span>
+                      <p className={`font-medium truncate ${device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() ? 'text-gray-900' : 'text-red-500'}`} title={device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() ? device.routeros.firmwareVersion : 'Firmware version not detected'}>
+                        {device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() 
+                          ? device.routeros.firmwareVersion 
+                          : 'Not detected'}
+                      </p>
+                    </div>
                   </div>
-                )}
+                  
+                  {/* Tags */}
+                  {device.tags && typeof device.tags === 'string' && device.tags.trim() && (
+                    <div className="mt-3">
+                      <div className="flex flex-wrap gap-1">
+                        {device.tags.split(',').slice(0, 3).map((tag, index) => (
+                          <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full" title={tag.trim()}>
+                            {tag.trim()}
+                          </span>
+                        ))}
+                        {device.tags.split(',').length > 3 && (
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                            +{device.tags.split(',').length - 3}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           );
