@@ -192,6 +192,14 @@ const Mikrotiks = () => {
       .mikrotiks-page .hover-lift:hover {
         transform: translateY(-8px) scale(1.02);
       }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
     `;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
@@ -1042,59 +1050,208 @@ const Mikrotiks = () => {
           };
           
           return (
-            <div key={device.id} className="group relative bg-white/70 backdrop-blur-sm border border-white/30 rounded-3xl hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 overflow-hidden hover:-translate-y-2 hover:scale-[1.02]">
+            <div 
+              key={device.id} 
+              style={{
+                position: 'relative',
+                background: 'rgba(255, 255, 255, 0.7)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '1.5rem',
+                transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                overflow: 'hidden',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'translateY(-8px) scale(1.02)';
+                e.target.style.boxShadow = '0 25px 50px -12px rgba(59, 130, 246, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0) scale(1)';
+                e.target.style.boxShadow = 'none';
+              }}
+            >
               {/* Gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(147, 51, 234, 0.05) 50%, rgba(79, 70, 229, 0.05) 100%)',
+                opacity: 0,
+                transition: 'opacity 0.5s ease'
+              }}></div>
               
               {/* Header section */}
-              <div className="relative p-4 border-b border-white/20">
-                <div className="flex items-center justify-between">
+              <div style={{
+                position: 'relative',
+                padding: '1rem',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
                   {/* Modern device info */}
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
-                        <span className="text-lg">🖥️</span>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <div style={{ position: 'relative' }}>
+                      <div style={{
+                        width: '2.5rem',
+                        height: '2.5rem',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #4f46e5 100%)',
+                        borderRadius: '0.75rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                        transition: 'all 0.3s ease'
+                      }}>
+                        <span style={{ fontSize: '1.125rem' }}>🖥️</span>
                     </div>
-                      <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
-                        <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
+                      <div style={{
+                        position: 'absolute',
+                        top: '-0.125rem',
+                        right: '-0.125rem',
+                        width: '0.75rem',
+                        height: '0.75rem',
+                        background: 'linear-gradient(135deg, #4ade80 0%, #10b981 100%)',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.1)'
+                      }}>
+                        <div style={{
+                          width: '0.375rem',
+                          height: '0.375rem',
+                          backgroundColor: 'white',
+                          borderRadius: '50%',
+                          animation: 'pulse 2s infinite'
+                        }}></div>
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <h3 className="font-bold text-xl text-gray-900 group-hover:text-blue-800 transition-colors duration-300">{safeRender(device.name, 'Unknown Device')}</h3>
-                      <p className="text-sm text-gray-600 font-mono bg-gray-100/50 px-3 py-1 rounded-lg">{safeRender(device.host, 'No Host')}</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <h3 style={{
+                        fontWeight: 'bold',
+                        fontSize: '1.25rem',
+                        color: '#111827',
+                        margin: 0,
+                        transition: 'color 0.3s ease'
+                      }}>{safeRender(device.name, 'Unknown Device')}</h3>
+                      <p style={{
+                        fontSize: '0.875rem',
+                        color: '#6b7280',
+                        fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
+                        backgroundColor: 'rgba(243, 244, 246, 0.5)',
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: '0.5rem',
+                        margin: 0
+                      }}>{safeRender(device.host, 'No Host')}</p>
                     </div>
                   </div>
                   
                   {/* Modern action buttons */}
-                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
+                  }} onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
-                      className="group/btn p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50/80 rounded-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:scale-110 hover:shadow-lg"
+                      style={{
+                        padding: '0.5rem',
+                        color: '#6b7280',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: '0.75rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        outline: 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.color = '#2563eb';
+                        e.target.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+                        e.target.style.transform = 'scale(1.1)';
+                        e.target.style.boxShadow = '0 4px 12px -2px rgba(0, 0, 0, 0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.color = '#6b7280';
+                        e.target.style.backgroundColor = 'transparent';
+                        e.target.style.transform = 'scale(1)';
+                        e.target.style.boxShadow = 'none';
+                      }}
                       onClick={() => handleEdit(device)}
                       title="Edit Device"
                       aria-label={`Edit device ${device.name}`}
                     >
-                      <div className="w-3 h-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded flex items-center justify-center group-hover/btn:scale-110 transition-transform duration-300">
-                        <svg className="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div style={{
+                        width: '0.75rem',
+                        height: '0.75rem',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                        borderRadius: '0.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'transform 0.3s ease'
+                      }}>
+                        <svg style={{ width: '0.5rem', height: '0.5rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </div>
                     </button>
                     <button
                       type="button"
-                      className="group/btn p-2 text-gray-500 hover:text-green-600 hover:bg-green-50/80 rounded-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-green-500/20 hover:scale-110 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{
+                        padding: '0.5rem',
+                        color: '#6b7280',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: '0.75rem',
+                        cursor: testingDevice === device.id ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.3s ease',
+                        outline: 'none',
+                        opacity: testingDevice === device.id ? 0.5 : 1
+                      }}
+                      onMouseEnter={(e) => {
+                        if (testingDevice !== device.id) {
+                          e.target.style.color = '#16a34a';
+                          e.target.style.backgroundColor = 'rgba(34, 197, 94, 0.1)';
+                          e.target.style.transform = 'scale(1.1)';
+                          e.target.style.boxShadow = '0 4px 12px -2px rgba(0, 0, 0, 0.1)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (testingDevice !== device.id) {
+                          e.target.style.color = '#6b7280';
+                          e.target.style.backgroundColor = 'transparent';
+                          e.target.style.transform = 'scale(1)';
+                          e.target.style.boxShadow = 'none';
+                        }
+                      }}
                       onClick={() => handleTestConnectivity(device)}
                       disabled={testingDevice === device.id}
                       title="Test Connection"
                       aria-label={`Test connection for device ${device.name}`}
                     >
-                      <div className="w-3 h-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded flex items-center justify-center group-hover/btn:scale-110 transition-transform duration-300">
+                      <div style={{
+                        width: '0.75rem',
+                        height: '0.75rem',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        borderRadius: '0.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'transform 0.3s ease'
+                      }}>
                       {testingDevice === device.id ? (
-                          <svg className="w-2 h-2 text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg style={{ width: '0.5rem', height: '0.5rem', color: 'white', animation: 'spin 1s linear infinite' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                           </svg>
                       ) : (
-                          <svg className="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg style={{ width: '0.5rem', height: '0.5rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
                           </svg>
                       )}
@@ -1102,13 +1259,43 @@ const Mikrotiks = () => {
                     </button>
                     <button
                       type="button"
-                      className="group/btn p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50/80 rounded-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500/20 hover:scale-110 hover:shadow-lg"
+                      style={{
+                        padding: '0.5rem',
+                        color: '#6b7280',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: '0.75rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        outline: 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.color = '#9333ea';
+                        e.target.style.backgroundColor = 'rgba(147, 51, 234, 0.1)';
+                        e.target.style.transform = 'scale(1.1)';
+                        e.target.style.boxShadow = '0 4px 12px -2px rgba(0, 0, 0, 0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.color = '#6b7280';
+                        e.target.style.backgroundColor = 'transparent';
+                        e.target.style.transform = 'scale(1)';
+                        e.target.style.boxShadow = 'none';
+                      }}
                       onClick={() => handleDeviceClick(device)}
                       title="View Device Details"
                       aria-label={`View details for device ${device.name}`}
                     >
-                      <div className="w-3 h-3 bg-gradient-to-br from-purple-500 to-indigo-600 rounded flex items-center justify-center group-hover/btn:scale-110 transition-transform duration-300">
-                        <svg className="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div style={{
+                        width: '0.75rem',
+                        height: '0.75rem',
+                        background: 'linear-gradient(135deg, #8b5cf6 0%, #4f46e5 100%)',
+                        borderRadius: '0.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'transform 0.3s ease'
+                      }}>
+                        <svg style={{ width: '0.5rem', height: '0.5rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         </svg>
@@ -1116,13 +1303,43 @@ const Mikrotiks = () => {
                     </button>
                     <button
                       type="button"
-                      className="group/btn p-2 text-gray-500 hover:text-red-600 hover:bg-red-50/80 rounded-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-500/20 hover:scale-110 hover:shadow-lg"
+                      style={{
+                        padding: '0.5rem',
+                        color: '#6b7280',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: '0.75rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        outline: 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.color = '#dc2626';
+                        e.target.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                        e.target.style.transform = 'scale(1.1)';
+                        e.target.style.boxShadow = '0 4px 12px -2px rgba(0, 0, 0, 0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.color = '#6b7280';
+                        e.target.style.backgroundColor = 'transparent';
+                        e.target.style.transform = 'scale(1)';
+                        e.target.style.boxShadow = 'none';
+                      }}
                       onClick={() => handleDelete(device)}
                       title="Delete Device"
                       aria-label={`Delete device ${device.name}`}
                     >
-                      <div className="w-3 h-3 bg-gradient-to-br from-red-500 to-pink-600 rounded flex items-center justify-center group-hover/btn:scale-110 transition-transform duration-300">
-                        <svg className="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div style={{
+                        width: '0.75rem',
+                        height: '0.75rem',
+                        background: 'linear-gradient(135deg, #ef4444 0%, #ec4899 100%)',
+                        borderRadius: '0.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'transform 0.3s ease'
+                      }}>
+                        <svg style={{ width: '0.5rem', height: '0.5rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </div>
