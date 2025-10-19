@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal.jsx';
+import pingService from '../services/pingService.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 // Modern Icons
@@ -229,7 +230,6 @@ const Mikrotiks = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGroup, setFilterGroup] = useState('');
   const [testingDevice, setTestingDevice] = useState(null);
-  const [pingResults, setPingResults] = useState({});
   const [expandedGroups, setExpandedGroups] = useState(() => {
     try {
       const saved = sessionStorage.getItem('mikrotiks-groups-expanded');
@@ -527,49 +527,17 @@ const Mikrotiks = () => {
     }
   };
 
-  // Real ping function using system ping
-  const performRealPing = async (host) => {
-    console.log('Performing ping to:', host);
-    try {
-      const response = await fetch('/api/ping', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ host })
-      });
-      
-      console.log('Ping response status:', response.status);
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Ping response data:', result);
-        return result;
-      } else {
-        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-        console.error('Ping failed:', errorData);
-        return { success: false, time: 'N/A', error: errorData.message || 'Ping failed' };
-      }
-    } catch (error) {
-      console.error('Ping network error:', error);
-      return { success: false, time: 'N/A', error: 'Network error: ' + error.message };
-    }
-  };
-
-  // Test ping for a device
+  // Test ping for a device using independent ping service
   const handleTestPing = async (device) => {
     console.log('Testing ping for device:', device.name, 'Host:', device.host);
     try {
-      const pingResult = await performRealPing(device.host);
+      const pingResult = await pingService.pingHost(device.host);
       console.log('Ping result:', pingResult);
-      setPingResults(prev => ({
-        ...prev,
-        [device.id]: pingResult
-      }));
+      // Force re-render to show updated ping result
+      setTestingDevice(prev => prev === device.id ? null : device.id);
+      setTimeout(() => setTestingDevice(null), 100);
     } catch (error) {
       console.error('Ping test error:', error);
-      setPingResults(prev => ({
-        ...prev,
-        [device.id]: { success: false, time: 'N/A', error: error.message }
-      }));
     }
   };
 
@@ -1007,8 +975,16 @@ const Mikrotiks = () => {
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-indigo-500/5 rounded-3xl"></div>
         <div className="relative backdrop-blur-sm bg-white/60 border border-white/30 rounded-3xl p-8 shadow-xl">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="space-y-3">
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2rem',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{
+              flex: '1',
+              minWidth: '300px'
+            }}>
               <label htmlFor="search" className="block text-sm font-bold text-gray-800 uppercase tracking-wide">
                 🔍 Search Devices
               </label>
@@ -1032,7 +1008,10 @@ const Mikrotiks = () => {
               />
         </div>
             </div>
-            <div className="space-y-3">
+            <div style={{
+              flex: '0 0 auto',
+              minWidth: '200px'
+            }}>
               <label htmlFor="group-filter" className="block text-sm font-bold text-gray-800 uppercase tracking-wide">
                 🏷️ Filter by Group
               </label>
@@ -1083,11 +1062,11 @@ const Mikrotiks = () => {
           
           // Calculate ping time - use real ping result if available, otherwise simulate
           const getPingTime = () => {
-            // Check if we have real ping result for this device
-            if (pingResults[device.id]) {
-              const result = pingResults[device.id];
-              if (result.success) {
-                return result.time || 'N/A';
+            // Check if we have real ping result for this device from ping service
+            const cachedResult = pingService.getCachedResult(device.host);
+            if (cachedResult) {
+              if (cachedResult.success) {
+                return cachedResult.time || 'N/A';
               } else {
                 return 'N/A';
               }
