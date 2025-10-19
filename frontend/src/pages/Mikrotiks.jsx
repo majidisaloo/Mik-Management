@@ -1315,11 +1315,11 @@ const Mikrotiks = () => {
           // Determine ping status based on any successful connection
           const pingStatus = deviceConnected ? 'up' : 'down';
           
-          // Calculate ping time - use real ping result if available, otherwise simulate
-          const getPingTime = () => {
+          // Calculate ping time and status - use real ping result if available, otherwise simulate
+          const getPingInfo = () => {
             // Check if ping is currently loading
             if (pingLoading.has(device.host)) {
-              return 'Loading...';
+              return { time: 'Loading...', success: null, isReal: false };
             }
             
             // Use IP address for ping cache lookup
@@ -1328,28 +1328,29 @@ const Mikrotiks = () => {
             // Check if we have real ping result for this device from ping service
             const cachedResult = pingService.getCachedResult(pingTarget);
             if (cachedResult) {
-              if (cachedResult.success) {
-                return cachedResult.time || 'N/A';
-              } else {
-                return 'N/A';
-              }
+              return {
+                time: cachedResult.time || 'N/A',
+                success: cachedResult.success,
+                isReal: true
+              };
             }
             
             // Fallback to simulated ping based on connection status
             if (pingStatus === 'up') {
               // Simulate ping time based on connection type
               if (apiConnected && actualSshConnected) {
-                return '<1ms'; // Both connected - very fast
+                return { time: '<1ms', success: true, isReal: false }; // Both connected - very fast
               } else if (apiConnected) {
-                return '2ms'; // API only
+                return { time: '2ms', success: true, isReal: false }; // API only
               } else if (actualSshConnected) {
-                return '5ms'; // SSH only
+                return { time: '5ms', success: true, isReal: false }; // SSH only
               }
             }
-            return 'N/A';
+            return { time: 'N/A', success: false, isReal: false };
           };
           
-          const pingTime = getPingTime();
+          const pingInfo = getPingInfo();
+          const pingTime = pingInfo.time;
           
           return (
             <div 
@@ -1717,15 +1718,17 @@ const Mikrotiks = () => {
                         height: '0.75rem',
                         borderRadius: '50%',
                         backgroundColor: pingLoading.has(device.host) ? '#f59e0b' :
-                                       pingStatus === 'up' ? '#10b981' : 
-                                       pingStatus === 'down' ? '#ef4444' : 
+                                       pingInfo.success === true ? '#10b981' : 
+                                       pingInfo.success === false ? '#ef4444' : 
                                        '#9ca3af',
                         animation: pingLoading.has(device.host) ? 'pulse 1.5s ease-in-out infinite' : 'none'
                       }}></div>
                       <span style={{
                         fontSize: '0.875rem',
                         fontWeight: '500',
-                        color: pingLoading.has(device.host) ? '#d97706' : '#374151'
+                        color: pingLoading.has(device.host) ? '#d97706' : 
+                               pingInfo.success === true ? '#166534' :
+                               pingInfo.success === false ? '#dc2626' : '#374151'
                       }}>
                         Ping: {pingTime}
                       </span>
