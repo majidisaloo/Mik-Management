@@ -657,25 +657,27 @@ const Mikrotiks = () => {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            className="btn btn--ghost hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 hover:scale-105"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
             onClick={() => {
               loadDevices();
               setStatus({ type: 'success', message: 'Data refreshed successfully!' });
               setTimeout(() => setStatus({ type: '', message: '' }), 3000);
             }}
             title="Refresh data"
-            style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
           >
-            <span style={{ fontSize: '24px', lineHeight: '1' }}>🔄</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
             Refresh
           </button>
           <button
             type="button"
-            className="btn btn--primary hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow-md"
             onClick={handleNewDevice}
-            style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
           >
-            <span style={{ fontSize: '24px', lineHeight: '1' }}>➕</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
             Add Device
           </button>
         </div>
@@ -722,40 +724,49 @@ const Mikrotiks = () => {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="card mt-8">
-        <div className="card__body">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="search" className="form-label">Search Devices</label>
-            <input
+      {/* Search and Filters */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
+              Search Devices
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
                 id="search"
                 type="text"
-                className="form-input"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 placeholder="Search by name, host, or tags..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-        </div>
-            <div>
-              <label htmlFor="group-filter" className="form-label">Filter by Group</label>
-              <select
-                id="group-filter"
-                className="form-input form-select"
-                value={filterGroup}
-                onChange={(e) => setFilterGroup(e.target.value)}
-              >
-                <option value="">All Groups</option>
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
+            </div>
           </div>
+          <div>
+            <label htmlFor="group-filter" className="block text-sm font-medium text-gray-700 mb-2">
+              Filter by Group
+            </label>
+            <select
+              id="group-filter"
+              className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              value={filterGroup}
+              onChange={(e) => setFilterGroup(e.target.value)}
+            >
+              <option value="">All Groups</option>
+              {groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
-          </div>
-        </div>
 
       {/* Devices Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-3">
