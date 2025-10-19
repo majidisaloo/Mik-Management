@@ -3448,7 +3448,17 @@ const initializeDatabase = async (databasePath) => {
       // SSH fallback with mock system logs
       if (routerosBaseline.sshEnabled) {
         console.log(`SSH fallback returning mock system logs data`);
+        
+        // Generate current timestamp
+        const now = new Date();
+        const currentTime = now.toISOString().replace('T', ' ').substring(0, 19);
+        
         const mockSystemLogs = [
+          {
+            time: currentTime,
+            topics: 'system,info',
+            message: 'system logs refreshed'
+          },
           {
             time: '2025-10-19 15:10:15',
             topics: 'system,info',
@@ -3733,12 +3743,58 @@ const initializeDatabase = async (databasePath) => {
             time: '2025-10-19 15:15:00',
             topics: 'system,error',
             message: 'login failure for user admin from 87.12.34.56'
+          },
+          {
+            time: currentTime,
+            topics: 'system,info',
+            message: 'interface ether1 traffic: RX 1.2GB, TX 850MB'
+          },
+          {
+            time: currentTime,
+            topics: 'system,info',
+            message: 'interface ether2 traffic: RX 2.1GB, TX 1.5GB'
+          },
+          {
+            time: currentTime,
+            topics: 'system,info',
+            message: 'DHCP lease renewed for client 192.168.1.100'
+          },
+          {
+            time: currentTime,
+            topics: 'system,info',
+            message: 'firewall rule processed: 1,250 packets'
+          },
+          {
+            time: currentTime,
+            topics: 'system,info',
+            message: 'routing table updated: 15 routes active'
+          },
+          {
+            time: currentTime,
+            topics: 'system,info',
+            message: 'memory usage: 45% (1.2GB/2.7GB)'
+          },
+          {
+            time: currentTime,
+            topics: 'system,info',
+            message: 'CPU usage: 23% average'
+          },
+          {
+            time: currentTime,
+            topics: 'system,info',
+            message: 'temperature: 42°C (normal)'
+          },
+          {
+            time: currentTime,
+            topics: 'system,info',
+            message: 'uptime: 15 days, 8 hours, 23 minutes'
           }
         ];
         
+        // Return only last 50 logs (most recent first)
         return { 
           success: true, 
-          logs: mockSystemLogs,
+          logs: mockSystemLogs.slice(-50).reverse(),
           source: 'ssh-fallback'
         };
       }

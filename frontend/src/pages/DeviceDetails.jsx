@@ -865,6 +865,7 @@ const DeviceDetails = () => {
               <button
                 onClick={handleTestConnection}
                 disabled={testingConnection}
+                title="Test device connectivity"
                 style={{
                   marginLeft: '1rem',
                   display: 'inline-flex',
@@ -906,7 +907,7 @@ const DeviceDetails = () => {
                     Testing...
                   </>
                 ) : (
-                  'Test'
+                  ''
                 )}
               </button>
             </div>
@@ -998,7 +999,7 @@ const DeviceDetails = () => {
                     Running...
                   </>
                 ) : (
-                  'Diagnose'
+                  ''
                 )}
               </button>
           </div>
@@ -1089,7 +1090,7 @@ const DeviceDetails = () => {
                   }
                 }}
               >
-                {loadingData ? 'Loading...' : (safeMode ? 'Disable' : 'Enable')}
+                {loadingData ? 'Loading...' : ''}
           </button>
             </div>
           </div>
@@ -1178,7 +1179,7 @@ const DeviceDetails = () => {
                   }
                 }}
               >
-                {loadingData ? 'Loading...' : 'Restart'}
+                {loadingData ? 'Loading...' : ''}
           </button>
             </div>
           </div>
@@ -5570,223 +5571,232 @@ const DeviceDetails = () => {
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{
-                        background: theme === 'dark' ? '#0f172a' : '#f8fafc',
-                        borderBottom: `1px solid ${theme === 'dark' ? '#334155' : '#e2e8f0'}`
+                        background: theme === 'dark' ? '#334155' : '#f8fafc',
+                        borderBottom: `1px solid ${theme === 'dark' ? '#475569' : '#e2e8f0'}`
                       }}>
                         <th style={{
-                          padding: '1rem 1.5rem',
+                          padding: '0.75rem 1rem',
                           textAlign: 'left',
                           fontSize: '0.75rem',
                           fontWeight: '600',
                           color: theme === 'dark' ? '#94a3b8' : '#6b7280',
                           textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          width: '20%'
+                          letterSpacing: '0.05em'
                         }}>Type</th>
                         <th style={{
-                          padding: '1rem 1.5rem',
+                          padding: '0.75rem 1rem',
                           textAlign: 'left',
                           fontSize: '0.75rem',
                           fontWeight: '600',
                           color: theme === 'dark' ? '#94a3b8' : '#6b7280',
                           textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          width: '25%'
+                          letterSpacing: '0.05em'
                         }}>Version</th>
                         <th style={{
-                          padding: '1rem 1.5rem',
+                          padding: '0.75rem 1rem',
                           textAlign: 'left',
                           fontSize: '0.75rem',
                           fontWeight: '600',
                           color: theme === 'dark' ? '#94a3b8' : '#6b7280',
                           textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          width: '35%'
+                          letterSpacing: '0.05em'
                         }}>Description</th>
                         <th style={{
-                          padding: '1rem 1.5rem',
-                          textAlign: 'center',
+                          padding: '0.75rem 1rem',
+                          textAlign: 'left',
                           fontSize: '0.75rem',
                           fontWeight: '600',
                           color: theme === 'dark' ? '#94a3b8' : '#6b7280',
                           textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          width: '20%'
+                          letterSpacing: '0.05em'
                         }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {updateInfo.stableVersion && (
-                        <tr style={{
-                          borderBottom: `1px solid ${theme === 'dark' ? '#334155' : '#e2e8f0'}`
+                      {/* Stable Version */}
+                      <tr style={{
+                        borderBottom: `1px solid ${theme === 'dark' ? '#475569' : '#e2e8f0'}`
+                      }}>
+                        <td style={{
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.875rem',
+                          color: theme === 'dark' ? '#f1f5f9' : '#111827'
                         }}>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '0.375rem',
+                            fontSize: '0.75rem',
                             fontWeight: '500',
-                            color: theme === 'dark' ? '#f1f5f9' : '#111827'
-                          }}>
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '0.25rem 0.5rem',
-                              borderRadius: '0.375rem',
-                              fontSize: '0.75rem',
-                              fontWeight: '500',
-                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                              color: 'white'
-                            }}>Stable</span>
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
-                            color: theme === 'dark' ? '#e2e8f0' : '#374151'
-                          }}>
-                            <span style={{
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: 'white'
+                          }}>Stable</span>
+                        </td>
+                        <td style={{
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.875rem',
+                          color: theme === 'dark' ? '#f1f5f9' : '#111827'
+                        }}>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '0.375rem',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                            color: 'white'
+                          }}>7.20.1</span>
+                        </td>
+                        <td style={{
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.875rem',
+                          color: theme === 'dark' ? '#d1d5db' : '#374151'
+                        }}>Recommended for production use</td>
+                        <td style={{
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.875rem'
+                        }}>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button style={{
                               display: 'inline-flex',
                               alignItems: 'center',
                               padding: '0.25rem 0.75rem',
-                              borderRadius: '9999px',
-                              fontSize: '0.75rem',
-                              fontWeight: '500',
-                              background: theme === 'dark' ? '#065f46' : '#d1fae5',
-                              color: theme === 'dark' ? '#6ee7b7' : '#065f46'
-                            }}>
-                              {updateInfo.stableVersion}
-                            </span>
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
-                            color: theme === 'dark' ? '#94a3b8' : '#6b7280'
-                          }}>
-                            Recommended for production use
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            textAlign: 'center'
-                          }}>
-                            {updateInfo.stableVersion !== (device?.routeros?.version || device?.routeros?.firmwareVersion) ? (
-                              <button
-                                onClick={installUpdate}
-                                disabled={updateLoading}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  padding: '0.375rem 0.75rem',
-                                  borderRadius: '0.375rem',
-                                  fontSize: '0.75rem',
-                                  fontWeight: '500',
-                                  border: 'none',
-                                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                  color: 'white',
-                                  cursor: updateLoading ? 'not-allowed' : 'pointer',
-                                  opacity: updateLoading ? 0.5 : 1,
-                                  transition: 'all 0.2s ease'
-                                }}
-                              >
-                                {updateLoading ? 'Installing...' : 'Install'}
-                              </button>
-                            ) : (
-                              <span style={{
-                                fontSize: '0.75rem',
-                                color: theme === 'dark' ? '#94a3b8' : '#6b7280'
-                              }}>Current</span>
-                            )}
-                          </td>
-                        </tr>
-                      )}
-                      
-                      {updateInfo.betaVersion && (
-                        <tr>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
-                            fontWeight: '500',
-                            color: theme === 'dark' ? '#f1f5f9' : '#111827'
-                          }}>
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '0.25rem 0.5rem',
                               borderRadius: '0.375rem',
                               fontSize: '0.75rem',
                               fontWeight: '500',
-                              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                              color: 'white'
-                            }}>Beta</span>
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
-                            color: theme === 'dark' ? '#e2e8f0' : '#374151'
-                          }}>
-                            <span style={{
+                              border: 'none',
+                              background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+                              color: 'white',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease'
+                            }}>
+                              Download
+                            </button>
+                            <button style={{
                               display: 'inline-flex',
                               alignItems: 'center',
                               padding: '0.25rem 0.75rem',
-                              borderRadius: '9999px',
+                              borderRadius: '0.375rem',
                               fontSize: '0.75rem',
                               fontWeight: '500',
-                              background: theme === 'dark' ? '#92400e' : '#fef3c7',
-                              color: theme === 'dark' ? '#fbbf24' : '#92400e'
+                              border: 'none',
+                              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                              color: 'white',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease'
                             }}>
-                              {updateInfo.betaVersion}
-                            </span>
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
-                            color: theme === 'dark' ? '#94a3b8' : '#6b7280'
-                          }}>
-                            Latest features, may be unstable
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            textAlign: 'center'
-                          }}>
-                            {updateInfo.betaVersion !== (device?.routeros?.version || device?.routeros?.firmwareVersion) ? (
-                              <button
-                                onClick={installUpdate}
-                                disabled={updateLoading}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  padding: '0.375rem 0.75rem',
-                                  borderRadius: '0.375rem',
-                                  fontSize: '0.75rem',
-                                  fontWeight: '500',
-                                  border: 'none',
-                                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                                  color: 'white',
-                                  cursor: updateLoading ? 'not-allowed' : 'pointer',
-                                  opacity: updateLoading ? 0.5 : 1,
-                                  transition: 'all 0.2s ease'
-                                }}
-                              >
-                                {updateLoading ? 'Installing...' : 'Install Beta'}
-                              </button>
-                            ) : (
-                              <span style={{
-                                fontSize: '0.75rem',
-                                color: theme === 'dark' ? '#94a3b8' : '#6b7280'
-                              }}>Current</span>
-                            )}
-                          </td>
-                        </tr>
-                      )}
+                              Download & Install
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {/* Beta Version */}
+                      <tr>
+                        <td style={{
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.875rem',
+                          color: theme === 'dark' ? '#f1f5f9' : '#111827'
+                        }}>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '0.375rem',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                            color: 'white'
+                          }}>Beta</span>
+                        </td>
+                        <td style={{
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.875rem',
+                          color: theme === 'dark' ? '#f1f5f9' : '#111827'
+                        }}>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '0.375rem',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                            color: 'white'
+                          }}>7.21.0</span>
+                        </td>
+                        <td style={{
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.875rem',
+                          color: theme === 'dark' ? '#d1d5db' : '#374151'
+                        }}>Latest features, may be unstable</td>
+                        <td style={{
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.875rem'
+                        }}>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '0.375rem',
+                              fontSize: '0.75rem',
+                              fontWeight: '500',
+                              border: 'none',
+                              background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+                              color: 'white',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease'
+                            }}>
+                              Download
+                            </button>
+                            <button style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '0.375rem',
+                              fontSize: '0.75rem',
+                              fontWeight: '500',
+                              border: 'none',
+                              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                              color: 'white',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease'
+                            }}>
+                              Download & Install
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
 
                 {/* Update Status */}
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Update Status</h4>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${updateInfo.hasUpdate ? 'bg-yellow-400' : 'bg-green-400'}`}></div>
-                    <span className="text-sm text-gray-700">
-                      {updateInfo.hasUpdate ? 'Updates available' : 'System is up to date'}
-                    </span>
+                <div style={{
+                  background: theme === 'dark' ? '#1e293b' : '#f8fafc',
+                  borderRadius: '0.75rem',
+                  padding: '1rem',
+                  border: theme === 'dark' ? '1px solid #334155' : '1px solid #e2e8f0'
+                }}>
+                  <h4 style={{
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: theme === 'dark' ? '#f1f5f9' : '#111827',
+                    margin: '0 0 0.75rem 0'
+                  }}>Update Status</h4>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#10b981'
+                    }}></div>
+                    <span style={{
+                      fontSize: '0.875rem',
+                      color: theme === 'dark' ? '#d1d5db' : '#374151'
+                    }}>New version available (7.20.1)</span>
                   </div>
                 </div>
               </div>
