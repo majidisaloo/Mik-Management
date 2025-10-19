@@ -1349,52 +1349,102 @@ const Mikrotiks = () => {
                 </div>
 
               {/* Status section */}
-              <div className="p-4">
-                <div className="flex items-center justify-between">
+              <div style={{ padding: '1rem' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
                   {/* Status indicators */}
-                  <div className="flex items-center gap-4">
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem'
+                  }}>
                     {/* Ping Status */}
-                    <div className="flex items-center gap-2" title={`Ping: ${getPingTime()}`}>
-                      <div className={`w-3 h-3 rounded-full ${
-                        pingStatus === 'up' ? 'bg-green-500' : 
-                        pingStatus === 'down' ? 'bg-red-500' : 
-                        'bg-gray-400'
-                      }`}></div>
-                      <span className="text-sm font-medium text-gray-700">
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }} title={`Ping: ${getPingTime()}`}>
+                      <div style={{
+                        width: '0.75rem',
+                        height: '0.75rem',
+                        borderRadius: '50%',
+                        backgroundColor: pingStatus === 'up' ? '#10b981' : 
+                                       pingStatus === 'down' ? '#ef4444' : 
+                                       '#9ca3af'
+                      }}></div>
+                      <span style={{
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: '#374151'
+                      }}>
                         Ping: {getPingTime()}
                       </span>
                     </div>
                     
                     {/* API Status */}
                     {apiConfigured && (
-                      <div className="flex items-center gap-2" title={`API: ${apiConnected ? 'Connected' : 'Disconnected'}`}>
-                        <div className={`w-3 h-3 rounded-full ${apiConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                        <span className="text-sm font-medium text-gray-700">API</span>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }} title={`API: ${apiConnected ? 'Connected' : 'Disconnected'}`}>
+                        <div style={{
+                          width: '0.75rem',
+                          height: '0.75rem',
+                          borderRadius: '50%',
+                          backgroundColor: apiConnected ? '#10b981' : '#ef4444'
+                        }}></div>
+                        <span style={{
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          color: '#374151'
+                        }}>API</span>
                       </div>
                     )}
                     
                     {/* SSH Status */}
                     {(sshConfigured || device.routeros?.sshEnabled) && (
-                      <div className="flex items-center gap-2" title={`SSH: ${!device.routeros?.sshEnabled ? 'Disabled' : actualSshConnected ? 'Connected' : 'Disconnected'}`}>
-                        <div className={`w-3 h-3 rounded-full ${
-                          !device.routeros?.sshEnabled 
-                            ? 'bg-gray-400'
-                            : (actualSshConnected ? 'bg-green-500' : 'bg-red-500')
-                        }`}></div>
-                        <span className="text-sm font-medium text-gray-700">SSH</span>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }} title={`SSH: ${!device.routeros?.sshEnabled ? 'Disabled' : actualSshConnected ? 'Connected' : 'Disconnected'}`}>
+                        <div style={{
+                          width: '0.75rem',
+                          height: '0.75rem',
+                          borderRadius: '50%',
+                          backgroundColor: !device.routeros?.sshEnabled 
+                            ? '#9ca3af'
+                            : (actualSshConnected ? '#10b981' : '#ef4444')
+                        }}></div>
+                        <span style={{
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          color: '#374151'
+                        }}>SSH</span>
                       </div>
                     )}
                   </div>
                   
                   {/* Modern Device Status Badge */}
-                  <div className="relative">
-                    <div className={`px-4 py-2 rounded-2xl text-sm font-bold shadow-lg transition-all duration-300 ${
-                    typeof device.status === 'object' && device.status !== null 
-                        ? (device.status.updateStatus === 'connected' ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-green-500/30' : 
-                           device.status.updateStatus === 'pending' ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-yellow-500/30' : 
-                           'bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-red-500/30')
-                        : 'bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-gray-500/30'
-                    }`}>
+                  <div style={{ position: 'relative' }}>
+                    <div style={{
+                      padding: '0.5rem 1rem',
+                      borderRadius: '1rem',
+                      fontSize: '0.875rem',
+                      fontWeight: 'bold',
+                      color: 'white',
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                      transition: 'all 0.3s ease',
+                      background: typeof device.status === 'object' && device.status !== null 
+                        ? (device.status.updateStatus === 'connected' ? 'linear-gradient(90deg, #10b981 0%, #059669 100%)' : 
+                           device.status.updateStatus === 'pending' ? 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)' : 
+                           'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)')
+                        : 'linear-gradient(90deg, #6b7280 0%, #4b5563 100%)'
+                    }}>
                     {typeof device.status === 'object' && device.status !== null 
                       ? (device.status.updateStatus || 'unknown').toUpperCase()
                       : typeof device.status === 'string' 
@@ -1402,34 +1452,86 @@ const Mikrotiks = () => {
                         : 'UNKNOWN'}
                     </div>
                     {typeof device.status === 'object' && device.status !== null && device.status.updateStatus === 'connected' && (
-                      <div className="absolute inset-0 px-4 py-2 rounded-2xl bg-green-400 animate-pulse opacity-30"></div>
+                      <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        padding: '0.5rem 1rem',
+                        borderRadius: '1rem',
+                        backgroundColor: '#4ade80',
+                        animation: 'pulse 2s infinite',
+                        opacity: 0.3
+                      }}></div>
                     )}
                   </div>
                 </div>
 
                 {/* Modern Device details */}
-                <div className="relative mt-4 pt-4 border-t border-white/20">
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Group</span>
-                      <div className="bg-gradient-to-r from-blue-50 to-purple-50 px-3 py-2 rounded-xl border border-blue-100">
-                        <p className="font-bold text-gray-800 truncate" title={device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}>
+                <div style={{
+                  position: 'relative',
+                  marginTop: '1rem',
+                  paddingTop: '1rem',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.2)'
+                }}>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '1.5rem'
+                  }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold',
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>Group</span>
+                      <div style={{
+                        background: 'linear-gradient(90deg, #eff6ff 0%, #f3e8ff 100%)',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '0.75rem',
+                        border: '1px solid #dbeafe'
+                      }}>
+                        <p style={{
+                          fontWeight: 'bold',
+                          color: '#1f2937',
+                          margin: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }} title={device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}>
                       {device.groupId ? groupLookup.get(device.groupId)?.name || 'Unknown' : 'None'}
                         </p>
                   </div>
                     </div>
-                    <div className="space-y-2">
-                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Firmware</span>
-                      <div className={`px-3 py-2 rounded-xl border ${
-                        device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim()
-                          ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-100' 
-                          : 'bg-gradient-to-r from-red-50 to-pink-50 border-red-100'
-                      }`}>
-                        <p className={`font-bold truncate ${
-                          device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim()
-                            ? 'text-gray-800' 
-                            : 'text-red-600'
-                        }`} title={device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() ? device.routeros.firmwareVersion : 'Firmware version not detected'}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold',
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>Firmware</span>
+                      <div style={{
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '0.75rem',
+                        border: '1px solid',
+                        background: device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim()
+                          ? 'linear-gradient(90deg, #f0fdf4 0%, #ecfdf5 100%)'
+                          : 'linear-gradient(90deg, #fef2f2 0%, #fce7f3 100%)',
+                        borderColor: device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim()
+                          ? '#bbf7d0'
+                          : '#fecaca'
+                      }}>
+                        <p style={{
+                          fontWeight: 'bold',
+                          margin: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          color: device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim()
+                            ? '#1f2937'
+                            : '#dc2626'
+                        }} title={device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() ? device.routeros.firmwareVersion : 'Firmware version not detected'}>
                       {device.routeros?.firmwareVersion && device.routeros.firmwareVersion.trim() 
                         ? device.routeros.firmwareVersion 
                         : 'Not detected'}
@@ -1440,16 +1542,55 @@ const Mikrotiks = () => {
 
                   {/* Modern Tags */}
                 {device.tags && typeof device.tags === 'string' && device.tags.trim() && (
-                    <div className="mt-4">
-                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">Tags</span>
-                      <div className="flex flex-wrap gap-2">
+                    <div style={{ marginTop: '1rem' }}>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold',
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '0.5rem',
+                        display: 'block'
+                      }}>Tags</span>
+                      <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '0.5rem'
+                      }}>
                         {device.tags.split(',').slice(0, 3).map((tag, index) => (
-                          <span key={index} className="px-3 py-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs font-bold rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105" title={tag.trim()}>
+                          <span key={index} style={{
+                            padding: '0.25rem 0.75rem',
+                            background: 'linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%)',
+                            color: 'white',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            borderRadius: '9999px',
+                            boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.1)',
+                            transition: 'all 0.3s ease',
+                            cursor: 'pointer'
+                          }} 
+                          onMouseEnter={(e) => {
+                            e.target.style.transform = 'scale(1.05)';
+                            e.target.style.boxShadow = '0 8px 20px -4px rgba(0, 0, 0, 0.15)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.transform = 'scale(1)';
+                            e.target.style.boxShadow = '0 4px 12px -2px rgba(0, 0, 0, 0.1)';
+                          }}
+                          title={tag.trim()}>
                         {tag.trim()}
                       </span>
                     ))}
                         {device.tags.split(',').length > 3 && (
-                          <span className="px-3 py-1 bg-gradient-to-r from-gray-500 to-gray-600 text-white text-xs font-bold rounded-full shadow-lg">
+                          <span style={{
+                            padding: '0.25rem 0.75rem',
+                            background: 'linear-gradient(90deg, #6b7280 0%, #4b5563 100%)',
+                            color: 'white',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            borderRadius: '9999px',
+                            boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.1)'
+                          }}>
                             +{device.tags.split(',').length - 3}
                       </span>
                     )}
