@@ -231,6 +231,7 @@ const Mikrotiks = () => {
   const [filterGroup, setFilterGroup] = useState('');
   const [testingDevice, setTestingDevice] = useState(null);
   const [pingPopup, setPingPopup] = useState({ show: false, device: null, logs: [] });
+  const [pingLoading, setPingLoading] = useState(new Set());
   const [expandedGroups, setExpandedGroups] = useState(() => {
     try {
       const saved = sessionStorage.getItem('mikrotiks-groups-expanded');
@@ -392,6 +393,19 @@ const Mikrotiks = () => {
     return () => clearInterval(interval);
   }, [navigate, user]);
 
+  // Set initial ping loading state when devices are loaded
+  useEffect(() => {
+    if (devices.length > 0) {
+      const deviceHosts = devices.map(device => device.host);
+      setPingLoading(new Set(deviceHosts));
+      
+      // Clear loading state after 3 seconds
+      setTimeout(() => {
+        setPingLoading(new Set());
+      }, 3000);
+    }
+  }, [devices.length]);
+
   const handleCreateDevice = async () => {
     try {
       const response = await fetch('/api/mikrotiks', {
@@ -532,6 +546,9 @@ const Mikrotiks = () => {
   const handleTestPing = async (device) => {
     console.log('Testing ping for device:', device.name, 'Host:', device.host);
     
+    // Set loading state for this device
+    setPingLoading(prev => new Set([...prev, device.host]));
+    
     // Open ping popup with initial logs
     const initialLogs = [
       `🔍 Starting ping test for device: ${device.name}`,
@@ -557,7 +574,7 @@ const Mikrotiks = () => {
         logs: [...prev.logs, `🎯 Ping target confirmed: ${pingTarget}`]
       }));
       
-      const pingResult = await pingService.pingHost(pingTarget);
+      const pingResult = await pingService.pingHostFresh(pingTarget);
       console.log('Ping result:', pingResult);
       
       // Add result logs
@@ -591,6 +608,13 @@ const Mikrotiks = () => {
         ...prev,
         logs: [...prev.logs, ...errorLogs]
       }));
+    } finally {
+      // Clear loading state for this device
+      setPingLoading(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(device.host);
+        return newSet;
+      });
     }
   };
 
@@ -1293,6 +1317,11 @@ const Mikrotiks = () => {
           
           // Calculate ping time - use real ping result if available, otherwise simulate
           const getPingTime = () => {
+            // Check if ping is currently loading
+            if (pingLoading.has(device.host)) {
+              return 'Loading...';
+            }
+            
             // Use IP address for ping cache lookup
             const pingTarget = device.host.includes('.') ? device.host : device.host;
             
@@ -1687,14 +1716,16 @@ const Mikrotiks = () => {
                         width: '0.75rem',
                         height: '0.75rem',
                         borderRadius: '50%',
-                        backgroundColor: pingStatus === 'up' ? '#10b981' : 
+                        backgroundColor: pingLoading.has(device.host) ? '#f59e0b' :
+                                       pingStatus === 'up' ? '#10b981' : 
                                        pingStatus === 'down' ? '#ef4444' : 
-                                       '#9ca3af'
+                                       '#9ca3af',
+                        animation: pingLoading.has(device.host) ? 'pulse 1.5s ease-in-out infinite' : 'none'
                       }}></div>
                       <span style={{
                         fontSize: '0.875rem',
                         fontWeight: '500',
-                        color: '#374151'
+                        color: pingLoading.has(device.host) ? '#d97706' : '#374151'
                       }}>
                         Ping: {pingTime}
                       </span>

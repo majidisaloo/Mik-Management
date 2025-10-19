@@ -6,14 +6,19 @@ class PingService {
   }
 
   // Perform ping test for a host
-  async pingHost(host) {
+  async pingHost(host, forceFresh = false) {
     if (this.isPinging.has(host)) {
       console.log(`Ping already in progress for ${host}`);
       return this.pingResults.get(host) || { success: false, time: 'N/A', error: 'Ping in progress' };
     }
 
+    // Clear cache if forceFresh is true
+    if (forceFresh) {
+      this.pingResults.delete(host);
+    }
+
     this.isPinging.add(host);
-    console.log(`Starting ping test for: ${host}`);
+    console.log(`Starting ping test for: ${host}${forceFresh ? ' (fresh)' : ''}`);
 
     try {
       // Add timeout to prevent hanging
@@ -93,6 +98,17 @@ class PingService {
   // Check if ping is in progress
   isPingInProgress(host) {
     return this.isPinging.has(host);
+  }
+
+  // Force fresh ping without using cache
+  async pingHostFresh(host) {
+    return this.pingHost(host, true);
+  }
+
+  // Clear all cache
+  clearAllCache() {
+    this.pingResults.clear();
+    this.isPinging.clear();
   }
 }
 
