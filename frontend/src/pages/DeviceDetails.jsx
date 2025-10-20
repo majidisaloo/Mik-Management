@@ -460,6 +460,8 @@ const DeviceDetails = () => {
     setDownloadProgress({ step: 'Starting download...', progress: 0 });
     
     try {
+      console.log(`Starting download for channel: ${channel}, device ID: ${id}`);
+      
       const response = await fetch(`/api/mikrotiks/${id}/update/download`, {
         method: 'POST',
         headers: {
@@ -468,8 +470,13 @@ const DeviceDetails = () => {
         body: JSON.stringify({ channel })
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('Download response:', data);
+        
         setDownloadProgress({ 
           step: 'Download completed!', 
           progress: 100,
@@ -483,13 +490,21 @@ const DeviceDetails = () => {
           setDownloadProgress(null);
         }, 1000);
       } else {
-        const error = await response.json();
-        alert(`❌ Download failed: ${error.message}`);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        let errorMessage = 'Unknown error';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+          errorMessage = errorText || `HTTP ${response.status}`;
+        }
+        alert(`❌ Download failed: ${errorMessage}`);
         setDownloadProgress(null);
       }
     } catch (err) {
-      console.error('Error:', err);
-      alert(`❌ Download error: ${err.message}`);
+      console.error('Network error:', err);
+      alert(`❌ Network error: ${err.message}\n\nPlease check if the backend server is running on port 5001.`);
       setDownloadProgress(null);
     } finally {
       setIsDownloading(false);
@@ -501,6 +516,8 @@ const DeviceDetails = () => {
     setDownloadProgress({ step: 'Starting download + install + reboot...', progress: 0 });
     
     try {
+      console.log(`Starting download + install for channel: ${channel}, device ID: ${id}`);
+      
       const response = await fetch(`/api/mikrotiks/${id}/update/install`, {
         method: 'POST',
         headers: {
@@ -509,8 +526,13 @@ const DeviceDetails = () => {
         body: JSON.stringify({ channel })
       });
 
+      console.log('Install response status:', response.status);
+      console.log('Install response ok:', response.ok);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('Install response:', data);
+        
         setDownloadProgress({ 
           step: 'Installation and reboot completed!', 
           progress: 100,
@@ -524,13 +546,21 @@ const DeviceDetails = () => {
           setDownloadProgress(null);
         }, 1000);
       } else {
-        const error = await response.json();
-        alert(`❌ Installation failed: ${error.message}`);
+        const errorText = await response.text();
+        console.error('Install error response:', errorText);
+        let errorMessage = 'Unknown error';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+          errorMessage = errorText || `HTTP ${response.status}`;
+        }
+        alert(`❌ Installation failed: ${errorMessage}`);
         setDownloadProgress(null);
       }
     } catch (err) {
-      console.error('Error:', err);
-      alert(`❌ Installation error: ${err.message}`);
+      console.error('Install network error:', err);
+      alert(`❌ Network error: ${err.message}\n\nPlease check if the backend server is running on port 5001.`);
       setDownloadProgress(null);
     } finally {
       setIsInstalling(false);
