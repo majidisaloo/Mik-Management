@@ -5858,11 +5858,22 @@ async function getMikrotikUpdateInfo(deviceId) {
 
     // Get latest available versions (in real implementation, this would fetch from Mikrotik's update server)
     // For now, we'll use realistic version numbers
-    const versionComparison = compareRouterosVersions(currentVersion, latestStable);
+    const stableVersionComparison = compareRouterosVersions(currentVersion, latestStable);
+    const testingVersionComparison = compareRouterosVersions(currentVersion, latestBeta);
     
-    if (versionComparison < 0) {
+    console.log(`Version comparison - Current: ${currentVersion}, Stable: ${latestStable}, Testing: ${latestBeta}`);
+    console.log(`Stable comparison result: ${stableVersionComparison}, Testing comparison result: ${testingVersionComparison}`);
+    
+    if (stableVersionComparison < 0) {
       // Current version is older than stable
       updateAvailable = true;
+      console.log(`✅ Stable update available: ${currentVersion} < ${latestStable}`);
+    }
+    
+    if (testingVersionComparison < 0) {
+      // Current version is older than testing
+      testingUpdateAvailable = true;
+      console.log(`✅ Testing update available: ${currentVersion} < ${latestBeta}`);
     }
 
     const updateInfo = {
