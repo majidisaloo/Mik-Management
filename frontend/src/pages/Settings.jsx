@@ -170,6 +170,41 @@ const Settings = () => {
     }
   }, []);
 
+  // Load update info on component mount
+  useEffect(() => {
+    const loadUpdateInfo = async () => {
+      try {
+        setUpdateLoading(true);
+        console.log(`=== Auto Update Check ===`);
+        console.log(`Channel: ${updateChannel}`);
+        
+        const response = await fetch('/api/check-updates', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ channel: updateChannel }),
+        });
+
+        const data = await response.json();
+        console.log('Auto check response:', data);
+        
+        if (response.ok) {
+          setUpdateInfo(data);
+          setLastCheckTime(new Date().toISOString());
+        } else {
+          console.error('Failed to load update info:', data.message);
+        }
+      } catch (error) {
+        console.error('Error loading update info:', error);
+      } finally {
+        setUpdateLoading(false);
+      }
+    };
+
+    loadUpdateInfo();
+  }, [updateChannel]);
+
   // Update functions
   const checkForUpdates = async () => {
     try {
@@ -458,48 +493,143 @@ const Settings = () => {
 
       {/* Updates Tab */}
       {activeTab === 'updates' && (
-        <div className="space-y-6">
-          <div className="card">
-            <div className="card__header">
-              <h2 className="card__title">System Updates</h2>
-              <p className="card__subtitle">Manage system updates and version channels</p>
-            </div>
-            <div className="card__content space-y-8">
+        <div style={{
+          // CSS Isolation - Reset all inherited styles
+          all: 'initial',
+          fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          fontSize: '14px',
+          lineHeight: '1.5',
+          color: theme === 'dark' ? '#fff' : '#000',
+          backgroundColor: theme === 'dark' ? '#1a1a1a' : '#fff',
+          padding: '20px',
+          borderRadius: '8px',
+          border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+          boxShadow: theme === 'dark' ? '0 4px 6px rgba(0, 0, 0, 0.3)' : '0 2px 4px rgba(0, 0, 0, 0.1)',
+          // Prevent external CSS interference
+          position: 'relative',
+          zIndex: 1,
+          // Reset common CSS properties that might be inherited
+          margin: 0,
+          boxSizing: 'border-box',
+          // Ensure proper display
+          display: 'block',
+          width: '100%',
+          minHeight: '400px'
+        }}>
+          <div style={{
+            marginBottom: '24px',
+            paddingBottom: '16px',
+            borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`
+          }}>
+            <h2 style={{
+              margin: 0,
+              fontSize: '24px',
+              fontWeight: '600',
+              color: theme === 'dark' ? '#fff' : '#000',
+              fontFamily: 'inherit'
+            }}>System Update</h2>
+            <p style={{
+              margin: '8px 0 0 0',
+              fontSize: '14px',
+              color: theme === 'dark' ? '#ccc' : '#666',
+              fontFamily: 'inherit'
+            }}>Manage system updates and version channels</p>
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
               {/* Update Channel Selection */}
-              <div className="space-y-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
-                  <label className="form-label text-base font-semibold">Update Channel</label>
-                  <p className="text-sm text-gray-600 mt-1">Choose your preferred update channel</p>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    color: theme === 'dark' ? '#fff' : '#000',
+                    marginBottom: '4px',
+                    fontFamily: 'inherit'
+                  }}>Update Channel</label>
+                  <p style={{
+                    fontSize: '14px',
+                    color: theme === 'dark' ? '#ccc' : '#666',
+                    margin: 0,
+                    fontFamily: 'inherit'
+                  }}>Choose your preferred update channel</p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <label className="flex items-start p-4 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer">
-                  <input
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    padding: '16px',
+                    border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff'
+                  }}>
+                    <input
                       type="radio"
                       name="updateChannel"
                       value="stable"
                       checked={updateChannel === 'stable'}
                       onChange={(e) => setUpdateChannel(e.target.value)}
-                      className="mt-1 mr-3 text-primary focus:ring-primary"
+                      style={{
+                        marginTop: '4px',
+                        marginRight: '12px',
+                        accentColor: '#3b82f6'
+                      }}
                     />
                     <div>
-                      <div className="font-medium text-gray-900">Stable</div>
-                      <div className="text-sm text-gray-500 mt-1">Recommended for production environments</div>
+                      <div style={{
+                        fontWeight: '500',
+                        color: theme === 'dark' ? '#fff' : '#000',
+                        fontSize: '14px',
+                        fontFamily: 'inherit'
+                      }}>Stable</div>
+                      <div style={{
+                        fontSize: '12px',
+                        color: theme === 'dark' ? '#ccc' : '#666',
+                        marginTop: '4px',
+                        fontFamily: 'inherit'
+                      }}>Recommended for production environments</div>
                     </div>
-                </label>
-                  <label className="flex items-start p-4 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer">
-                  <input
+                  </label>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    padding: '16px',
+                    border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff'
+                  }}>
+                    <input
                       type="radio"
                       name="updateChannel"
                       value="beta"
                       checked={updateChannel === 'beta'}
                       onChange={(e) => setUpdateChannel(e.target.value)}
-                      className="mt-1 mr-3 text-primary focus:ring-primary"
+                      style={{
+                        marginTop: '4px',
+                        marginRight: '12px',
+                        accentColor: '#3b82f6'
+                      }}
                     />
                     <div>
-                      <div className="font-medium text-gray-900">Beta</div>
-                      <div className="text-sm text-gray-500 mt-1">Latest features, may be unstable</div>
+                      <div style={{
+                        fontWeight: '500',
+                        color: theme === 'dark' ? '#fff' : '#000',
+                        fontSize: '14px',
+                        fontFamily: 'inherit'
+                      }}>Beta</div>
+                      <div style={{
+                        fontSize: '12px',
+                        color: theme === 'dark' ? '#ccc' : '#666',
+                        marginTop: '4px',
+                        fontFamily: 'inherit'
+                      }}>Latest features, may be unstable</div>
                     </div>
-                </label>
+                  </label>
                 </div>
               </div>
 
@@ -545,47 +675,132 @@ const Settings = () => {
               </div>
 
               {/* Current Version */}
-              <div className="space-y-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
-                  <label className="form-label text-base font-semibold">Current Version</label>
-                  <p className="text-sm text-gray-600 mt-1">Your current system version</p>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    color: theme === 'dark' ? '#fff' : '#000',
+                    marginBottom: '4px',
+                    fontFamily: 'inherit'
+                  }}>Current Version</label>
+                  <p style={{
+                    fontSize: '14px',
+                    color: theme === 'dark' ? '#ccc' : '#666',
+                    margin: 0,
+                    fontFamily: 'inherit'
+                  }}>Your current system version</p>
                 </div>
-                <div className="bg-white border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-gray-600">Current Version:</span>
-                    <span className="font-medium text-gray-900">{updateInfo?.currentVersion || 'Loading...'}</span>
+                <div style={{
+                  backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff',
+                  border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                  borderRadius: '8px',
+                  padding: '16px'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '8px 0'
+                  }}>
+                    <span style={{
+                      color: theme === 'dark' ? '#ccc' : '#666',
+                      fontSize: '14px',
+                      fontFamily: 'inherit'
+                    }}>Current Version:</span>
+                    <span style={{
+                      fontWeight: '500',
+                      color: theme === 'dark' ? '#fff' : '#000',
+                      fontSize: '14px',
+                      fontFamily: 'inherit'
+                    }}>{updateInfo?.currentVersion || 'Loading...'}</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
                   {/* Stable Version */}
-                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
+                  <div style={{
+                    background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '8px',
+                    padding: '16px'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
                       <div>
-                        <span className="font-mono text-lg font-bold text-green-900">
+                        <span style={{
+                          fontFamily: 'monospace',
+                          fontSize: '18px',
+                          fontWeight: 'bold',
+                          color: '#166534',
+                          display: 'block'
+                        }}>
                           {updateInfo?.updateInfo?.stableVersion || updateInfo?.stableVersion || updateInfo?.currentVersion?.replace('-beta', '') || 'Loading...'}
                         </span>
-                        <div className="text-sm text-green-600 mt-1">Stable Version</div>
+                        <div style={{
+                          fontSize: '12px',
+                          color: '#16a34a',
+                          marginTop: '4px',
+                          fontFamily: 'inherit'
+                        }}>Stable Version</div>
                       </div>
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <div style={{
+                        width: '12px',
+                        height: '12px',
+                        backgroundColor: '#22c55e',
+                        borderRadius: '50%'
+                      }}></div>
                     </div>
                   </div>
                   
                   {/* Beta Version */}
-                  <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
+                  <div style={{
+                    background: 'linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%)',
+                    border: '1px solid #fed7aa',
+                    borderRadius: '8px',
+                    padding: '16px'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
                       <div>
-                        <span className="font-mono text-lg font-bold text-orange-900">
+                        <span style={{
+                          fontFamily: 'monospace',
+                          fontSize: '18px',
+                          fontWeight: 'bold',
+                          color: '#c2410c',
+                          display: 'block'
+                        }}>
                           {updateInfo?.updateInfo?.betaVersion || updateInfo?.betaVersion || updateInfo?.currentVersion || 'Loading...'}
                         </span>
-                        <div className="text-sm text-orange-600 mt-1">Beta Version</div>
+                        <div style={{
+                          fontSize: '12px',
+                          color: '#ea580c',
+                          marginTop: '4px',
+                          fontFamily: 'inherit'
+                        }}>Beta Version</div>
                       </div>
-                      <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                      <div style={{
+                        width: '12px',
+                        height: '12px',
+                        backgroundColor: '#f97316',
+                        borderRadius: '50%'
+                      }}></div>
                     </div>
                   </div>
                 </div>
                 {lastCheckTime && (
-                  <div className="text-right">
-                    <div className="text-xs text-blue-500">
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{
+                      fontSize: '12px',
+                      color: '#3b82f6',
+                      fontFamily: 'inherit'
+                    }}>
                       Last checked: {new Date(lastCheckTime).toLocaleTimeString()}
                     </div>
                   </div>
@@ -613,45 +828,168 @@ const Settings = () => {
 
               {/* Update Info */}
               {updateInfo && (
-                <div className="space-y-4">
-                      <div>
-                    <label className="form-label text-base font-semibold">Update Information</label>
-                    <p className="text-sm text-gray-600 mt-1">Current update status and available versions</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: theme === 'dark' ? '#fff' : '#000',
+                      marginBottom: '4px',
+                      fontFamily: 'inherit'
+                    }}>Update Information</label>
+                    <p style={{
+                      fontSize: '14px',
+                      color: theme === 'dark' ? '#ccc' : '#666',
+                      margin: 0,
+                      fontFamily: 'inherit'
+                    }}>Current update status and available versions</p>
                   </div>
-                  <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-gray-600">Channel:</span>
-                      <span className="font-medium text-gray-900 capitalize">{updateInfo.channel}</span>
+                  <div style={{
+                    backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff',
+                    border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    borderRadius: '8px',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '8px 0',
+                      borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#eee'}`
+                    }}>
+                      <span style={{
+                        color: theme === 'dark' ? '#ccc' : '#666',
+                        fontSize: '14px',
+                        fontFamily: 'inherit'
+                      }}>Channel:</span>
+                      <span style={{
+                        fontWeight: '500',
+                        color: theme === 'dark' ? '#fff' : '#000',
+                        fontSize: '14px',
+                        fontFamily: 'inherit',
+                        textTransform: 'capitalize'
+                      }}>{updateInfo.channel}</span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-gray-600">Latest Stable:</span>
-                      <span className="font-medium text-gray-900">{updateInfo?.updateInfo?.stableVersion || updateInfo?.stableVersion || 'N/A'}</span>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '8px 0',
+                      borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#eee'}`
+                    }}>
+                      <span style={{
+                        color: theme === 'dark' ? '#ccc' : '#666',
+                        fontSize: '14px',
+                        fontFamily: 'inherit'
+                      }}>Latest Stable:</span>
+                      <span style={{
+                        fontWeight: '500',
+                        color: theme === 'dark' ? '#fff' : '#000',
+                        fontSize: '14px',
+                        fontFamily: 'inherit'
+                      }}>{updateInfo?.updateInfo?.stableVersion || updateInfo?.stableVersion || 'N/A'}</span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-gray-600">Latest Beta:</span>
-                      <span className="font-medium text-gray-900">{updateInfo?.updateInfo?.betaVersion || updateInfo?.betaVersion || 'N/A'}</span>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '8px 0',
+                      borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#eee'}`
+                    }}>
+                      <span style={{
+                        color: theme === 'dark' ? '#ccc' : '#666',
+                        fontSize: '14px',
+                        fontFamily: 'inherit'
+                      }}>Latest Beta:</span>
+                      <span style={{
+                        fontWeight: '500',
+                        color: theme === 'dark' ? '#fff' : '#000',
+                        fontSize: '14px',
+                        fontFamily: 'inherit'
+                      }}>{updateInfo?.updateInfo?.betaVersion || updateInfo?.betaVersion || 'N/A'}</span>
                     </div>
                     {updateInfo.updateAvailable ? (
                       <>
-                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                          <span className="text-gray-600">Update Available:</span>
-                          <span className="font-medium text-green-600">Yes</span>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '8px 0',
+                          borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#eee'}`
+                        }}>
+                          <span style={{
+                            color: theme === 'dark' ? '#ccc' : '#666',
+                            fontSize: '14px',
+                            fontFamily: 'inherit'
+                          }}>Update Available:</span>
+                          <span style={{
+                            fontWeight: '500',
+                            color: '#16a34a',
+                            fontSize: '14px',
+                            fontFamily: 'inherit'
+                          }}>Yes</span>
                         </div>
-                        <div className="flex justify-between items-center py-2">
-                          <span className="text-gray-600">Target Version:</span>
-                          <span className="font-medium text-green-600">{updateInfo.latestVersion}</span>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '8px 0'
+                        }}>
+                          <span style={{
+                            color: theme === 'dark' ? '#ccc' : '#666',
+                            fontSize: '14px',
+                            fontFamily: 'inherit'
+                          }}>Target Version:</span>
+                          <span style={{
+                            fontWeight: '500',
+                            color: '#16a34a',
+                            fontSize: '14px',
+                            fontFamily: 'inherit'
+                          }}>{updateInfo.latestVersion}</span>
                         </div>
                         {updateInfo.updateInfo?.updateSize && (
-                          <div className="flex justify-between items-center py-2">
-                            <span className="text-gray-600">Commits Behind:</span>
-                            <span className="font-medium text-orange-600">{updateInfo.updateInfo.updateSize}</span>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '8px 0'
+                          }}>
+                            <span style={{
+                              color: theme === 'dark' ? '#ccc' : '#666',
+                              fontSize: '14px',
+                              fontFamily: 'inherit'
+                            }}>Commits Behind:</span>
+                            <span style={{
+                              fontWeight: '500',
+                              color: '#ea580c',
+                              fontSize: '14px',
+                              fontFamily: 'inherit'
+                            }}>{updateInfo.updateInfo.updateSize}</span>
                           </div>
                         )}
                       </>
                     ) : (
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-gray-600">Update Available:</span>
-                        <span className="font-medium text-green-600">No</span>
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '8px 0'
+                      }}>
+                        <span style={{
+                          color: theme === 'dark' ? '#ccc' : '#666',
+                          fontSize: '14px',
+                          fontFamily: 'inherit'
+                        }}>Update Available:</span>
+                        <span style={{
+                          fontWeight: '500',
+                          color: '#16a34a',
+                          fontSize: '14px',
+                          fontFamily: 'inherit'
+                        }}>No</span>
                       </div>
                     )}
                   </div>
@@ -659,25 +997,73 @@ const Settings = () => {
               )}
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                paddingTop: '16px',
+                borderTop: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`
+              }}>
                 <button
                   type="button"
-                  className="btn btn--secondary flex items-center justify-center"
                   onClick={checkForUpdates}
                   disabled={updateLoading}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '12px 24px',
+                    backgroundColor: updateLoading ? (theme === 'dark' ? '#6c757d' : '#6c757d') : (theme === 'dark' ? '#374151' : '#f3f4f6'),
+                    color: updateLoading ? '#fff' : (theme === 'dark' ? '#fff' : '#374151'),
+                    border: `1px solid ${theme === 'dark' ? '#4b5563' : '#d1d5db'}`,
+                    borderRadius: '8px',
+                    cursor: updateLoading ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    opacity: updateLoading ? 0.7 : 1,
+                    transition: 'all 0.2s ease',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                    margin: 0,
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                    outline: 'none'
+                  }}
                 >
                   <RefreshIcon />
-                  <span className="ml-2">{updateLoading ? 'Checking...' : 'Check for Updates'}</span>
+                  <span style={{ marginLeft: '8px' }}>{updateLoading ? 'Checking...' : 'Check for Updates'}</span>
                 </button>
                 {updateInfo?.updateAvailable && (
                   <button
                     type="button"
-                    className="btn btn--primary flex items-center justify-center"
                     onClick={performUpdate}
                     disabled={updateLoading}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '12px 24px',
+                      backgroundColor: updateLoading ? (theme === 'dark' ? '#6c757d' : '#6c757d') : '#3b82f6',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: updateLoading ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      opacity: updateLoading ? 0.7 : 1,
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'inherit',
+                      boxSizing: 'border-box',
+                      margin: 0,
+                      appearance: 'none',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'none',
+                      outline: 'none'
+                    }}
                   >
                     <UpdateIcon />
-                    <span className="ml-2">{updateLoading ? 'Updating...' : 'Update Now'}</span>
+                    <span style={{ marginLeft: '8px' }}>{updateLoading ? 'Updating...' : 'Update Now'}</span>
                   </button>
                 )}
               </div>
