@@ -5665,8 +5665,8 @@ async function toggleMikrotikSafeMode(deviceId, enabled) {
         
         // Use the appropriate command based on enabled state
         const safeModeCommand = enabled 
-          ? `sshpass -p "${routerosBaseline.sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${routerosBaseline.sshUsername}@${host} "/system routerboard settings set boot-device=try-ethernet-once-and-then-nand"`
-          : `sshpass -p "${routerosBaseline.sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${routerosBaseline.sshUsername}@${host} "/system routerboard settings set boot-device=nand-only"`;
+          ? `sshpass -p "${routerosBaseline.sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${routerosBaseline.sshUsername}@${host} "/system routerboard settings set boot-device=try-ethernet-once"`
+          : `sshpass -p "${routerosBaseline.sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${routerosBaseline.sshUsername}@${host} "/system routerboard settings set boot-device=flash"`;
         
         console.log(`Executing safe mode command: ${safeModeCommand.replace(routerosBaseline.sshPassword, '***')}`);
         
@@ -5707,6 +5707,56 @@ async function toggleMikrotikSafeMode(deviceId, enabled) {
       enabled: false,
       message: error.message
     };
+  }
+}
+
+// Function to check safe mode status
+async function getMikrotikSafeModeStatus(deviceId) {
+  try {
+    const routerosBaseline = await getMikrotik(deviceId);
+    if (!routerosBaseline) {
+      return { success: false, message: 'Device not found' };
+    }
+
+    const { host, sshEnabled, sshUsername, sshPassword } = routerosBaseline;
+
+    if (!sshEnabled) {
+      return { success: false, message: 'SSH not enabled for this device' };
+    }
+
+    // Check safe mode status via SSH
+    const { exec } = await import('child_process');
+    const statusCommand = `sshpass -p "${sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${sshUsername}@${host} "/system routerboard settings print"`;
+    
+    console.log(`Checking safe mode status: ${statusCommand.replace(sshPassword, '***')}`);
+    
+    const result = await new Promise((resolve, reject) => {
+      exec(statusCommand, { timeout: 15000 }, (error, stdout, stderr) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve({ stdout, stderr });
+        }
+      });
+    });
+
+    if (result.stdout) {
+      console.log(`✅ Safe mode status check result: ${result.stdout}`);
+      
+      // Parse the output to determine safe mode status
+      const bootDeviceMatch = result.stdout.match(/boot-device:\s*([^\s\n]+)/);
+      if (bootDeviceMatch) {
+        const bootDevice = bootDeviceMatch[1];
+        const isSafeMode = bootDevice === 'try-ethernet-once';
+        console.log(`🔍 Boot device: ${bootDevice}, Safe mode: ${isSafeMode}`);
+        return { success: true, enabled: isSafeMode, bootDevice };
+      }
+    }
+    
+    return { success: false, message: 'Could not determine safe mode status' };
+  } catch (error) {
+    console.log(`❌ Failed to check safe mode status: ${error.message}`);
+    return { success: false, message: error.message };
   }
 }
 
@@ -6067,5 +6117,5 @@ async function addMikrotikIpAddress(deviceId, ipData) {
   }
 }
 
-export { toggleMikrotikSafeMode, getMikrotikUpdateInfo, installMikrotikUpdate, getMikrotikById, addMikrotikIpAddress, addSystemLog };
+export { toggleMikrotikSafeMode, getMikrotikSafeModeStatus, getMikrotikUpdateInfo, installMikrotikUpdate, getMikrotikById, addMikrotikIpAddress, addSystemLog };
 export default initializeDatabase;

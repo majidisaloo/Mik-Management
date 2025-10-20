@@ -10,6 +10,7 @@ import initializeDatabase, {
 } from './database.js';
 import { 
   toggleMikrotikSafeMode,
+  getMikrotikSafeModeStatus,
   getMikrotikUpdateInfo,
   installMikrotikUpdate,
   getMikrotikById,
@@ -2712,6 +2713,31 @@ const bootstrap = async () => {
       }
     };
 
+    const handleGetMikrotikSafeModeStatus = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        console.log(`Getting safe mode status for MikroTik device ID: ${deviceId}`);
+        const result = await getMikrotikSafeModeStatus(deviceId);
+
+        if (!result.success) {
+          throw new Error(result.message || 'Unable to get safe mode status.');
+        }
+
+        sendJson(res, 200, { 
+          enabled: result.enabled,
+          bootDevice: result.bootDevice,
+          message: 'Safe mode status retrieved successfully'
+        });
+      } catch (error) {
+        console.error('Get safe mode status error', error);
+        sendJson(res, 500, { message: 'Unable to get safe mode status right now.' });
+      }
+    };
+
     const handleGetMikrotikUpdateInfo = async (deviceId) => {
       if (!Number.isInteger(deviceId) || deviceId <= 0) {
         sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
@@ -4665,6 +4691,11 @@ const bootstrap = async () => {
 
         if (action === 'safe-mode' && method === 'POST') {
           await handleToggleMikrotikSafeMode(deviceId);
+          return;
+        }
+
+        if (action === 'safe-mode' && method === 'GET') {
+          await handleGetMikrotikSafeModeStatus(deviceId);
           return;
         }
       }

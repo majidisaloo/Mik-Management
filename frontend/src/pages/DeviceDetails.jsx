@@ -72,6 +72,11 @@ const DeviceDetails = () => {
 
   useEffect(() => {
     loadDevice();
+    
+    // Cleanup function to stop safe mode status check when component unmounts
+    return () => {
+      stopSafeModeStatusCheck();
+    };
   }, [id]);
 
   // URL routing logic
@@ -1143,12 +1148,48 @@ const DeviceDetails = () => {
         const data = await response.json();
         setSafeMode(data.enabled);
         await loadSystemLogs();
+        alert(`Safe mode ${data.enabled ? 'enabled' : 'disabled'} successfully!`);
+        
+        // Start checking safe mode status every 10 seconds
+        startSafeModeStatusCheck();
       } else {
         const error = await response.json();
         alert(`Error: ${error.message}`);
       }
     } catch (err) {
       alert(`Error: ${err.message}`);
+    }
+  };
+
+  const checkSafeModeStatus = async () => {
+    try {
+      const response = await fetch(`/api/mikrotiks/${id}/safe-mode`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`🔍 Safe mode status check: ${data.enabled ? 'Enabled' : 'Disabled'} (Boot device: ${data.bootDevice})`);
+        setSafeMode(data.enabled);
+      }
+    } catch (err) {
+      console.error('Error checking safe mode status:', err);
+    }
+  };
+
+  const startSafeModeStatusCheck = () => {
+    // Clear any existing interval
+    if (window.safeModeCheckInterval) {
+      clearInterval(window.safeModeCheckInterval);
+    }
+    
+    // Start checking every 10 seconds
+    window.safeModeCheckInterval = setInterval(checkSafeModeStatus, 10000);
+    console.log('🔄 Started safe mode status check every 10 seconds');
+  };
+
+  const stopSafeModeStatusCheck = () => {
+    if (window.safeModeCheckInterval) {
+      clearInterval(window.safeModeCheckInterval);
+      window.safeModeCheckInterval = null;
+      console.log('⏹️ Stopped safe mode status check');
     }
   };
 
