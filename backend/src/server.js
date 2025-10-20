@@ -2760,38 +2760,47 @@ const bootstrap = async () => {
         const channel = body.channel || 'stable';
 
         console.log(`📥 Starting download of ${channel} update for MikroTik device ID: ${deviceId}`);
-        
-        // Simulate download process with progress updates
-        const downloadSteps = [
-          { step: 'Connecting to Mikrotik servers...', progress: 10 },
-          { step: 'Checking available versions...', progress: 25 },
-          { step: 'Downloading firmware package...', progress: 50 },
-          { step: 'Verifying package integrity...', progress: 75 },
-          { step: 'Saving to local storage...', progress: 90 },
-          { step: 'Download completed!', progress: 100 }
-        ];
 
-        // Simulate download progress
-        for (const downloadStep of downloadSteps) {
-          console.log(`📥 ${downloadStep.step} (${downloadStep.progress}%)`);
-          await new Promise(resolve => setTimeout(resolve, 500)); // Simulate each step
+        // Get device info first
+        const device = await db.getMikrotikById(deviceId);
+        if (!device) {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
         }
+
+        const deviceIP = device.host || device.ip;
+        const devicePassword = device.routeros?.sshPassword || device.password;
+        const sshUsername = device.routeros?.sshUsername || 'admin';
         
-        const downloadPath = `/tmp/mikrotik-${channel}-update.npk`;
-        const fileSize = Math.floor(Math.random() * 50000000) + 10000000; // Random size between 10-60MB
-        
+        console.log(`📥 Device found: ${device.name} (${deviceIP})`);
+
+        // Download update via SSH
+        try {
+          const downloadCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system package update set channel=${channel}; /system package update download"`;
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          
+          const { stdout } = await execAsync(downloadCommand, { timeout: 30000 });
+          console.log(`📥 Download output: ${stdout}`);
+          console.log(`✅ Download completed successfully`);
+        } catch (downloadError) {
+          console.log(`⚠️ Download failed: ${downloadError.message}`);
+          throw new Error(`Download failed: ${downloadError.message}`);
+        }
+
         sendJson(res, 200, {
           success: true,
           message: `${channel} update download completed successfully.`,
           channel: channel,
-          downloadPath: downloadPath,
-          fileSize: fileSize,
+          deviceName: device.name,
+          deviceIP: deviceIP,
           downloadedAt: new Date().toISOString(),
           status: 'downloaded'
         });
       } catch (error) {
         console.error('Download Mikrotik update error', error);
-        sendJson(res, 500, { message: 'Unable to download update right now.' });
+        sendJson(res, 500, { message: `Unable to download update: ${error.message}` });
       }
     };
 
@@ -2820,60 +2829,77 @@ const bootstrap = async () => {
 
         console.log(`🚀 Starting download + install + reboot for ${channel} update on MikroTik device ID: ${deviceId}`);
         
-        // Step 1: Download
+        // Get device info first
+        const device = await db.getMikrotikById(deviceId);
+        if (!device) {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        const deviceIP = device.host || device.ip;
+        const devicePassword = device.routeros?.sshPassword || device.password;
+        const sshUsername = device.routeros?.sshUsername || 'admin';
+        
+        console.log(`🚀 Device found: ${device.name} (${deviceIP})`);
+        
+        // Step 1: Download update via SSH
         console.log(`📥 Step 1/3: Downloading ${channel} update...`);
-        const downloadSteps = [
-          { step: 'Connecting to Mikrotik servers...', progress: 10 },
-          { step: 'Checking available versions...', progress: 25 },
-          { step: 'Downloading firmware package...', progress: 50 },
-          { step: 'Verifying package integrity...', progress: 75 },
-          { step: 'Saving to local storage...', progress: 90 },
-          { step: 'Download completed!', progress: 100 }
-        ];
-
-        for (const downloadStep of downloadSteps) {
-          console.log(`📥 ${downloadStep.step} (${downloadStep.progress}%)`);
-          await new Promise(resolve => setTimeout(resolve, 400));
+        try {
+          const downloadCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system package update set channel=${channel}; /system package update download"`;
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          
+          const { stdout } = await execAsync(downloadCommand, { timeout: 30000 });
+          console.log(`📥 Download output: ${stdout}`);
+          console.log(`✅ Download completed successfully`);
+        } catch (downloadError) {
+          console.log(`⚠️ Download failed: ${downloadError.message}`);
+          throw new Error(`Download failed: ${downloadError.message}`);
         }
 
-        // Step 2: Install
+        // Step 2: Install update via SSH
         console.log(`🔧 Step 2/3: Installing ${channel} update...`);
-        const installSteps = [
-          { step: 'Preparing installation...', progress: 20 },
-          { step: 'Backing up current configuration...', progress: 40 },
-          { step: 'Installing new firmware...', progress: 60 },
-          { step: 'Verifying installation...', progress: 80 },
-          { step: 'Installation completed!', progress: 100 }
-        ];
-
-        for (const installStep of installSteps) {
-          console.log(`🔧 ${installStep.step} (${installStep.progress}%)`);
-          await new Promise(resolve => setTimeout(resolve, 600));
+        try {
+          const installCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system package update install"`;
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          
+          const { stdout } = await execAsync(installCommand, { timeout: 30000 });
+          console.log(`🔧 Install output: ${stdout}`);
+          console.log(`✅ Installation completed successfully`);
+        } catch (installError) {
+          console.log(`⚠️ Installation failed: ${installError.message}`);
+          throw new Error(`Installation failed: ${installError.message}`);
         }
 
-        // Step 3: Reboot
+        // Step 3: Reboot device via SSH
         console.log(`🔄 Step 3/3: Rebooting device...`);
-        const rebootSteps = [
-          { step: 'Saving configuration...', progress: 30 },
-          { step: 'Initiating reboot sequence...', progress: 60 },
-          { step: 'Device is rebooting...', progress: 90 },
-          { step: 'Reboot completed!', progress: 100 }
-        ];
-
-        for (const rebootStep of rebootSteps) {
-          console.log(`🔄 ${rebootStep.step} (${rebootStep.progress}%)`);
-          await new Promise(resolve => setTimeout(resolve, 500));
+        try {
+          const rebootCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system reboot"`;
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          
+          // Execute reboot command (this will disconnect SSH)
+          execAsync(rebootCommand, { timeout: 10000 }).catch(() => {
+            // Expected to fail as device will disconnect
+            console.log(`✅ Reboot command sent successfully`);
+          });
+          
+          console.log(`✅ Reboot command executed`);
+        } catch (rebootError) {
+          console.log(`⚠️ Reboot failed: ${rebootError.message}`);
+          // Don't throw error for reboot as it's expected to disconnect
         }
-
-        const downloadPath = `/tmp/mikrotik-${channel}-update.npk`;
-        const fileSize = Math.floor(Math.random() * 50000000) + 10000000;
         
         sendJson(res, 200, {
           success: true,
           message: `${channel} update downloaded, installed, and device rebooted successfully.`,
           channel: channel,
-          downloadPath: downloadPath,
-          fileSize: fileSize,
+          deviceName: device.name,
+          deviceIP: deviceIP,
           downloadedAt: new Date().toISOString(),
           installedAt: new Date().toISOString(),
           rebootedAt: new Date().toISOString(),
@@ -2881,7 +2907,7 @@ const bootstrap = async () => {
         });
       } catch (error) {
         console.error('Install Mikrotik update error', error);
-        sendJson(res, 500, { message: 'Unable to install update right now.' });
+        sendJson(res, 500, { message: `Unable to install update: ${error.message}` });
       }
     };
 

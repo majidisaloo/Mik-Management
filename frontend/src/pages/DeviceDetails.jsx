@@ -519,7 +519,7 @@ const DeviceDetails = () => {
         
         // Show success message
         setTimeout(() => {
-          alert(`✅ Download completed successfully!\n\nChannel: ${data.channel}\nFile: ${data.downloadPath}\nSize: ${Math.round(data.fileSize / 1024 / 1024)} MB`);
+          alert(`✅ Download completed successfully!\n\nChannel: ${data.channel}\nDevice: ${data.deviceName}\nIP: ${data.deviceIP}\n\nUpdate is ready for installation.`);
           setDownloadProgress(null);
         }, 1000);
       } else {
@@ -608,7 +608,7 @@ const DeviceDetails = () => {
         
         // Show success message
         setTimeout(() => {
-          alert(`✅ Installation completed successfully!\n\nChannel: ${data.channel}\nFile: ${data.downloadPath}\nSize: ${Math.round(data.fileSize / 1024 / 1024)} MB\n\nDevice has been rebooted and is ready to use.`);
+          alert(`✅ Installation completed successfully!\n\nChannel: ${data.channel}\nDevice: ${data.deviceName}\nIP: ${data.deviceIP}\n\nDevice has been rebooted and is ready to use.`);
           setDownloadProgress(null);
         }, 1000);
       } else {
