@@ -25,6 +25,15 @@ const DeviceDetails = () => {
   const [lastConnectivityCheck, setLastConnectivityCheck] = useState(null);
   const [connectivityNotification, setConnectivityNotification] = useState(null);
   
+  // Logs state
+  const [logs, setLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState(null);
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsTotalPages, setLogsTotalPages] = useState(1);
+  const [logsSearch, setLogsSearch] = useState('');
+  const [logsSource, setLogsSource] = useState('unknown');
+  
   // Modal states
   const [showAddIpModal, setShowAddIpModal] = useState(false);
   const [showAddInterfaceModal, setShowAddInterfaceModal] = useState(false);
@@ -156,6 +165,39 @@ const DeviceDetails = () => {
       }
     } catch (err) {
       console.error('Error loading mangle rules:', err);
+    }
+  };
+
+  const loadLogs = async (page = 1, search = '') => {
+    try {
+      setLogsLoading(true);
+      setLogsError(null);
+      
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '50',
+        max: '1000'
+      });
+      
+      if (search) {
+        params.append('search', search);
+      }
+      
+      const response = await fetch(`/api/mikrotiks/${id}/logs?${params}`);
+      if (response.ok) {
+        const data = await response.json();
+        setLogs(data.logs || []);
+        setLogsPage(data.pagination?.page || page);
+        setLogsTotalPages(data.pagination?.totalPages || 1);
+        setLogsSource(data.source || 'unknown');
+      } else {
+        throw new Error('Failed to load logs');
+      }
+    } catch (err) {
+      console.error('Error loading logs:', err);
+      setLogsError(err.message);
+    } finally {
+      setLogsLoading(false);
     }
   };
 
@@ -753,7 +795,13 @@ const DeviceDetails = () => {
         {tabs.map(tab => (
               <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => {
+              setActiveTab(tab.id);
+              // Load logs when logs tab is selected
+              if (tab.id === 'logs') {
+                loadLogs(1, logsSearch);
+              }
+            }}
             style={{
               padding: '10px 20px',
               backgroundColor: activeTab === tab.id 
@@ -1519,6 +1567,217 @@ const DeviceDetails = () => {
             </table>
           </div>
               </div>
+      )}
+
+      {activeTab === 'logs' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h2>System Logs</h2>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input
+                  type="text"
+                  placeholder="Search logs..."
+                  value={logsSearch}
+                  onChange={(e) => setLogsSearch(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      loadLogs(1, logsSearch);
+                    }
+                  }}
+                  style={{
+                    padding: '8px 12px',
+                    border: `1px solid ${theme === 'dark' ? '#555' : '#ddd'}`,
+                    borderRadius: '5px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                    color: theme === 'dark' ? '#fff' : '#000',
+                    fontSize: '14px',
+                    minWidth: '200px'
+                  }}
+                />
+                <button
+                  onClick={() => loadLogs(1, logsSearch)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: theme === 'dark' ? '#007acc' : '#0066cc',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Search
+                </button>
+              </div>
+              <button
+                onClick={() => loadLogs(logsPage, logsSearch)}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
+                  color: theme === 'dark' ? '#fff' : '#000',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer'
+                }}
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          {/* Logs Source Info */}
+          <div style={{
+            backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f8f9fa',
+            border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+            borderRadius: '5px',
+            padding: '10px 15px',
+            marginBottom: '20px',
+            fontSize: '14px',
+            color: theme === 'dark' ? '#ccc' : '#666'
+          }}>
+            <strong>Source:</strong> {logsSource === 'api' ? 'RouterOS API' : logsSource === 'ssh' ? 'SSH Command' : logsSource === 'mock' ? 'Mock Data' : 'Unknown'} 
+            {logsSource === 'mock' && ' (Connection failed, showing sample data)'}
+          </div>
+
+          {/* Logs Table */}
+          <div style={{
+            backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff',
+            borderRadius: '10px',
+            border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+            overflow: 'hidden'
+          }}>
+            {logsLoading ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: theme === 'dark' ? '#ccc' : '#666' }}>
+                Loading logs...
+              </div>
+            ) : logsError ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#dc3545' }}>
+                Error: {logsError}
+              </div>
+            ) : logs.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: theme === 'dark' ? '#ccc' : '#666' }}>
+                No logs found
+              </div>
+            ) : (
+              <>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ 
+                      borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                      backgroundColor: theme === 'dark' ? '#333' : '#f8f9fa'
+                    }}>
+                      <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Time</th>
+                      <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Level</th>
+                      <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Topics</th>
+                      <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Message</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logs.map((log, index) => (
+                      <tr 
+                        key={log.id || index}
+                        style={{ 
+                          borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#eee'}`,
+                          backgroundColor: index % 2 === 0 ? 'transparent' : (theme === 'dark' ? '#1a1a1a' : '#f8f9fa')
+                        }}
+                      >
+                        <td style={{ 
+                          padding: '12px', 
+                          fontSize: '13px',
+                          fontFamily: 'monospace',
+                          color: theme === 'dark' ? '#ccc' : '#666'
+                        }}>
+                          {new Date(log.time).toLocaleString()}
+                        </td>
+                        <td style={{ padding: '12px', fontSize: '13px' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            textTransform: 'uppercase',
+                            backgroundColor: 
+                              log.level === 'error' ? '#dc3545' :
+                              log.level === 'warning' ? '#ffc107' :
+                              log.level === 'info' ? '#17a2b8' :
+                              log.level === 'debug' ? '#6c757d' : '#28a745',
+                            color: log.level === 'warning' ? '#000' : '#fff'
+                          }}>
+                            {log.level}
+                          </span>
+                        </td>
+                        <td style={{ 
+                          padding: '12px', 
+                          fontSize: '13px',
+                          color: theme === 'dark' ? '#ccc' : '#666'
+                        }}>
+                          {log.topics}
+                        </td>
+                        <td style={{ 
+                          padding: '12px', 
+                          fontSize: '13px',
+                          color: theme === 'dark' ? '#fff' : '#000',
+                          wordBreak: 'break-word'
+                        }}>
+                          {log.message}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {/* Pagination */}
+                {logsTotalPages > 1 && (
+                  <div style={{
+                    padding: '15px',
+                    borderTop: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: theme === 'dark' ? '#333' : '#f8f9fa'
+                  }}>
+                    <div style={{ fontSize: '14px', color: theme === 'dark' ? '#ccc' : '#666' }}>
+                      Page {logsPage} of {logsTotalPages}
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button
+                        onClick={() => loadLogs(logsPage - 1, logsSearch)}
+                        disabled={logsPage <= 1}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: logsPage <= 1 ? (theme === 'dark' ? '#444' : '#e0e0e0') : (theme === 'dark' ? '#007acc' : '#0066cc'),
+                          color: logsPage <= 1 ? (theme === 'dark' ? '#666' : '#999') : '#fff',
+                          border: 'none',
+                          borderRadius: '5px',
+                          cursor: logsPage <= 1 ? 'not-allowed' : 'pointer',
+                          fontSize: '14px'
+                        }}
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => loadLogs(logsPage + 1, logsSearch)}
+                        disabled={logsPage >= logsTotalPages}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: logsPage >= logsTotalPages ? (theme === 'dark' ? '#444' : '#e0e0e0') : (theme === 'dark' ? '#007acc' : '#0066cc'),
+                          color: logsPage >= logsTotalPages ? (theme === 'dark' ? '#666' : '#999') : '#fff',
+                          border: 'none',
+                          borderRadius: '5px',
+                          cursor: logsPage >= logsTotalPages ? 'not-allowed' : 'pointer',
+                          fontSize: '14px'
+                        }}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {activeTab === 'update' && (
