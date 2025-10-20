@@ -5856,41 +5856,42 @@ async function getMikrotikUpdateInfo(deviceId) {
       }
     }
 
-    // Get latest available versions (in real implementation, this would fetch from Mikrotik's update server)
-    // For now, we'll use realistic version numbers
+    // Compare current version with each channel separately
     const stableVersionComparison = compareRouterosVersions(currentVersion, latestStable);
     const testingVersionComparison = compareRouterosVersions(currentVersion, latestBeta);
     
-    console.log(`Version comparison - Current: ${currentVersion}, Stable: ${latestStable}, Testing: ${latestBeta}`);
-    console.log(`Stable comparison result: ${stableVersionComparison}, Testing comparison result: ${testingVersionComparison}`);
+    console.log(`=== VERSION COMPARISON ===`);
+    console.log(`Current Version: ${currentVersion}`);
+    console.log(`Latest Stable: ${latestStable}`);
+    console.log(`Latest Testing: ${latestBeta}`);
+    console.log(`Stable comparison (current vs stable): ${stableVersionComparison}`);
+    console.log(`Testing comparison (current vs testing): ${testingVersionComparison}`);
     
     // Test the comparison function
-    console.log(`Testing comparison: 7.17.2 vs 7.20.1 = ${compareRouterosVersions('7.17.2', '7.20.1')}`);
-    console.log(`Testing comparison: 7.20.1 vs 7.17.2 = ${compareRouterosVersions('7.20.1', '7.17.2')}`);
-    console.log(`Testing comparison: 7.17.2 vs 7.17.2 = ${compareRouterosVersions('7.17.2', '7.17.2')}`);
+    console.log(`Test: 7.17.2 vs 7.20.1 = ${compareRouterosVersions('7.17.2', '7.20.1')}`);
+    console.log(`Test: 7.20.1 vs 7.17.2 = ${compareRouterosVersions('7.20.1', '7.17.2')}`);
+    console.log(`Test: 7.17.2 vs 7.17.2 = ${compareRouterosVersions('7.17.2', '7.17.2')}`);
     
-    // If comparison < 0: current is OLDER than latest (update available)
-    // If comparison > 0: current is NEWER than latest (up to date)
-    // If comparison = 0: current is SAME as latest (up to date)
-    
-    if (stableVersionComparison < 0) {
-      // Current version is older than stable - UPDATE AVAILABLE
-      updateAvailable = true;
-      console.log(`✅ Stable update available: ${currentVersion} < ${latestStable}`);
-    } else {
-      // Current version is same or newer than stable - UP TO DATE
+    // STABLE CHANNEL: Compare current vs latest stable
+    if (stableVersionComparison === 0) {
+      // Current version is SAME as stable - UP TO DATE
       updateAvailable = false;
-      console.log(`✅ Stable up to date: ${currentVersion} >= ${latestStable}`);
+      console.log(`📦 STABLE: Up to date (${currentVersion} = ${latestStable})`);
+    } else {
+      // Current version is different from stable - NEED UPDATE
+      updateAvailable = true;
+      console.log(`📦 STABLE: Update needed (${currentVersion} ≠ ${latestStable})`);
     }
     
-    if (testingVersionComparison < 0) {
-      // Current version is older than testing - UPDATE AVAILABLE
-      testingUpdateAvailable = true;
-      console.log(`✅ Testing update available: ${currentVersion} < ${latestBeta}`);
-    } else {
-      // Current version is same or newer than testing - UP TO DATE
+    // TESTING CHANNEL: Compare current vs latest testing
+    if (testingVersionComparison === 0) {
+      // Current version is SAME as testing - UP TO DATE
       testingUpdateAvailable = false;
-      console.log(`✅ Testing up to date: ${currentVersion} >= ${latestBeta}`);
+      console.log(`🧪 TESTING: Up to date (${currentVersion} = ${latestBeta})`);
+    } else {
+      // Current version is different from testing - NEED UPDATE
+      testingUpdateAvailable = true;
+      console.log(`🧪 TESTING: Update needed (${currentVersion} ≠ ${latestBeta})`);
     }
 
     const updateInfo = {
