@@ -2984,12 +2984,16 @@ const bootstrap = async () => {
           return;
         }
 
-        console.log(`🔍 Device found: ${device.name} (${device.ip})`);
+        const deviceIP = device.host || device.ip;
+        const devicePassword = device.routeros?.sshPassword || device.password;
+        const sshUsername = device.routeros?.sshUsername || 'admin';
+        
+        console.log(`🔍 Device found: ${device.name} (${deviceIP})`);
         
         // Get current firmware version via SSH
         let currentVersion = 'Unknown';
         try {
-          const versionCommand = `sshpass -p "${device.password}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@${device.ip} "/system resource print"`;
+          const versionCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system resource print"`;
           const { exec } = await import('child_process');
           const { promisify } = await import('util');
           const execAsync = promisify(exec);
@@ -3010,7 +3014,7 @@ const bootstrap = async () => {
         // Get system info
         let systemInfo = {};
         try {
-          const systemCommand = `sshpass -p "${device.password}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@${device.ip} "/system identity print"`;
+          const systemCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system identity print"`;
           const { exec } = await import('child_process');
           const { promisify } = await import('util');
           const execAsync = promisify(exec);
@@ -3032,7 +3036,7 @@ const bootstrap = async () => {
           message: `Device diagnosis completed successfully. Current version: ${currentVersion}`,
           deviceId: deviceId,
           deviceName: device.name,
-          deviceIP: device.ip,
+          deviceIP: deviceIP,
           currentVersion: currentVersion,
           systemInfo: systemInfo,
           diagnosedAt: new Date().toISOString(),

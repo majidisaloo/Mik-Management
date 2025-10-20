@@ -775,7 +775,119 @@ const DeviceDetails = () => {
 
       if (response.ok) {
         const data = await response.json();
-        alert(`✅ ${data.message}\n\nDevice: ${data.deviceName}\nIP: ${data.deviceIP}\nCurrent Version: ${data.currentVersion}\nSystem Name: ${data.systemInfo?.name || 'Unknown'}\n\nDiagnosed at: ${new Date(data.diagnosedAt).toLocaleString()}`);
+        
+        // Create a beautiful modal instead of simple alert
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.5);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 10000;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+        
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = `
+          background: white;
+          border-radius: 12px;
+          padding: 24px;
+          max-width: 500px;
+          width: 90%;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+          animation: modalSlideIn 0.3s ease-out;
+        `;
+        
+        // Add CSS animation
+        const style = document.createElement('style');
+        style.textContent = `
+          @keyframes modalSlideIn {
+            from { opacity: 0; transform: translateY(-20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+          }
+        `;
+        document.head.appendChild(style);
+        
+        modalContent.innerHTML = `
+          <div style="display: flex; align-items: center; margin-bottom: 20px;">
+            <div style="
+              width: 40px;
+              height: 40px;
+              background: #10B981;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              margin-right: 12px;
+            ">
+              <span style="color: white; font-size: 20px;">✓</span>
+            </div>
+            <div>
+              <h2 style="margin: 0; color: #1F2937; font-size: 18px; font-weight: 600;">Device Diagnosis Complete</h2>
+              <p style="margin: 4px 0 0 0; color: #6B7280; font-size: 14px;">Current version: ${data.currentVersion}</p>
+            </div>
+          </div>
+          
+          <div style="background: #F9FAFB; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div>
+                <div style="color: #6B7280; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Device Name</div>
+                <div style="color: #1F2937; font-size: 14px; font-weight: 500;">${data.deviceName}</div>
+              </div>
+              <div>
+                <div style="color: #6B7280; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">IP Address</div>
+                <div style="color: #1F2937; font-size: 14px; font-weight: 500;">${data.deviceIP}</div>
+              </div>
+              <div>
+                <div style="color: #6B7280; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Firmware Version</div>
+                <div style="color: #1F2937; font-size: 14px; font-weight: 500;">${data.currentVersion}</div>
+              </div>
+              <div>
+                <div style="color: #6B7280; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">System Name</div>
+                <div style="color: #1F2937; font-size: 14px; font-weight: 500;">${data.systemInfo?.name || 'Unknown'}</div>
+              </div>
+            </div>
+          </div>
+          
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="color: #6B7280; font-size: 12px;">
+              Diagnosed at: ${new Date(data.diagnosedAt).toLocaleString()}
+            </div>
+            <button id="closeModal" style="
+              background: #3B82F6;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              padding: 8px 16px;
+              font-size: 14px;
+              font-weight: 500;
+              cursor: pointer;
+              transition: background-color 0.2s;
+            " onmouseover="this.style.background='#2563EB'" onmouseout="this.style.background='#3B82F6'">
+              Close
+            </button>
+          </div>
+        `;
+        
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+        
+        // Close modal functionality
+        const closeModal = () => {
+          document.body.removeChild(modal);
+          document.head.removeChild(style);
+        };
+        
+        modalContent.querySelector('#closeModal').onclick = closeModal;
+        modal.onclick = (e) => {
+          if (e.target === modal) closeModal();
+        };
+        
         await loadSystemLogs();
       } else {
         const error = await response.json();
