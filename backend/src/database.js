@@ -5714,8 +5714,8 @@ async function getMikrotikUpdateInfo(deviceId) {
 
     // Get current firmware version from device
     let currentVersion = routerosBaseline.firmwareVersion || 'Unknown';
-    let latestStable = '7.17.2'; // Default fallback
-    let latestBeta = '7.18.0'; // Default fallback
+    let latestStable = '7.30.1'; // Latest stable version
+    let latestBeta = '7.31.0-beta'; // Latest beta version
     let updateAvailable = false;
 
     // Try to get real firmware version from Mikrotik
