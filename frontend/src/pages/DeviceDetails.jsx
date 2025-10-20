@@ -2346,11 +2346,11 @@ const DeviceDetails = () => {
                         display: 'inline-block'
                       }}>
                         {updateInfo.testingUpdateAvailable ? 'Available' : 'Up to date'}
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                          </span>
+                        </td>
+                      </tr>
+                  </tbody>
+                </table>
               <div style={{ 
                 marginTop: '16px',
                 display: 'flex',
@@ -2360,11 +2360,11 @@ const DeviceDetails = () => {
                 <button
                   onClick={() => handleDownloadUpdate('testing')}
                   disabled={isDownloading || isInstalling}
-                  style={{
+                    style={{
                     padding: '8px 16px',
                     backgroundColor: (isDownloading || isInstalling) ? '#6c757d' : (theme === 'dark' ? '#6f42c1' : '#6f42c1'),
-                    color: '#fff',
-                    border: 'none',
+                      color: '#fff',
+                      border: 'none',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     fontSize: '12px',
@@ -2388,15 +2388,15 @@ const DeviceDetails = () => {
                   }}
                 >
                   📥 Download
-                </button>
-                <button
+                  </button>
+                  <button
                   onClick={() => handleDownloadAndInstallUpdate('testing')}
                   disabled={isDownloading || isInstalling}
-                  style={{
+                    style={{
                     padding: '8px 16px',
                     backgroundColor: (isDownloading || isInstalling) ? '#6c757d' : (theme === 'dark' ? '#fd7e14' : '#fd7e14'),
-                    color: '#fff',
-                    border: 'none',
+                      color: '#fff',
+                      border: 'none',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     fontSize: '12px',

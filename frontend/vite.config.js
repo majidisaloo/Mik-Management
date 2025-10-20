@@ -7,7 +7,7 @@ const commitCount = execSync('git rev-list --count HEAD').toString().trim();
 
 export default defineConfig({
   server: {
-    port: 5173,
+    port: 5174,
     proxy: {
       '/api': {
         target: 'http://localhost:5001',
