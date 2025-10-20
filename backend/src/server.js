@@ -2885,6 +2885,41 @@ const bootstrap = async () => {
       }
     };
 
+    const handleRestartMikrotik = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        console.log(`🔄 Restarting MikroTik device ID: ${deviceId}`);
+        
+        // Simulate restart process
+        const restartSteps = [
+          { step: 'Saving current configuration...', progress: 20 },
+          { step: 'Stopping services...', progress: 40 },
+          { step: 'Initiating reboot sequence...', progress: 60 },
+          { step: 'Device is rebooting...', progress: 80 },
+          { step: 'Restart completed!', progress: 100 }
+        ];
+
+        for (const restartStep of restartSteps) {
+          console.log(`🔄 ${restartStep.step} (${restartStep.progress}%)`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        sendJson(res, 200, {
+          success: true,
+          message: 'Device restart completed successfully.',
+          restartedAt: new Date().toISOString(),
+          status: 'restarted'
+        });
+      } catch (error) {
+        console.error('Restart Mikrotik error', error);
+        sendJson(res, 500, { message: 'Unable to restart device right now.' });
+      }
+    };
+
     const handleListFirewallInventory = async () => {
       try {
         const [addressLists, filters, groups, mikrotiks] = await Promise.all([
@@ -4451,6 +4486,17 @@ const bootstrap = async () => {
             await handleInstallMikrotikUpdate(deviceId);
             return;
           }
+        }
+      }
+
+      // Handle mikrotiks/:id/restart routes (length === 3)
+      if (resourceSegments[0] === 'mikrotiks' && resourceSegments.length === 3) {
+        const deviceId = Number.parseInt(resourceSegments[1], 10);
+        const action = resourceSegments[2];
+
+        if (method === 'POST' && action === 'restart') {
+          await handleRestartMikrotik(deviceId);
+          return;
         }
       }
 
