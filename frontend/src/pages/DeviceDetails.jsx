@@ -498,7 +498,9 @@ const DeviceDetails = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ channel })
+        body: JSON.stringify({ channel }),
+        // Increase timeout for download operation
+        signal: AbortSignal.timeout(30000) // 30 seconds timeout
       });
 
       console.log('Response status:', response.status);
@@ -533,13 +535,19 @@ const DeviceDetails = () => {
         alert(`❌ Download failed: ${errorMessage}`);
         setDownloadProgress(null);
       }
-    } catch (err) {
-      console.error('Network error:', err);
-      alert(`❌ Network error: ${err.message}\n\nPlease check if the backend server is running on port 5001.`);
-      setDownloadProgress(null);
-    } finally {
-      setIsDownloading(false);
-    }
+      } catch (err) {
+        console.error('Network error:', err);
+        if (err.name === 'TimeoutError') {
+          alert(`❌ Download timeout: The operation took too long.\n\nThis might be normal for large files. Please try again.`);
+        } else if (err.name === 'AbortError') {
+          alert(`❌ Download cancelled: The operation was cancelled.`);
+        } else {
+          alert(`❌ Network error: ${err.message}\n\nPlease check if the backend server is running on port 5001.`);
+        }
+        setDownloadProgress(null);
+      } finally {
+        setIsDownloading(false);
+      }
   };
 
   const handleDownloadAndInstallUpdate = async (channel = 'stable') => {
@@ -579,7 +587,9 @@ const DeviceDetails = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ channel })
+        body: JSON.stringify({ channel }),
+        // Increase timeout for install operation
+        signal: AbortSignal.timeout(60000) // 60 seconds timeout
       });
 
       console.log('Install response status:', response.status);
@@ -614,13 +624,19 @@ const DeviceDetails = () => {
         alert(`❌ Installation failed: ${errorMessage}`);
         setDownloadProgress(null);
       }
-    } catch (err) {
-      console.error('Install network error:', err);
-      alert(`❌ Network error: ${err.message}\n\nPlease check if the backend server is running on port 5001.`);
-      setDownloadProgress(null);
-    } finally {
-      setIsInstalling(false);
-    }
+      } catch (err) {
+        console.error('Install network error:', err);
+        if (err.name === 'TimeoutError') {
+          alert(`❌ Installation timeout: The operation took too long.\n\nThis might be normal for large updates. Please check the device status manually.`);
+        } else if (err.name === 'AbortError') {
+          alert(`❌ Installation cancelled: The operation was cancelled.`);
+        } else {
+          alert(`❌ Network error: ${err.message}\n\nPlease check if the backend server is running on port 5001.`);
+        }
+        setDownloadProgress(null);
+      } finally {
+        setIsInstalling(false);
+      }
   };
 
   const handleEditFirewallRule = async (e) => {
