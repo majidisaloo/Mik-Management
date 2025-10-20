@@ -2743,8 +2743,21 @@ const bootstrap = async () => {
       }
 
       try {
-        const body = await getRequestBody(req);
-        const { channel } = body;
+        // Parse request body
+        let body = {};
+        try {
+          const chunks = [];
+          for await (const chunk of req) {
+            chunks.push(chunk);
+          }
+          const rawBody = Buffer.concat(chunks).toString();
+          body = rawBody ? JSON.parse(rawBody) : {};
+        } catch (parseError) {
+          console.error('Error parsing request body:', parseError);
+          body = {};
+        }
+
+        const channel = body.channel || 'stable';
 
         console.log(`Downloading ${channel} update for MikroTik device ID: ${deviceId}`);
         
