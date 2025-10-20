@@ -2943,15 +2943,16 @@ const bootstrap = async () => {
           console.log(`⚠️ Could not save config via SSH, continuing with restart...`);
         }
 
-        // Step 2: Execute restart command
+        // Step 2: Execute restart command with confirmation
         console.log(`🔄 Step 2/3: Initiating reboot sequence...`);
         try {
-          const restartCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system reboot"`;
+          // Use echo to send 'y' confirmation to the reboot command
+          const restartCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "echo 'y' | /system reboot"`;
           const { exec } = await import('child_process');
           const { promisify } = await import('util');
           const execAsync = promisify(exec);
           
-          console.log(`🔄 Executing restart command: ${restartCommand.replace(devicePassword, '***')}`);
+          console.log(`🔄 Executing restart command with confirmation: ${restartCommand.replace(devicePassword, '***')}`);
           
           // Execute restart command (this will disconnect SSH)
           execAsync(restartCommand, { timeout: 10000 }).catch((error) => {
@@ -2962,14 +2963,14 @@ const bootstrap = async () => {
           console.log(`✅ Restart command executed`);
         } catch (restartError) {
           console.log(`⚠️ SSH restart failed, trying alternative method...`);
-          // Fallback: try with different SSH options
+          // Fallback: try with different SSH options and confirmation
           try {
-            const fallbackCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o ServerAliveInterval=1 ${sshUsername}@${deviceIP} "/system reboot"`;
+            const fallbackCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o ServerAliveInterval=1 ${sshUsername}@${deviceIP} "echo 'y' | /system reboot"`;
             const { exec } = await import('child_process');
             const { promisify } = await import('util');
             const execAsync = promisify(exec);
             
-            console.log(`🔄 Executing fallback restart command: ${fallbackCommand.replace(devicePassword, '***')}`);
+            console.log(`🔄 Executing fallback restart command with confirmation: ${fallbackCommand.replace(devicePassword, '***')}`);
             
             execAsync(fallbackCommand, { timeout: 8000 }).catch((error) => {
               console.log(`✅ Fallback restart command sent (disconnect expected)`);
@@ -2990,7 +2991,7 @@ const bootstrap = async () => {
           restartedAt: new Date().toISOString(),
           status: 'restarting',
           deviceName: device.name,
-          deviceIP: device.ip
+          deviceIP: deviceIP
         });
       } catch (error) {
         console.error('Restart Mikrotik error', error);

@@ -3036,10 +3036,10 @@ const DeviceDetails = () => {
               }}>
                 <button
                   onClick={() => handleDownloadUpdate('stable')}
-                  disabled={isDownloading || isInstalling}
+                  disabled={isDownloading || isInstalling || !updateInfo?.stableUpdateAvailable}
                     style={{
                     padding: '8px 16px',
-                      backgroundColor: (isDownloading || isInstalling) ? '#6c757d' : (theme === 'dark' ? '#007acc' : '#0066cc'),
+                      backgroundColor: (isDownloading || isInstalling || !updateInfo?.stableUpdateAvailable) ? '#6c757d' : (theme === 'dark' ? '#007acc' : '#0066cc'),
                       color: '#fff',
                       border: 'none',
                     borderRadius: '6px',
@@ -3068,10 +3068,10 @@ const DeviceDetails = () => {
                   </button>
                   <button
                   onClick={() => handleDownloadAndInstallUpdate('stable')}
-                  disabled={isDownloading || isInstalling}
+                  disabled={isDownloading || isInstalling || !updateInfo?.stableUpdateAvailable}
                     style={{
                     padding: '8px 16px',
-                      backgroundColor: (isDownloading || isInstalling) ? '#6c757d' : (theme === 'dark' ? '#28a745' : '#28a745'),
+                      backgroundColor: (isDownloading || isInstalling || !updateInfo?.stableUpdateAvailable) ? '#6c757d' : (theme === 'dark' ? '#28a745' : '#28a745'),
                       color: '#fff',
                       border: 'none',
                     borderRadius: '6px',
@@ -3199,10 +3199,10 @@ const DeviceDetails = () => {
               }}>
                 <button
                   onClick={() => handleDownloadUpdate('testing')}
-                  disabled={isDownloading || isInstalling}
+                  disabled={isDownloading || isInstalling || !updateInfo?.testingUpdateAvailable}
                     style={{
                     padding: '8px 16px',
-                    backgroundColor: (isDownloading || isInstalling) ? '#6c757d' : (theme === 'dark' ? '#6f42c1' : '#6f42c1'),
+                    backgroundColor: (isDownloading || isInstalling || !updateInfo?.testingUpdateAvailable) ? '#6c757d' : (theme === 'dark' ? '#6f42c1' : '#6f42c1'),
                       color: '#fff',
                       border: 'none',
                     borderRadius: '6px',
@@ -3231,10 +3231,10 @@ const DeviceDetails = () => {
                   </button>
                   <button
                   onClick={() => handleDownloadAndInstallUpdate('testing')}
-                  disabled={isDownloading || isInstalling}
+                  disabled={isDownloading || isInstalling || !updateInfo?.testingUpdateAvailable}
                     style={{
                     padding: '8px 16px',
-                    backgroundColor: (isDownloading || isInstalling) ? '#6c757d' : (theme === 'dark' ? '#fd7e14' : '#fd7e14'),
+                    backgroundColor: (isDownloading || isInstalling || !updateInfo?.testingUpdateAvailable) ? '#6c757d' : (theme === 'dark' ? '#fd7e14' : '#fd7e14'),
                       color: '#fff',
                       border: 'none',
                     borderRadius: '6px',
