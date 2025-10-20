@@ -8,6 +8,11 @@ const DeviceDetails = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme } = useTheme();
+  
+  // Debug logging
+  console.log('DeviceDetails component loaded with ID:', id);
+  console.log('Current location:', location.pathname);
+  
   const [device, setDevice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -246,10 +251,16 @@ const DeviceDetails = () => {
 
   const loadUpdateInfo = async () => {
     try {
+      console.log('Loading update info for device ID:', id);
       const response = await fetch(`/api/mikrotiks/${id}/update-info`);
+      console.log('Update info response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('Update info data:', data);
         setUpdateInfo(data);
+      } else {
+        console.error('Update info response not ok:', response.status);
       }
     } catch (err) {
       console.error('Error loading update info:', err);
@@ -462,9 +473,14 @@ const DeviceDetails = () => {
     try {
       console.log(`Starting download for channel: ${channel}, device ID: ${id}`);
       
+      // Validate device ID
+      if (!id || isNaN(parseInt(id))) {
+        throw new Error('Invalid device ID');
+      }
+      
       // Test basic connectivity first
       console.log('Testing basic connectivity...');
-      const testResponse = await fetch('/api/mikrotiks/7/update-info');
+      const testResponse = await fetch(`/api/mikrotiks/${id}/update-info`);
       console.log('Test response status:', testResponse.status);
       
       const response = await fetch(`/api/mikrotiks/${id}/update/download`, {
