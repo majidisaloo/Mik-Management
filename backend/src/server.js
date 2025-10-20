@@ -1544,11 +1544,7 @@ const bootstrap = async () => {
         let gitCommand = `git pull origin ${channel}`;
         let backendInstallCommand = `npm install`;
         
-        // For development/testing, simulate successful update
-        console.log(`Simulating update for channel: ${channel}`);
-        
-        // In production, uncomment the following code:
-        /*
+        // Perform actual git pull
         try {
           // Try without sudo first
           console.log(`Trying git pull without sudo...`);
@@ -1572,27 +1568,9 @@ const bootstrap = async () => {
             throw new Error(`Update failed: Cannot pull latest changes. Please check git permissions. Error: ${gitError.message}`);
           }
         }
-        */
         
-        // Simulate successful installation
-        console.log(`Simulating backend dependencies installation...`);
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate delay
-        console.log(`Backend dependencies installed successfully`);
-        
-        // Simulate frontend updates
-        const frontendPath = path.join(process.cwd(), 'frontend');
-        if (fs.existsSync(frontendPath)) {
-          console.log(`Simulating frontend dependencies installation...`);
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate delay
-          console.log(`Simulating frontend build...`);
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate delay
-          console.log(`Frontend build completed successfully`);
-        }
-        
-        // In production, uncomment the following code:
-        /*
-        try {
         // Install backend dependencies
+        try {
           console.log(`Installing backend dependencies...`);
           execSync(backendInstallCommand, { cwd: process.cwd(), stdio: 'pipe' });
           console.log(`Backend dependencies installed successfully`);
@@ -1618,7 +1596,6 @@ const bootstrap = async () => {
             throw new Error(`Update failed: Cannot update frontend. Error: ${frontendError.message}`);
           }
         }
-        */
         
         sendJson(res, 200, { 
           message: 'Update completed successfully. System will restart.',
@@ -1627,10 +1604,11 @@ const bootstrap = async () => {
           usedSudo: useSudo
         });
         
-        // Note: In production, you would restart the application here
-        // setTimeout(() => {
-        //   process.exit(0);
-        // }, 2000);
+        // Restart the application after successful update
+        setTimeout(() => {
+          console.log('Restarting application after update...');
+          process.exit(0);
+        }, 2000);
         
       } catch (error) {
         console.error('Update error:', error);
