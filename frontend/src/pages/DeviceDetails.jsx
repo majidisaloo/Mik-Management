@@ -21,6 +21,9 @@ const DeviceDetails = () => {
   const [updateInfo, setUpdateInfo] = useState(null);
   const [connectivity, setConnectivity] = useState(null);
   const [safeMode, setSafeMode] = useState(false);
+  const [connectivityTesting, setConnectivityTesting] = useState(false);
+  const [lastConnectivityCheck, setLastConnectivityCheck] = useState(null);
+  const [connectivityNotification, setConnectivityNotification] = useState(null);
   
   // Modal states
   const [showAddIpModal, setShowAddIpModal] = useState(false);
@@ -73,6 +76,10 @@ const DeviceDetails = () => {
         loadUpdateInfo(),
         loadConnectivity()
       ]);
+
+      // Automatically run connectivity test after loading device data
+      console.log('🚀 Page loaded, starting automatic connectivity test...');
+      await runConnectivityTest();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -185,6 +192,48 @@ const DeviceDetails = () => {
       }
     } catch (err) {
       console.error('Error loading connectivity:', err);
+    }
+  };
+
+  const runConnectivityTest = async () => {
+    try {
+      setConnectivityTesting(true);
+      console.log('🔍 Starting automatic connectivity test for device:', device?.name);
+      
+      const response = await fetch(`/api/mikrotiks/${id}/test-connectivity`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Connectivity test completed:', data);
+        setConnectivity(data);
+        setLastConnectivityCheck(new Date().toLocaleString());
+        
+        // Show success message
+        const apiStatus = data.mikrotik?.connectivity?.api?.status || 'unknown';
+        const sshStatus = data.mikrotik?.connectivity?.ssh?.status || 'unknown';
+        console.log(`📊 Real-time Status - API: ${apiStatus}, SSH: ${sshStatus}`);
+        
+        // Show notification
+        setConnectivityNotification({
+          type: 'success',
+          message: `Connectivity test completed! API: ${apiStatus}, SSH: ${sshStatus}`,
+          timestamp: new Date()
+        });
+        
+        // Clear notification after 5 seconds
+        setTimeout(() => {
+          setConnectivityNotification(null);
+        }, 5000);
+      } else {
+        const error = await response.json();
+        console.error('❌ Connectivity test failed:', error);
+      }
+    } catch (err) {
+      console.error('❌ Connectivity test error:', err);
+    } finally {
+      setConnectivityTesting(false);
     }
   };
 
@@ -505,22 +554,8 @@ const DeviceDetails = () => {
   };
 
   const handleTestConnectivity = async () => {
-    try {
-      const response = await fetch(`/api/mikrotiks/${id}/test-connectivity`, {
-        method: 'POST',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setConnectivity(data);
-        await loadSystemLogs();
-      } else {
-        const error = await response.json();
-        alert(`Error: ${error.message}`);
-      }
-    } catch (err) {
-      alert(`Error: ${err.message}`);
-    }
+    await runConnectivityTest();
+    await loadSystemLogs();
   };
 
   const handleDiagnose = async () => {
@@ -633,6 +668,65 @@ const DeviceDetails = () => {
           <p style={{ margin: '5px 0 0 0', opacity: 0.7 }}>
             {device.host}:{device.port} • {device.firmwareVersion}
           </p>
+          
+          {/* Real-time Connectivity Status */}
+          <div style={{ 
+            margin: '10px 0 0 0', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '15px',
+            fontSize: '0.9rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: connectivityTesting ? '#f59e0b' : 
+                  (connectivity?.mikrotik?.connectivity?.api?.status === 'online' ? '#10b981' : 
+                   connectivity?.mikrotik?.connectivity?.api?.status === 'disabled' ? '#6b7280' : '#ef4444')
+              }}></div>
+              <span>API: {connectivityTesting ? 'Testing...' : 
+                (connectivity?.mikrotik?.connectivity?.api?.status || 'Unknown')}</span>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: connectivityTesting ? '#f59e0b' : 
+                  (connectivity?.mikrotik?.connectivity?.ssh?.status === 'online' ? '#10b981' : 
+                   connectivity?.mikrotik?.connectivity?.ssh?.status === 'disabled' ? '#6b7280' : '#ef4444')
+              }}></div>
+              <span>SSH: {connectivityTesting ? 'Testing...' : 
+                (connectivity?.mikrotik?.connectivity?.ssh?.status || 'Unknown')}</span>
+            </div>
+            
+            {lastConnectivityCheck && (
+              <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>
+                Last check: {lastConnectivityCheck}
+              </span>
+            )}
+          </div>
+          
+          {/* Connectivity Notification */}
+          {connectivityNotification && (
+            <div style={{
+              margin: '10px 0 0 0',
+              padding: '8px 12px',
+              backgroundColor: connectivityNotification.type === 'success' ? '#10b981' : '#ef4444',
+              color: 'white',
+              borderRadius: '5px',
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span>✅</span>
+              <span>{connectivityNotification.message}</span>
+            </div>
+          )}
               </div>
               <button
           onClick={() => navigate('/mikrotiks')}
@@ -717,17 +811,19 @@ const DeviceDetails = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <button 
                   onClick={handleTestConnectivity}
+                  disabled={connectivityTesting}
                   style={{
                     padding: '10px',
-                    backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
+                    backgroundColor: connectivityTesting ? '#f59e0b' : (theme === 'dark' ? '#333' : '#e0e0e0'),
                     color: theme === 'dark' ? '#fff' : '#000',
                     border: 'none',
                     borderRadius: '5px',
-                    cursor: 'pointer'
+                    cursor: connectivityTesting ? 'not-allowed' : 'pointer',
+                    opacity: connectivityTesting ? 0.7 : 1
                   }}
-                  title="Test connectivity to device"
+                  title={connectivityTesting ? "Testing connectivity..." : "Test connectivity to device"}
                 >
-                  Test
+                  {connectivityTesting ? 'Testing...' : 'Test Connectivity'}
           </button>
           <button 
                   onClick={handleDiagnose}

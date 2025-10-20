@@ -243,7 +243,6 @@ const Mikrotiks = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState(emptyDeviceForm());
   const [showModal, setShowModal] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, device: null });
 
   // Add CSS for spin animation
   React.useEffect(() => {
@@ -528,15 +527,15 @@ const Mikrotiks = () => {
     }
   };
 
-  const handleDeleteDevice = async (deviceId) => {
+  const handleDeleteDevice = async () => {
     try {
-      console.log('Deleting device with ID:', deviceId, 'Type:', typeof deviceId);
+      console.log('Deleting device with ID:', selectedId, 'Type:', typeof selectedId);
       
-      if (!deviceId) {
-        throw new Error('No device ID provided for deletion');
+      if (!selectedId) {
+        throw new Error('No device selected for deletion');
       }
       
-      const response = await fetch(`/api/mikrotiks/${deviceId}`, {
+      const response = await fetch(`/api/mikrotiks/${selectedId}`, {
         method: 'DELETE'
       });
 
@@ -551,22 +550,11 @@ const Mikrotiks = () => {
         type: 'success',
         message: 'Device deleted successfully.'
       });
-      
-      // Auto-hide success message after 3 seconds
-      setTimeout(() => {
-        setStatus({ type: '', message: '' });
-      }, 3000);
     } catch (error) {
-      console.error('Delete error:', error);
       setStatus({
         type: 'error',
         message: error.message || 'Unable to delete device.'
       });
-      
-      // Auto-hide error message after 5 seconds
-      setTimeout(() => {
-        setStatus({ type: '', message: '' });
-      }, 5000);
     }
   };
 
@@ -630,8 +618,8 @@ const Mikrotiks = () => {
       const resultLogs = [
         `✅ Connectivity test completed`,
         `📊 Result: ${result.success ? 'SUCCESS' : 'FAILED'}`,
-        `🔗 API Status: ${result.mikrotik?.routeros?.apiEnabled ? 'Enabled' : 'Disabled'}`,
-        `🔐 SSH Status: ${result.mikrotik?.routeros?.sshEnabled ? 'Enabled' : 'Disabled'}`,
+        `🔗 API Status: ${result.mikrotik?.connectivity?.api?.status || 'unknown'}`,
+        `🔐 SSH Status: ${result.mikrotik?.connectivity?.ssh?.status || 'unknown'}`,
         `📡 Firmware: ${result.mikrotik?.routeros?.firmwareVersion || 'Not detected'}`,
         `📝 Details: ${result.message || 'No details available'}`
       ];
@@ -857,19 +845,12 @@ const Mikrotiks = () => {
 
   const handleDelete = (device) => {
     console.log('Delete button clicked for device:', device);
-    setDeleteConfirm({ show: true, device: device });
-  };
-
-  const confirmDelete = async () => {
-    if (deleteConfirm.device) {
-      console.log('User confirmed deletion, deleting device:', deleteConfirm.device.id);
-      setDeleteConfirm({ show: false, device: null });
-      await handleDeleteDevice(deleteConfirm.device.id);
+    if (!confirm(`Are you sure you want to delete the device "${device.name}"?`)) {
+      return;
     }
-  };
-
-  const cancelDelete = () => {
-    setDeleteConfirm({ show: false, device: null });
+    console.log('User confirmed deletion, setting selectedId to:', device.id);
+    setSelectedId(device.id);
+    handleDeleteDevice();
   };
 
   const handleNewDevice = () => {
@@ -1473,9 +1454,53 @@ const Mikrotiks = () => {
         </div>
       </div>
 
-      {/* Modern Devices Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6">
-        {filteredDevices.map((device) => {
+       {/* Modern Devices Table */}
+       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+         {/* Table Header */}
+         <div className="bg-gradient-to-r from-gray-50 to-blue-50/30 border-b border-gray-200 px-6 py-4">
+           <div className="grid grid-cols-12 gap-4 items-center">
+             <div className="col-span-3">
+               <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide flex items-center gap-2">
+                 <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
+                 Device
+               </h3>
+             </div>
+             <div className="col-span-2">
+               <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide flex items-center gap-2">
+                 <div className="w-2 h-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full"></div>
+                 Status
+               </h3>
+             </div>
+             <div className="col-span-2">
+               <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide flex items-center gap-2">
+                 <div className="w-2 h-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-full"></div>
+                 Connectivity
+               </h3>
+             </div>
+             <div className="col-span-2">
+               <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide flex items-center gap-2">
+                 <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"></div>
+                 Firmware
+               </h3>
+             </div>
+             <div className="col-span-2">
+               <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide flex items-center gap-2">
+                 <div className="w-2 h-2 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-full"></div>
+                 Last Check
+               </h3>
+             </div>
+             <div className="col-span-1">
+               <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide flex items-center gap-2">
+                 <div className="w-2 h-2 bg-gradient-to-r from-gray-500 to-slate-500 rounded-full"></div>
+                 Actions
+               </h3>
+             </div>
+           </div>
+         </div>
+
+         {/* Table Body */}
+         <div className="divide-y divide-gray-100">
+           {filteredDevices.map((device) => {
           // Determine connection statuses
           const apiConfigured = device.routeros?.apiEnabled && device.routeros?.apiUsername && device.routeros?.apiPassword;
           const sshConfigured = device.routeros?.sshEnabled && device.routeros?.sshUsername && device.routeros?.sshPassword;
@@ -2127,50 +2152,74 @@ const Mikrotiks = () => {
       </div>
 
       {filteredDevices.length === 0 && (
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-          border: '1px solid #e5e7eb',
-          padding: '32px',
-          margin: '20px 0'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '16px'
-          }}>
-            <div style={{
-              width: '32px',
-              height: '32px',
-              backgroundColor: '#f3f4f6',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}>
-              <svg style={{ width: '16px', height: '16px', color: '#374151' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          {/* Table Header */}
+          <div className="bg-gray-50 border-b border-gray-200 px-6 py-4">
+            <div className="grid grid-cols-12 gap-4 items-center">
+              <div className="col-span-3">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Device</h3>
+              </div>
+              <div className="col-span-2">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Status</h3>
+              </div>
+              <div className="col-span-2">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Connectivity</h3>
+              </div>
+              <div className="col-span-2">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Firmware</h3>
+              </div>
+              <div className="col-span-2">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Last Check</h3>
+              </div>
+              <div className="col-span-1">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Actions</h3>
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
-              <h3 style={{
-                fontSize: '18px',
-                fontWeight: '600',
-                color: '#111827',
-                margin: '0 0 8px 0',
-                fontFamily: 'system-ui, -apple-system, sans-serif'
-              }}>
+          </div>
+
+          {/* Sample Row to Show Table Structure */}
+          <div className="px-6 py-4 border-b border-gray-100">
+            <div className="grid grid-cols-12 gap-4 items-center opacity-30">
+              <div className="col-span-3 flex items-center gap-3">
+                <div className="w-10 h-10 bg-gray-200 rounded-lg"></div>
+                <div>
+                  <div className="h-4 w-24 bg-gray-200 rounded mb-1"></div>
+                  <div className="h-3 w-16 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+              <div className="col-span-2">
+                <div className="h-6 w-16 bg-gray-200 rounded-full"></div>
+              </div>
+              <div className="col-span-2 flex items-center gap-2">
+                <div className="h-2 w-2 bg-gray-200 rounded-full"></div>
+                <div className="h-4 w-12 bg-gray-200 rounded"></div>
+              </div>
+              <div className="col-span-2">
+                <div className="h-4 w-16 bg-gray-200 rounded"></div>
+              </div>
+              <div className="col-span-2">
+                <div className="h-4 w-20 bg-gray-200 rounded"></div>
+              </div>
+              <div className="col-span-1">
+                <div className="h-8 w-8 bg-gray-200 rounded"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Empty State Content */}
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-indigo-500/5"></div>
+            <div className="relative p-12 text-center">
+              <div className="mx-auto w-24 h-24 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full flex items-center justify-center mb-6 relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full animate-pulse"></div>
+                <svg style={{ width: '2.5rem', height: '2.5rem', color: '#9ca3af', position: 'relative', zIndex: 10 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-gray-900 via-blue-800 to-purple-800 bg-clip-text text-transparent mb-3">
                 {searchTerm || filterGroup ? 'No devices found' : 'No devices yet'}
               </h3>
-              <p style={{
-                color: '#6b7280',
-                margin: '0 0 24px 0',
-                fontSize: '14px',
-                lineHeight: '1.5',
-                fontFamily: 'system-ui, -apple-system, sans-serif'
-              }}>
+              <p className="text-gray-600 mb-6 max-w-md mx-auto">
                 {searchTerm || filterGroup 
                   ? 'Try adjusting your search criteria or filters to find what you\'re looking for.' 
                   : 'Get started by adding your first MikroTik device to begin monitoring your network infrastructure.'
@@ -2179,65 +2228,31 @@ const Mikrotiks = () => {
               {!searchTerm && !filterGroup && (
                 <button
                   type="button"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 16px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: 'white',
-                    backgroundColor: '#2563eb',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontFamily: 'system-ui, -apple-system, sans-serif'
-                  }}
+                  className="group inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 border border-transparent rounded-xl hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-blue-500/30 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
                   onClick={handleNewDevice}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#1d4ed8';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#2563eb';
-                  }}
                 >
-                  <svg style={{ width: '16px', height: '16px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
+                  <div className="w-4 h-4 bg-white/20 rounded flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <svg style={{ width: '0.625rem', height: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                  </div>
                   Add Your First Device
                 </button>
               )}
               {(searchTerm || filterGroup) && (
                 <button
                   type="button"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 16px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: '#374151',
-                    backgroundColor: '#f3f4f6',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontFamily: 'system-ui, -apple-system, sans-serif'
-                  }}
+                  className="group inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-gray-700 bg-white/70 backdrop-blur-sm border border-white/40 rounded-xl hover:bg-white/90 hover:border-white/60 focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
                   onClick={() => {
                     setSearchTerm('');
                     setFilterGroup('');
                   }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#e5e7eb';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#f3f4f6';
-                  }}
                 >
-                  <svg style={{ width: '16px', height: '16px', color: '#6b7280' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <div className="w-4 h-4 bg-gradient-to-br from-gray-500 to-gray-600 rounded flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <svg style={{ width: '0.625rem', height: '0.625rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
                   Clear Filters
                 </button>
               )}
@@ -2559,57 +2574,6 @@ const Mikrotiks = () => {
         )}
       </div>
           </form>
-        </Modal>
-
-        {/* Delete Confirmation Modal */}
-        <Modal
-          title="Delete Device"
-          description={`Are you sure you want to delete the device "${deleteConfirm.device?.name}"? This action cannot be undone.`}
-          open={deleteConfirm.show}
-          onClose={cancelDelete}
-          actions={[
-            <button
-              key="cancel"
-              type="button"
-              className="btn btn--ghost"
-              onClick={cancelDelete}
-            >
-              Cancel
-            </button>,
-            <button
-              key="delete"
-              type="button"
-              className="btn btn--danger"
-              onClick={confirmDelete}
-            >
-              Delete Device
-            </button>
-          ]}
-        >
-          <div style={{
-            padding: '1rem',
-            textAlign: 'center',
-            backgroundColor: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: '0.5rem',
-            marginBottom: '1rem'
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              marginBottom: '0.5rem'
-            }}>
-              <svg style={{ width: '1.5rem', height: '1.5rem', color: '#dc2626' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-              <span style={{ fontWeight: 'bold', color: '#dc2626' }}>Warning</span>
-            </div>
-            <p style={{ margin: 0, color: '#991b1b', fontSize: '0.875rem' }}>
-              This will permanently delete the device and all its configuration data.
-            </p>
-          </div>
         </Modal>
       </div>
 
