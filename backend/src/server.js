@@ -4348,6 +4348,25 @@ const bootstrap = async () => {
         }
       }
 
+      // Handle mikrotiks/:id/update/:action routes (length === 4)
+      if (resourceSegments[0] === 'mikrotiks' && resourceSegments.length === 4) {
+        const deviceId = Number.parseInt(resourceSegments[1], 10);
+        const category = resourceSegments[2];
+        const action = resourceSegments[3];
+
+        if (category === 'update') {
+          if (method === 'POST' && action === 'download') {
+            await handleDownloadMikrotikUpdate(deviceId);
+            return;
+          }
+
+          if (method === 'POST' && action === 'install') {
+            await handleInstallMikrotikUpdate(deviceId);
+            return;
+          }
+        }
+      }
+
       if (method === 'POST' && (canonicalPath === '/api/mikrotiks' || resourcePath === '/mikrotiks')) {
         await handleCreateMikrotik();
         return;
