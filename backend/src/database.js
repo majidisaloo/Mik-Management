@@ -3910,7 +3910,7 @@ password = "${routerosBaseline.sshPassword || ''}"
 cmd = [
     "sshpass", "-p", password,
     "ssh", 
-    "-o", "ConnectTimeout=10",
+    "-o", "ConnectTimeout=20",
     "-o", "StrictHostKeyChecking=no", 
     "-o", "UserKnownHostsFile=/dev/null",
     "-o", "LogLevel=ERROR",
@@ -3919,7 +3919,7 @@ cmd = [
 ]
 
 try:
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
     if result.returncode == 0:
         print(result.stdout)
     else:
@@ -3960,14 +3960,31 @@ except Exception as e:
             
             for (const line of logLines) {
               try {
-                // Parse RouterOS log format: "date time message"
-                const parts = line.split(' ');
+                // Parse RouterOS log format: " 2025-10-20 01:16:06 system,error,critical..."
+                const parts = line.trim().split(/\s+/);
                 if (parts.length >= 3) {
                   const date = parts[0];
                   const time = parts[1];
-                  const message = parts.slice(2).join(' ');
+                  const restOfLine = parts.slice(2).join(' ');
                   
-                  // Extract level from message (e.g., "system,info,account..." -> "info")
+                  // Check if restOfLine starts with a time pattern (HH:MM:SS)
+                  // This happens when the line is: "2025-10-20 01:16:06 system,error..."
+                  // But we're getting: time="2025-10-20", message="01:16:06 system,error..."
+                  // So we need to extract the time from the message
+                  const timeMatch = restOfLine.match(/^(\d{2}:\d{2}:\d{2})\s+(.+)$/);
+                  let actualTime, message;
+                  
+                  if (timeMatch) {
+                    // If message starts with time, use that time and remove it from message
+                    actualTime = `${date} ${timeMatch[1]}`;
+                    message = timeMatch[2];
+                  } else {
+                    // Otherwise use parts as is
+                    actualTime = `${date} ${time}`;
+                    message = restOfLine;
+                  }
+                  
+                  // Extract level from message (e.g., "system,error,critical..." -> "error")
                   let level = 'info';
                   if (message.includes('system,error,critical')) {
                     level = 'error';
@@ -3981,17 +3998,11 @@ except Exception as e:
                     level = 'debug';
                   }
                   
-                  // Clean up message - remove time from beginning if it exists
-                  let cleanMessage = message;
-                  if (message.match(/^\d{2}:\d{2}:\d{2}\s/)) {
-                    cleanMessage = message.replace(/^\d{2}:\d{2}:\d{2}\s/, '');
-                  }
-                  
                   logs.push({
                     id: Math.random().toString(36).substr(2, 9),
-                    time: `${date} ${time}`,
+                    time: actualTime,
                     topics: 'system',
-                    message: cleanMessage,
+                    message: message,
                     level: level,
                     source: 'ssh'
                   });
