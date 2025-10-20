@@ -2969,47 +2969,50 @@ const bootstrap = async () => {
           console.log(`⚠️ Could not save config via SSH, continuing with restart...`);
         }
 
-        // Step 2: Execute restart command with confirmation
+        // Step 2: Execute simple restart command
         console.log(`🔄 Step 2/3: Initiating reboot sequence...`);
         try {
-          // Method 1: Try with system reboot command (like winbox)
-          const restartCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system reboot"`;
+          // Simple restart command - just like winbox
+          const restartCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ${sshUsername}@${deviceIP} "/system reboot"`;
           const { exec } = await import('child_process');
-          const { promisify } = await import('util');
-          const execAsync = promisify(exec);
           
           console.log(`🔄 Executing restart command: ${restartCommand.replace(devicePassword, '***')}`);
           
           // Execute restart command (this will disconnect SSH)
-          execAsync(restartCommand, { timeout: 10000 }).catch((error) => {
-            // Expected to fail as device will disconnect
-            console.log(`✅ Restart command sent successfully (disconnect expected)`);
+          exec(restartCommand, { timeout: 5000 }, (error, stdout, stderr) => {
+            if (error) {
+              console.log(`✅ Restart command sent (disconnect expected): ${error.message}`);
+            } else {
+              console.log(`✅ Restart command executed successfully`);
+            }
           });
           
-          console.log(`✅ Restart command executed`);
+          console.log(`✅ Restart command sent to device`);
         } catch (restartError) {
-          console.log(`⚠️ SSH restart failed, trying alternative method...`);
-          // Fallback: try with different SSH options
-          try {
-            const fallbackCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o ServerAliveInterval=1 ${sshUsername}@${deviceIP} "/system reboot"`;
-            const { exec } = await import('child_process');
-            const { promisify } = await import('util');
-            const execAsync = promisify(exec);
-            
-            console.log(`🔄 Executing fallback restart command: ${fallbackCommand.replace(devicePassword, '***')}`);
-            
-            execAsync(fallbackCommand, { timeout: 8000 }).catch((error) => {
-              console.log(`✅ Fallback restart command sent (disconnect expected)`);
-            });
-          } catch (fallbackError) {
-            console.log(`❌ All restart methods failed: ${fallbackError.message}`);
-            throw new Error('Unable to restart device via SSH');
-          }
+          console.log(`❌ Restart command failed: ${restartError.message}`);
+          throw new Error('Unable to restart device via SSH');
         }
 
-        // Step 3: Wait and verify
+        // Step 3: Wait and verify with ping test
         console.log(`🔄 Step 3/3: Device is rebooting...`);
         await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+        
+        // Test ping to verify restart
+        console.log(`🔍 Testing ping to verify restart...`);
+        try {
+          const { exec } = await import('child_process');
+          const pingCommand = `ping -c 3 -W 2000 ${deviceIP}`;
+          
+          exec(pingCommand, { timeout: 10000 }, (error, stdout, stderr) => {
+            if (error) {
+              console.log(`❌ Ping failed (device may be restarting): ${error.message}`);
+            } else {
+              console.log(`✅ Ping successful - device is online`);
+            }
+          });
+        } catch (pingError) {
+          console.log(`⚠️ Ping test failed: ${pingError.message}`);
+        }
         
         sendJson(res, 200, {
           success: true,
