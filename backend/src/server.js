@@ -2439,7 +2439,7 @@ const bootstrap = async () => {
         const page = parseInt(url.searchParams.get('page') || '1', 10);
         const limit = parseInt(url.searchParams.get('limit') || '50', 10);
         const search = url.searchParams.get('search') || '';
-        const maxLogs = parseInt(url.searchParams.get('max') || '250', 10);
+          const maxLogs = parseInt(url.searchParams.get('max') || '50', 10);
 
         console.log(`Fetching logs for MikroTik device ID: ${deviceId}, page: ${page}, limit: ${limit}, search: "${search}"`);
         const result = await db.getMikrotikLogs(deviceId, { page, limit, search, maxLogs });

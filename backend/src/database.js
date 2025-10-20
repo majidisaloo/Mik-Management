@@ -3756,8 +3756,8 @@ const initializeDatabase = async (databasePath) => {
       return { success: false, reason: 'connection-error', message: 'All connection methods failed' };
     },
 
-    async getMikrotikLogs(id, options = {}) {
-      const { page = 1, limit = 50, search = '', maxLogs = 250 } = options;
+  async getMikrotikLogs(id, options = {}) {
+    const { page = 1, limit = 50, search = '', maxLogs = 50 } = options;
       const state = await load();
       const index = state.mikrotiks.findIndex((device) => device.id === id);
 
