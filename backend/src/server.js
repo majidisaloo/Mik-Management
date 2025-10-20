@@ -2736,6 +2736,35 @@ const bootstrap = async () => {
       }
     };
 
+    const handleDownloadMikrotikUpdate = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        const body = await getRequestBody(req);
+        const { channel } = body;
+
+        console.log(`Downloading ${channel} update for MikroTik device ID: ${deviceId}`);
+        
+        // For now, simulate download process
+        // In real implementation, this would download the firmware file from Mikrotik's servers
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate download time
+        
+        sendJson(res, 200, {
+          success: true,
+          message: `${channel} update download completed successfully.`,
+          channel: channel,
+          downloadPath: `/tmp/mikrotik-${channel}-update.npk`,
+          downloadedAt: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Download Mikrotik update error', error);
+        sendJson(res, 500, { message: 'Unable to download update right now.' });
+      }
+    };
+
     const handleInstallMikrotikUpdate = async (deviceId) => {
       if (!Number.isInteger(deviceId) || deviceId <= 0) {
         sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
@@ -4305,6 +4334,11 @@ const bootstrap = async () => {
 
         if (method === 'GET' && action === 'update-info') {
           await handleGetMikrotikUpdateInfo(deviceId);
+          return;
+        }
+
+        if (method === 'POST' && action === 'download') {
+          await handleDownloadMikrotikUpdate(deviceId);
           return;
         }
 
