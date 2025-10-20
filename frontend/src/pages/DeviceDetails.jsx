@@ -1306,7 +1306,7 @@ const DeviceDetails = () => {
                   transition: all 0.3s ease;
                 " onmouseover="this.style.borderColor='#ff6b6b'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
                   <div style="color: #64748B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">IP Address</div>
-                  <div style="color: #1E293B; font-size: 16px; font-weight: 700;">${result.deviceIP}</div>
+                  <div style="color: #1E293B; font-size: 16px; font-weight: 700;">${result.deviceIP || 'Loading...'}</div>
                 </div>
                 
                 <div style="
@@ -3056,12 +3056,16 @@ const DeviceDetails = () => {
                     outline: 'none'
                   }}
                   onMouseOver={(e) => {
-                    e.target.style.backgroundColor = theme === 'dark' ? '#0056b3' : '#0056b3';
-                    e.target.style.transform = 'translateY(-1px)';
+                    if (!isDownloading && !isInstalling && updateInfo?.stableUpdateAvailable) {
+                      e.target.style.backgroundColor = theme === 'dark' ? '#0056b3' : '#0056b3';
+                      e.target.style.transform = 'translateY(-1px)';
+                    }
                   }}
                   onMouseOut={(e) => {
-                    e.target.style.backgroundColor = theme === 'dark' ? '#007acc' : '#0066cc';
-                    e.target.style.transform = 'translateY(0)';
+                    if (!isDownloading && !isInstalling && updateInfo?.stableUpdateAvailable) {
+                      e.target.style.backgroundColor = theme === 'dark' ? '#007acc' : '#0066cc';
+                      e.target.style.transform = 'translateY(0)';
+                    }
                   }}
                 >
                   📥 Download
@@ -3088,12 +3092,16 @@ const DeviceDetails = () => {
                     outline: 'none'
                   }}
                   onMouseOver={(e) => {
-                    e.target.style.backgroundColor = '#218838';
-                    e.target.style.transform = 'translateY(-1px)';
+                    if (!isDownloading && !isInstalling && updateInfo?.stableUpdateAvailable) {
+                      e.target.style.backgroundColor = '#218838';
+                      e.target.style.transform = 'translateY(-1px)';
+                    }
                   }}
                   onMouseOut={(e) => {
-                    e.target.style.backgroundColor = theme === 'dark' ? '#28a745' : '#28a745';
-                    e.target.style.transform = 'translateY(0)';
+                    if (!isDownloading && !isInstalling && updateInfo?.stableUpdateAvailable) {
+                      e.target.style.backgroundColor = theme === 'dark' ? '#28a745' : '#28a745';
+                      e.target.style.transform = 'translateY(0)';
+                    }
                   }}
                 >
                   🚀 Install
@@ -3219,12 +3227,16 @@ const DeviceDetails = () => {
                     outline: 'none'
                   }}
                   onMouseOver={(e) => {
-                    e.target.style.backgroundColor = '#5a32a3';
-                    e.target.style.transform = 'translateY(-1px)';
+                    if (!isDownloading && !isInstalling && updateInfo?.testingUpdateAvailable) {
+                      e.target.style.backgroundColor = '#5a32a3';
+                      e.target.style.transform = 'translateY(-1px)';
+                    }
                   }}
                   onMouseOut={(e) => {
-                    e.target.style.backgroundColor = theme === 'dark' ? '#6f42c1' : '#6f42c1';
-                    e.target.style.transform = 'translateY(0)';
+                    if (!isDownloading && !isInstalling && updateInfo?.testingUpdateAvailable) {
+                      e.target.style.backgroundColor = theme === 'dark' ? '#6f42c1' : '#6f42c1';
+                      e.target.style.transform = 'translateY(0)';
+                    }
                   }}
                 >
                   📥 Download
@@ -3251,12 +3263,16 @@ const DeviceDetails = () => {
                     outline: 'none'
                   }}
                   onMouseOver={(e) => {
-                    e.target.style.backgroundColor = '#e8650e';
-                    e.target.style.transform = 'translateY(-1px)';
+                    if (!isDownloading && !isInstalling && updateInfo?.testingUpdateAvailable) {
+                      e.target.style.backgroundColor = '#e8650e';
+                      e.target.style.transform = 'translateY(-1px)';
+                    }
                   }}
                   onMouseOut={(e) => {
-                    e.target.style.backgroundColor = theme === 'dark' ? '#fd7e14' : '#fd7e14';
-                    e.target.style.transform = 'translateY(0)';
+                    if (!isDownloading && !isInstalling && updateInfo?.testingUpdateAvailable) {
+                      e.target.style.backgroundColor = theme === 'dark' ? '#fd7e14' : '#fd7e14';
+                      e.target.style.transform = 'translateY(0)';
+                    }
                   }}
                 >
                   ⚡ Install

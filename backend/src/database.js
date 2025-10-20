@@ -5847,6 +5847,25 @@ async function getMikrotikUpdateInfo(deviceId) {
                 console.log(`✅ Testing update available`);
               }
             }
+
+            // Reset channel back to stable (important!)
+            const resetChannelCommand = `sshpass -p "${routerosBaseline.sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${routerosBaseline.sshUsername}@${host} "/system package update set channel=stable"`;
+            
+            try {
+              await new Promise((resolve, reject) => {
+                exec(resetChannelCommand, { timeout: 10000 }, (error, stdout, stderr) => {
+                  if (error) {
+                    console.log(`⚠️ Failed to reset channel to stable: ${error.message}`);
+                    resolve(); // Don't fail the whole operation
+                  } else {
+                    console.log(`✅ Channel reset to stable`);
+                    resolve();
+                  }
+                });
+              });
+            } catch (resetError) {
+              console.log(`⚠️ Channel reset failed: ${resetError.message}`);
+            }
           } catch (updateError) {
             console.log(`❌ Failed to get update info via SSH: ${updateError.message}`);
           }
