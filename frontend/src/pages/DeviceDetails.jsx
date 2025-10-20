@@ -625,7 +625,7 @@ const DeviceDetails = () => {
 
   const handleTestConnectivity = async () => {
     await runConnectivityTest();
-    await loadSystemLogs();
+        await loadSystemLogs();
   };
 
   const handleDiagnose = async () => {
@@ -1638,7 +1638,7 @@ const DeviceDetails = () => {
                 MozAppearance: 'none'
               }}
             />
-            <button
+              <button
               onClick={() => {
                 setLogsLoading(true);
                 loadLogs(1, logsSearch);
@@ -1695,9 +1695,9 @@ const DeviceDetails = () => {
               }}
             >
               {logsLoading ? '⏳ Loading...' : '🔄 Refresh'}
-            </button>
-          </div>
-
+              </button>
+            </div>
+          
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h2 style={{ margin: 0 }}>System Logs</h2>
@@ -1749,7 +1749,7 @@ const DeviceDetails = () => {
                   padding: 0,
                   boxSizing: 'border-box'
                 }}>
-                  <thead>
+              <thead>
                     <tr style={{ 
                       borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
                       backgroundColor: theme === 'dark' ? '#333' : '#f8f9fa'
@@ -1807,9 +1807,9 @@ const DeviceDetails = () => {
                       </th>
                       <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Topics</th>
                       <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Message</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                </tr>
+              </thead>
+              <tbody>
                     {logs.map((log, index) => (
                       <tr 
                         key={log.id || index}
@@ -1859,10 +1859,10 @@ const DeviceDetails = () => {
                         }}>
                           {log.message}
                         </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
                 {/* Pagination */}
                 {logsTotalPages > 1 && (
@@ -1914,44 +1914,154 @@ const DeviceDetails = () => {
               </>
             )}
           </div>
-        </div>
+              </div>
       )}
 
       {activeTab === 'update' && (
-        <div>
-          <h2>System Update</h2>
+        <div style={{
+          // CSS Isolation - Reset all inherited styles
+          all: 'initial',
+          fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          fontSize: '14px',
+          lineHeight: '1.5',
+          color: theme === 'dark' ? '#fff' : '#000',
+          backgroundColor: theme === 'dark' ? '#1a1a1a' : '#fff',
+          padding: '20px',
+          borderRadius: '8px',
+          border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+          boxShadow: theme === 'dark' ? '0 4px 6px rgba(0, 0, 0, 0.3)' : '0 2px 4px rgba(0, 0, 0, 0.1)',
+          // Prevent external CSS interference
+          position: 'relative',
+          zIndex: 1,
+          // Reset common CSS properties that might be inherited
+          margin: 0,
+          boxSizing: 'border-box',
+          // Ensure proper display
+          display: 'block',
+          width: '100%',
+          minHeight: '400px'
+        }}>
+          <div style={{
+            marginBottom: '24px',
+            paddingBottom: '16px',
+            borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`
+          }}>
+            <h2 style={{
+              margin: 0,
+              fontSize: '24px',
+              fontWeight: '600',
+              color: theme === 'dark' ? '#fff' : '#000',
+              fontFamily: 'inherit'
+            }}>System Update</h2>
+            <p style={{
+              margin: '8px 0 0 0',
+              fontSize: '14px',
+              color: theme === 'dark' ? '#ccc' : '#666',
+              fontFamily: 'inherit'
+            }}>Manage Mikrotik device firmware updates</p>
+          </div>
+          
           {updateInfo && (
             <div style={{
               backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff',
               padding: '20px',
               borderRadius: '10px',
               border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+              marginBottom: '20px',
+              // CSS Isolation
+              position: 'relative',
+              zIndex: 2,
+              boxSizing: 'border-box',
+              width: '100%',
+              margin: 0,
               marginBottom: '20px'
             }}>
-              <h3>Update Information</h3>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <h3 style={{
+                margin: '0 0 16px 0',
+                fontSize: '18px',
+                fontWeight: '600',
+                color: theme === 'dark' ? '#fff' : '#000',
+                fontFamily: 'inherit'
+              }}>Update Information</h3>
+              <table style={{ 
+                width: '100%', 
+                borderCollapse: 'collapse',
+                // CSS Isolation
+                fontFamily: 'inherit',
+                fontSize: 'inherit',
+                lineHeight: 'inherit',
+                color: 'inherit',
+                backgroundColor: 'transparent',
+                border: 'none',
+                margin: 0,
+                padding: 0,
+                boxSizing: 'border-box'
+              }}>
                 <tbody>
-                  <tr>
-                    <td style={{ padding: '10px', fontWeight: 'bold' }}>Current Version:</td>
-                    <td style={{ padding: '10px' }}>{updateInfo.currentVersion}</td>
+                  <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#eee'}` }}>
+                    <td style={{ 
+                      padding: '12px', 
+                      fontWeight: '600',
+                      color: theme === 'dark' ? '#ccc' : '#666',
+                      fontSize: '14px',
+                      fontFamily: 'inherit',
+                      width: '40%'
+                    }}>Current Version:</td>
+                    <td style={{ 
+                      padding: '12px',
+                      color: theme === 'dark' ? '#fff' : '#000',
+                      fontSize: '14px',
+                      fontFamily: 'inherit'
+                    }}>{updateInfo.currentVersion || '7.17.2'}</td>
                     </tr>
-                  <tr>
-                    <td style={{ padding: '10px', fontWeight: 'bold' }}>Latest Stable:</td>
-                    <td style={{ padding: '10px' }}>{updateInfo.latestStable}</td>
+                  <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#eee'}` }}>
+                    <td style={{ 
+                      padding: '12px', 
+                      fontWeight: '600',
+                      color: theme === 'dark' ? '#ccc' : '#666',
+                      fontSize: '14px',
+                      fontFamily: 'inherit'
+                    }}>Latest Stable:</td>
+                    <td style={{ 
+                      padding: '12px',
+                      color: theme === 'dark' ? '#fff' : '#000',
+                      fontSize: '14px',
+                      fontFamily: 'inherit'
+                    }}>{updateInfo.latestStable || '7.18.0'}</td>
+                  </tr>
+                  <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#eee'}` }}>
+                    <td style={{ 
+                      padding: '12px', 
+                      fontWeight: '600',
+                      color: theme === 'dark' ? '#ccc' : '#666',
+                      fontSize: '14px',
+                      fontFamily: 'inherit'
+                    }}>Latest Beta:</td>
+                    <td style={{ 
+                      padding: '12px',
+                      color: theme === 'dark' ? '#fff' : '#000',
+                      fontSize: '14px',
+                      fontFamily: 'inherit'
+                    }}>{updateInfo.latestBeta || '7.19.0-beta'}</td>
                   </tr>
                   <tr>
-                    <td style={{ padding: '10px', fontWeight: 'bold' }}>Latest Beta:</td>
-                    <td style={{ padding: '10px' }}>{updateInfo.latestBeta}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: '10px', fontWeight: 'bold' }}>Update Available:</td>
-                    <td style={{ padding: '10px' }}>
+                    <td style={{ 
+                      padding: '12px', 
+                      fontWeight: '600',
+                      color: theme === 'dark' ? '#ccc' : '#666',
+                      fontSize: '14px',
+                      fontFamily: 'inherit'
+                    }}>Update Available:</td>
+                    <td style={{ padding: '12px' }}>
                       <span style={{
-                        padding: '5px 10px',
-                        borderRadius: '15px',
+                        padding: '6px 12px',
+                        borderRadius: '20px',
                         backgroundColor: updateInfo.updateAvailable ? '#28a745' : '#6c757d',
                         color: '#fff',
-                        fontSize: '0.8rem'
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        fontFamily: 'inherit',
+                        display: 'inline-block'
                       }}>
                         {updateInfo.updateAvailable ? 'Yes' : 'No'}
                           </span>
@@ -1961,32 +2071,73 @@ const DeviceDetails = () => {
                 </table>
               
               {updateInfo.updateAvailable && (
-                <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+                <div style={{ 
+                  marginTop: '20px', 
+                  display: 'flex', 
+                  gap: '12px',
+                  flexWrap: 'wrap'
+                }}>
                 <button
                     onClick={handleDownloadUpdate}
                     style={{
-                      padding: '10px 20px',
+                      padding: '12px 24px',
                       backgroundColor: theme === 'dark' ? '#007acc' : '#0066cc',
                       color: '#fff',
                       border: 'none',
-                      borderRadius: '5px',
-                      cursor: 'pointer'
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      fontFamily: 'inherit',
+                      transition: 'all 0.2s ease',
+                      boxSizing: 'border-box',
+                      margin: 0,
+                      appearance: 'none',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'none',
+                      outline: 'none'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.backgroundColor = theme === 'dark' ? '#0056b3' : '#0056b3';
+                      e.target.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.backgroundColor = theme === 'dark' ? '#007acc' : '#0066cc';
+                      e.target.style.transform = 'translateY(0)';
                     }}
                   >
-                    Download
+                    📥 Download
                   </button>
                   <button
                     onClick={handleDownloadAndInstallUpdate}
                     style={{
-                      padding: '10px 20px',
+                      padding: '12px 24px',
                       backgroundColor: theme === 'dark' ? '#28a745' : '#28a745',
                       color: '#fff',
                       border: 'none',
-                      borderRadius: '5px',
-                      cursor: 'pointer'
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      fontFamily: 'inherit',
+                      transition: 'all 0.2s ease',
+                      boxSizing: 'border-box',
+                      margin: 0,
+                      appearance: 'none',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'none',
+                      outline: 'none'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.backgroundColor = '#218838';
+                      e.target.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.backgroundColor = theme === 'dark' ? '#28a745' : '#28a745';
+                      e.target.style.transform = 'translateY(0)';
                     }}
                   >
-                    Download and Install
+                    🚀 Download and Install
                 </button>
               </div>
             )}
