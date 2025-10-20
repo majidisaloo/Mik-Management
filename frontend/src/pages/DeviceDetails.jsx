@@ -1306,7 +1306,7 @@ const DeviceDetails = () => {
                   transition: all 0.3s ease;
                 " onmouseover="this.style.borderColor='#ff6b6b'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
                   <div style="color: #64748B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">IP Address</div>
-                  <div style="color: #1E293B; font-size: 16px; font-weight: 700;">${result.deviceIP || 'Loading...'}</div>
+                  <div style="color: #1E293B; font-size: 16px; font-weight: 700;">${result.deviceIP || device?.host || device?.ip || 'Unknown'}</div>
                 </div>
                 
                 <div style="

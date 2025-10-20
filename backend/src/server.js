@@ -1591,7 +1591,7 @@ const bootstrap = async () => {
         // In production, uncomment the following code:
         /*
         try {
-          // Install backend dependencies
+        // Install backend dependencies
           console.log(`Installing backend dependencies...`);
           execSync(backendInstallCommand, { cwd: process.cwd(), stdio: 'pipe' });
           console.log(`Backend dependencies installed successfully`);
@@ -2893,7 +2893,7 @@ const bootstrap = async () => {
           console.log(`⚠️ Reboot failed: ${rebootError.message}`);
           // Don't throw error for reboot as it's expected to disconnect
         }
-        
+
         sendJson(res, 200, {
           success: true,
           message: `${channel} update downloaded, installed, and device rebooted successfully.`,
@@ -2946,8 +2946,8 @@ const bootstrap = async () => {
         // Step 2: Execute restart command with confirmation
         console.log(`🔄 Step 2/3: Initiating reboot sequence...`);
         try {
-          // Use echo to send 'y' confirmation to the reboot command
-          const restartCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "echo 'y' | /system reboot"`;
+          // Method 1: Try with printf
+          const restartCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "printf 'y\\n' | /system reboot"`;
           const { exec } = await import('child_process');
           const { promisify } = await import('util');
           const execAsync = promisify(exec);
@@ -2965,7 +2965,7 @@ const bootstrap = async () => {
           console.log(`⚠️ SSH restart failed, trying alternative method...`);
           // Fallback: try with different SSH options and confirmation
           try {
-            const fallbackCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o ServerAliveInterval=1 ${sshUsername}@${deviceIP} "echo 'y' | /system reboot"`;
+            const fallbackCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o ServerAliveInterval=1 ${sshUsername}@${deviceIP} "printf 'y\\n' | /system reboot"`;
             const { exec } = await import('child_process');
             const { promisify } = await import('util');
             const execAsync = promisify(exec);
