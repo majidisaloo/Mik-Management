@@ -2075,38 +2075,88 @@ const DeviceDetails = () => {
               <div style={{ 
                 marginTop: '20px'
               }}>
+                {/* Check Update Button */}
+                <div style={{
+                  marginBottom: '20px',
+                  textAlign: 'center'
+                }}>
+                  <button
+                    onClick={loadUpdateInfo}
+                    style={{
+                      padding: '12px 24px',
+                      backgroundColor: theme === 'dark' ? '#17a2b8' : '#17a2b8',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      fontFamily: 'inherit',
+                      transition: 'all 0.2s ease',
+                      boxSizing: 'border-box',
+                      margin: 0,
+                      appearance: 'none',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'none',
+                      outline: 'none'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.backgroundColor = '#138496';
+                      e.target.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.backgroundColor = theme === 'dark' ? '#17a2b8' : '#17a2b8';
+                      e.target.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    🔄 Check for Updates
+                  </button>
+                </div>
+
                 {/* Stable Version Row */}
                 <div style={{
                   marginBottom: '16px',
                   padding: '16px',
                   backgroundColor: theme === 'dark' ? '#1e3a5f' : '#e3f2fd',
                   borderRadius: '8px',
-                  border: `1px solid ${theme === 'dark' ? '#2d5a87' : '#bbdefb'}`
+                  border: `1px solid ${theme === 'dark' ? '#2d5a87' : '#bbdefb'}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
                 }}>
-                  <h4 style={{
-                    margin: '0 0 12px 0',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    color: theme === 'dark' ? '#64b5f6' : '#1976d2',
-                    fontFamily: 'inherit'
-                  }}>
-                    📦 Stable Version ({updateInfo.latestStable || '7.30.1'})
-                  </h4>
+                  <div>
+                    <h4 style={{
+                      margin: '0 0 4px 0',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: theme === 'dark' ? '#64b5f6' : '#1976d2',
+                      fontFamily: 'inherit'
+                    }}>
+                      📦 Stable Version
+                    </h4>
+                    <p style={{
+                      margin: 0,
+                      fontSize: '14px',
+                      color: theme === 'dark' ? '#ccc' : '#666',
+                      fontFamily: 'inherit'
+                    }}>
+                      {updateInfo.latestStable || '7.30.1'}
+                    </p>
+                  </div>
                   <div style={{ 
                     display: 'flex', 
-                    gap: '12px',
-                    flexWrap: 'wrap'
+                    gap: '8px'
                   }}>
                     <button
                       onClick={() => handleDownloadUpdate('stable')}
                       style={{
-                        padding: '10px 20px',
+                        padding: '8px 16px',
                         backgroundColor: theme === 'dark' ? '#007acc' : '#0066cc',
                         color: '#fff',
                         border: 'none',
                         borderRadius: '6px',
                         cursor: 'pointer',
-                        fontSize: '14px',
+                        fontSize: '12px',
                         fontWeight: '500',
                         fontFamily: 'inherit',
                         transition: 'all 0.2s ease',
@@ -2131,13 +2181,13 @@ const DeviceDetails = () => {
                     <button
                       onClick={() => handleDownloadAndInstallUpdate('stable')}
                       style={{
-                        padding: '10px 20px',
+                        padding: '8px 16px',
                         backgroundColor: theme === 'dark' ? '#28a745' : '#28a745',
                         color: '#fff',
                         border: 'none',
                         borderRadius: '6px',
                         cursor: 'pointer',
-                        fontSize: '14px',
+                        fontSize: '12px',
                         fontWeight: '500',
                         fontFamily: 'inherit',
                         transition: 'all 0.2s ease',
@@ -2157,7 +2207,7 @@ const DeviceDetails = () => {
                         e.target.style.transform = 'translateY(0)';
                       }}
                     >
-                      🚀 Download & Install
+                      🚀 Install
                     </button>
                   </div>
                 </div>
@@ -2167,32 +2217,44 @@ const DeviceDetails = () => {
                   padding: '16px',
                   backgroundColor: theme === 'dark' ? '#4a1a4a' : '#fce4ec',
                   borderRadius: '8px',
-                  border: `1px solid ${theme === 'dark' ? '#7b1f7b' : '#f8bbd9'}`
+                  border: `1px solid ${theme === 'dark' ? '#7b1f7b' : '#f8bbd9'}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
                 }}>
-                  <h4 style={{
-                    margin: '0 0 12px 0',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    color: theme === 'dark' ? '#ce93d8' : '#c2185b',
-                    fontFamily: 'inherit'
-                  }}>
-                    🧪 Beta Version ({updateInfo.latestBeta || '7.31.0-beta'})
-                  </h4>
+                  <div>
+                    <h4 style={{
+                      margin: '0 0 4px 0',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: theme === 'dark' ? '#ce93d8' : '#c2185b',
+                      fontFamily: 'inherit'
+                    }}>
+                      🧪 Beta Version
+                    </h4>
+                    <p style={{
+                      margin: 0,
+                      fontSize: '14px',
+                      color: theme === 'dark' ? '#ccc' : '#666',
+                      fontFamily: 'inherit'
+                    }}>
+                      {updateInfo.latestBeta || '7.31.0-beta'}
+                    </p>
+                  </div>
                   <div style={{ 
                     display: 'flex', 
-                    gap: '12px',
-                    flexWrap: 'wrap'
+                    gap: '8px'
                   }}>
                     <button
                       onClick={() => handleDownloadUpdate('beta')}
                       style={{
-                        padding: '10px 20px',
+                        padding: '8px 16px',
                         backgroundColor: theme === 'dark' ? '#6f42c1' : '#6f42c1',
                         color: '#fff',
                         border: 'none',
                         borderRadius: '6px',
                         cursor: 'pointer',
-                        fontSize: '14px',
+                        fontSize: '12px',
                         fontWeight: '500',
                         fontFamily: 'inherit',
                         transition: 'all 0.2s ease',
@@ -2217,13 +2279,13 @@ const DeviceDetails = () => {
                     <button
                       onClick={() => handleDownloadAndInstallUpdate('beta')}
                       style={{
-                        padding: '10px 20px',
+                        padding: '8px 16px',
                         backgroundColor: theme === 'dark' ? '#fd7e14' : '#fd7e14',
                         color: '#fff',
                         border: 'none',
                         borderRadius: '6px',
                         cursor: 'pointer',
-                        fontSize: '14px',
+                        fontSize: '12px',
                         fontWeight: '500',
                         fontFamily: 'inherit',
                         transition: 'all 0.2s ease',
@@ -2243,7 +2305,7 @@ const DeviceDetails = () => {
                         e.target.style.transform = 'translateY(0)';
                       }}
                     >
-                      ⚡ Download & Install
+                      ⚡ Install
                     </button>
                   </div>
                 </div>

@@ -5761,8 +5761,8 @@ async function getMikrotikUpdateInfo(deviceId) {
       }
     }
 
-    // Try SSH method if API failed
-    if (currentVersion === 'Unknown' && routerosBaseline.sshEnabled) {
+    // Try SSH method to get real firmware version (always try SSH for latest info)
+    if (routerosBaseline.sshEnabled) {
       try {
         console.log(`Trying SSH method to get firmware version...`);
         const { exec } = await import('child_process');
@@ -5785,6 +5785,33 @@ async function getMikrotikUpdateInfo(deviceId) {
           if (versionMatch) {
             currentVersion = versionMatch[1];
             console.log(`✅ Current firmware version detected via SSH: ${currentVersion}`);
+          }
+          
+          // Also try to get latest available versions from Mikrotik
+          try {
+            const updateCommand = `sshpass -p "${routerosBaseline.sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${routerosBaseline.sshUsername}@${host} "/system package update print"`;
+            
+            const updateResult = await new Promise((resolve, reject) => {
+              exec(updateCommand, { timeout: 15000 }, (error, stdout, stderr) => {
+                if (error) {
+                  reject(error);
+                } else {
+                  resolve({ stdout, stderr });
+                }
+              });
+            });
+
+            if (updateResult.stdout) {
+              // Parse available versions from update output
+              const availableMatch = updateResult.stdout.match(/available-version:\s*([^\s\n]+)/i);
+              
+              if (availableMatch) {
+                latestStable = availableMatch[1];
+                console.log(`✅ Latest stable version from device: ${latestStable}`);
+              }
+            }
+          } catch (updateError) {
+            console.log(`❌ Failed to get update info via SSH: ${updateError.message}`);
           }
         }
       } catch (error) {
