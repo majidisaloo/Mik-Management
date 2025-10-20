@@ -1246,9 +1246,9 @@ const Mikrotiks = () => {
           padding: '1.5rem',
           boxShadow: theme === 'dark' ? '0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05)' : '0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1)'
         }}>
-          <div style={{
+          <div           style={{
             display: 'flex',
-            alignItems: 'flex-end',
+            alignItems: 'flex-start',
             gap: '1.5rem',
             flexWrap: 'wrap'
           }}>
@@ -1271,13 +1271,19 @@ const Mikrotiks = () => {
               <div style={{
                 position: 'relative',
                 width: '100%',
-                display: 'block'
+                display: 'flex',
+                alignItems: 'center',
+                background: theme === 'dark' ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+                backdropFilter: 'blur(8px)',
+                border: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.5)',
+                borderRadius: '14px',
+                boxShadow: theme === 'dark' ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                height: '48px',
+                paddingLeft: '16px',
+                paddingRight: '16px',
+                boxSizing: 'border-box'
               }}>
                 <div style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '16px',
-                  transform: 'translateY(-50%)',
                   width: '20px',
                   height: '20px',
                   background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
@@ -1286,21 +1292,13 @@ const Mikrotiks = () => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   transition: 'transform 0.3s ease',
-                  zIndex: 10,
-                  margin: 0,
-                  padding: 0,
-                  border: 'none',
-                  outline: 'none',
-                  lineHeight: '1'
+                  marginRight: '12px',
+                  flexShrink: 0
                 }}>
                   <svg style={{ 
                     width: '12px', 
                     height: '12px', 
-                    color: 'white',
-                    display: 'block',
-                    margin: '0',
-                    verticalAlign: 'baseline',
-                    textAlign: 'center'
+                    color: 'white'
                   }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
@@ -1312,38 +1310,28 @@ const Mikrotiks = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search devices by name, IP address, or tags..."
                   style={{
-                    width: '100%',
-                    paddingLeft: '56px',
-                    paddingRight: '16px',
-                    paddingTop: '14px',
-                    paddingBottom: '14px',
-                    background: theme === 'dark' ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-                    backdropFilter: 'blur(8px)',
-                    border: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.5)',
-                    borderRadius: '14px',
+                    flex: 1,
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
                     fontSize: '14px',
                     fontWeight: '500',
                     color: theme === 'dark' ? '#f1f5f9' : '#374151',
-                    transition: 'all 0.3s ease',
-                    boxShadow: theme === 'dark' ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                    outline: 'none',
-                    margin: 0,
                     fontFamily: 'system-ui, -apple-system, sans-serif',
                     lineHeight: '1.2',
-                    verticalAlign: 'baseline',
-                    display: 'block',
-                    height: '48px',
-                    boxSizing: 'border-box'
+                    height: '100%',
+                    margin: 0,
+                    padding: 0
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = 'rgba(59, 130, 246, 0.6)';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1), 0 10px 15px -3px rgba(0, 0, 0, 0.1)';
-                    e.target.style.transform = 'translateY(-1px)';
+                    e.target.parentElement.style.borderColor = 'rgba(59, 130, 246, 0.6)';
+                    e.target.parentElement.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1), 0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                    e.target.parentElement.style.transform = 'translateY(-1px)';
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)';
-                    e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
-                    e.target.style.transform = 'translateY(0)';
+                    e.target.parentElement.style.borderColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.5)';
+                    e.target.parentElement.style.boxShadow = theme === 'dark' ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+                    e.target.parentElement.style.transform = 'translateY(0)';
                   }}
                 />
                 <div style={{
@@ -1374,7 +1362,19 @@ const Mikrotiks = () => {
                 🏷️ Filter by Group
               </label>
               <div style={{
-                position: 'relative'
+                position: 'relative',
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                background: theme === 'dark' ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+                backdropFilter: 'blur(8px)',
+                border: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.5)',
+                borderRadius: '14px',
+                boxShadow: theme === 'dark' ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                height: '48px',
+                paddingLeft: '16px',
+                paddingRight: '16px',
+                boxSizing: 'border-box'
               }}>
               <select
                 id="group-filter"
@@ -1382,32 +1382,29 @@ const Mikrotiks = () => {
                 onChange={(e) => setFilterGroup(e.target.value)}
                   style={{
                     width: '100%',
-                    paddingLeft: '1rem',
-                    paddingRight: '3.5rem',
-                    paddingTop: '0.875rem',
-                    paddingBottom: '0.875rem',
-                    background: theme === 'dark' ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-                    backdropFilter: 'blur(8px)',
-                    border: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.5)',
-                    borderRadius: '0.875rem',
-                    fontSize: '0.875rem',
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: '14px',
                     fontWeight: '500',
                     color: theme === 'dark' ? '#f1f5f9' : '#374151',
-                    transition: 'all 0.3s ease',
-                    boxShadow: theme === 'dark' ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                    outline: 'none',
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                    lineHeight: '1.2',
+                    height: '100%',
+                    margin: 0,
+                    padding: 0,
                     cursor: 'pointer',
                     appearance: 'none'
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = 'rgba(59, 130, 246, 0.6)';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1), 0 10px 15px -3px rgba(0, 0, 0, 0.1)';
-                    e.target.style.transform = 'translateY(-1px)';
+                    e.target.parentElement.style.borderColor = 'rgba(59, 130, 246, 0.6)';
+                    e.target.parentElement.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1), 0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                    e.target.parentElement.style.transform = 'translateY(-1px)';
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)';
-                    e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
-                    e.target.style.transform = 'translateY(0)';
+                    e.target.parentElement.style.borderColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.5)';
+                    e.target.parentElement.style.boxShadow = theme === 'dark' ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+                    e.target.parentElement.style.transform = 'translateY(0)';
                   }}
               >
                 <option value="">All Groups</option>
