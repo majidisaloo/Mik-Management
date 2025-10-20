@@ -1162,14 +1162,14 @@ const DeviceDetails = () => {
   };
 
   const checkSafeModeStatus = async () => {
-    try {
+      try {
       const response = await fetch(`/api/mikrotiks/${id}/safe-mode`);
-      if (response.ok) {
+        if (response.ok) {
         const data = await response.json();
         console.log(`🔍 Safe mode status check: ${data.enabled ? 'Enabled' : 'Disabled'} (Boot device: ${data.bootDevice})`);
         setSafeMode(data.enabled);
-      }
-    } catch (err) {
+        }
+      } catch (err) {
       console.error('Error checking safe mode status:', err);
     }
   };
@@ -1197,10 +1197,10 @@ const DeviceDetails = () => {
     if (window.confirm('Are you sure you want to restart this device? This will disconnect the device temporarily.')) {
       try {
         const response = await fetch(`/api/mikrotiks/${id}/restart`, {
-          method: 'POST',
-        });
+        method: 'POST',
+      });
 
-        if (response.ok) {
+      if (response.ok) {
           const result = await response.json();
           
           // Create beautiful restart modal instead of simple alert
