@@ -2326,7 +2326,8 @@ const bootstrap = async () => {
         console.log(`Connectivity test result:`, result);
         const groups = await db.listGroups();
         sendJson(res, 200, {
-          message: 'Connectivity refreshed successfully.',
+          success: result.success,
+          message: result.message || 'Connectivity refreshed successfully.',
           mikrotik: mapMikrotik(result.mikrotik, groups),
           targetRouterOs: TARGET_ROUTEROS_VERSION
         });
@@ -2423,6 +2424,51 @@ const bootstrap = async () => {
       } catch (error) {
         console.error('Get Mikrotik routes error', error);
         sendJson(res, 500, { message: 'Unable to fetch routes right now.' });
+      }
+    };
+
+    const handleGetMikrotikLogs = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        // Parse query parameters
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const page = parseInt(url.searchParams.get('page') || '1', 10);
+        const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+        const search = url.searchParams.get('search') || '';
+        const maxLogs = parseInt(url.searchParams.get('max') || '250', 10);
+
+        console.log(`Fetching logs for MikroTik device ID: ${deviceId}, page: ${page}, limit: ${limit}, search: "${search}"`);
+        const result = await db.getMikrotikLogs(deviceId, { page, limit, search, maxLogs });
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to fetch logs.');
+        }
+
+        console.log(`Logs fetch result: ${result.logs?.length || 0} logs found`);
+        sendJson(res, 200, {
+          message: 'Logs fetched successfully.',
+          logs: result.logs || [],
+          pagination: {
+            page: result.page || page,
+            limit: result.limit || limit,
+            total: result.total || 0,
+            totalPages: result.totalPages || 0,
+            hasMore: result.hasMore || false
+          },
+          source: result.source || 'unknown'
+        });
+      } catch (error) {
+        console.error('Get Mikrotik logs error', error);
+        sendJson(res, 500, { message: 'Unable to fetch logs right now.' });
       }
     };
 
@@ -4131,6 +4177,7 @@ const bootstrap = async () => {
       if (resourceSegments[0] === 'mikrotiks' && resourceSegments.length === 2) {
         const idSegment = resourceSegments[1];
         const deviceId = Number.parseInt(idSegment, 10);
+        console.log(`Parsing device ID: "${idSegment}" -> ${deviceId} (isNaN: ${isNaN(deviceId)})`);
 
         if (method === 'GET') {
           await handleGetMikrotik(deviceId);
@@ -4174,6 +4221,11 @@ const bootstrap = async () => {
 
         if (method === 'GET' && action === 'routes') {
           await handleGetMikrotikRoutes(deviceId);
+          return;
+        }
+
+        if (method === 'GET' && action === 'logs') {
+          await handleGetMikrotikLogs(deviceId);
           return;
         }
 

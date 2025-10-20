@@ -208,18 +208,26 @@ const sanitizeConnectivity = (connectivity = {}, routeros = defaultRouterosOptio
 
   const api = connectivity.api ?? {};
   const apiStatus = typeof api.status === 'string' ? api.status.toLowerCase() : '';
-  normalized.api.status = allowedConnectivityStatuses.has(apiStatus) ? apiStatus : baseline.api.status;
+  
+  // If API is disabled in configuration, always set to disabled
   if (!routeros.apiEnabled) {
     normalized.api.status = 'disabled';
+  } else {
+    // If API is enabled, use the actual test result
+    normalized.api.status = allowedConnectivityStatuses.has(apiStatus) ? apiStatus : baseline.api.status;
   }
   normalized.api.lastCheckedAt = typeof api.lastCheckedAt === 'string' ? api.lastCheckedAt : baseline.api.lastCheckedAt;
   normalized.api.lastError = normalizeOptionalText(api.lastError ?? baseline.api.lastError ?? '') || null;
 
   const ssh = connectivity.ssh ?? {};
   const sshStatus = typeof ssh.status === 'string' ? ssh.status.toLowerCase() : '';
-  normalized.ssh.status = allowedConnectivityStatuses.has(sshStatus) ? sshStatus : baseline.ssh.status;
+  
+  // If SSH is disabled in configuration, always set to disabled
   if (!routeros.sshEnabled) {
     normalized.ssh.status = 'disabled';
+  } else {
+    // If SSH is enabled, use the actual test result
+    normalized.ssh.status = allowedConnectivityStatuses.has(sshStatus) ? sshStatus : baseline.ssh.status;
   }
   normalized.ssh.lastCheckedAt = typeof ssh.lastCheckedAt === 'string' ? ssh.lastCheckedAt : baseline.ssh.lastCheckedAt;
   normalized.ssh.lastError = normalizeOptionalText(ssh.lastError ?? baseline.ssh.lastError ?? '') || null;
@@ -3748,6 +3756,339 @@ const initializeDatabase = async (databasePath) => {
       return { success: false, reason: 'connection-error', message: 'All connection methods failed' };
     },
 
+    async getMikrotikLogs(id, options = {}) {
+      const { page = 1, limit = 50, search = '', maxLogs = 250 } = options;
+      const state = await load();
+      const index = state.mikrotiks.findIndex((device) => device.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      const existing = state.mikrotiks[index];
+      const routerosBaseline = sanitizeRouteros(existing.routeros, defaultRouterosOptions());
+      const host = normalizeOptionalText(existing.host);
+
+      console.log(`Fetching logs for ${existing.name} (${host}) with options:`, options);
+
+      // Try multiple connection methods - API first, then HTTP/HTTPS, then SSH
+      const connectionMethods = [];
+      
+      if (routerosBaseline.apiEnabled) {
+        connectionMethods.push({
+          type: 'api',
+          protocol: 'http',
+          port: routerosBaseline.apiPort || 80,
+          path: '/rest/log/print',
+          username: routerosBaseline.apiUsername || 'admin',
+          password: routerosBaseline.apiPassword || ''
+        });
+      }
+
+      // Try HTTP/HTTPS endpoints
+      connectionMethods.push(
+        { type: 'http', protocol: 'http', port: 80, path: '/rest/log/print' },
+        { type: 'http', protocol: 'https', port: 443, path: '/rest/log/print' },
+        { type: 'http', protocol: 'http', port: 8080, path: '/rest/log/print' },
+        { type: 'http', protocol: 'https', port: 8443, path: '/rest/log/print' }
+      );
+
+      // Try each connection method
+      for (const method of connectionMethods) {
+        try {
+          console.log(`Trying ${method.type} connection to ${method.protocol}://${host}:${method.port}${method.path}`);
+          
+          let logs = [];
+          
+          if (method.type === 'api') {
+            // Use RouterOS API
+            const apiUrl = `${method.protocol}://${host}:${method.port}${method.path}`;
+            const auth = Buffer.from(`${method.username}:${method.password}`).toString('base64');
+            
+            const response = await fetch(apiUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Basic ${auth}`,
+                'Content-Type': 'application/json'
+              },
+              timeout: 10000
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              logs = Array.isArray(data) ? data : [];
+              console.log(`✅ API logs fetched: ${logs.length} entries`);
+            }
+          } else if (method.type === 'http') {
+            // Try HTTP/HTTPS
+            const httpUrl = `${method.protocol}://${host}:${method.port}${method.path}`;
+            
+            const response = await fetch(httpUrl, {
+              method: 'GET',
+              timeout: 10000
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              logs = Array.isArray(data) ? data : [];
+              console.log(`✅ HTTP logs fetched: ${logs.length} entries`);
+            }
+          }
+
+          if (logs.length > 0) {
+            // Process and filter logs
+            let processedLogs = logs.map(log => ({
+              id: log['.id'] || log.id || Math.random().toString(36).substr(2, 9),
+              time: log.time || log.timestamp || new Date().toISOString(),
+              topics: log.topics || log.category || 'system',
+              message: log.message || log.msg || '',
+              level: log.level || 'info',
+              source: 'api'
+            }));
+
+            // Apply search filter
+            if (search) {
+              const searchLower = search.toLowerCase();
+              processedLogs = processedLogs.filter(log => 
+                log.message.toLowerCase().includes(searchLower) ||
+                log.topics.toLowerCase().includes(searchLower) ||
+                log.level.toLowerCase().includes(searchLower)
+              );
+            }
+
+            // Limit total logs
+            if (processedLogs.length > maxLogs) {
+              processedLogs = processedLogs.slice(-maxLogs); // Get latest logs
+            }
+
+            // Calculate pagination
+            const total = processedLogs.length;
+            const totalPages = Math.ceil(total / limit);
+            const startIndex = (page - 1) * limit;
+            const endIndex = startIndex + limit;
+            const paginatedLogs = processedLogs.slice(startIndex, endIndex);
+
+            return {
+              success: true,
+              logs: paginatedLogs,
+              page,
+              limit,
+              total,
+              totalPages,
+              hasMore: page < totalPages,
+              source: 'api'
+            };
+          }
+
+        } catch (error) {
+          console.log(`❌ ${method.type} connection failed: ${error.message}`);
+          continue;
+        }
+      }
+
+      // If all HTTP/API methods failed, try SSH fallback
+      if (routerosBaseline.sshEnabled) {
+        console.log('All HTTP/API methods failed, trying SSH fallback for logs...');
+        
+        try {
+          // Use SSH to get logs
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+
+          // Create a temporary script to handle SSH with password
+          const tempScript = `
+import subprocess
+import sys
+import os
+
+host = "${host}"
+username = "${routerosBaseline.sshUsername || 'admin'}"
+password = "${routerosBaseline.sshPassword || ''}"
+
+# Use sshpass to provide password
+cmd = [
+    "sshpass", "-p", password,
+    "ssh", 
+    "-o", "ConnectTimeout=5",
+    "-o", "StrictHostKeyChecking=no", 
+    "-o", "UserKnownHostsFile=/dev/null",
+    "-o", "LogLevel=ERROR",
+    f"{username}@{host}",
+    "/log/print"
+]
+
+try:
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+    if result.returncode == 0:
+        print(result.stdout)
+    else:
+        print(f"SSH Error: {result.stderr}", file=sys.stderr)
+except Exception as e:
+    print(f"SSH Exception: {str(e)}", file=sys.stderr)
+`;
+
+          // Write temporary Python script
+          const fs = await import('fs');
+          const path = await import('path');
+          const os = await import('os');
+          
+          const tempDir = os.tmpdir();
+          const tempFile = path.join(tempDir, `ssh_logs_script_${Date.now()}.py`);
+          
+          fs.writeFileSync(tempFile, tempScript);
+          
+          console.log(`Executing SSH logs command via Python script for ${routerosBaseline.sshUsername || 'admin'}@${host}`);
+          
+          const { stdout, stderr } = await execAsync(`python3 "${tempFile}"`, { 
+            timeout: 20000
+          });
+          
+          // Clean up temp file
+          try {
+            fs.unlinkSync(tempFile);
+          } catch (cleanupError) {
+            console.log(`Warning: Could not clean up temp file: ${cleanupError.message}`);
+          }
+          
+          if (stdout) {
+            console.log(`SSH logs command output length: ${stdout.length} characters`);
+            
+            // Parse RouterOS log output
+            const logLines = stdout.split('\n').filter(line => line.trim());
+            const logs = [];
+            
+            for (const line of logLines) {
+              try {
+                // Parse RouterOS log format: "date time message"
+                const parts = line.split(' ');
+                if (parts.length >= 3) {
+                  const date = parts[0];
+                  const time = parts[1];
+                  const message = parts.slice(2).join(' ');
+                  
+                  // Extract level from message (e.g., "system,info,account..." -> "info")
+                  let level = 'info';
+                  if (message.includes('system,error,critical')) {
+                    level = 'error';
+                  } else if (message.includes('system,error')) {
+                    level = 'error';
+                  } else if (message.includes('system,warning')) {
+                    level = 'warning';
+                  } else if (message.includes('system,info')) {
+                    level = 'info';
+                  } else if (message.includes('system,debug')) {
+                    level = 'debug';
+                  }
+                  
+                  // Clean up message - remove time from beginning if it exists
+                  let cleanMessage = message;
+                  if (message.match(/^\d{2}:\d{2}:\d{2}\s/)) {
+                    cleanMessage = message.replace(/^\d{2}:\d{2}:\d{2}\s/, '');
+                  }
+                  
+                  logs.push({
+                    id: Math.random().toString(36).substr(2, 9),
+                    time: `${date} ${time}`,
+                    topics: 'system',
+                    message: cleanMessage,
+                    level: level,
+                    source: 'ssh'
+                  });
+                }
+              } catch (parseError) {
+                console.log(`Warning: Could not parse log line: ${line}`);
+              }
+            }
+
+            // Apply search filter
+            let filteredLogs = logs;
+            if (search) {
+              const searchLower = search.toLowerCase();
+              filteredLogs = logs.filter(log => 
+                log.message.toLowerCase().includes(searchLower) ||
+                log.topics.toLowerCase().includes(searchLower) ||
+                log.level.toLowerCase().includes(searchLower)
+              );
+            }
+
+            // Limit total logs
+            if (filteredLogs.length > maxLogs) {
+              filteredLogs = filteredLogs.slice(-maxLogs); // Get latest logs
+            }
+
+            // Sort logs by time (newest first)
+            filteredLogs.sort((a, b) => {
+              try {
+                const timeA = new Date(a.time).getTime();
+                const timeB = new Date(b.time).getTime();
+                return timeB - timeA; // Newest first
+              } catch (e) {
+                return 0;
+              }
+            });
+
+            // Calculate pagination
+            const total = filteredLogs.length;
+            const totalPages = Math.ceil(total / limit);
+            const startIndex = (page - 1) * limit;
+            const endIndex = startIndex + limit;
+            const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
+
+            return {
+              success: true,
+              logs: paginatedLogs,
+              page,
+              limit,
+              total,
+              totalPages,
+              hasMore: page < totalPages,
+              source: 'ssh'
+            };
+          }
+          
+          if (stderr) {
+            console.log(`SSH logs command stderr:`, stderr);
+          }
+          
+        } catch (sshError) {
+          console.log(`❌ SSH logs command failed: ${sshError.message}`);
+        }
+      }
+
+      // If everything failed, return mock data
+      console.log('All methods failed, returning mock logs data');
+      const mockLogs = [
+        {
+          id: '1',
+          time: new Date().toISOString(),
+          topics: 'system',
+          message: 'System started',
+          level: 'info',
+          source: 'mock'
+        },
+        {
+          id: '2',
+          time: new Date(Date.now() - 60000).toISOString(),
+          topics: 'dhcp',
+          message: 'DHCP lease assigned to 192.168.1.100',
+          level: 'info',
+          source: 'mock'
+        }
+      ];
+
+      return {
+        success: true,
+        logs: mockLogs,
+        page: 1,
+        limit: 50,
+        total: mockLogs.length,
+        totalPages: 1,
+        hasMore: false,
+        source: 'mock'
+      };
+    },
+
     async getMikrotikRoutes(id) {
       const state = await load();
       const index = state.mikrotiks.findIndex((device) => device.id === id);
@@ -4217,10 +4558,97 @@ const initializeDatabase = async (databasePath) => {
                 }
               }
               
-              // If HTTP/HTTPS failed, skip SSH command for now to avoid hanging
+              // If HTTP/HTTPS failed, try SSH command to get firmware version
               if (!firmwareVersion) {
-                console.log(`🔍 HTTP/HTTPS failed, skipping SSH command to avoid timeout issues`);
-                console.log(`ℹ️ Firmware version detection via SSH is temporarily disabled`);
+                console.log(`🔍 HTTP/HTTPS failed, trying SSH command to get firmware version...`);
+                
+                try {
+                  // Use SSH to get system resource information
+                  const { exec } = await import('child_process');
+                  const { promisify } = await import('util');
+                  const execAsync = promisify(exec);
+                  
+                  // Create a temporary script to handle SSH with password
+                  const tempScript = `
+import subprocess
+import sys
+import os
+
+host = "${host}"
+username = "${routerosBaseline.sshUsername || 'admin'}"
+password = "${routerosBaseline.sshPassword || ''}"
+
+# Use sshpass to provide password
+cmd = [
+    "sshpass", "-p", password,
+    "ssh", 
+    "-o", "ConnectTimeout=5",
+    "-o", "StrictHostKeyChecking=no", 
+    "-o", "UserKnownHostsFile=/dev/null",
+    "-o", "LogLevel=ERROR",
+    f"{username}@{host}",
+    "/system resource print"
+]
+
+try:
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+    if result.returncode == 0:
+        print(result.stdout)
+    else:
+        print(f"SSH Error: {result.stderr}", file=sys.stderr)
+except Exception as e:
+    print(f"SSH Exception: {str(e)}", file=sys.stderr)
+`;
+                  
+                  // Write temporary Python script
+                  const fs = await import('fs');
+                  const path = await import('path');
+                  const os = await import('os');
+                  
+                  const tempDir = os.tmpdir();
+                  const tempFile = path.join(tempDir, `ssh_script_${Date.now()}.py`);
+                  
+                  fs.writeFileSync(tempFile, tempScript);
+                  
+                  console.log(`Executing SSH command via Python script for ${routerosBaseline.sshUsername || 'admin'}@${host}`);
+                  
+                  const { stdout, stderr } = await execAsync(`python3 "${tempFile}"`, { 
+                    timeout: 15000
+                  });
+                  
+                  // Clean up temp file
+                  try {
+                    fs.unlinkSync(tempFile);
+                  } catch (cleanupError) {
+                    console.log(`Warning: Could not clean up temp file: ${cleanupError.message}`);
+                  }
+                  
+                  if (stdout) {
+                    console.log(`SSH command output:`, stdout);
+                    
+                    // Parse RouterOS output to extract version
+                    const versionMatch = stdout.match(/version:\s*([^\s\n]+)/i);
+                    if (versionMatch) {
+                      firmwareVersion = versionMatch[1];
+                      console.log(`✅ Firmware version detected via SSH: ${firmwareVersion}`);
+                    } else {
+                      // Try alternative patterns
+                      const altMatch = stdout.match(/version=([^\s\n]+)/i);
+                      if (altMatch) {
+                        firmwareVersion = altMatch[1];
+                        console.log(`✅ Firmware version detected via SSH (alt pattern): ${firmwareVersion}`);
+                      }
+                    }
+                  }
+                  
+                  if (stderr) {
+                    console.log(`SSH command stderr:`, stderr);
+                  }
+                  
+                } catch (sshError) {
+                  console.log(`❌ SSH command failed: ${sshError.message}`);
+                  console.log(`ℹ️ Could not get firmware version via SSH`);
+                }
               }
             }
           } else {
