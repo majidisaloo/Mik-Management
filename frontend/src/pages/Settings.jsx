@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useUpdate } from '../context/UpdateContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
 import UpdateStatusIcon from '../components/UpdateStatusIcon';
 import './Settings.css';
 
@@ -75,6 +76,7 @@ const NetworkIcon = () => (
 
 const Settings = () => {
   const { user, logout } = useAuth();
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   
