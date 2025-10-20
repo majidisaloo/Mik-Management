@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { createPortal } from 'react-dom';
 
 const DeviceDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme } = useTheme();
   const [device, setDevice] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -64,6 +65,31 @@ const DeviceDetails = () => {
   useEffect(() => {
     loadDevice();
   }, [id]);
+
+  // URL routing logic
+  useEffect(() => {
+    const path = location.pathname;
+    if (path.endsWith('/logs')) {
+      setActiveTab('logs');
+      loadLogs(1, logsSearch);
+    } else if (path.endsWith('/interfaces')) {
+      setActiveTab('interfaces');
+    } else if (path.endsWith('/ip-addresses')) {
+      setActiveTab('ip-addresses');
+    } else if (path.endsWith('/routes')) {
+      setActiveTab('routes');
+    } else if (path.endsWith('/firewall')) {
+      setActiveTab('firewall');
+    } else if (path.endsWith('/nat')) {
+      setActiveTab('nat');
+    } else if (path.endsWith('/mangle')) {
+      setActiveTab('mangle');
+    } else if (path.endsWith('/update')) {
+      setActiveTab('update');
+    } else {
+      setActiveTab('overview');
+    }
+  }, [location.pathname, logsSearch]);
 
   const loadDevice = async () => {
     try {
@@ -799,9 +825,26 @@ const DeviceDetails = () => {
             key={tab.id}
             onClick={() => {
               setActiveTab(tab.id);
-              // Load logs when logs tab is selected
+              // Update URL based on tab
               if (tab.id === 'logs') {
+                navigate(`/mikrotiks/${id}/logs`);
                 loadLogs(1, logsSearch);
+              } else if (tab.id === 'interfaces') {
+                navigate(`/mikrotiks/${id}/interfaces`);
+              } else if (tab.id === 'ip-addresses') {
+                navigate(`/mikrotiks/${id}/ip-addresses`);
+              } else if (tab.id === 'routes') {
+                navigate(`/mikrotiks/${id}/routes`);
+              } else if (tab.id === 'firewall') {
+                navigate(`/mikrotiks/${id}/firewall`);
+              } else if (tab.id === 'nat') {
+                navigate(`/mikrotiks/${id}/nat`);
+              } else if (tab.id === 'mangle') {
+                navigate(`/mikrotiks/${id}/mangle`);
+              } else if (tab.id === 'update') {
+                navigate(`/mikrotiks/${id}/update`);
+              } else {
+                navigate(`/mikrotiks/${id}`);
               }
             }}
             style={{
@@ -1527,7 +1570,29 @@ const DeviceDetails = () => {
 
 
       {activeTab === 'logs' && (
-        <div>
+        <div style={{
+          // CSS Isolation - Reset all inherited styles
+          all: 'initial',
+          fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          fontSize: '14px',
+          lineHeight: '1.5',
+          color: theme === 'dark' ? '#fff' : '#000',
+          backgroundColor: theme === 'dark' ? '#1a1a1a' : '#fff',
+          padding: '20px',
+          borderRadius: '8px',
+          border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+          boxShadow: theme === 'dark' ? '0 4px 6px rgba(0, 0, 0, 0.3)' : '0 2px 4px rgba(0, 0, 0, 0.1)',
+          // Prevent external CSS interference
+          position: 'relative',
+          zIndex: 1,
+          // Reset common CSS properties that might be inherited
+          margin: 0,
+          boxSizing: 'border-box',
+          // Ensure proper display
+          display: 'block',
+          width: '100%',
+          minHeight: '400px'
+        }}>
           {/* Search Bar */}
           <div style={{ 
             display: 'flex', 
@@ -1537,7 +1602,12 @@ const DeviceDetails = () => {
             padding: '15px',
             backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f8f9fa',
             borderRadius: '8px',
-            border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`
+            border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+            // CSS Isolation
+            position: 'relative',
+            zIndex: 2,
+            boxSizing: 'border-box',
+            width: '100%'
           }}>
             <input
               type="text"
@@ -1557,7 +1627,15 @@ const DeviceDetails = () => {
                 backgroundColor: theme === 'dark' ? '#333' : '#fff',
                 color: theme === 'dark' ? '#fff' : '#000',
                 fontSize: '14px',
-                outline: 'none'
+                outline: 'none',
+                // CSS Isolation
+                fontFamily: 'inherit',
+                lineHeight: 'inherit',
+                boxSizing: 'border-box',
+                margin: 0,
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                MozAppearance: 'none'
               }}
             />
             <button
@@ -1575,7 +1653,16 @@ const DeviceDetails = () => {
                 cursor: logsLoading ? 'not-allowed' : 'pointer',
                 fontSize: '14px',
                 fontWeight: '500',
-                opacity: logsLoading ? 0.7 : 1
+                opacity: logsLoading ? 0.7 : 1,
+                // CSS Isolation
+                fontFamily: 'inherit',
+                lineHeight: 'inherit',
+                boxSizing: 'border-box',
+                margin: 0,
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                MozAppearance: 'none',
+                outline: 'none'
               }}
             >
               {logsLoading ? '⏳ Searching...' : '🔍 Search'}
@@ -1595,7 +1682,16 @@ const DeviceDetails = () => {
                 cursor: logsLoading ? 'not-allowed' : 'pointer',
                 fontSize: '14px',
                 fontWeight: '500',
-                opacity: logsLoading ? 0.7 : 1
+                opacity: logsLoading ? 0.7 : 1,
+                // CSS Isolation
+                fontFamily: 'inherit',
+                lineHeight: 'inherit',
+                boxSizing: 'border-box',
+                margin: 0,
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                MozAppearance: 'none',
+                outline: 'none'
               }}
             >
               {logsLoading ? '⏳ Loading...' : '🔄 Refresh'}
@@ -1616,7 +1712,14 @@ const DeviceDetails = () => {
             backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff',
             borderRadius: '10px',
             border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
-            overflow: 'hidden'
+            overflow: 'hidden',
+            // CSS Isolation
+            position: 'relative',
+            zIndex: 2,
+            boxSizing: 'border-box',
+            width: '100%',
+            margin: 0,
+            padding: 0
           }}>
             {logsLoading ? (
               <div style={{ padding: '40px', textAlign: 'center', color: theme === 'dark' ? '#ccc' : '#666' }}>
@@ -1632,7 +1735,20 @@ const DeviceDetails = () => {
               </div>
             ) : (
               <>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table style={{ 
+                  width: '100%', 
+                  borderCollapse: 'collapse',
+                  // CSS Isolation
+                  fontFamily: 'inherit',
+                  fontSize: 'inherit',
+                  lineHeight: 'inherit',
+                  color: 'inherit',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  margin: 0,
+                  padding: 0,
+                  boxSizing: 'border-box'
+                }}>
                   <thead>
                     <tr style={{ 
                       borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
