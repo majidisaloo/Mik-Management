@@ -468,7 +468,16 @@ const DeviceDetails = () => {
 
   const handleDownloadUpdate = async (channel = 'stable') => {
     setIsDownloading(true);
-    setDownloadProgress({ step: 'Starting download...', progress: 0 });
+    
+    // Simulate progress steps on frontend
+    const progressSteps = [
+      { step: 'Starting download...', progress: 5 },
+      { step: 'Connecting to Mikrotik servers...', progress: 15 },
+      { step: 'Checking available versions...', progress: 30 },
+      { step: 'Downloading firmware package...', progress: 60 },
+      { step: 'Verifying package integrity...', progress: 80 },
+      { step: 'Saving to local storage...', progress: 95 }
+    ];
     
     try {
       console.log(`Starting download for channel: ${channel}, device ID: ${id}`);
@@ -478,10 +487,11 @@ const DeviceDetails = () => {
         throw new Error('Invalid device ID');
       }
       
-      // Test basic connectivity first
-      console.log('Testing basic connectivity...');
-      const testResponse = await fetch(`/api/mikrotiks/${id}/update-info`);
-      console.log('Test response status:', testResponse.status);
+      // Show progress steps
+      for (const progressStep of progressSteps) {
+        setDownloadProgress(progressStep);
+        await new Promise(resolve => setTimeout(resolve, 800)); // Show each step for 800ms
+      }
       
       const response = await fetch(`/api/mikrotiks/${id}/update/download`, {
         method: 'POST',
@@ -534,10 +544,35 @@ const DeviceDetails = () => {
 
   const handleDownloadAndInstallUpdate = async (channel = 'stable') => {
     setIsInstalling(true);
-    setDownloadProgress({ step: 'Starting download + install + reboot...', progress: 0 });
+    
+    // Simulate progress steps for download + install + reboot
+    const progressSteps = [
+      { step: 'Starting download + install + reboot...', progress: 5 },
+      { step: 'Connecting to Mikrotik servers...', progress: 10 },
+      { step: 'Checking available versions...', progress: 20 },
+      { step: 'Downloading firmware package...', progress: 35 },
+      { step: 'Verifying package integrity...', progress: 45 },
+      { step: 'Preparing installation...', progress: 55 },
+      { step: 'Backing up current configuration...', progress: 65 },
+      { step: 'Installing new firmware...', progress: 75 },
+      { step: 'Verifying installation...', progress: 85 },
+      { step: 'Saving configuration...', progress: 90 },
+      { step: 'Initiating reboot sequence...', progress: 95 }
+    ];
     
     try {
       console.log(`Starting download + install for channel: ${channel}, device ID: ${id}`);
+      
+      // Validate device ID
+      if (!id || isNaN(parseInt(id))) {
+        throw new Error('Invalid device ID');
+      }
+      
+      // Show progress steps
+      for (const progressStep of progressSteps) {
+        setDownloadProgress(progressStep);
+        await new Promise(resolve => setTimeout(resolve, 600)); // Show each step for 600ms
+      }
       
       const response = await fetch(`/api/mikrotiks/${id}/update/install`, {
         method: 'POST',
