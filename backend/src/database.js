@@ -3910,7 +3910,7 @@ password = "${routerosBaseline.sshPassword || ''}"
 cmd = [
     "sshpass", "-p", password,
     "ssh", 
-    "-o", "ConnectTimeout=5",
+    "-o", "ConnectTimeout=10",
     "-o", "StrictHostKeyChecking=no", 
     "-o", "UserKnownHostsFile=/dev/null",
     "-o", "LogLevel=ERROR",
@@ -4057,25 +4057,26 @@ except Exception as e:
       }
 
       // If everything failed, return mock data
-      console.log('All methods failed, returning mock logs data');
-      const mockLogs = [
-        {
-          id: '1',
-          time: new Date().toISOString(),
-          topics: 'system',
-          message: 'System started',
-          level: 'info',
-          source: 'mock'
-        },
-        {
-          id: '2',
-          time: new Date(Date.now() - 60000).toISOString(),
-          topics: 'dhcp',
-          message: 'DHCP lease assigned to 192.168.1.100',
-          level: 'info',
-          source: 'mock'
-        }
-      ];
+            console.log('All methods failed, returning mock logs data');
+            const now = new Date();
+            const mockLogs = [
+              {
+                id: '1',
+                time: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`,
+                topics: 'system',
+                message: 'System started',
+                level: 'info',
+                source: 'mock'
+              },
+              {
+                id: '2',
+                time: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes() - 1).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`,
+                topics: 'dhcp',
+                message: 'DHCP lease assigned to 192.168.1.100',
+                level: 'info',
+                source: 'mock'
+              }
+            ];
 
       return {
         success: true,
