@@ -2946,13 +2946,13 @@ const bootstrap = async () => {
         // Step 2: Execute restart command with confirmation
         console.log(`🔄 Step 2/3: Initiating reboot sequence...`);
         try {
-          // Method 1: Try with printf
-          const restartCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "printf 'y\\n' | /system reboot"`;
+          // Method 1: Try with expect-like approach using here document
+          const restartCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "echo 'y' | /system reboot"`;
           const { exec } = await import('child_process');
           const { promisify } = await import('util');
           const execAsync = promisify(exec);
           
-          console.log(`🔄 Executing restart command with confirmation: ${restartCommand.replace(devicePassword, '***')}`);
+          console.log(`🔄 Executing restart command with echo: ${restartCommand.replace(devicePassword, '***')}`);
           
           // Execute restart command (this will disconnect SSH)
           execAsync(restartCommand, { timeout: 10000 }).catch((error) => {
@@ -2965,12 +2965,12 @@ const bootstrap = async () => {
           console.log(`⚠️ SSH restart failed, trying alternative method...`);
           // Fallback: try with different SSH options and confirmation
           try {
-            const fallbackCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o ServerAliveInterval=1 ${sshUsername}@${deviceIP} "printf 'y\\n' | /system reboot"`;
+            const fallbackCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o ServerAliveInterval=1 ${sshUsername}@${deviceIP} "echo 'y' | /system reboot"`;
             const { exec } = await import('child_process');
             const { promisify } = await import('util');
             const execAsync = promisify(exec);
             
-            console.log(`🔄 Executing fallback restart command with confirmation: ${fallbackCommand.replace(devicePassword, '***')}`);
+            console.log(`🔄 Executing fallback restart command with echo: ${fallbackCommand.replace(devicePassword, '***')}`);
             
             execAsync(fallbackCommand, { timeout: 8000 }).catch((error) => {
               console.log(`✅ Fallback restart command sent (disconnect expected)`);
