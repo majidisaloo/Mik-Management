@@ -1269,29 +1269,37 @@ const Mikrotiks = () => {
                 🔍 Search Devices
               </label>
               <div style={{
-                position: 'relative'
+                position: 'relative',
+                width: '100%',
+                display: 'block'
               }}>
                 <div style={{
                   position: 'absolute',
                   top: '50%',
-                  left: '1rem',
+                  left: '16px',
                   transform: 'translateY(-50%)',
-                  width: '1.25rem',
-                  height: '1.25rem',
+                  width: '20px',
+                  height: '20px',
                   background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
-                  borderRadius: '0.375rem',
+                  borderRadius: '6px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   transition: 'transform 0.3s ease',
-                  zIndex: 1
+                  zIndex: 10,
+                  margin: 0,
+                  padding: 0,
+                  border: 'none',
+                  outline: 'none'
                 }}>
                   <svg style={{ 
-                    width: '0.75rem', 
-                    height: '0.75rem', 
+                    width: '12px', 
+                    height: '12px', 
                     color: 'white',
                     display: 'block',
-                    margin: 'auto'
+                    margin: '0 auto',
+                    verticalAlign: 'middle',
+                    textAlign: 'center'
                   }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
@@ -1304,20 +1312,25 @@ const Mikrotiks = () => {
                   placeholder="Search devices by name, IP address, or tags..."
                   style={{
                     width: '100%',
-                    paddingLeft: '3.5rem',
-                    paddingRight: '1rem',
-                    paddingTop: '0.875rem',
-                    paddingBottom: '0.875rem',
+                    paddingLeft: '56px',
+                    paddingRight: '16px',
+                    paddingTop: '14px',
+                    paddingBottom: '14px',
                     background: theme === 'dark' ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)',
                     backdropFilter: 'blur(8px)',
                     border: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.5)',
-                    borderRadius: '0.875rem',
-                    fontSize: '0.875rem',
+                    borderRadius: '14px',
+                    fontSize: '14px',
                     fontWeight: '500',
                     color: theme === 'dark' ? '#f1f5f9' : '#374151',
                     transition: 'all 0.3s ease',
                     boxShadow: theme === 'dark' ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                    outline: 'none'
+                    outline: 'none',
+                    margin: 0,
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                    lineHeight: '1.5',
+                    verticalAlign: 'middle',
+                    display: 'block'
                   }}
                   onFocus={(e) => {
                     e.target.style.borderColor = 'rgba(59, 130, 246, 0.6)';
