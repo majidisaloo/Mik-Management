@@ -1963,32 +1963,74 @@ const DeviceDetails = () => {
             }}>Manage Mikrotik device firmware updates</p>
           </div>
           
-          {updateInfo && (
+        {/* Check Update Button */}
+        <div style={{
+          marginBottom: '20px',
+          textAlign: 'center'
+        }}>
+          <button
+            onClick={loadUpdateInfo}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: theme === 'dark' ? '#17a2b8' : '#17a2b8',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500',
+              fontFamily: 'inherit',
+              transition: 'all 0.2s ease',
+              boxSizing: 'border-box',
+              margin: 0,
+              appearance: 'none',
+              WebkitAppearance: 'none',
+              MozAppearance: 'none',
+              outline: 'none'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.backgroundColor = '#138496';
+              e.target.style.transform = 'translateY(-1px)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.backgroundColor = theme === 'dark' ? '#17a2b8' : '#17a2b8';
+              e.target.style.transform = 'translateY(0)';
+            }}
+          >
+            🔄 Check for Updates
+          </button>
+        </div>
+
+        {updateInfo && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '20px',
+            width: '100%'
+          }}>
+            {/* Stable Channel Table */}
             <div style={{
-              backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff',
+              backgroundColor: theme === 'dark' ? '#1e3a5f' : '#e3f2fd',
               padding: '20px',
               borderRadius: '10px',
-              border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
-              marginBottom: '20px',
-              // CSS Isolation
+              border: `1px solid ${theme === 'dark' ? '#2d5a87' : '#bbdefb'}`,
               position: 'relative',
               zIndex: 2,
               boxSizing: 'border-box',
               width: '100%',
-              margin: 0,
-              marginBottom: '20px'
+              margin: 0
             }}>
               <h3 style={{
                 margin: '0 0 16px 0',
                 fontSize: '18px',
                 fontWeight: '600',
-                color: theme === 'dark' ? '#fff' : '#000',
-                fontFamily: 'inherit'
-              }}>Update Information</h3>
-              <table style={{ 
-                width: '100%', 
+                color: theme === 'dark' ? '#64b5f6' : '#1976d2',
+                fontFamily: 'inherit',
+                textAlign: 'center'
+              }}>📦 Stable Channel</h3>
+              <table style={{
+                width: '100%',
                 borderCollapse: 'collapse',
-                // CSS Isolation
                 fontFamily: 'inherit',
                 fontSize: 'inherit',
                 lineHeight: 'inherit',
@@ -2000,318 +2042,295 @@ const DeviceDetails = () => {
                 boxSizing: 'border-box'
               }}>
                 <tbody>
-                  <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#eee'}` }}>
-                    <td style={{ 
-                      padding: '12px', 
+                  <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#2d5a87' : '#bbdefb'}` }}>
+                    <td style={{
+                      padding: '12px',
                       fontWeight: '600',
                       color: theme === 'dark' ? '#ccc' : '#666',
                       fontSize: '14px',
                       fontFamily: 'inherit',
-                      width: '40%'
-                    }}>Current Version:</td>
-                    <td style={{ 
+                      width: '50%'
+                    }}>Current:</td>
+                    <td style={{
                       padding: '12px',
                       color: theme === 'dark' ? '#fff' : '#000',
                       fontSize: '14px',
                       fontFamily: 'inherit'
                     }}>{updateInfo.currentVersion || 'Unknown'}</td>
                   </tr>
-                  <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#eee'}` }}>
-                    <td style={{ 
-                      padding: '12px', 
+                  <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#2d5a87' : '#bbdefb'}` }}>
+                    <td style={{
+                      padding: '12px',
                       fontWeight: '600',
                       color: theme === 'dark' ? '#ccc' : '#666',
                       fontSize: '14px',
                       fontFamily: 'inherit'
-                    }}>Latest Stable:</td>
-                    <td style={{ 
+                    }}>Latest:</td>
+                    <td style={{
                       padding: '12px',
                       color: theme === 'dark' ? '#fff' : '#000',
                       fontSize: '14px',
                       fontFamily: 'inherit'
-                    }}>{updateInfo.latestStable || '7.30.1'}</td>
-                  </tr>
-                  <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#eee'}` }}>
-                    <td style={{ 
-                      padding: '12px', 
-                      fontWeight: '600',
-                      color: theme === 'dark' ? '#ccc' : '#666',
-                      fontSize: '14px',
-                      fontFamily: 'inherit'
-                    }}>Latest Beta:</td>
-                    <td style={{ 
-                      padding: '12px',
-                      color: theme === 'dark' ? '#fff' : '#000',
-                      fontSize: '14px',
-                      fontFamily: 'inherit'
-                    }}>{updateInfo.latestBeta || '7.31.0-beta'}</td>
+                    }}>{updateInfo.latestStable || '7.20.1'}</td>
                   </tr>
                   <tr>
-                    <td style={{ 
-                      padding: '12px', 
+                    <td style={{
+                      padding: '12px',
                       fontWeight: '600',
                       color: theme === 'dark' ? '#ccc' : '#666',
                       fontSize: '14px',
                       fontFamily: 'inherit'
-                    }}>Update Available:</td>
+                    }}>Status:</td>
                     <td style={{ padding: '12px' }}>
                       <span style={{
                         padding: '6px 12px',
                         borderRadius: '20px',
-                        backgroundColor: updateInfo.updateAvailable ? '#28a745' : '#6c757d',
+                        backgroundColor: updateInfo.stableUpdateAvailable ? '#28a745' : '#6c757d',
                         color: '#fff',
                         fontSize: '12px',
                         fontWeight: '500',
                         fontFamily: 'inherit',
                         display: 'inline-block'
                       }}>
-                        {updateInfo.updateAvailable ? 'Yes' : 'No'}
+                        {updateInfo.stableUpdateAvailable ? 'Available' : 'Up to date'}
                       </span>
                     </td>
                   </tr>
-                  </tbody>
-                </table>
-              
+                </tbody>
+              </table>
               <div style={{ 
-                marginTop: '20px'
+                marginTop: '16px',
+                display: 'flex',
+                gap: '8px',
+                justifyContent: 'center'
               }}>
-                {/* Check Update Button */}
-                <div style={{
-                  marginBottom: '20px',
-                  textAlign: 'center'
-                }}>
-                  <button
-                    onClick={loadUpdateInfo}
-                    style={{
-                      padding: '12px 24px',
-                      backgroundColor: theme === 'dark' ? '#17a2b8' : '#17a2b8',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      fontFamily: 'inherit',
-                      transition: 'all 0.2s ease',
-                      boxSizing: 'border-box',
-                      margin: 0,
-                      appearance: 'none',
-                      WebkitAppearance: 'none',
-                      MozAppearance: 'none',
-                      outline: 'none'
-                    }}
-                    onMouseOver={(e) => {
-                      e.target.style.backgroundColor = '#138496';
-                      e.target.style.transform = 'translateY(-1px)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.target.style.backgroundColor = theme === 'dark' ? '#17a2b8' : '#17a2b8';
-                      e.target.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    🔄 Check for Updates
-                  </button>
-                </div>
-
-                {/* Stable Version Row */}
-                <div style={{
-                  marginBottom: '16px',
-                  padding: '16px',
-                  backgroundColor: theme === 'dark' ? '#1e3a5f' : '#e3f2fd',
-                  borderRadius: '8px',
-                  border: `1px solid ${theme === 'dark' ? '#2d5a87' : '#bbdefb'}`,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}>
-                  <div>
-                    <h4 style={{
-                      margin: '0 0 4px 0',
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      color: theme === 'dark' ? '#64b5f6' : '#1976d2',
-                      fontFamily: 'inherit'
-                    }}>
-                      📦 Stable Version
-                    </h4>
-                    <p style={{
-                      margin: 0,
-                      fontSize: '14px',
-                      color: theme === 'dark' ? '#ccc' : '#666',
-                      fontFamily: 'inherit'
-                    }}>
-                      {updateInfo.latestStable || '7.30.1'}
-                    </p>
-                  </div>
-                  <div style={{ 
-                    display: 'flex', 
-                    gap: '8px'
-                  }}>
-                    <button
-                      onClick={() => handleDownloadUpdate('stable')}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: theme === 'dark' ? '#007acc' : '#0066cc',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        fontFamily: 'inherit',
-                        transition: 'all 0.2s ease',
-                        boxSizing: 'border-box',
-                        margin: 0,
-                        appearance: 'none',
-                        WebkitAppearance: 'none',
-                        MozAppearance: 'none',
-                        outline: 'none'
-                      }}
-                      onMouseOver={(e) => {
-                        e.target.style.backgroundColor = theme === 'dark' ? '#0056b3' : '#0056b3';
-                        e.target.style.transform = 'translateY(-1px)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.target.style.backgroundColor = theme === 'dark' ? '#007acc' : '#0066cc';
-                        e.target.style.transform = 'translateY(0)';
-                      }}
-                    >
-                      📥 Download
-                    </button>
-                    <button
-                      onClick={() => handleDownloadAndInstallUpdate('stable')}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: theme === 'dark' ? '#28a745' : '#28a745',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        fontFamily: 'inherit',
-                        transition: 'all 0.2s ease',
-                        boxSizing: 'border-box',
-                        margin: 0,
-                        appearance: 'none',
-                        WebkitAppearance: 'none',
-                        MozAppearance: 'none',
-                        outline: 'none'
-                      }}
-                      onMouseOver={(e) => {
-                        e.target.style.backgroundColor = '#218838';
-                        e.target.style.transform = 'translateY(-1px)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.target.style.backgroundColor = theme === 'dark' ? '#28a745' : '#28a745';
-                        e.target.style.transform = 'translateY(0)';
-                      }}
-                    >
-                      🚀 Install
-                    </button>
-                  </div>
-                </div>
-
-                {/* Beta Version Row */}
-                <div style={{
-                  padding: '16px',
-                  backgroundColor: theme === 'dark' ? '#4a1a4a' : '#fce4ec',
-                  borderRadius: '8px',
-                  border: `1px solid ${theme === 'dark' ? '#7b1f7b' : '#f8bbd9'}`,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}>
-                  <div>
-                    <h4 style={{
-                      margin: '0 0 4px 0',
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      color: theme === 'dark' ? '#ce93d8' : '#c2185b',
-                      fontFamily: 'inherit'
-                    }}>
-                      🧪 Beta Version
-                    </h4>
-                    <p style={{
-                      margin: 0,
-                      fontSize: '14px',
-                      color: theme === 'dark' ? '#ccc' : '#666',
-                      fontFamily: 'inherit'
-                    }}>
-                      {updateInfo.latestBeta || '7.31.0-beta'}
-                    </p>
-                  </div>
-                  <div style={{ 
-                    display: 'flex', 
-                    gap: '8px'
-                  }}>
-                    <button
-                      onClick={() => handleDownloadUpdate('beta')}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: theme === 'dark' ? '#6f42c1' : '#6f42c1',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        fontFamily: 'inherit',
-                        transition: 'all 0.2s ease',
-                        boxSizing: 'border-box',
-                        margin: 0,
-                        appearance: 'none',
-                        WebkitAppearance: 'none',
-                        MozAppearance: 'none',
-                        outline: 'none'
-                      }}
-                      onMouseOver={(e) => {
-                        e.target.style.backgroundColor = '#5a32a3';
-                        e.target.style.transform = 'translateY(-1px)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.target.style.backgroundColor = theme === 'dark' ? '#6f42c1' : '#6f42c1';
-                        e.target.style.transform = 'translateY(0)';
-                      }}
-                    >
-                      📥 Download
-                    </button>
-                    <button
-                      onClick={() => handleDownloadAndInstallUpdate('beta')}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: theme === 'dark' ? '#fd7e14' : '#fd7e14',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        fontFamily: 'inherit',
-                        transition: 'all 0.2s ease',
-                        boxSizing: 'border-box',
-                        margin: 0,
-                        appearance: 'none',
-                        WebkitAppearance: 'none',
-                        MozAppearance: 'none',
-                        outline: 'none'
-                      }}
-                      onMouseOver={(e) => {
-                        e.target.style.backgroundColor = '#e8650e';
-                        e.target.style.transform = 'translateY(-1px)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.target.style.backgroundColor = theme === 'dark' ? '#fd7e14' : '#fd7e14';
-                        e.target.style.transform = 'translateY(0)';
-                      }}
-                    >
-                      ⚡ Install
-                    </button>
-                  </div>
-                </div>
+                <button
+                  onClick={() => handleDownloadUpdate('stable')}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: theme === 'dark' ? '#007acc' : '#0066cc',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    fontFamily: 'inherit',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box',
+                    margin: 0,
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                    outline: 'none'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = theme === 'dark' ? '#0056b3' : '#0056b3';
+                    e.target.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = theme === 'dark' ? '#007acc' : '#0066cc';
+                    e.target.style.transform = 'translateY(0)';
+                  }}
+                >
+                  📥 Download
+                </button>
+                <button
+                  onClick={() => handleDownloadAndInstallUpdate('stable')}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: theme === 'dark' ? '#28a745' : '#28a745',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    fontFamily: 'inherit',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box',
+                    margin: 0,
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                    outline: 'none'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = '#218838';
+                    e.target.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = theme === 'dark' ? '#28a745' : '#28a745';
+                    e.target.style.transform = 'translateY(0)';
+                  }}
+                >
+                  🚀 Install
+                </button>
               </div>
+            </div>
+
+            {/* Testing Channel Table */}
+            <div style={{
+              backgroundColor: theme === 'dark' ? '#4a1a4a' : '#fce4ec',
+              padding: '20px',
+              borderRadius: '10px',
+              border: `1px solid ${theme === 'dark' ? '#7b1f7b' : '#f8bbd9'}`,
+              position: 'relative',
+              zIndex: 2,
+              boxSizing: 'border-box',
+              width: '100%',
+              margin: 0
+            }}>
+              <h3 style={{
+                margin: '0 0 16px 0',
+                fontSize: '18px',
+                fontWeight: '600',
+                color: theme === 'dark' ? '#ce93d8' : '#c2185b',
+                fontFamily: 'inherit',
+                textAlign: 'center'
+              }}>🧪 Testing Channel</h3>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontFamily: 'inherit',
+                fontSize: 'inherit',
+                lineHeight: 'inherit',
+                color: 'inherit',
+                backgroundColor: 'transparent',
+                border: 'none',
+                margin: 0,
+                padding: 0,
+                boxSizing: 'border-box'
+              }}>
+                <tbody>
+                  <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#7b1f7b' : '#f8bbd9'}` }}>
+                    <td style={{
+                      padding: '12px',
+                      fontWeight: '600',
+                      color: theme === 'dark' ? '#ccc' : '#666',
+                      fontSize: '14px',
+                      fontFamily: 'inherit',
+                      width: '50%'
+                    }}>Current:</td>
+                    <td style={{
+                      padding: '12px',
+                      color: theme === 'dark' ? '#fff' : '#000',
+                      fontSize: '14px',
+                      fontFamily: 'inherit'
+                    }}>{updateInfo.currentVersion || 'Unknown'}</td>
+                  </tr>
+                  <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#7b1f7b' : '#f8bbd9'}` }}>
+                    <td style={{
+                      padding: '12px',
+                      fontWeight: '600',
+                      color: theme === 'dark' ? '#ccc' : '#666',
+                      fontSize: '14px',
+                      fontFamily: 'inherit'
+                    }}>Latest:</td>
+                    <td style={{
+                      padding: '12px',
+                      color: theme === 'dark' ? '#fff' : '#000',
+                      fontSize: '14px',
+                      fontFamily: 'inherit'
+                    }}>{updateInfo.latestTesting || '7.21beta3'}</td>
+                  </tr>
+                  <tr>
+                    <td style={{
+                      padding: '12px',
+                      fontWeight: '600',
+                      color: theme === 'dark' ? '#ccc' : '#666',
+                      fontSize: '14px',
+                      fontFamily: 'inherit'
+                    }}>Status:</td>
+                    <td style={{ padding: '12px' }}>
+                      <span style={{
+                        padding: '6px 12px',
+                        borderRadius: '20px',
+                        backgroundColor: updateInfo.testingUpdateAvailable ? '#28a745' : '#6c757d',
+                        color: '#fff',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        fontFamily: 'inherit',
+                        display: 'inline-block'
+                      }}>
+                        {updateInfo.testingUpdateAvailable ? 'Available' : 'Up to date'}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div style={{ 
+                marginTop: '16px',
+                display: 'flex',
+                gap: '8px',
+                justifyContent: 'center'
+              }}>
+                <button
+                  onClick={() => handleDownloadUpdate('testing')}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: theme === 'dark' ? '#6f42c1' : '#6f42c1',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    fontFamily: 'inherit',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box',
+                    margin: 0,
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                    outline: 'none'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = '#5a32a3';
+                    e.target.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = theme === 'dark' ? '#6f42c1' : '#6f42c1';
+                    e.target.style.transform = 'translateY(0)';
+                  }}
+                >
+                  📥 Download
+                </button>
+                <button
+                  onClick={() => handleDownloadAndInstallUpdate('testing')}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: theme === 'dark' ? '#fd7e14' : '#fd7e14',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    fontFamily: 'inherit',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box',
+                    margin: 0,
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                    outline: 'none'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = '#e8650e';
+                    e.target.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = theme === 'dark' ? '#fd7e14' : '#fd7e14';
+                    e.target.style.transform = 'translateY(0)';
+                  }}
+                >
+                  ⚡ Install
+                </button>
+              </div>
+            </div>
           </div>
-          )}
+        )}
       </div>
     )}
 

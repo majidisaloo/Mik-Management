@@ -5714,9 +5714,10 @@ async function getMikrotikUpdateInfo(deviceId) {
 
     // Get current firmware version from device
     let currentVersion = routerosBaseline.firmwareVersion || 'Unknown';
-    let latestStable = '7.30.1'; // Latest stable version
-    let latestBeta = '7.31.0-beta'; // Latest beta version
+    let latestStable = '7.20.1'; // Latest stable version
+    let latestBeta = '7.21beta3'; // Latest testing version
     let updateAvailable = false;
+    let testingUpdateAvailable = false;
 
     // Try to get real firmware version from Mikrotik
     if (routerosBaseline.apiEnabled) {
@@ -5789,10 +5790,11 @@ async function getMikrotikUpdateInfo(deviceId) {
           
           // Also try to get latest available versions from Mikrotik
           try {
-            const updateCommand = `sshpass -p "${routerosBaseline.sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${routerosBaseline.sshUsername}@${host} "/system package update print"`;
+            // Check stable channel
+            const stableUpdateCommand = `sshpass -p "${routerosBaseline.sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${routerosBaseline.sshUsername}@${host} "/system package update set channel=stable; /system package update check-for-updates"`;
             
-            const updateResult = await new Promise((resolve, reject) => {
-              exec(updateCommand, { timeout: 15000 }, (error, stdout, stderr) => {
+            const stableUpdateResult = await new Promise((resolve, reject) => {
+              exec(stableUpdateCommand, { timeout: 15000 }, (error, stdout, stderr) => {
                 if (error) {
                   reject(error);
                 } else {
@@ -5801,13 +5803,48 @@ async function getMikrotikUpdateInfo(deviceId) {
               });
             });
 
-            if (updateResult.stdout) {
-              // Parse available versions from update output
-              const availableMatch = updateResult.stdout.match(/available-version:\s*([^\s\n]+)/i);
+            if (stableUpdateResult.stdout) {
+              // Parse stable channel output
+              const stableLatestMatch = stableUpdateResult.stdout.match(/latest-version:\s*([^\s\n]+)/i);
+              const stableStatusMatch = stableUpdateResult.stdout.match(/status:\s*([^\s\n]+)/i);
               
-              if (availableMatch) {
-                latestStable = availableMatch[1];
+              if (stableLatestMatch) {
+                latestStable = stableLatestMatch[1];
                 console.log(`✅ Latest stable version from device: ${latestStable}`);
+              }
+              
+              if (stableStatusMatch && stableStatusMatch[1].includes('New version is available')) {
+                updateAvailable = true;
+                console.log(`✅ Stable update available`);
+              }
+            }
+
+            // Check testing channel
+            const testingUpdateCommand = `sshpass -p "${routerosBaseline.sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${routerosBaseline.sshUsername}@${host} "/system package update set channel=testing; /system package update check-for-updates"`;
+            
+            const testingUpdateResult = await new Promise((resolve, reject) => {
+              exec(testingUpdateCommand, { timeout: 15000 }, (error, stdout, stderr) => {
+                if (error) {
+                  reject(error);
+                } else {
+                  resolve({ stdout, stderr });
+                }
+              });
+            });
+
+            if (testingUpdateResult.stdout) {
+              // Parse testing channel output
+              const testingLatestMatch = testingUpdateResult.stdout.match(/latest-version:\s*([^\s\n]+)/i);
+              const testingStatusMatch = testingUpdateResult.stdout.match(/status:\s*([^\s\n]+)/i);
+              
+              if (testingLatestMatch) {
+                latestBeta = testingLatestMatch[1];
+                console.log(`✅ Latest testing version from device: ${latestBeta}`);
+              }
+              
+              if (testingStatusMatch && testingStatusMatch[1].includes('New version is available')) {
+                testingUpdateAvailable = true;
+                console.log(`✅ Testing update available`);
               }
             }
           } catch (updateError) {
@@ -5831,7 +5868,9 @@ async function getMikrotikUpdateInfo(deviceId) {
     const updateInfo = {
       currentVersion: currentVersion,
       latestStable: latestStable,
-      latestBeta: latestBeta,
+      latestTesting: latestBeta, // Rename beta to testing
+      stableUpdateAvailable: updateAvailable,
+      testingUpdateAvailable: testingUpdateAvailable,
       updateAvailable: updateAvailable,
       lastChecked: new Date().toISOString(),
       updateChannel: 'stable',
