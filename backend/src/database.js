@@ -5653,12 +5653,46 @@ async function toggleMikrotikSafeMode(deviceId, enabled) {
       throw new Error('Device not found');
     }
 
-    // In a real implementation, this would send SSH commands to enable/disable safe mode
-    // For now, we'll just return the requested state
-    console.log(`Toggling safe mode for device ${deviceId}: ${enabled ? 'enabled' : 'disabled'}`);
+    const host = device.host;
+    const routerosBaseline = device.routeros || defaultRouterosOptions();
     
-    // Add log entry for safe mode toggle
-    await addSystemLog(deviceId, 'system', 'info', `Safe mode ${enabled ? 'enabled' : 'disabled'} by user`);
+    console.log(`Toggling safe mode for device ${deviceId} (${host}): ${enabled ? 'enabled' : 'disabled'}`);
+    
+    // Send real SSH command to toggle safe mode
+    if (routerosBaseline.sshEnabled) {
+      try {
+        const { exec } = await import('child_process');
+        
+        // Use the appropriate command based on enabled state
+        const safeModeCommand = enabled 
+          ? `sshpass -p "${routerosBaseline.sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${routerosBaseline.sshUsername}@${host} "/system routerboard settings set boot-device=try-ethernet-once"`
+          : `sshpass -p "${routerosBaseline.sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${routerosBaseline.sshUsername}@${host} "/system routerboard settings set boot-device=flash"`;
+        
+        console.log(`Executing safe mode command: ${safeModeCommand.replace(routerosBaseline.sshPassword, '***')}`);
+        
+        const result = await new Promise((resolve, reject) => {
+          exec(safeModeCommand, { timeout: 15000 }, (error, stdout, stderr) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve({ stdout, stderr });
+            }
+          });
+        });
+
+        if (result.stdout) {
+          console.log(`✅ Safe mode command executed successfully: ${result.stdout}`);
+        }
+        
+        // Add log entry for safe mode toggle
+        await addSystemLog(deviceId, 'system', 'info', `Safe mode ${enabled ? 'enabled' : 'disabled'} by user via SSH`);
+      } catch (sshError) {
+        console.log(`❌ SSH safe mode command failed: ${sshError.message}`);
+        throw new Error(`Failed to toggle safe mode via SSH: ${sshError.message}`);
+      }
+    } else {
+      throw new Error('SSH is not enabled for this device');
+    }
     
     return {
       success: true,

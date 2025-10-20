@@ -1373,12 +1373,12 @@ const DeviceDetails = () => {
             if (e.target === modal) closeModal();
           };
           
-          await loadSystemLogs();
-        } else {
-          const error = await response.json();
+        await loadSystemLogs();
+      } else {
+        const error = await response.json();
           alert(`❌ Error: ${error.message}`);
-        }
-      } catch (err) {
+      }
+    } catch (err) {
         console.error('Error:', err);
         alert(`❌ Network Error: ${err.message}`);
       }
@@ -3035,7 +3035,11 @@ const DeviceDetails = () => {
                 justifyContent: 'center'
               }}>
                 <button
-                  onClick={() => handleDownloadUpdate('stable')}
+                  onClick={() => {
+                    if (!isDownloading && !isInstalling && updateInfo?.stableUpdateAvailable) {
+                      handleDownloadUpdate('stable');
+                    }
+                  }}
                   disabled={isDownloading || isInstalling || !updateInfo?.stableUpdateAvailable}
                     style={{
                     padding: '8px 16px',
@@ -3043,7 +3047,7 @@ const DeviceDetails = () => {
                       color: '#fff',
                       border: 'none',
                     borderRadius: '6px',
-                    cursor: 'pointer',
+                    cursor: (isDownloading || isInstalling || !updateInfo?.stableUpdateAvailable) ? 'not-allowed' : 'pointer',
                     fontSize: '12px',
                     fontWeight: '500',
                     fontFamily: 'inherit',
@@ -3071,7 +3075,11 @@ const DeviceDetails = () => {
                   📥 Download
                   </button>
                   <button
-                  onClick={() => handleDownloadAndInstallUpdate('stable')}
+                  onClick={() => {
+                    if (!isDownloading && !isInstalling && updateInfo?.stableUpdateAvailable) {
+                      handleDownloadAndInstallUpdate('stable');
+                    }
+                  }}
                   disabled={isDownloading || isInstalling || !updateInfo?.stableUpdateAvailable}
                     style={{
                     padding: '8px 16px',
@@ -3079,7 +3087,7 @@ const DeviceDetails = () => {
                       color: '#fff',
                       border: 'none',
                     borderRadius: '6px',
-                    cursor: 'pointer',
+                    cursor: (isDownloading || isInstalling || !updateInfo?.stableUpdateAvailable) ? 'not-allowed' : 'pointer',
                     fontSize: '12px',
                     fontWeight: '500',
                     fontFamily: 'inherit',
@@ -3206,7 +3214,11 @@ const DeviceDetails = () => {
                 justifyContent: 'center'
               }}>
                 <button
-                  onClick={() => handleDownloadUpdate('testing')}
+                  onClick={() => {
+                    if (!isDownloading && !isInstalling && updateInfo?.testingUpdateAvailable) {
+                      handleDownloadUpdate('testing');
+                    }
+                  }}
                   disabled={isDownloading || isInstalling || !updateInfo?.testingUpdateAvailable}
                     style={{
                     padding: '8px 16px',
@@ -3214,7 +3226,7 @@ const DeviceDetails = () => {
                       color: '#fff',
                       border: 'none',
                     borderRadius: '6px',
-                    cursor: 'pointer',
+                    cursor: (isDownloading || isInstalling || !updateInfo?.testingUpdateAvailable) ? 'not-allowed' : 'pointer',
                     fontSize: '12px',
                     fontWeight: '500',
                     fontFamily: 'inherit',
@@ -3242,7 +3254,11 @@ const DeviceDetails = () => {
                   📥 Download
                   </button>
                   <button
-                  onClick={() => handleDownloadAndInstallUpdate('testing')}
+                  onClick={() => {
+                    if (!isDownloading && !isInstalling && updateInfo?.testingUpdateAvailable) {
+                      handleDownloadAndInstallUpdate('testing');
+                    }
+                  }}
                   disabled={isDownloading || isInstalling || !updateInfo?.testingUpdateAvailable}
                     style={{
                     padding: '8px 16px',
@@ -3250,7 +3266,7 @@ const DeviceDetails = () => {
                       color: '#fff',
                       border: 'none',
                     borderRadius: '6px',
-                    cursor: 'pointer',
+                    cursor: (isDownloading || isInstalling || !updateInfo?.testingUpdateAvailable) ? 'not-allowed' : 'pointer',
                     fontSize: '12px',
                     fontWeight: '500',
                     fontFamily: 'inherit',
