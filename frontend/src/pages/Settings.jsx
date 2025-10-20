@@ -550,13 +550,19 @@ const Settings = () => {
                   <label className="form-label text-base font-semibold">Current Version</label>
                   <p className="text-sm text-gray-600 mt-1">Your current system version</p>
                 </div>
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-gray-600">Current Version:</span>
+                    <span className="font-medium text-gray-900">{updateInfo?.currentVersion || 'Loading...'}</span>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Stable Version */}
                   <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="font-mono text-lg font-bold text-green-900">
-                          {updateInfo?.stableVersion || updateInfo?.currentVersion?.replace('-beta', '') || 'Loading...'}
+                          {updateInfo?.updateInfo?.stableVersion || updateInfo?.stableVersion || updateInfo?.currentVersion?.replace('-beta', '') || 'Loading...'}
                         </span>
                         <div className="text-sm text-green-600 mt-1">Stable Version</div>
                       </div>
@@ -569,7 +575,7 @@ const Settings = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="font-mono text-lg font-bold text-orange-900">
-                          {updateInfo?.betaVersion || updateInfo?.currentVersion || 'Loading...'}
+                          {updateInfo?.updateInfo?.betaVersion || updateInfo?.betaVersion || updateInfo?.currentVersion || 'Loading...'}
                         </span>
                         <div className="text-sm text-orange-600 mt-1">Beta Version</div>
                       </div>
@@ -617,10 +623,22 @@ const Settings = () => {
                       <span className="text-gray-600">Channel:</span>
                       <span className="font-medium text-gray-900 capitalize">{updateInfo.channel}</span>
                     </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="text-gray-600">Latest Stable:</span>
+                      <span className="font-medium text-gray-900">{updateInfo?.updateInfo?.stableVersion || updateInfo?.stableVersion || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="text-gray-600">Latest Beta:</span>
+                      <span className="font-medium text-gray-900">{updateInfo?.updateInfo?.betaVersion || updateInfo?.betaVersion || 'N/A'}</span>
+                    </div>
                     {updateInfo.updateAvailable ? (
                       <>
                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                          <span className="text-gray-600">Latest Version:</span>
+                          <span className="text-gray-600">Update Available:</span>
+                          <span className="font-medium text-green-600">Yes</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2">
+                          <span className="text-gray-600">Target Version:</span>
                           <span className="font-medium text-green-600">{updateInfo.latestVersion}</span>
                         </div>
                         {updateInfo.updateInfo?.updateSize && (
@@ -631,11 +649,9 @@ const Settings = () => {
                         )}
                       </>
                     ) : (
-                      <div className="text-center py-1">
-                        <div className="inline-flex items-center px-1 py-0.5 bg-green-100 text-green-800 rounded text-xs font-medium">
-                          <UpdateStatusIcon size={6} className="mr-0.5" />
-                          You are up to date!
-                        </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-gray-600">Update Available:</span>
+                        <span className="font-medium text-green-600">No</span>
                       </div>
                     )}
                   </div>
