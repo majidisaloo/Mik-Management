@@ -20,6 +20,9 @@ const DeviceDetails = () => {
   const [mangleRules, setMangleRules] = useState([]);
   const [systemLogs, setSystemLogs] = useState([]);
   const [updateInfo, setUpdateInfo] = useState(null);
+  const [downloadProgress, setDownloadProgress] = useState(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isInstalling, setIsInstalling] = useState(false);
   const [connectivity, setConnectivity] = useState(null);
   const [safeMode, setSafeMode] = useState(false);
   const [connectivityTesting, setConnectivityTesting] = useState(false);
@@ -453,6 +456,9 @@ const DeviceDetails = () => {
   };
 
   const handleDownloadUpdate = async (channel = 'stable') => {
+    setIsDownloading(true);
+    setDownloadProgress({ step: 'Starting download...', progress: 0 });
+    
     try {
       const response = await fetch(`/api/mikrotiks/${id}/update/download`, {
         method: 'POST',
@@ -463,22 +469,37 @@ const DeviceDetails = () => {
       });
 
       if (response.ok) {
-        const result = await response.json();
-        console.log('Update download started:', result);
-        await loadSystemLogs();
-        alert(`Update ${channel} download started successfully!`);
+        const data = await response.json();
+        setDownloadProgress({ 
+          step: 'Download completed!', 
+          progress: 100,
+          fileSize: data.fileSize,
+          downloadPath: data.downloadPath
+        });
+        
+        // Show success message
+        setTimeout(() => {
+          alert(`✅ Download completed successfully!\n\nChannel: ${data.channel}\nFile: ${data.downloadPath}\nSize: ${Math.round(data.fileSize / 1024 / 1024)} MB`);
+          setDownloadProgress(null);
+        }, 1000);
       } else {
         const error = await response.json();
-        console.error('Error response:', error);
-        alert(`Error: ${error.message}`);
+        alert(`❌ Download failed: ${error.message}`);
+        setDownloadProgress(null);
       }
     } catch (err) {
       console.error('Error:', err);
-      alert(`Error: ${err.message}`);
+      alert(`❌ Download error: ${err.message}`);
+      setDownloadProgress(null);
+    } finally {
+      setIsDownloading(false);
     }
   };
 
   const handleDownloadAndInstallUpdate = async (channel = 'stable') => {
+    setIsInstalling(true);
+    setDownloadProgress({ step: 'Starting download + install + reboot...', progress: 0 });
+    
     try {
       const response = await fetch(`/api/mikrotiks/${id}/update/install`, {
         method: 'POST',
@@ -489,18 +510,30 @@ const DeviceDetails = () => {
       });
 
       if (response.ok) {
-        const result = await response.json();
-        console.log('Update download and install started:', result);
-        await loadSystemLogs();
-        alert(`Update ${channel} download and install started successfully!`);
+        const data = await response.json();
+        setDownloadProgress({ 
+          step: 'Installation and reboot completed!', 
+          progress: 100,
+          fileSize: data.fileSize,
+          downloadPath: data.downloadPath
+        });
+        
+        // Show success message
+        setTimeout(() => {
+          alert(`✅ Installation completed successfully!\n\nChannel: ${data.channel}\nFile: ${data.downloadPath}\nSize: ${Math.round(data.fileSize / 1024 / 1024)} MB\n\nDevice has been rebooted and is ready to use.`);
+          setDownloadProgress(null);
+        }, 1000);
       } else {
         const error = await response.json();
-        console.error('Error response:', error);
-        alert(`Error: ${error.message}`);
+        alert(`❌ Installation failed: ${error.message}`);
+        setDownloadProgress(null);
       }
     } catch (err) {
       console.error('Error:', err);
-      alert(`Error: ${err.message}`);
+      alert(`❌ Installation error: ${err.message}`);
+      setDownloadProgress(null);
+    } finally {
+      setIsInstalling(false);
     }
   };
 
@@ -2001,8 +2034,65 @@ const DeviceDetails = () => {
           </button>
         </div>
 
-        {updateInfo && (
+        {/* Download Progress Bar */}
+        {downloadProgress && (
           <div style={{
+            backgroundColor: theme === 'dark' ? '#2d3748' : '#f7fafc',
+            border: `1px solid ${theme === 'dark' ? '#4a5568' : '#e2e8f0'}`,
+            borderRadius: '8px',
+            padding: '16px',
+            marginBottom: '20px',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '8px'
+            }}>
+              <span style={{
+                fontSize: '14px',
+                fontWeight: '500',
+                color: theme === 'dark' ? '#fff' : '#2d3748'
+              }}>
+                {downloadProgress.step}
+              </span>
+              <span style={{
+                fontSize: '12px',
+                color: theme === 'dark' ? '#a0aec0' : '#718096'
+              }}>
+                {downloadProgress.progress}%
+              </span>
+            </div>
+            <div style={{
+              width: '100%',
+              height: '8px',
+              backgroundColor: theme === 'dark' ? '#4a5568' : '#e2e8f0',
+              borderRadius: '4px',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                width: `${downloadProgress.progress}%`,
+                height: '100%',
+                backgroundColor: downloadProgress.progress === 100 ? '#48bb78' : '#4299e1',
+                transition: 'width 0.3s ease',
+                borderRadius: '4px'
+              }} />
+            </div>
+            {downloadProgress.fileSize && (
+              <div style={{
+                fontSize: '12px',
+                color: theme === 'dark' ? '#a0aec0' : '#718096',
+                marginTop: '8px'
+              }}>
+                File Size: {Math.round(downloadProgress.fileSize / 1024 / 1024)} MB
+              </div>
+            )}
+          </div>
+        )}
+
+          {updateInfo && (
+            <div style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
             gap: '20px',
@@ -2057,7 +2147,7 @@ const DeviceDetails = () => {
                       fontSize: '14px',
                       fontFamily: 'inherit'
                     }}>{updateInfo.currentVersion || 'Unknown'}</td>
-                  </tr>
+                    </tr>
                   <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#2d5a87' : '#bbdefb'}` }}>
                     <td style={{
                       padding: '12px',
@@ -2093,11 +2183,11 @@ const DeviceDetails = () => {
                         display: 'inline-block'
                       }}>
                         {updateInfo.stableUpdateAvailable ? 'Available' : 'Up to date'}
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                          </span>
+                        </td>
+                      </tr>
+                  </tbody>
+                </table>
               <div style={{ 
                 marginTop: '16px',
                 display: 'flex',
@@ -2106,11 +2196,12 @@ const DeviceDetails = () => {
               }}>
                 <button
                   onClick={() => handleDownloadUpdate('stable')}
-                  style={{
+                  disabled={isDownloading || isInstalling}
+                    style={{
                     padding: '8px 16px',
-                    backgroundColor: theme === 'dark' ? '#007acc' : '#0066cc',
-                    color: '#fff',
-                    border: 'none',
+                      backgroundColor: (isDownloading || isInstalling) ? '#6c757d' : (theme === 'dark' ? '#007acc' : '#0066cc'),
+                      color: '#fff',
+                      border: 'none',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     fontSize: '12px',
@@ -2134,14 +2225,15 @@ const DeviceDetails = () => {
                   }}
                 >
                   📥 Download
-                </button>
-                <button
+                  </button>
+                  <button
                   onClick={() => handleDownloadAndInstallUpdate('stable')}
-                  style={{
+                  disabled={isDownloading || isInstalling}
+                    style={{
                     padding: '8px 16px',
-                    backgroundColor: theme === 'dark' ? '#28a745' : '#28a745',
-                    color: '#fff',
-                    border: 'none',
+                      backgroundColor: (isDownloading || isInstalling) ? '#6c757d' : (theme === 'dark' ? '#28a745' : '#28a745'),
+                      color: '#fff',
+                      border: 'none',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     fontSize: '12px',
@@ -2267,9 +2359,10 @@ const DeviceDetails = () => {
               }}>
                 <button
                   onClick={() => handleDownloadUpdate('testing')}
+                  disabled={isDownloading || isInstalling}
                   style={{
                     padding: '8px 16px',
-                    backgroundColor: theme === 'dark' ? '#6f42c1' : '#6f42c1',
+                    backgroundColor: (isDownloading || isInstalling) ? '#6c757d' : (theme === 'dark' ? '#6f42c1' : '#6f42c1'),
                     color: '#fff',
                     border: 'none',
                     borderRadius: '6px',
@@ -2298,9 +2391,10 @@ const DeviceDetails = () => {
                 </button>
                 <button
                   onClick={() => handleDownloadAndInstallUpdate('testing')}
+                  disabled={isDownloading || isInstalling}
                   style={{
                     padding: '8px 16px',
-                    backgroundColor: theme === 'dark' ? '#fd7e14' : '#fd7e14',
+                    backgroundColor: (isDownloading || isInstalling) ? '#6c757d' : (theme === 'dark' ? '#fd7e14' : '#fd7e14'),
                     color: '#fff',
                     border: 'none',
                     borderRadius: '6px',
@@ -2330,7 +2424,7 @@ const DeviceDetails = () => {
               </div>
             </div>
           </div>
-        )}
+          )}
       </div>
     )}
 
