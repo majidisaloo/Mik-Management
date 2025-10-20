@@ -2946,13 +2946,13 @@ const bootstrap = async () => {
         // Step 2: Execute restart command with confirmation
         console.log(`🔄 Step 2/3: Initiating reboot sequence...`);
         try {
-          // Method 1: Try with expect-like approach using here document
-          const restartCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "echo 'y' | /system reboot"`;
+          // Method 1: Try with system reboot command (like winbox)
+          const restartCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system reboot"`;
           const { exec } = await import('child_process');
           const { promisify } = await import('util');
           const execAsync = promisify(exec);
           
-          console.log(`🔄 Executing restart command with echo: ${restartCommand.replace(devicePassword, '***')}`);
+          console.log(`🔄 Executing restart command: ${restartCommand.replace(devicePassword, '***')}`);
           
           // Execute restart command (this will disconnect SSH)
           execAsync(restartCommand, { timeout: 10000 }).catch((error) => {
@@ -2963,14 +2963,14 @@ const bootstrap = async () => {
           console.log(`✅ Restart command executed`);
         } catch (restartError) {
           console.log(`⚠️ SSH restart failed, trying alternative method...`);
-          // Fallback: try with different SSH options and confirmation
+          // Fallback: try with different SSH options
           try {
-            const fallbackCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o ServerAliveInterval=1 ${sshUsername}@${deviceIP} "echo 'y' | /system reboot"`;
+            const fallbackCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o ServerAliveInterval=1 ${sshUsername}@${deviceIP} "/system reboot"`;
             const { exec } = await import('child_process');
             const { promisify } = await import('util');
             const execAsync = promisify(exec);
             
-            console.log(`🔄 Executing fallback restart command with echo: ${fallbackCommand.replace(devicePassword, '***')}`);
+            console.log(`🔄 Executing fallback restart command: ${fallbackCommand.replace(devicePassword, '***')}`);
             
             execAsync(fallbackCommand, { timeout: 8000 }).catch((error) => {
               console.log(`✅ Fallback restart command sent (disconnect expected)`);
@@ -4655,6 +4655,17 @@ const bootstrap = async () => {
             await handleInstallMikrotikUpdate(deviceId);
             return;
           }
+        }
+      }
+
+      // Handle mikrotiks/:id/safe-mode routes (length === 3)
+      if (resourceSegments[0] === 'mikrotiks' && resourceSegments.length === 3) {
+        const deviceId = Number.parseInt(resourceSegments[1], 10);
+        const action = resourceSegments[2];
+
+        if (action === 'safe-mode' && method === 'POST') {
+          await handleToggleMikrotikSafeMode(deviceId);
+          return;
         }
       }
 

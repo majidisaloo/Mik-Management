@@ -5665,8 +5665,8 @@ async function toggleMikrotikSafeMode(deviceId, enabled) {
         
         // Use the appropriate command based on enabled state
         const safeModeCommand = enabled 
-          ? `sshpass -p "${routerosBaseline.sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${routerosBaseline.sshUsername}@${host} "/system routerboard settings set boot-device=try-ethernet-once"`
-          : `sshpass -p "${routerosBaseline.sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${routerosBaseline.sshUsername}@${host} "/system routerboard settings set boot-device=flash"`;
+          ? `sshpass -p "${routerosBaseline.sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${routerosBaseline.sshUsername}@${host} "/system routerboard settings set boot-device=try-ethernet-once-and-then-nand"`
+          : `sshpass -p "${routerosBaseline.sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${routerosBaseline.sshUsername}@${host} "/system routerboard settings set boot-device=nand-only"`;
         
         console.log(`Executing safe mode command: ${safeModeCommand.replace(routerosBaseline.sshPassword, '***')}`);
         
@@ -5683,8 +5683,8 @@ async function toggleMikrotikSafeMode(deviceId, enabled) {
         if (result.stdout) {
           console.log(`✅ Safe mode command executed successfully: ${result.stdout}`);
         }
-        
-        // Add log entry for safe mode toggle
+    
+    // Add log entry for safe mode toggle
         await addSystemLog(deviceId, 'system', 'info', `Safe mode ${enabled ? 'enabled' : 'disabled'} by user via SSH`);
       } catch (sshError) {
         console.log(`❌ SSH safe mode command failed: ${sshError.message}`);
