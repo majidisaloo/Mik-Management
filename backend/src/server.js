@@ -2953,12 +2953,13 @@ const bootstrap = async () => {
           return;
         }
 
-        console.log(`🔄 Device found: ${device.name} (${device.ip})`);
+        console.log(`🔄 Device found: ${device.name} (${device.host || device.ip})`);
+        console.log(`🔄 Device object:`, JSON.stringify(device, null, 2));
         
         // Step 1: Save configuration
         console.log(`🔄 Step 1/3: Saving current configuration...`);
         try {
-          const saveConfigCommand = `sshpass -p "${device.password}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@${device.ip} "/system backup save name=before-restart"`;
+          const saveConfigCommand = `sshpass -p "${device.routeros?.sshPassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${device.routeros?.sshUsername || 'admin'}@${device.host || device.ip} "/system backup save name=before-restart"`;
           const { exec } = await import('child_process');
           const { promisify } = await import('util');
           const execAsync = promisify(exec);
@@ -2972,6 +2973,15 @@ const bootstrap = async () => {
         // Step 2: Execute restart command with confirmation
         console.log(`🔄 Step 2/3: Initiating reboot sequence...`);
         try {
+          // Get device credentials
+          const deviceIP = device.host || device.ip;
+          const sshUsername = device.routeros?.sshUsername || 'admin';
+          const devicePassword = device.routeros?.sshPassword;
+          
+          if (!devicePassword) {
+            throw new Error('SSH password not found for device');
+          }
+          
           // Restart command with automatic confirmation
           const restartCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "echo 'y' | /system reboot"`;
           const { exec } = await import('child_process');
