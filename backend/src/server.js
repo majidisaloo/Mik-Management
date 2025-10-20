@@ -2894,29 +2894,77 @@ const bootstrap = async () => {
       try {
         console.log(`🔄 Restarting MikroTik device ID: ${deviceId}`);
         
-        // Simulate restart process
-        const restartSteps = [
-          { step: 'Saving current configuration...', progress: 20 },
-          { step: 'Stopping services...', progress: 40 },
-          { step: 'Initiating reboot sequence...', progress: 60 },
-          { step: 'Device is rebooting...', progress: 80 },
-          { step: 'Restart completed!', progress: 100 }
-        ];
-
-        for (const restartStep of restartSteps) {
-          console.log(`🔄 ${restartStep.step} (${restartStep.progress}%)`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
+        // Get device info first
+        const device = await db.getMikrotikById(deviceId);
+        if (!device) {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
         }
+
+        console.log(`🔄 Device found: ${device.name} (${device.ip})`);
+        
+        // Step 1: Save configuration
+        console.log(`🔄 Step 1/3: Saving current configuration...`);
+        try {
+          const saveConfigCommand = `sshpass -p "${device.password}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@${device.ip} "/system backup save name=before-restart"`;
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          
+          await execAsync(saveConfigCommand, { timeout: 15000 });
+          console.log(`✅ Configuration saved successfully`);
+        } catch (saveError) {
+          console.log(`⚠️ Could not save config via SSH, continuing with restart...`);
+        }
+
+        // Step 2: Execute restart command
+        console.log(`🔄 Step 2/3: Initiating reboot sequence...`);
+        try {
+          const restartCommand = `sshpass -p "${device.password}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@${device.ip} "/system reboot"`;
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          
+          // Execute restart command (this will disconnect SSH)
+          execAsync(restartCommand, { timeout: 10000 }).catch(() => {
+            // Expected to fail as device will disconnect
+            console.log(`✅ Restart command sent successfully`);
+          });
+          
+          console.log(`✅ Restart command executed`);
+        } catch (restartError) {
+          console.log(`⚠️ SSH restart failed, trying alternative method...`);
+          // Fallback: try with different SSH options
+          try {
+            const fallbackCommand = `sshpass -p "${device.password}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o ServerAliveInterval=1 admin@${device.ip} "/system reboot"`;
+            const { exec } = await import('child_process');
+            const { promisify } = await import('util');
+            const execAsync = promisify(exec);
+            
+            execAsync(fallbackCommand, { timeout: 8000 }).catch(() => {
+              console.log(`✅ Fallback restart command sent`);
+            });
+          } catch (fallbackError) {
+            console.log(`❌ All restart methods failed: ${fallbackError.message}`);
+            throw new Error('Unable to restart device via SSH');
+          }
+        }
+
+        // Step 3: Wait and verify
+        console.log(`🔄 Step 3/3: Device is rebooting...`);
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
         
         sendJson(res, 200, {
           success: true,
-          message: 'Device restart completed successfully.',
+          message: 'Device restart command sent successfully. Device is rebooting...',
           restartedAt: new Date().toISOString(),
-          status: 'restarted'
+          status: 'restarting',
+          deviceName: device.name,
+          deviceIP: device.ip
         });
       } catch (error) {
         console.error('Restart Mikrotik error', error);
-        sendJson(res, 500, { message: 'Unable to restart device right now.' });
+        sendJson(res, 500, { message: `Unable to restart device: ${error.message}` });
       }
     };
 

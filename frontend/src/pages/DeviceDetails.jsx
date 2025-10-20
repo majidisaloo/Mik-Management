@@ -725,21 +725,23 @@ const DeviceDetails = () => {
   };
 
   const handleRestartDevice = async () => {
-    if (window.confirm('Are you sure you want to restart this device?')) {
+    if (window.confirm('Are you sure you want to restart this device? This will disconnect the device temporarily.')) {
       try {
         const response = await fetch(`/api/mikrotiks/${id}/restart`, {
           method: 'POST',
         });
 
         if (response.ok) {
-          alert('Device restart initiated');
+          const result = await response.json();
+          alert(`✅ ${result.message}\n\nDevice: ${result.deviceName}\nIP: ${result.deviceIP}\n\nPlease wait 1-2 minutes for the device to come back online.`);
           await loadSystemLogs();
         } else {
           const error = await response.json();
-          alert(`Error: ${error.message}`);
+          alert(`❌ Error: ${error.message}`);
         }
       } catch (err) {
-        alert(`Error: ${err.message}`);
+        console.error('Error:', err);
+        alert(`❌ Network Error: ${err.message}`);
       }
     }
   };
