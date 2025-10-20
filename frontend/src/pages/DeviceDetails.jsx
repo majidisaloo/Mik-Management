@@ -775,14 +775,15 @@ const DeviceDetails = () => {
 
       if (response.ok) {
         const data = await response.json();
-        alert(`Diagnosis: ${data.message}`);
+        alert(`✅ ${data.message}\n\nDevice: ${data.deviceName}\nIP: ${data.deviceIP}\nCurrent Version: ${data.currentVersion}\nSystem Name: ${data.systemInfo?.name || 'Unknown'}\n\nDiagnosed at: ${new Date(data.diagnosedAt).toLocaleString()}`);
         await loadSystemLogs();
       } else {
         const error = await response.json();
-        alert(`Error: ${error.message}`);
+        alert(`❌ Error: ${error.message}`);
       }
     } catch (err) {
-      alert(`Error: ${err.message}`);
+      console.error('Diagnose error:', err);
+      alert(`❌ Network Error: ${err.message}`);
     }
   };
 

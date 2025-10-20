@@ -2968,6 +2968,82 @@ const bootstrap = async () => {
       }
     };
 
+    const handleDiagnoseMikrotik = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        console.log(`🔍 Diagnosing MikroTik device ID: ${deviceId}`);
+        
+        // Get device info first
+        const device = await db.getMikrotikById(deviceId);
+        if (!device) {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        console.log(`🔍 Device found: ${device.name} (${device.ip})`);
+        
+        // Get current firmware version via SSH
+        let currentVersion = 'Unknown';
+        try {
+          const versionCommand = `sshpass -p "${device.password}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@${device.ip} "/system resource print"`;
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          
+          const { stdout } = await execAsync(versionCommand, { timeout: 15000 });
+          console.log(`🔍 SSH output: ${stdout}`);
+          
+          // Parse version from output
+          const versionMatch = stdout.match(/version:\s*(\d+\.\d+\.\d+)/i);
+          if (versionMatch) {
+            currentVersion = versionMatch[1];
+            console.log(`✅ Current version detected: ${currentVersion}`);
+          }
+        } catch (sshError) {
+          console.log(`⚠️ Could not get version via SSH: ${sshError.message}`);
+        }
+
+        // Get system info
+        let systemInfo = {};
+        try {
+          const systemCommand = `sshpass -p "${device.password}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@${device.ip} "/system identity print"`;
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          
+          const { stdout } = await execAsync(systemCommand, { timeout: 15000 });
+          console.log(`🔍 System info: ${stdout}`);
+          
+          // Parse system info
+          const nameMatch = stdout.match(/name:\s*(.+)/i);
+          if (nameMatch) {
+            systemInfo.name = nameMatch[1].trim();
+          }
+        } catch (systemError) {
+          console.log(`⚠️ Could not get system info via SSH: ${systemError.message}`);
+        }
+        
+        sendJson(res, 200, {
+          success: true,
+          message: `Device diagnosis completed successfully. Current version: ${currentVersion}`,
+          deviceId: deviceId,
+          deviceName: device.name,
+          deviceIP: device.ip,
+          currentVersion: currentVersion,
+          systemInfo: systemInfo,
+          diagnosedAt: new Date().toISOString(),
+          status: 'diagnosed'
+        });
+      } catch (error) {
+        console.error('Diagnose Mikrotik error', error);
+        sendJson(res, 500, { message: `Unable to diagnose device: ${error.message}` });
+      }
+    };
+
     const handleListFirewallInventory = async () => {
       try {
         const [addressLists, filters, groups, mikrotiks] = await Promise.all([
@@ -4544,6 +4620,11 @@ const bootstrap = async () => {
 
         if (method === 'POST' && action === 'restart') {
           await handleRestartMikrotik(deviceId);
+          return;
+        }
+
+        if (method === 'POST' && action === 'diagnose') {
+          await handleDiagnoseMikrotik(deviceId);
           return;
         }
       }
