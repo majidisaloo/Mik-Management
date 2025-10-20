@@ -1523,51 +1523,6 @@ const DeviceDetails = () => {
       </div>
     )}
 
-      {activeTab === 'logs' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h2>System Logs</h2>
-              <button
-              onClick={loadSystemLogs}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
-                color: theme === 'dark' ? '#fff' : '#000',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer'
-              }}
-            >
-              Refresh
-              </button>
-            </div>
-          
-          <div style={{
-            backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff',
-            borderRadius: '10px',
-            border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`
-          }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}` }}>
-                  <th style={{ padding: '15px', textAlign: 'left' }}>Time</th>
-                  <th style={{ padding: '15px', textAlign: 'left' }}>Topics</th>
-                  <th style={{ padding: '15px', textAlign: 'left' }}>Message</th>
-                </tr>
-              </thead>
-              <tbody>
-                {systemLogs.map((log, index) => (
-                  <tr key={index} style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}` }}>
-                    <td style={{ padding: '15px' }}>{log.time}</td>
-                    <td style={{ padding: '15px' }}>{log.topics}</td>
-                    <td style={{ padding: '15px' }}>{log.message}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-              </div>
-      )}
 
       {activeTab === 'logs' && (
         <div>
@@ -1681,8 +1636,50 @@ const DeviceDetails = () => {
                       borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
                       backgroundColor: theme === 'dark' ? '#333' : '#f8f9fa'
                     }}>
-                      <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Time</th>
-                      <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Level</th>
+                      <th 
+                        style={{ 
+                          padding: '12px', 
+                          textAlign: 'left', 
+                          fontSize: '14px', 
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          userSelect: 'none'
+                        }}
+                        onClick={() => {
+                          // Sort by time
+                          const sortedLogs = [...logs].sort((a, b) => {
+                            try {
+                              const timeA = new Date(a.time).getTime();
+                              const timeB = new Date(b.time).getTime();
+                              return timeA - timeB; // Oldest first when clicked
+                            } catch (e) {
+                              return 0;
+                            }
+                          });
+                          setLogs(sortedLogs);
+                        }}
+                      >
+                        Time ↕️
+                      </th>
+                      <th 
+                        style={{ 
+                          padding: '12px', 
+                          textAlign: 'left', 
+                          fontSize: '14px', 
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          userSelect: 'none'
+                        }}
+                        onClick={() => {
+                          // Sort by level
+                          const sortedLogs = [...logs].sort((a, b) => {
+                            return a.level.localeCompare(b.level);
+                          });
+                          setLogs(sortedLogs);
+                        }}
+                      >
+                        Level ↕️
+                      </th>
                       <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Topics</th>
                       <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Message</th>
                     </tr>
@@ -1703,30 +1700,7 @@ const DeviceDetails = () => {
                           color: theme === 'dark' ? '#ccc' : '#666',
                           whiteSpace: 'nowrap'
                         }}>
-                          {(() => {
-                            try {
-                              const date = new Date(log.time);
-                              if (isNaN(date.getTime())) {
-                                // If it's not a valid date, try to parse RouterOS format
-                                const parts = log.time.toString().split(' ');
-                                if (parts.length >= 2) {
-                                  return `${parts[0]} ${parts[1]}`;
-                                }
-                                return log.time;
-                              }
-                              return date.toLocaleString('en-US', {
-                                month: '2-digit',
-                                day: '2-digit',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                second: '2-digit',
-                                hour12: false
-                              });
-                            } catch (e) {
-                              return log.time;
-                            }
-                          })()}
+                          {log.time}
                         </td>
                         <td style={{ padding: '12px', fontSize: '13px' }}>
                           <span style={{
