@@ -176,7 +176,7 @@ const DeviceDetails = () => {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: '50',
-        max: '1000'
+        max: '250'
       });
       
       if (search) {
@@ -1571,74 +1571,88 @@ const DeviceDetails = () => {
 
       {activeTab === 'logs' && (
         <div>
+          {/* Search Bar */}
+          <div style={{ 
+            display: 'flex', 
+            gap: '10px', 
+            alignItems: 'center', 
+            marginBottom: '20px',
+            padding: '15px',
+            backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f8f9fa',
+            borderRadius: '8px',
+            border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`
+          }}>
+            <input
+              type="text"
+              placeholder="Search logs by IP, service, or message..."
+              value={logsSearch}
+              onChange={(e) => setLogsSearch(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  loadLogs(1, logsSearch);
+                }
+              }}
+              style={{
+                flex: 1,
+                padding: '10px 15px',
+                border: `1px solid ${theme === 'dark' ? '#555' : '#ddd'}`,
+                borderRadius: '6px',
+                backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                color: theme === 'dark' ? '#fff' : '#000',
+                fontSize: '14px',
+                outline: 'none'
+              }}
+            />
+            <button
+              onClick={() => {
+                setLogsLoading(true);
+                loadLogs(1, logsSearch);
+              }}
+              disabled={logsLoading}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: logsLoading ? (theme === 'dark' ? '#6c757d' : '#6c757d') : (theme === 'dark' ? '#007acc' : '#0066cc'),
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: logsLoading ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                opacity: logsLoading ? 0.7 : 1
+              }}
+            >
+              {logsLoading ? '⏳ Searching...' : '🔍 Search'}
+            </button>
+            <button
+              onClick={() => {
+                setLogsLoading(true);
+                loadLogs(logsPage, logsSearch);
+              }}
+              disabled={logsLoading}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: logsLoading ? (theme === 'dark' ? '#6c757d' : '#6c757d') : (theme === 'dark' ? '#28a745' : '#28a745'),
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: logsLoading ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                opacity: logsLoading ? 0.7 : 1
+              }}
+            >
+              {logsLoading ? '⏳ Loading...' : '🔄 Refresh'}
+            </button>
+          </div>
+
+          {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h2>System Logs</h2>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <input
-                  type="text"
-                  placeholder="Search logs..."
-                  value={logsSearch}
-                  onChange={(e) => setLogsSearch(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      loadLogs(1, logsSearch);
-                    }
-                  }}
-                  style={{
-                    padding: '8px 12px',
-                    border: `1px solid ${theme === 'dark' ? '#555' : '#ddd'}`,
-                    borderRadius: '5px',
-                    backgroundColor: theme === 'dark' ? '#333' : '#fff',
-                    color: theme === 'dark' ? '#fff' : '#000',
-                    fontSize: '14px',
-                    minWidth: '200px'
-                  }}
-                />
-                <button
-                  onClick={() => loadLogs(1, logsSearch)}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: theme === 'dark' ? '#007acc' : '#0066cc',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                >
-                  Search
-                </button>
-              </div>
-              <button
-                onClick={() => loadLogs(logsPage, logsSearch)}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
-                  color: theme === 'dark' ? '#fff' : '#000',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer'
-                }}
-              >
-                Refresh
-              </button>
+            <h2 style={{ margin: 0 }}>System Logs</h2>
+            <div style={{ fontSize: '14px', color: theme === 'dark' ? '#ccc' : '#666' }}>
+              {logs.length > 0 && `Showing ${logs.length} logs`}
             </div>
           </div>
 
-          {/* Logs Source Info */}
-          <div style={{
-            backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f8f9fa',
-            border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
-            borderRadius: '5px',
-            padding: '10px 15px',
-            marginBottom: '20px',
-            fontSize: '14px',
-            color: theme === 'dark' ? '#ccc' : '#666'
-          }}>
-            <strong>Source:</strong> {logsSource === 'api' ? 'RouterOS API' : logsSource === 'ssh' ? 'SSH Command' : logsSource === 'mock' ? 'Mock Data' : 'Unknown'} 
-            {logsSource === 'mock' && ' (Connection failed, showing sample data)'}
-          </div>
 
           {/* Logs Table */}
           <div style={{
@@ -1686,9 +1700,33 @@ const DeviceDetails = () => {
                           padding: '12px', 
                           fontSize: '13px',
                           fontFamily: 'monospace',
-                          color: theme === 'dark' ? '#ccc' : '#666'
+                          color: theme === 'dark' ? '#ccc' : '#666',
+                          whiteSpace: 'nowrap'
                         }}>
-                          {new Date(log.time).toLocaleString()}
+                          {(() => {
+                            try {
+                              const date = new Date(log.time);
+                              if (isNaN(date.getTime())) {
+                                // If it's not a valid date, try to parse RouterOS format
+                                const parts = log.time.toString().split(' ');
+                                if (parts.length >= 2) {
+                                  return `${parts[0]} ${parts[1]}`;
+                                }
+                                return log.time;
+                              }
+                              return date.toLocaleString('en-US', {
+                                month: '2-digit',
+                                day: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                                hour12: false
+                              });
+                            } catch (e) {
+                              return log.time;
+                            }
+                          })()}
                         </td>
                         <td style={{ padding: '12px', fontSize: '13px' }}>
                           <span style={{
