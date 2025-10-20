@@ -517,9 +517,215 @@ const DeviceDetails = () => {
           downloadPath: data.downloadPath
         });
         
-        // Show success message
+        // Show success message with beautiful modal
         setTimeout(() => {
-          alert(`✅ Download completed successfully!\n\nChannel: ${data.channel}\nDevice: ${data.deviceName}\nIP: ${data.deviceIP}\n\nUpdate is ready for installation.`);
+          // Create a beautiful modal instead of simple alert
+          const modal = document.createElement('div');
+          modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            backdrop-filter: blur(4px);
+          `;
+          
+          const modalContent = document.createElement('div');
+          modalContent.style.cssText = `
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 20px;
+            padding: 0;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            overflow: hidden;
+            position: relative;
+          `;
+          
+          // Add CSS animation
+          const style = document.createElement('style');
+          style.textContent = `
+            @keyframes modalSlideIn {
+              from { 
+                opacity: 0; 
+                transform: translateY(-30px) scale(0.9) rotateX(10deg); 
+              }
+              to { 
+                opacity: 1; 
+                transform: translateY(0) scale(1) rotateX(0deg); 
+              }
+            }
+            @keyframes pulse {
+              0%, 100% { transform: scale(1); }
+              50% { transform: scale(1.05); }
+            }
+            @keyframes float {
+              0%, 100% { transform: translateY(0px); }
+              50% { transform: translateY(-10px); }
+            }
+          `;
+          document.head.appendChild(style);
+          
+          modalContent.innerHTML = `
+            <div style="
+              background: rgba(255, 255, 255, 0.1);
+              backdrop-filter: blur(10px);
+              padding: 30px;
+              text-align: center;
+              position: relative;
+            ">
+              <!-- Download Icon with Animation -->
+              <div style="
+                width: 80px;
+                height: 80px;
+                background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 20px;
+                box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+                animation: float 3s ease-in-out infinite;
+                position: relative;
+              ">
+                <div style="
+                  width: 60px;
+                  height: 60px;
+                  background: rgba(255, 255, 255, 0.2);
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  animation: pulse 2s ease-in-out infinite;
+                ">
+                  <span style="color: white; font-size: 32px; font-weight: bold;">📥</span>
+                </div>
+              </div>
+              
+              <!-- Title -->
+              <h2 style="
+                margin: 0 0 10px 0; 
+                color: white; 
+                font-size: 24px; 
+                font-weight: 700;
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+              ">Download Complete!</h2>
+              
+              <p style="
+                margin: 0 0 25px 0; 
+                color: rgba(255, 255, 255, 0.9); 
+                font-size: 16px;
+                line-height: 1.5;
+              ">Update is ready for installation</p>
+            </div>
+            
+            <!-- Content Section -->
+            <div style="
+              background: white;
+              padding: 25px;
+              border-radius: 0 0 20px 20px;
+            ">
+              <div style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                margin-bottom: 25px;
+              ">
+                <div style="
+                  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+                  border-radius: 12px;
+                  padding: 15px;
+                  text-align: center;
+                  border: 2px solid #e2e8f0;
+                  transition: all 0.3s ease;
+                " onmouseover="this.style.borderColor='#3B82F6'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
+                  <div style="color: #64748B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Channel</div>
+                  <div style="color: #1E293B; font-size: 16px; font-weight: 700;">${data.channel}</div>
+                </div>
+                
+                <div style="
+                  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+                  border-radius: 12px;
+                  padding: 15px;
+                  text-align: center;
+                  border: 2px solid #e2e8f0;
+                  transition: all 0.3s ease;
+                " onmouseover="this.style.borderColor='#3B82F6'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
+                  <div style="color: #64748B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Device</div>
+                  <div style="color: #1E293B; font-size: 16px; font-weight: 700;">${data.deviceName}</div>
+                </div>
+                
+                <div style="
+                  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+                  border-radius: 12px;
+                  padding: 15px;
+                  text-align: center;
+                  border: 2px solid #e2e8f0;
+                  transition: all 0.3s ease;
+                " onmouseover="this.style.borderColor='#3B82F6'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
+                  <div style="color: #64748B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">IP Address</div>
+                  <div style="color: #1E293B; font-size: 16px; font-weight: 700;">${data.deviceIP}</div>
+                </div>
+                
+                <div style="
+                  background: linear-gradient(135deg, #fef3c7, #fde68a);
+                  border-radius: 12px;
+                  padding: 15px;
+                  text-align: center;
+                  border: 2px solid #f59e0b;
+                  transition: all 0.3s ease;
+                " onmouseover="this.style.borderColor='#D97706'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#f59e0b'; this.style.transform='translateY(0)'">
+                  <div style="color: #92400E; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Status</div>
+                  <div style="color: #B45309; font-size: 16px; font-weight: 700;">📥 Ready</div>
+                </div>
+              </div>
+              
+              <!-- Action Button -->
+              <div style="text-align: center;">
+                <button id="closeModal" style="
+                  background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+                  color: white;
+                  border: none;
+                  border-radius: 12px;
+                  padding: 12px 30px;
+                  font-size: 16px;
+                  font-weight: 600;
+                  cursor: pointer;
+                  transition: all 0.3s ease;
+                  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                " onmouseover="this.style.background='linear-gradient(135deg, #1D4ED8, #1E40AF)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(59, 130, 246, 0.4)'" onmouseout="this.style.background='linear-gradient(135deg, #3B82F6, #1D4ED8)'; this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(59, 130, 246, 0.3)'">
+                  ✨ Close
+                </button>
+              </div>
+            </div>
+          `;
+          
+          modal.appendChild(modalContent);
+          document.body.appendChild(modal);
+          
+          // Close modal functionality
+          const closeModal = () => {
+            modal.style.animation = 'modalSlideIn 0.3s ease-out reverse';
+            setTimeout(() => {
+              document.body.removeChild(modal);
+              document.head.removeChild(style);
+            }, 300);
+          };
+          
+          modalContent.querySelector('#closeModal').onclick = closeModal;
+          modal.onclick = (e) => {
+            if (e.target === modal) closeModal();
+          };
+          
           setDownloadProgress(null);
         }, 1000);
       } else {
@@ -535,7 +741,7 @@ const DeviceDetails = () => {
         alert(`❌ Download failed: ${errorMessage}`);
         setDownloadProgress(null);
       }
-      } catch (err) {
+    } catch (err) {
         console.error('Network error:', err);
         if (err.name === 'TimeoutError') {
           alert(`❌ Download timeout: The operation took too long.\n\nThis might be normal for large files. Please try again.`);
@@ -606,9 +812,215 @@ const DeviceDetails = () => {
           downloadPath: data.downloadPath
         });
         
-        // Show success message
+        // Show success message with beautiful modal
         setTimeout(() => {
-          alert(`✅ Installation completed successfully!\n\nChannel: ${data.channel}\nDevice: ${data.deviceName}\nIP: ${data.deviceIP}\n\nDevice has been rebooted and is ready to use.`);
+          // Create a beautiful modal instead of simple alert
+          const modal = document.createElement('div');
+          modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            backdrop-filter: blur(4px);
+          `;
+          
+          const modalContent = document.createElement('div');
+          modalContent.style.cssText = `
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 0;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            overflow: hidden;
+            position: relative;
+          `;
+          
+          // Add CSS animation
+          const style = document.createElement('style');
+          style.textContent = `
+            @keyframes modalSlideIn {
+              from { 
+                opacity: 0; 
+                transform: translateY(-30px) scale(0.9) rotateX(10deg); 
+              }
+              to { 
+                opacity: 1; 
+                transform: translateY(0) scale(1) rotateX(0deg); 
+              }
+            }
+            @keyframes pulse {
+              0%, 100% { transform: scale(1); }
+              50% { transform: scale(1.05); }
+            }
+            @keyframes float {
+              0%, 100% { transform: translateY(0px); }
+              50% { transform: translateY(-10px); }
+            }
+          `;
+          document.head.appendChild(style);
+          
+          modalContent.innerHTML = `
+            <div style="
+              background: rgba(255, 255, 255, 0.1);
+              backdrop-filter: blur(10px);
+              padding: 30px;
+              text-align: center;
+              position: relative;
+            ">
+              <!-- Success Icon with Animation -->
+              <div style="
+                width: 80px;
+                height: 80px;
+                background: linear-gradient(135deg, #10B981, #059669);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 20px;
+                box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+                animation: float 3s ease-in-out infinite;
+                position: relative;
+              ">
+                <div style="
+                  width: 60px;
+                  height: 60px;
+                  background: rgba(255, 255, 255, 0.2);
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  animation: pulse 2s ease-in-out infinite;
+                ">
+                  <span style="color: white; font-size: 32px; font-weight: bold;">✓</span>
+                </div>
+              </div>
+              
+              <!-- Title -->
+              <h2 style="
+                margin: 0 0 10px 0; 
+                color: white; 
+                font-size: 24px; 
+                font-weight: 700;
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+              ">Installation Complete!</h2>
+              
+              <p style="
+                margin: 0 0 25px 0; 
+                color: rgba(255, 255, 255, 0.9); 
+                font-size: 16px;
+                line-height: 1.5;
+              ">Device has been rebooted and is ready to use</p>
+            </div>
+            
+            <!-- Content Section -->
+            <div style="
+              background: white;
+              padding: 25px;
+              border-radius: 0 0 20px 20px;
+            ">
+              <div style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                margin-bottom: 25px;
+              ">
+                <div style="
+                  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+                  border-radius: 12px;
+                  padding: 15px;
+                  text-align: center;
+                  border: 2px solid #e2e8f0;
+                  transition: all 0.3s ease;
+                " onmouseover="this.style.borderColor='#3B82F6'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
+                  <div style="color: #64748B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Channel</div>
+                  <div style="color: #1E293B; font-size: 16px; font-weight: 700;">${data.channel}</div>
+                </div>
+                
+                <div style="
+                  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+                  border-radius: 12px;
+                  padding: 15px;
+                  text-align: center;
+                  border: 2px solid #e2e8f0;
+                  transition: all 0.3s ease;
+                " onmouseover="this.style.borderColor='#3B82F6'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
+                  <div style="color: #64748B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Device</div>
+                  <div style="color: #1E293B; font-size: 16px; font-weight: 700;">${data.deviceName}</div>
+                </div>
+                
+                <div style="
+                  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+                  border-radius: 12px;
+                  padding: 15px;
+                  text-align: center;
+                  border: 2px solid #e2e8f0;
+                  transition: all 0.3s ease;
+                " onmouseover="this.style.borderColor='#3B82F6'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
+                  <div style="color: #64748B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">IP Address</div>
+                  <div style="color: #1E293B; font-size: 16px; font-weight: 700;">${data.deviceIP}</div>
+                </div>
+                
+                <div style="
+                  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+                  border-radius: 12px;
+                  padding: 15px;
+                  text-align: center;
+                  border: 2px solid #bbf7d0;
+                  transition: all 0.3s ease;
+                " onmouseover="this.style.borderColor='#10B981'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#bbf7d0'; this.style.transform='translateY(0)'">
+                  <div style="color: #166534; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Status</div>
+                  <div style="color: #15803d; font-size: 16px; font-weight: 700;">✅ Ready</div>
+                </div>
+              </div>
+              
+              <!-- Action Button -->
+              <div style="text-align: center;">
+                <button id="closeModal" style="
+                  background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+                  color: white;
+                  border: none;
+                  border-radius: 12px;
+                  padding: 12px 30px;
+                  font-size: 16px;
+                  font-weight: 600;
+                  cursor: pointer;
+                  transition: all 0.3s ease;
+                  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                " onmouseover="this.style.background='linear-gradient(135deg, #1D4ED8, #1E40AF)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(59, 130, 246, 0.4)'" onmouseout="this.style.background='linear-gradient(135deg, #3B82F6, #1D4ED8)'; this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(59, 130, 246, 0.3)'">
+                  ✨ Close
+                </button>
+              </div>
+            </div>
+          `;
+          
+          modal.appendChild(modalContent);
+          document.body.appendChild(modal);
+          
+          // Close modal functionality
+          const closeModal = () => {
+            modal.style.animation = 'modalSlideIn 0.3s ease-out reverse';
+            setTimeout(() => {
+              document.body.removeChild(modal);
+              document.head.removeChild(style);
+            }, 300);
+          };
+          
+          modalContent.querySelector('#closeModal').onclick = closeModal;
+          modal.onclick = (e) => {
+            if (e.target === modal) closeModal();
+          };
+          
           setDownloadProgress(null);
         }, 1000);
       } else {
@@ -624,7 +1036,7 @@ const DeviceDetails = () => {
         alert(`❌ Installation failed: ${errorMessage}`);
         setDownloadProgress(null);
       }
-      } catch (err) {
+    } catch (err) {
         console.error('Install network error:', err);
         if (err.name === 'TimeoutError') {
           alert(`❌ Installation timeout: The operation took too long.\n\nThis might be normal for large updates. Please check the device status manually.`);
@@ -636,7 +1048,7 @@ const DeviceDetails = () => {
         setDownloadProgress(null);
       } finally {
         setIsInstalling(false);
-      }
+    }
   };
 
   const handleEditFirewallRule = async (e) => {
