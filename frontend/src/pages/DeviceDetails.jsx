@@ -462,6 +462,11 @@ const DeviceDetails = () => {
     try {
       console.log(`Starting download for channel: ${channel}, device ID: ${id}`);
       
+      // Test basic connectivity first
+      console.log('Testing basic connectivity...');
+      const testResponse = await fetch('/api/mikrotiks/7/update-info');
+      console.log('Test response status:', testResponse.status);
+      
       const response = await fetch(`/api/mikrotiks/${id}/update/download`, {
         method: 'POST',
         headers: {
