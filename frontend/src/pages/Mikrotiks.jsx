@@ -1290,15 +1290,16 @@ const Mikrotiks = () => {
                   margin: 0,
                   padding: 0,
                   border: 'none',
-                  outline: 'none'
+                  outline: 'none',
+                  lineHeight: '1'
                 }}>
                   <svg style={{ 
                     width: '12px', 
                     height: '12px', 
                     color: 'white',
                     display: 'block',
-                    margin: '0 auto',
-                    verticalAlign: 'middle',
+                    margin: '0',
+                    verticalAlign: 'baseline',
                     textAlign: 'center'
                   }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1328,9 +1329,11 @@ const Mikrotiks = () => {
                     outline: 'none',
                     margin: 0,
                     fontFamily: 'system-ui, -apple-system, sans-serif',
-                    lineHeight: '1.5',
-                    verticalAlign: 'middle',
-                    display: 'block'
+                    lineHeight: '1.2',
+                    verticalAlign: 'baseline',
+                    display: 'block',
+                    height: '48px',
+                    boxSizing: 'border-box'
                   }}
                   onFocus={(e) => {
                     e.target.style.borderColor = 'rgba(59, 130, 246, 0.6)';
