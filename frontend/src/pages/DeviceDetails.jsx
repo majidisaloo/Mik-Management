@@ -452,20 +452,21 @@ const DeviceDetails = () => {
     }
   };
 
-  const handleDownloadUpdate = async () => {
+  const handleDownloadUpdate = async (channel = 'stable') => {
     try {
       const response = await fetch(`/api/mikrotiks/${id}/update/download`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ channel })
       });
 
       if (response.ok) {
         const result = await response.json();
         console.log('Update download started:', result);
         await loadSystemLogs();
-        alert('Update download started successfully!');
+        alert(`Update ${channel} download started successfully!`);
       } else {
         const error = await response.json();
         console.error('Error response:', error);
@@ -477,20 +478,21 @@ const DeviceDetails = () => {
     }
   };
 
-  const handleDownloadAndInstallUpdate = async () => {
+  const handleDownloadAndInstallUpdate = async (channel = 'stable') => {
     try {
       const response = await fetch(`/api/mikrotiks/${id}/update/install`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ channel })
       });
 
       if (response.ok) {
         const result = await response.json();
         console.log('Update download and install started:', result);
         await loadSystemLogs();
-        alert('Update download and install started successfully!');
+        alert(`Update ${channel} download and install started successfully!`);
       } else {
         const error = await response.json();
         console.error('Error response:', error);
@@ -2012,8 +2014,8 @@ const DeviceDetails = () => {
                       color: theme === 'dark' ? '#fff' : '#000',
                       fontSize: '14px',
                       fontFamily: 'inherit'
-                    }}>{updateInfo.currentVersion || '7.17.2'}</td>
-                    </tr>
+                    }}>{updateInfo.currentVersion || 'Unknown'}</td>
+                  </tr>
                   <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#eee'}` }}>
                     <td style={{ 
                       padding: '12px', 
@@ -2027,7 +2029,7 @@ const DeviceDetails = () => {
                       color: theme === 'dark' ? '#fff' : '#000',
                       fontSize: '14px',
                       fontFamily: 'inherit'
-                    }}>{updateInfo.latestStable || '7.18.0'}</td>
+                    }}>{updateInfo.latestStable || '7.17.2'}</td>
                   </tr>
                   <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#eee'}` }}>
                     <td style={{ 
@@ -2042,7 +2044,7 @@ const DeviceDetails = () => {
                       color: theme === 'dark' ? '#fff' : '#000',
                       fontSize: '14px',
                       fontFamily: 'inherit'
-                    }}>{updateInfo.latestBeta || '7.19.0-beta'}</td>
+                    }}>{updateInfo.latestBeta || '7.18.0'}</td>
                   </tr>
                   <tr>
                     <td style={{ 
@@ -2064,83 +2066,144 @@ const DeviceDetails = () => {
                         display: 'inline-block'
                       }}>
                         {updateInfo.updateAvailable ? 'Yes' : 'No'}
-                          </span>
-                        </td>
-                      </tr>
+                      </span>
+                    </td>
+                  </tr>
                   </tbody>
                 </table>
               
-              {updateInfo.updateAvailable && (
-                <div style={{ 
-                  marginTop: '20px', 
-                  display: 'flex', 
-                  gap: '12px',
-                  flexWrap: 'wrap'
-                }}>
+              <div style={{ 
+                marginTop: '20px', 
+                display: 'flex', 
+                gap: '12px',
+                flexWrap: 'wrap',
+                alignItems: 'center'
+              }}>
                 <button
-                    onClick={handleDownloadUpdate}
-                    style={{
-                      padding: '12px 24px',
-                      backgroundColor: theme === 'dark' ? '#007acc' : '#0066cc',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      fontFamily: 'inherit',
-                      transition: 'all 0.2s ease',
-                      boxSizing: 'border-box',
-                      margin: 0,
-                      appearance: 'none',
-                      WebkitAppearance: 'none',
-                      MozAppearance: 'none',
-                      outline: 'none'
-                    }}
-                    onMouseOver={(e) => {
-                      e.target.style.backgroundColor = theme === 'dark' ? '#0056b3' : '#0056b3';
-                      e.target.style.transform = 'translateY(-1px)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.target.style.backgroundColor = theme === 'dark' ? '#007acc' : '#0066cc';
-                      e.target.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    📥 Download
-                  </button>
-                  <button
-                    onClick={handleDownloadAndInstallUpdate}
-                    style={{
-                      padding: '12px 24px',
-                      backgroundColor: theme === 'dark' ? '#28a745' : '#28a745',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      fontFamily: 'inherit',
-                      transition: 'all 0.2s ease',
-                      boxSizing: 'border-box',
-                      margin: 0,
-                      appearance: 'none',
-                      WebkitAppearance: 'none',
-                      MozAppearance: 'none',
-                      outline: 'none'
-                    }}
-                    onMouseOver={(e) => {
-                      e.target.style.backgroundColor = '#218838';
-                      e.target.style.transform = 'translateY(-1px)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.target.style.backgroundColor = theme === 'dark' ? '#28a745' : '#28a745';
-                      e.target.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    🚀 Download and Install
+                  onClick={() => handleDownloadUpdate('stable')}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: theme === 'dark' ? '#007acc' : '#0066cc',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    fontFamily: 'inherit',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box',
+                    margin: 0,
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                    outline: 'none'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = theme === 'dark' ? '#0056b3' : '#0056b3';
+                    e.target.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = theme === 'dark' ? '#007acc' : '#0066cc';
+                    e.target.style.transform = 'translateY(0)';
+                  }}
+                >
+                  📥 Download Stable ({updateInfo.latestStable || '7.17.2'})
+                </button>
+                <button
+                  onClick={() => handleDownloadUpdate('beta')}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: theme === 'dark' ? '#6f42c1' : '#6f42c1',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    fontFamily: 'inherit',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box',
+                    margin: 0,
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                    outline: 'none'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = '#5a32a3';
+                    e.target.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = theme === 'dark' ? '#6f42c1' : '#6f42c1';
+                    e.target.style.transform = 'translateY(0)';
+                  }}
+                >
+                  🧪 Download Beta ({updateInfo.latestBeta || '7.18.0'})
+                </button>
+                <button
+                  onClick={() => handleDownloadAndInstallUpdate('stable')}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: theme === 'dark' ? '#28a745' : '#28a745',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    fontFamily: 'inherit',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box',
+                    margin: 0,
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                    outline: 'none'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = '#218838';
+                    e.target.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = theme === 'dark' ? '#28a745' : '#28a745';
+                    e.target.style.transform = 'translateY(0)';
+                  }}
+                >
+                  🚀 Install Stable
+                </button>
+                <button
+                  onClick={() => handleDownloadAndInstallUpdate('beta')}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: theme === 'dark' ? '#fd7e14' : '#fd7e14',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    fontFamily: 'inherit',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box',
+                    margin: 0,
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                    outline: 'none'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = '#e8650e';
+                    e.target.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = theme === 'dark' ? '#fd7e14' : '#fd7e14';
+                    e.target.style.transform = 'translateY(0)';
+                  }}
+                >
+                  ⚡ Install Beta
                 </button>
               </div>
-            )}
           </div>
           )}
       </div>

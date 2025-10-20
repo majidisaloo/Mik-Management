@@ -5707,23 +5707,115 @@ async function getMikrotikUpdateInfo(deviceId) {
       throw new Error('Device not found');
     }
 
-    // Mock update information
-    const mockUpdateInfo = {
-      currentVersion: device.routeros?.version || device.routeros?.firmwareVersion || '7.12.1',
-      stableVersion: '7.17.2',
-      betaVersion: '7.18.0',
-      hasUpdate: true,
+    const host = device.host;
+    const routerosBaseline = device.routeros || defaultRouterosOptions();
+    
+    console.log(`Fetching update info for device ${deviceId} (${host})`);
+
+    // Get current firmware version from device
+    let currentVersion = routerosBaseline.firmwareVersion || 'Unknown';
+    let latestStable = '7.17.2'; // Default fallback
+    let latestBeta = '7.18.0'; // Default fallback
+    let updateAvailable = false;
+
+    // Try to get real firmware version from Mikrotik
+    if (routerosBaseline.apiEnabled) {
+      try {
+        const connectionMethods = [
+          { protocol: 'http', port: 80 },
+          { protocol: 'https', port: 443 },
+          { protocol: 'http', port: 8080 },
+          { protocol: 'https', port: 8443 }
+        ];
+
+        for (const method of connectionMethods) {
+          try {
+            const apiUrl = `${method.protocol}://${host}:${method.port}/rest/system/resource`;
+            console.log(`Trying to fetch firmware version from: ${apiUrl}`);
+            
+            const response = await fetch(apiUrl, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Basic ${Buffer.from(`${routerosBaseline.apiUsername || 'admin'}:${routerosBaseline.apiPassword || ''}`).toString('base64')}`
+              },
+              rejectUnauthorized: false,
+              timeout: 10000
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              const version = data[0]?.version || data?.version;
+              if (version) {
+                currentVersion = version;
+                console.log(`✅ Current firmware version detected: ${currentVersion}`);
+                break;
+              }
+            }
+          } catch (error) {
+            console.log(`❌ Failed to fetch from ${method.protocol}:${method.port}: ${error.message}`);
+          }
+        }
+      } catch (error) {
+        console.log(`❌ API method failed: ${error.message}`);
+      }
+    }
+
+    // Try SSH method if API failed
+    if (currentVersion === 'Unknown' && routerosBaseline.sshEnabled) {
+      try {
+        console.log(`Trying SSH method to get firmware version...`);
+        const { exec } = await import('child_process');
+        
+        const sshCommand = `sshpass -p "${routerosBaseline.sshPassword}" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${routerosBaseline.sshUsername}@${host} "/system resource print"`;
+        
+        const result = await new Promise((resolve, reject) => {
+          exec(sshCommand, { timeout: 15000 }, (error, stdout, stderr) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve({ stdout, stderr });
+            }
+          });
+        });
+
+        if (result.stdout) {
+          // Parse RouterOS output to extract version
+          const versionMatch = result.stdout.match(/version:\s*([^\s\n]+)/i);
+          if (versionMatch) {
+            currentVersion = versionMatch[1];
+            console.log(`✅ Current firmware version detected via SSH: ${currentVersion}`);
+          }
+        }
+      } catch (error) {
+        console.log(`❌ SSH method failed: ${error.message}`);
+      }
+    }
+
+    // Get latest available versions (in real implementation, this would fetch from Mikrotik's update server)
+    // For now, we'll use realistic version numbers
+    const versionComparison = compareRouterosVersions(currentVersion, latestStable);
+    
+    if (versionComparison < 0) {
+      // Current version is older than stable
+      updateAvailable = true;
+    }
+
+    const updateInfo = {
+      currentVersion: currentVersion,
+      latestStable: latestStable,
+      latestBeta: latestBeta,
+      updateAvailable: updateAvailable,
       lastChecked: new Date().toISOString(),
-      updateChannel: 'stable'
+      updateChannel: 'stable',
+      source: currentVersion !== 'Unknown' ? 'device' : 'fallback'
     };
 
-    console.log(`Fetching update info for device ${deviceId}`);
-    console.log('SSH fallback returning mock update info');
+    console.log(`Update info for device ${deviceId}:`, updateInfo);
     
     return {
       success: true,
-      ...mockUpdateInfo,
-      source: 'ssh-fallback'
+      ...updateInfo
     };
   } catch (error) {
     console.error('Error fetching update info:', error);
