@@ -33,6 +33,8 @@ const DeviceDetails = () => {
   const [logsTotalPages, setLogsTotalPages] = useState(1);
   const [logsSearch, setLogsSearch] = useState('');
   const [logsSource, setLogsSource] = useState('unknown');
+  const [sortColumn, setSortColumn] = useState(null);
+  const [sortDirection, setSortDirection] = useState('asc');
   
   // Modal states
   const [showAddIpModal, setShowAddIpModal] = useState(false);
@@ -173,11 +175,11 @@ const DeviceDetails = () => {
       setLogsLoading(true);
       setLogsError(null);
       
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: '50',
-        max: '250'
-      });
+          const params = new URLSearchParams({
+            page: page.toString(),
+            limit: '50',
+            max: '50'
+          });
       
       if (search) {
         params.append('search', search);
@@ -1646,12 +1648,15 @@ const DeviceDetails = () => {
                           userSelect: 'none'
                         }}
                         onClick={() => {
-                          // Sort by time
+                          const newDirection = sortColumn === 'time' && sortDirection === 'asc' ? 'desc' : 'asc';
+                          setSortColumn('time');
+                          setSortDirection(newDirection);
+                          
                           const sortedLogs = [...logs].sort((a, b) => {
                             try {
                               const timeA = new Date(a.time).getTime();
                               const timeB = new Date(b.time).getTime();
-                              return timeA - timeB; // Oldest first when clicked
+                              return newDirection === 'asc' ? timeA - timeB : timeB - timeA;
                             } catch (e) {
                               return 0;
                             }
@@ -1659,7 +1664,7 @@ const DeviceDetails = () => {
                           setLogs(sortedLogs);
                         }}
                       >
-                        Time ↕️
+                        Time {sortColumn === 'time' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕️'}
                       </th>
                       <th 
                         style={{ 
@@ -1671,14 +1676,18 @@ const DeviceDetails = () => {
                           userSelect: 'none'
                         }}
                         onClick={() => {
-                          // Sort by level
+                          const newDirection = sortColumn === 'level' && sortDirection === 'asc' ? 'desc' : 'asc';
+                          setSortColumn('level');
+                          setSortDirection(newDirection);
+                          
                           const sortedLogs = [...logs].sort((a, b) => {
-                            return a.level.localeCompare(b.level);
+                            const result = a.level.localeCompare(b.level);
+                            return newDirection === 'asc' ? result : -result;
                           });
                           setLogs(sortedLogs);
                         }}
                       >
-                        Level ↕️
+                        Level {sortColumn === 'level' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕️'}
                       </th>
                       <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Topics</th>
                       <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Message</th>
