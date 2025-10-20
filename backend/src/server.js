@@ -2946,15 +2946,17 @@ const bootstrap = async () => {
         // Step 2: Execute restart command
         console.log(`🔄 Step 2/3: Initiating reboot sequence...`);
         try {
-          const restartCommand = `sshpass -p "${device.password}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@${device.ip} "/system reboot"`;
+          const restartCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system reboot"`;
           const { exec } = await import('child_process');
           const { promisify } = await import('util');
           const execAsync = promisify(exec);
           
+          console.log(`🔄 Executing restart command: ${restartCommand.replace(devicePassword, '***')}`);
+          
           // Execute restart command (this will disconnect SSH)
-          execAsync(restartCommand, { timeout: 10000 }).catch(() => {
+          execAsync(restartCommand, { timeout: 10000 }).catch((error) => {
             // Expected to fail as device will disconnect
-            console.log(`✅ Restart command sent successfully`);
+            console.log(`✅ Restart command sent successfully (disconnect expected)`);
           });
           
           console.log(`✅ Restart command executed`);
@@ -2962,13 +2964,15 @@ const bootstrap = async () => {
           console.log(`⚠️ SSH restart failed, trying alternative method...`);
           // Fallback: try with different SSH options
           try {
-            const fallbackCommand = `sshpass -p "${device.password}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o ServerAliveInterval=1 admin@${device.ip} "/system reboot"`;
+            const fallbackCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o ServerAliveInterval=1 ${sshUsername}@${deviceIP} "/system reboot"`;
             const { exec } = await import('child_process');
             const { promisify } = await import('util');
             const execAsync = promisify(exec);
             
-            execAsync(fallbackCommand, { timeout: 8000 }).catch(() => {
-              console.log(`✅ Fallback restart command sent`);
+            console.log(`🔄 Executing fallback restart command: ${fallbackCommand.replace(devicePassword, '***')}`);
+            
+            execAsync(fallbackCommand, { timeout: 8000 }).catch((error) => {
+              console.log(`✅ Fallback restart command sent (disconnect expected)`);
             });
           } catch (fallbackError) {
             console.log(`❌ All restart methods failed: ${fallbackError.message}`);
@@ -3016,45 +3020,55 @@ const bootstrap = async () => {
         
         console.log(`🔍 Device found: ${device.name} (${deviceIP})`);
         
-        // Get current firmware version via SSH
+        // Get current firmware version and system info via SSH (parallel execution for speed)
         let currentVersion = 'Unknown';
-        try {
-          const versionCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system resource print"`;
-          const { exec } = await import('child_process');
-          const { promisify } = await import('util');
-          const execAsync = promisify(exec);
-          
-          const { stdout } = await execAsync(versionCommand, { timeout: 15000 });
-          console.log(`🔍 SSH output: ${stdout}`);
-          
-          // Parse version from output
-          const versionMatch = stdout.match(/version:\s*(\d+\.\d+\.\d+)/i);
-          if (versionMatch) {
-            currentVersion = versionMatch[1];
-            console.log(`✅ Current version detected: ${currentVersion}`);
-          }
-        } catch (sshError) {
-          console.log(`⚠️ Could not get version via SSH: ${sshError.message}`);
-        }
-
-        // Get system info
         let systemInfo = {};
+        
         try {
-          const systemCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system identity print"`;
+          // Execute both commands in parallel for faster response
+          const versionCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ${sshUsername}@${deviceIP} "/system resource print"`;
+          const systemCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ${sshUsername}@${deviceIP} "/system identity print"`;
+          
           const { exec } = await import('child_process');
           const { promisify } = await import('util');
           const execAsync = promisify(exec);
           
-          const { stdout } = await execAsync(systemCommand, { timeout: 15000 });
-          console.log(`🔍 System info: ${stdout}`);
+          // Execute both commands in parallel
+          const [versionResult, systemResult] = await Promise.allSettled([
+            execAsync(versionCommand, { timeout: 8000 }),
+            execAsync(systemCommand, { timeout: 8000 })
+          ]);
           
-          // Parse system info
-          const nameMatch = stdout.match(/name:\s*(.+)/i);
-          if (nameMatch) {
-            systemInfo.name = nameMatch[1].trim();
+          // Process version result
+          if (versionResult.status === 'fulfilled') {
+            const stdout = versionResult.value.stdout;
+            console.log(`🔍 SSH version output: ${stdout}`);
+            
+            // Parse version from output
+            const versionMatch = stdout.match(/version:\s*(\d+\.\d+\.\d+)/i);
+            if (versionMatch) {
+              currentVersion = versionMatch[1];
+              console.log(`✅ Current version detected: ${currentVersion}`);
+            }
+          } else {
+            console.log(`⚠️ Could not get version via SSH: ${versionResult.reason.message}`);
           }
-        } catch (systemError) {
-          console.log(`⚠️ Could not get system info via SSH: ${systemError.message}`);
+          
+          // Process system info result
+          if (systemResult.status === 'fulfilled') {
+            const stdout = systemResult.value.stdout;
+            console.log(`🔍 SSH system info: ${stdout}`);
+            
+            // Parse system info
+            const nameMatch = stdout.match(/name:\s*(.+)/i);
+            if (nameMatch) {
+              systemInfo.name = nameMatch[1].trim();
+            }
+          } else {
+            console.log(`⚠️ Could not get system info via SSH: ${systemResult.reason.message}`);
+          }
+        } catch (error) {
+          console.log(`⚠️ SSH diagnostic failed: ${error.message}`);
         }
         
         sendJson(res, 200, {

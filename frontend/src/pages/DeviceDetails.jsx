@@ -1161,7 +1161,218 @@ const DeviceDetails = () => {
 
         if (response.ok) {
           const result = await response.json();
-          alert(`✅ ${result.message}\n\nDevice: ${result.deviceName}\nIP: ${result.deviceIP}\n\nPlease wait 1-2 minutes for the device to come back online.`);
+          
+          // Create beautiful restart modal instead of simple alert
+          const modal = document.createElement('div');
+          modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            backdrop-filter: blur(4px);
+          `;
+          
+          const modalContent = document.createElement('div');
+          modalContent.style.cssText = `
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            border-radius: 20px;
+            padding: 0;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            overflow: hidden;
+            position: relative;
+          `;
+          
+          // Add CSS animation
+          const style = document.createElement('style');
+          style.textContent = `
+            @keyframes modalSlideIn {
+              from { 
+                opacity: 0; 
+                transform: translateY(-30px) scale(0.9) rotateX(10deg); 
+              }
+              to { 
+                opacity: 1; 
+                transform: translateY(0) scale(1) rotateX(0deg); 
+              }
+            }
+            @keyframes pulse {
+              0%, 100% { transform: scale(1); }
+              50% { transform: scale(1.05); }
+            }
+            @keyframes float {
+              0%, 100% { transform: translateY(0px); }
+              50% { transform: translateY(-10px); }
+            }
+            @keyframes spin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
+          `;
+          document.head.appendChild(style);
+          
+          modalContent.innerHTML = `
+            <div style="
+              background: rgba(255, 255, 255, 0.1);
+              backdrop-filter: blur(10px);
+              padding: 30px;
+              text-align: center;
+              position: relative;
+            ">
+              <!-- Restart Icon with Animation -->
+              <div style="
+                width: 80px;
+                height: 80px;
+                background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 20px;
+                box-shadow: 0 10px 25px rgba(255, 107, 107, 0.3);
+                animation: float 3s ease-in-out infinite;
+                position: relative;
+              ">
+                <div style="
+                  width: 60px;
+                  height: 60px;
+                  background: rgba(255, 255, 255, 0.2);
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  animation: pulse 2s ease-in-out infinite;
+                ">
+                  <span style="color: white; font-size: 32px; font-weight: bold; animation: spin 2s linear infinite;">🔄</span>
+                </div>
+              </div>
+              
+              <!-- Title -->
+              <h2 style="
+                margin: 0 0 10px 0; 
+                color: white; 
+                font-size: 24px; 
+                font-weight: 700;
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+              ">Device Restarting!</h2>
+              
+              <p style="
+                margin: 0 0 25px 0; 
+                color: rgba(255, 255, 255, 0.9); 
+                font-size: 16px;
+                line-height: 1.5;
+              ">Please wait 1-2 minutes for the device to come back online</p>
+            </div>
+            
+            <!-- Content Section -->
+            <div style="
+              background: white;
+              padding: 25px;
+              border-radius: 0 0 20px 20px;
+            ">
+              <div style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                margin-bottom: 25px;
+              ">
+                <div style="
+                  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+                  border-radius: 12px;
+                  padding: 15px;
+                  text-align: center;
+                  border: 2px solid #e2e8f0;
+                  transition: all 0.3s ease;
+                " onmouseover="this.style.borderColor='#ff6b6b'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
+                  <div style="color: #64748B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Device</div>
+                  <div style="color: #1E293B; font-size: 16px; font-weight: 700;">${result.deviceName}</div>
+                </div>
+                
+                <div style="
+                  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+                  border-radius: 12px;
+                  padding: 15px;
+                  text-align: center;
+                  border: 2px solid #e2e8f0;
+                  transition: all 0.3s ease;
+                " onmouseover="this.style.borderColor='#ff6b6b'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
+                  <div style="color: #64748B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">IP Address</div>
+                  <div style="color: #1E293B; font-size: 16px; font-weight: 700;">${result.deviceIP}</div>
+                </div>
+                
+                <div style="
+                  background: linear-gradient(135deg, #fef3c7, #fde68a);
+                  border-radius: 12px;
+                  padding: 15px;
+                  text-align: center;
+                  border: 2px solid #f59e0b;
+                  transition: all 0.3s ease;
+                " onmouseover="this.style.borderColor='#D97706'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#f59e0b'; this.style.transform='translateY(0)'">
+                  <div style="color: #92400E; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Status</div>
+                  <div style="color: #B45309; font-size: 16px; font-weight: 700;">🔄 Restarting</div>
+                </div>
+                
+                <div style="
+                  background: linear-gradient(135deg, #fef3c7, #fde68a);
+                  border-radius: 12px;
+                  padding: 15px;
+                  text-align: center;
+                  border: 2px solid #f59e0b;
+                  transition: all 0.3s ease;
+                " onmouseover="this.style.borderColor='#D97706'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#f59e0b'; this.style.transform='translateY(0)'">
+                  <div style="color: #92400E; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">ETA</div>
+                  <div style="color: #B45309; font-size: 16px; font-weight: 700;">1-2 min</div>
+                </div>
+              </div>
+              
+              <!-- Action Button -->
+              <div style="text-align: center;">
+                <button id="closeModal" style="
+                  background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+                  color: white;
+                  border: none;
+                  border-radius: 12px;
+                  padding: 12px 30px;
+                  font-size: 16px;
+                  font-weight: 600;
+                  cursor: pointer;
+                  transition: all 0.3s ease;
+                  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                " onmouseover="this.style.background='linear-gradient(135deg, #ee5a24, #d63031)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(255, 107, 107, 0.4)'" onmouseout="this.style.background='linear-gradient(135deg, #ff6b6b, #ee5a24)'; this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(255, 107, 107, 0.3)'">
+                  ✨ Close
+                </button>
+              </div>
+            </div>
+          `;
+          
+          modal.appendChild(modalContent);
+          document.body.appendChild(modal);
+          
+          // Close modal functionality
+          const closeModal = () => {
+            modal.style.animation = 'modalSlideIn 0.3s ease-out reverse';
+            setTimeout(() => {
+              document.body.removeChild(modal);
+              document.head.removeChild(style);
+            }, 300);
+          };
+          
+          modalContent.querySelector('#closeModal').onclick = closeModal;
+          modal.onclick = (e) => {
+            if (e.target === modal) closeModal();
+          };
+          
           await loadSystemLogs();
         } else {
           const error = await response.json();
