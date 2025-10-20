@@ -2969,17 +2969,17 @@ const bootstrap = async () => {
           console.log(`⚠️ Could not save config via SSH, continuing with restart...`);
         }
 
-        // Step 2: Execute simple restart command
+        // Step 2: Execute restart command with confirmation
         console.log(`🔄 Step 2/3: Initiating reboot sequence...`);
         try {
-          // Simple restart command - just like winbox
-          const restartCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ${sshUsername}@${deviceIP} "/system reboot"`;
+          // Restart command with automatic confirmation
+          const restartCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "echo 'y' | /system reboot"`;
           const { exec } = await import('child_process');
           
-          console.log(`🔄 Executing restart command: ${restartCommand.replace(devicePassword, '***')}`);
+          console.log(`🔄 Executing restart command with confirmation: ${restartCommand.replace(devicePassword, '***')}`);
           
           // Execute restart command (this will disconnect SSH)
-          exec(restartCommand, { timeout: 5000 }, (error, stdout, stderr) => {
+          exec(restartCommand, { timeout: 10000 }, (error, stdout, stderr) => {
             if (error) {
               console.log(`✅ Restart command sent (disconnect expected): ${error.message}`);
             } else {
