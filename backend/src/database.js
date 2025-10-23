@@ -132,6 +132,24 @@ const normalizeOptionalText = (value) => {
   return value.trim();
 };
 
+const normalizeUrl = (value, fallback = '') => {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return fallback;
+  }
+
+  // Ensure URL has protocol
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    return `https://${trimmed}`;
+  }
+
+  return trimmed;
+};
+
 const normalizeBoolean = (value, fallback = false) => {
   if (typeof value === 'boolean') {
     return value;
@@ -146,6 +164,66 @@ const normalizeBoolean = (value, fallback = false) => {
   }
 
   return fallback;
+};
+
+const allowedIpamStatuses = new Set(['connected', 'failed', 'unknown']);
+
+const sanitizeIpamCollections = (collections = {}) => {
+  return {
+    sections: Array.isArray(collections.sections) ? collections.sections : [],
+    datacenters: Array.isArray(collections.datacenters) ? collections.datacenters : [],
+    ranges: Array.isArray(collections.ranges) ? collections.ranges.map(range => ({
+      ...range,
+      ips: Array.isArray(range.ips) ? range.ips : []
+    })) : []
+  };
+};
+
+const sanitizeIpamRecord = (ipam, { identifier, timestamp }) => {
+  return {
+    id: identifier,
+    name: normalizeText(ipam.name ?? ''),
+    baseUrl: normalizeUrl(ipam.baseUrl ?? ''),
+    appId: normalizeText(ipam.appId ?? ''),
+    appCode: normalizeOptionalText(ipam.appCode ?? ''),
+    appPermissions: normalizeText(ipam.appPermissions ?? 'Read', 'Read'),
+    appSecurity: normalizeText(ipam.appSecurity ?? 'SSL with App code token', 'SSL with App code token'),
+    status: normalizeText(ipam.status ?? 'unknown', 'unknown'),
+    checkedAt: normalizeIsoDate(ipam.checkedAt ?? timestamp),
+    lastSyncAt: normalizeIsoDate(ipam.lastSyncAt ?? timestamp),
+    collections: sanitizeIpamCollections(ipam.collections ?? {}),
+    createdAt: normalizeIsoDate(ipam.createdAt ?? timestamp),
+    updatedAt: normalizeIsoDate(ipam.updatedAt ?? timestamp)
+  };
+};
+
+const presentIpamForClient = (ipam) => {
+  if (!ipam) {
+    return null;
+  }
+  
+  return {
+    id: ipam.id,
+    name: ipam.name,
+    baseUrl: ipam.baseUrl,
+    appId: ipam.appId,
+    appPermissions: ipam.appPermissions,
+    appSecurity: ipam.appSecurity,
+    status: ipam.lastStatus || ipam.status || 'unknown',
+    checkedAt: ipam.checkedAt,
+    lastSyncAt: ipam.lastSyncAt,
+    createdAt: ipam.createdAt,
+    updatedAt: ipam.updatedAt,
+    collections: ipam.collections ? {
+      sections: ipam.collections.sections?.length || 0,
+      datacenters: ipam.collections.datacenters?.length || 0,
+      ranges: ipam.collections.ranges?.length || 0
+    } : {
+      sections: 0,
+      datacenters: 0,
+      ranges: 0
+    }
+  };
 };
 
 const clampNumber = (value, { min, max, fallback }) => {
@@ -2451,7 +2529,7 @@ const initializeDatabase = async (databasePath) => {
       return { success: true };
     },
 
-    async updateIpamStatus(id, { status, checkedAt }) {
+    async updateIpamStatus(id, { status, checkedAt, syncedAt }) {
       const state = await load();
       const index = state.ipams.findIndex((ipam) => ipam.id === id);
 
@@ -2464,11 +2542,13 @@ const initializeDatabase = async (databasePath) => {
       const loweredStatus = (status || '').toLowerCase();
       const normalizedStatus = allowedIpamStatuses.has(loweredStatus) ? loweredStatus : 'unknown';
       const normalizedCheckedAt = checkedAt ? normalizeIsoDate(checkedAt) ?? timestamp : timestamp;
+      const normalizedSyncedAt = syncedAt ? normalizeIsoDate(syncedAt) ?? timestamp : ipam.lastSyncAt;
 
       state.ipams[index] = {
         ...ipam,
         lastStatus: normalizedStatus,
         lastCheckedAt: normalizedCheckedAt,
+        lastSyncAt: normalizedSyncedAt,
         updatedAt: timestamp
       };
 
@@ -2477,6 +2557,41 @@ const initializeDatabase = async (databasePath) => {
       return { success: true, ipam: presentIpamForClient(state.ipams[index]) };
     },
 
+    async updateIpam(id, { name, baseUrl, appId, appCode, appPermissions, appSecurity }) {
+      const state = await load();
+      const index = state.ipams.findIndex((ipam) => ipam.id === id);
+
+      if (index === -1) {
+        return { success: false, reason: 'not-found' };
+      }
+
+      if (!name || !baseUrl || !appId) {
+        return { success: false, reason: 'name-required' };
+      }
+
+      const timestamp = new Date().toISOString();
+      const normalizedName = normalizeText(name);
+      const normalizedBaseUrl = normalizeUrl(baseUrl);
+      const normalizedAppId = normalizeText(appId);
+      const normalizedAppCode = normalizeOptionalText(appCode);
+      const normalizedAppPermissions = normalizeText(appPermissions ?? 'Read', 'Read');
+      const normalizedAppSecurity = normalizeText(appSecurity ?? 'SSL with App code token', 'SSL with App code token');
+
+      state.ipams[index] = {
+        ...state.ipams[index],
+        name: normalizedName,
+        baseUrl: normalizedBaseUrl,
+        appId: normalizedAppId,
+        appCode: normalizedAppCode,
+        appPermissions: normalizedAppPermissions,
+        appSecurity: normalizedAppSecurity,
+        updatedAt: timestamp
+      };
+
+      await persist(state);
+
+      return { success: true, ipam: presentIpamForClient(state.ipams[index]) };
+    },
     async replaceIpamCollections(id, collections) {
       const state = await load();
       const index = state.ipams.findIndex((ipam) => ipam.id === id);
@@ -2500,12 +2615,7 @@ const initializeDatabase = async (databasePath) => {
       return { success: true, ipam: presentIpamForClient(state.ipams[index]) };
     },
 
-    async listIpams() {
-      const state = await load();
-      return state.ipams.map((ipam) => presentIpamForClient(ipam));
-    },
-
-    async createIpam({ name, baseUrl, appId, appCode, appPermissions, appSecurity }) {
+    async createMikrotik({ name, host, groupId, tags, notes, routeros, status, connectivity }) {
       const state = await load();
 
       const normalizedName = normalizeText(name);
@@ -2585,32 +2695,6 @@ const initializeDatabase = async (databasePath) => {
       await persist(state);
 
       return { success: true };
-    },
-
-    async updateIpamStatus(id, { status, checkedAt }) {
-      const state = await load();
-      const index = state.ipams.findIndex((ipam) => ipam.id === id);
-
-      if (index === -1) {
-        return { success: false, reason: 'not-found' };
-      }
-
-      const ipam = state.ipams[index];
-      const timestamp = new Date().toISOString();
-      const loweredStatus = (status || '').toLowerCase();
-      const normalizedStatus = allowedIpamStatuses.has(loweredStatus) ? loweredStatus : 'unknown';
-      const normalizedCheckedAt = checkedAt ? normalizeIsoDate(checkedAt) ?? timestamp : timestamp;
-
-      state.ipams[index] = {
-        ...ipam,
-        lastStatus: normalizedStatus,
-        lastCheckedAt: normalizedCheckedAt,
-        updatedAt: timestamp
-      };
-
-      await persist(state);
-
-      return { success: true, ipam: presentIpamForClient(state.ipams[index]) };
     },
 
     async replaceIpamCollections(id, collections) {
@@ -2918,107 +3002,177 @@ const initializeDatabase = async (databasePath) => {
       if (routerosBaseline.sshEnabled) {
         console.log(`All HTTP/HTTPS methods failed, trying SSH fallback for interfaces...`);
         try {
-          // For now, return mock data since SSH command execution is complex
-          // In a real implementation, you would use SSH to execute RouterOS commands
-          const mockInterfaces = [
-            {
-              name: 'ether1',
-              type: 'ether',
-              macAddress: '00:11:22:33:44:55',
-              arp: 'enabled',
-              mtu: '1500',
-              comment: 'WAN Interface',
-              disabled: false,
-              running: true
-            },
-            {
-              name: 'ether2',
-              type: 'ether',
-              macAddress: '00:11:22:33:44:56',
-              arp: 'enabled',
-              mtu: '1500',
-              comment: 'Main WAN Interface',
-              disabled: false,
-              running: true
-            },
-            {
-              name: 'Eoip-Shatel-Majid-Asiatech-owa',
-              type: 'eoip',
-              macAddress: '00:11:22:33:44:57',
-              arp: 'enabled',
-              mtu: '1500',
-              comment: 'Shatel EoIP Tunnel',
-              disabled: false,
-              running: true
-            },
-            {
-              name: 'EoipV6-Majid',
-              type: 'eoipv6',
-              macAddress: '00:11:22:33:44:58',
-              arp: 'enabled',
-              mtu: '1500',
-              comment: 'IPv6 EoIP Tunnel',
-              disabled: false,
-              running: true
-            },
-            {
-              name: 'GreV6-Majid',
-              type: 'grev6',
-              macAddress: '00:11:22:33:44:59',
-              arp: 'enabled',
-              mtu: '1500',
-              comment: 'IPv6 GRE Tunnel',
-              disabled: false,
-              running: true
-            },
-            {
-              name: 'ipipv6-tunnel1',
-              type: 'ipipv6',
-              macAddress: '00:11:22:33:44:60',
-              arp: 'enabled',
-              mtu: '1500',
-              comment: 'IPv6 IPIP Tunnel',
-              disabled: false,
-              running: true
-            },
-            {
-              name: 'Eoip-Majid-Tehran',
-              type: 'eoip',
-              macAddress: '00:11:22:33:44:61',
-              arp: 'enabled',
-              mtu: '1500',
-              comment: 'Tehran EoIP Tunnel',
-              disabled: false,
-              running: true
-            },
-            {
-              name: 'Eoip_Majid.Mashayekhi_72.212',
-              type: 'eoip',
-              macAddress: '00:11:22:33:44:62',
-              arp: 'enabled',
-              mtu: '1500',
-              comment: 'Mashayekhi EoIP Tunnel',
-              disabled: false,
-              running: true
-            },
-            {
-              name: 'To-HallgheDare',
-              type: 'gre',
-              macAddress: '00:11:22:33:44:63',
-              arp: 'enabled',
-              mtu: '1500',
-              comment: 'HallgheDare Tunnel',
-              disabled: false,
-              running: true
-            }
-          ];
+          // Use Python SSH client to get real interfaces
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
           
-          console.log(`SSH fallback returning mock interfaces data`);
+          // Get interface list first
+          const sshCommand = `python3 ssh_client.py ${host} ${routerosBaseline.sshUsername || 'admin'} "${routerosBaseline.sshPassword}" "/interface print"`;
+          const result = await execAsync(sshCommand, { timeout: 15000 });
+          const sshData = JSON.parse(result.stdout);
+          
+          // Get interface stats for TX/RX data
+          const statsCommand = `python3 ssh_client.py ${host} ${routerosBaseline.sshUsername || 'admin'} "${routerosBaseline.sshPassword}" "/interface print stats"`;
+          const statsResult = await execAsync(statsCommand, { timeout: 15000 });
+          const statsData = JSON.parse(statsResult.stdout);
+          
+          if (sshData.success && statsData.success) {
+            // Parse RouterOS interface output
+            const lines = sshData.output.split('\n');
+            const statsLines = statsData.output.split('\n');
+            const interfaces = [];
+            let inDataSection = false;
+            
+            // Parse stats data first
+            const statsMap = new Map();
+            let inStatsSection = false;
+            for (const line of statsLines) {
+              if (line.includes('Columns: NAME, RX-BYTE')) {
+                inStatsSection = true;
+                continue;
+              }
+              if (inStatsSection && line.trim() && !line.includes('Flags:') && !line.includes('Columns:')) {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length >= 6) {
+                  if (parts[0] === '#') continue;
+                  
+                  let name, rxBytes, txBytes, rxPackets, txPackets;
+                  if (parts[0].match(/^\d+$/)) {
+                    if (parts[1] === 'R') {
+                      name = parts[2];
+                      rxBytes = parts[3];
+                      txBytes = parts[4];
+                      rxPackets = parts[5];
+                      txPackets = parts[6];
+                    } else {
+                      name = parts[1];
+                      rxBytes = parts[2];
+                      txBytes = parts[3];
+                      rxPackets = parts[4];
+                      txPackets = parts[5];
+                    }
+                  } else {
+                    name = parts[0];
+                    rxBytes = parts[1];
+                    txBytes = parts[2];
+                    rxPackets = parts[3];
+                    txPackets = parts[4];
+                  }
+                  
+                  if (name && name !== 'NAME') {
+                    statsMap.set(name, {
+                      rxBytes: parseInt((rxBytes || '0').replace(/\s/g, '')) || 0,
+                      txBytes: parseInt((txBytes || '0').replace(/\s/g, '')) || 0,
+                      rxPackets: parseInt((rxPackets || '0').replace(/\s/g, '')) || 0,
+                      txPackets: parseInt((txPackets || '0').replace(/\s/g, '')) || 0
+                    });
+                  }
+                }
+              }
+            }
+            
+            for (const line of lines) {
+              if (line.includes('Columns: NAME, TYPE')) {
+                inDataSection = true;
+                continue;
+              }
+              if (inDataSection && line.trim() && !line.includes('Flags:') && !line.includes('Columns:')) {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length >= 4) {
+                  // Skip header lines
+                  if (parts[0] === '#' || parts[1] === 'NAME' || parts[2] === 'TYPE') {
+                    continue;
+                  }
+                  
+                  // Parse RouterOS format: "0 R ether2 ether 1500 9014" or "0 X ether2 ether 1500 9014"
+                  let name, type, running = false, disabled = false;
+                  
+                  if (parts[0].match(/^\d+$/)) {
+                    // Format: "0 R ether2 ether 1500 9014" or "1 eoip-name eoip 1458 65535" or "0 X ether2 ether 1500 9014"
+                    if (parts[1] === 'R') {
+                      running = true;
+                      disabled = false;
+                      name = parts[2];
+                      type = parts[3];
+                    } else if (parts[1] === 'X') {
+                      running = false;
+                      disabled = true;
+                      name = parts[2];
+                      type = parts[3];
+                    } else {
+                      running = false;
+                      disabled = false;
+                      name = parts[1];
+                      type = parts[2];
+                    }
+                  } else if (parts[0] === 'R') {
+                    // Format: "R ether2 ether 1500 9014" (no number, starts with R)
+                    running = true;
+                    disabled = false;
+                    name = parts[1];
+                    type = parts[2];
+                  } else if (parts[0] === 'X') {
+                    // Format: "X ether2 ether 1500 9014" (no number, starts with X)
+                    running = false;
+                    disabled = true;
+                    name = parts[1];
+                    type = parts[2];
+                  } else {
+                    // Format: "eoip-name eoip 1458 65535" (no number, no R flag)
+                    running = false;
+                    disabled = false;
+                    name = parts[0];
+                    type = parts[1];
+                  }
+                  
+                  // Skip if name or type is invalid
+                  if (!name || !type || name === 'NAME' || type === 'TYPE' || name.length < 2) {
+                    continue;
+                  }
+                  
+                  // Get stats for this interface
+                  const stats = statsMap.get(name) || { rxBytes: 0, txBytes: 0, rxPackets: 0, txPackets: 0 };
+                  
+                  interfaces.push({
+                    name: name,
+                    type: type,
+                    macAddress: '00:00:00:00:00:00',
+              arp: 'enabled',
+              mtu: '1500',
+                    comment: '',
+              disabled: disabled,
+                    running: running,
+                    rxBytes: stats.rxBytes,
+                    txBytes: stats.txBytes,
+                    rxPackets: stats.rxPackets,
+                    txPackets: stats.txPackets
+                  });
+                }
+              }
+            }
+            
+            // Sort interfaces: Ethernet and Loopback first, then tunnels
+            interfaces.sort((a, b) => {
+              const aIsPhysical = a.type === 'ether' || a.type === 'loopback';
+              const bIsPhysical = b.type === 'ether' || b.type === 'loopback';
+              
+              if (aIsPhysical && !bIsPhysical) return -1;
+              if (!aIsPhysical && bIsPhysical) return 1;
+              
+              // Within same category, sort by name
+              return a.name.localeCompare(b.name);
+            });
+            
+            console.log(`SSH fallback returning real interfaces data: ${interfaces.length} interfaces found`);
           return { 
             success: true, 
-            interfaces: mockInterfaces,
-            source: 'ssh-fallback'
+              interfaces: interfaces,
+              source: 'ssh-real'
           };
+          } else {
+            throw new Error(sshData.error);
+          }
         } catch (error) {
           console.log(`SSH fallback failed: ${error.message}`);
         }
@@ -3026,6 +3180,7 @@ const initializeDatabase = async (databasePath) => {
 
       return { success: false, reason: 'connection-error', message: 'All connection methods failed' };
     },
+
 
     async getMikrotikIpAddresses(id) {
       const state = await load();
@@ -3039,6 +3194,162 @@ const initializeDatabase = async (databasePath) => {
       
       // Get IP addresses from database first
       const dbIpAddresses = existing.routeros?.ipAddresses || [];
+      const customIpAddresses = existing.customIpAddresses || {};
+      
+      // Try to fetch IPv6 addresses via SSH
+      try {
+        const routerosBaseline = sanitizeRouteros(existing.routeros, defaultRouterosOptions());
+        const host = normalizeOptionalText(existing.host);
+
+        if (routerosBaseline.sshEnabled) {
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+
+          // Fetch IPv4 addresses
+          const ipv4Command = `python3 ssh_client.py ${host} ${routerosBaseline.sshUsername || 'admin'} "${routerosBaseline.sshPassword}" "/ip address print detail"`;
+          const ipv4Result = await execAsync(ipv4Command, { timeout: 15000 });
+          const ipv4Data = JSON.parse(ipv4Result.stdout);
+
+          // Fetch IPv6 addresses
+          const ipv6Command = `python3 ssh_client.py ${host} ${routerosBaseline.sshUsername || 'admin'} "${routerosBaseline.sshPassword}" "/ipv6 address print detail"`;
+          const ipv6Result = await execAsync(ipv6Command, { timeout: 15000 });
+          const ipv6Data = JSON.parse(ipv6Result.stdout);
+
+          let allAddresses = [...dbIpAddresses];
+
+          if (ipv4Data.success) {
+            // Parse IPv4 addresses
+            const lines = ipv4Data.output.split('\n');
+            const ipv4Addresses = [];
+            let currentAddress = null;
+            let currentComment = '';
+
+            let currentRouterosId = null;
+            let currentDisabled = false;
+            
+            for (const line of lines) {
+              // Check for ID line (starts with number)
+              const idMatch = line.match(/^\s*(\d+)\s*([A-Za-z]*)/);
+              if (idMatch) {
+                currentRouterosId = parseInt(idMatch[1]);
+                currentDisabled = idMatch[2].includes('X');
+              }
+              
+              // Check for comment line (starts with ;;;)
+              if (line.includes(';;;')) {
+                // Remove row number, flags, and ;;; prefix to get clean comment
+                currentComment = line.replace(/^\s*\d+\s*[A-Za-z]*\s*;;;\s*/, '').trim();
+              }
+              // Check for address line
+              else if (line.includes('address=')) {
+                const addressMatch = line.match(/address=([^\s]+)/);
+                const networkMatch = line.match(/network=([^\s]+)/);
+                const interfaceMatch = line.match(/interface=([^\s]+)/);
+                
+                if (addressMatch) {
+                  currentAddress = {
+                    address: addressMatch[1],
+                    network: networkMatch ? networkMatch[1] : '',
+                    interface: interfaceMatch ? interfaceMatch[1] : '',
+                    disabled: currentDisabled,
+                    comment: currentComment,
+                    type: 'ipv4',
+                    routerosId: currentRouterosId // Add RouterOS ID for editing
+                  };
+                  ipv4Addresses.push(currentAddress);
+                  currentComment = ''; // Reset comment for next address
+                }
+              }
+              // Check for interface line on separate line
+              else if (currentAddress && line.includes('interface=') && !currentAddress.interface) {
+                const interfaceMatch = line.match(/interface=([^\s]+)/);
+                if (interfaceMatch) {
+                  currentAddress.interface = interfaceMatch[1];
+                }
+              }
+            }
+            allAddresses = [...allAddresses, ...ipv4Addresses];
+          }
+
+          if (ipv6Data.success) {
+            // Parse IPv6 addresses
+            const lines = ipv6Data.output.split('\n');
+            const ipv6Addresses = [];
+            let currentAddress = null;
+            let currentComment = '';
+
+            let currentRouterosId = null;
+            let currentDisabled = false;
+            
+            for (const line of lines) {
+              // Check for ID line (starts with number)
+              const idMatch = line.match(/^\s*(\d+)\s*([A-Za-z]*)/);
+              if (idMatch) {
+                currentRouterosId = parseInt(idMatch[1]);
+                currentDisabled = idMatch[2].includes('X');
+              }
+              
+              // Check for comment line (starts with ;;;)
+              if (line.includes(';;;')) {
+                // Remove row number, flags, and ;;; prefix to get clean comment
+                currentComment = line.replace(/^\s*\d+\s*[A-Za-z]*\s*;;;\s*/, '').trim();
+              }
+              // Check for address line
+              else if (line.includes('address=')) {
+                const addressMatch = line.match(/address=([^\s]+)/);
+                const networkMatch = line.match(/network=([^\s]+)/);
+                const interfaceMatch = line.match(/interface=([^\s]+)/);
+                
+                if (addressMatch) {
+                  currentAddress = {
+                    address: addressMatch[1],
+                    network: networkMatch ? networkMatch[1] : '',
+                    interface: interfaceMatch ? interfaceMatch[1] : '',
+                    disabled: currentDisabled,
+                    comment: currentComment,
+                    type: 'ipv6',
+                    routerosId: currentRouterosId // Add RouterOS ID for editing
+                  };
+                  ipv6Addresses.push(currentAddress);
+                  currentComment = ''; // Reset comment for next address
+                }
+              }
+              // Check for interface line on separate line
+              else if (currentAddress && line.includes('interface=') && !currentAddress.interface) {
+                const interfaceMatch = line.match(/interface=([^\s]+)/);
+                if (interfaceMatch) {
+                  currentAddress.interface = interfaceMatch[1];
+                }
+              }
+            }
+            allAddresses = [...allAddresses, ...ipv6Addresses];
+          }
+            
+          // Merge with custom IP addresses, custom ones override SSH ones
+          const finalAddresses = [...allAddresses];
+          console.log('Merging custom IP addresses:', customIpAddresses);
+          Object.values(customIpAddresses).forEach(customAddr => {
+            const existingIndex = finalAddresses.findIndex(addr => addr.address === customAddr.address);
+            if (existingIndex !== -1) {
+              finalAddresses[existingIndex] = customAddr; // Replace with custom version
+              console.log(`Replaced SSH IP ${customAddr.address} with custom version`);
+            } else {
+              finalAddresses.push(customAddr); // Add if not exists
+              console.log(`Added custom IP ${customAddr.address}`);
+            }
+          });
+
+          return {
+            success: true,
+            message: 'IP addresses fetched successfully.',
+            ipAddresses: finalAddresses,
+            source: 'database+ssh'
+          };
+        }
+      } catch (error) {
+        console.log(`SSH fallback failed for IP addresses: ${error.message}`);
+      }
       
       // If we have IP addresses in database, return them
       if (dbIpAddresses.length > 0) {
@@ -3159,50 +3470,171 @@ const initializeDatabase = async (databasePath) => {
         }
       }
 
-      // SSH fallback with mock data
+      // SSH fallback with real data
       if (routerosBaseline.sshEnabled) {
-        console.log(`SSH fallback returning mock firewall rules data`);
-        const mockFirewallRules = [
-          {
-            chain: 'input',
-            action: 'accept',
-            protocol: 'tcp',
-            dstPort: '22',
-            comment: 'SSH Access',
-            disabled: false
-          },
-          {
-            chain: 'input',
-            action: 'accept',
-            protocol: 'tcp',
-            dstPort: '80,443',
-            comment: 'HTTP/HTTPS Access',
-            disabled: false
-          },
-          {
-            chain: 'forward',
-            action: 'accept',
-            protocol: 'all',
-            comment: 'Allow Forward',
-            disabled: false
-          },
-          {
-            chain: 'input',
-            action: 'drop',
-            protocol: 'all',
-            comment: 'Drop All Other Input',
-            disabled: false
+        try {
+          console.log(`Fetching real firewall rules via SSH for device ${id}`);
+          const host = normalizeOptionalText(device.host);
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+
+          // Get firewall filter rules
+          const sshCommand = `python3 ssh_client.py ${host} ${routerosBaseline.sshUsername || 'admin'} "${routerosBaseline.sshPassword}" "/ip firewall filter print detail"`;
+          console.log(`Executing SSH command: ${sshCommand}`);
+          
+          const result = await execAsync(sshCommand, { timeout: 15000 });
+          const sshResult = JSON.parse(result.stdout);
+          
+          if (!sshResult.success) {
+            throw new Error(`SSH command failed: ${sshResult.error}`);
           }
-        ];
-        
+
+          // Parse firewall rules from SSH output
+          const lines = sshResult.output.split('\n');
+          const firewallRules = [];
+          let currentRule = null;
+          let currentComment = '';
+          let currentRouterosId = null;
+          let currentDisabled = false;
+
+          for (const line of lines) {
+            // Check for ID line (starts with number)
+            const idMatch = line.match(/^\s*(\d+)\s*([A-Za-z]*)/);
+            if (idMatch) {
+              currentRouterosId = parseInt(idMatch[1]);
+              currentDisabled = idMatch[2].includes('X');
+            }
+            
+            // Check for comment line (starts with ;;;)
+            if (line.includes(';;;')) {
+              // Remove row number, flags, and ;;; prefix to get clean comment
+              currentComment = line.replace(/^\s*\d+\s*[A-Za-z]*\s*;;;\s*/, '').trim();
+            }
+            // Check for rule line with chain and action
+            else if (line.includes('chain=') && line.includes('action=')) {
+              const chainMatch = line.match(/chain=([^\s]+)/);
+              const actionMatch = line.match(/action=([^\s]+)/);
+              const protocolMatch = line.match(/protocol=([^\s]+)/);
+              const srcAddressMatch = line.match(/src-address=([^\s]+)/);
+              const dstAddressMatch = line.match(/dst-address=([^\s]+)/);
+              const srcAddressListMatch = line.match(/src-address-list=([^\s]+)/);
+              const dstAddressListMatch = line.match(/dst-address-list=([^\s]+)/);
+              const dstPortMatch = line.match(/dst-port=([^\s]+)/);
+              const srcPortMatch = line.match(/src-port=([^\s]+)/);
+              const inInterfaceMatch = line.match(/in-interface=([^\s]+)/);
+              const outInterfaceMatch = line.match(/out-interface=([^\s]+)/);
+              
+              if (chainMatch && actionMatch) {
+                currentRule = {
+                  chain: chainMatch[1],
+                  action: actionMatch[1],
+                  protocol: protocolMatch ? protocolMatch[1] : '',
+                  srcAddress: srcAddressMatch ? srcAddressMatch[1] : '',
+                  dstAddress: dstAddressMatch ? dstAddressMatch[1] : '',
+                  srcAddressList: srcAddressListMatch ? srcAddressListMatch[1] : '',
+                  dstAddressList: dstAddressListMatch ? dstAddressListMatch[1] : '',
+                  dstPort: dstPortMatch ? dstPortMatch[1] : '',
+                  srcPort: srcPortMatch ? srcPortMatch[1] : '',
+                  inInterface: inInterfaceMatch ? inInterfaceMatch[1] : '',
+                  outInterface: outInterfaceMatch ? outInterfaceMatch[1] : '',
+                  comment: currentComment,
+                  disabled: currentDisabled,
+                  routerosId: currentRouterosId
+                };
+                firewallRules.push(currentRule);
+                currentComment = ''; // Reset comment for next rule
+              }
+            }
+          }
+
+          console.log(`Parsed ${firewallRules.length} firewall rules from SSH`);
         return { 
           success: true, 
-          rules: mockFirewallRules,
-          source: 'ssh-fallback'
-        };
+            rules: firewallRules,
+            source: 'ssh-real'
+          };
+        } catch (error) {
+          console.error('SSH fallback failed:', error);
+          return { 
+            success: false, 
+            reason: 'ssh-error',
+            message: error.message
+          };
+        }
       }
 
       return { success: false, reason: 'connection-error', message: 'All connection methods failed' };
+    },
+
+    async updateMikrotikFirewallRule(deviceId, ruleData) {
+      try {
+        const device = await getMikrotikById(deviceId);
+        if (!device) {
+          return {
+            success: false,
+            reason: 'not-found',
+            message: 'Device not found'
+          };
+        }
+
+        console.log(`Updating firewall rule ${ruleData.routerosId} for device ${deviceId}`);
+        
+        // Check if device has SSH enabled
+        const routerosBaseline = sanitizeRouteros(device.routeros, defaultRouterosOptions());
+        if (!routerosBaseline.sshEnabled) {
+          return {
+            success: false,
+            reason: 'ssh-disabled',
+            message: 'SSH is not enabled for this device'
+          };
+        }
+
+        const host = normalizeOptionalText(device.host);
+        const { exec } = await import('child_process');
+        const { promisify } = await import('util');
+        const execAsync = promisify(exec);
+
+        // Build RouterOS command to update the firewall rule
+        let routerosCommand = `/ip firewall filter set ${ruleData.routerosId}`;
+        
+        if (ruleData.comment !== undefined) {
+          routerosCommand += ` comment="${ruleData.comment}"`;
+        }
+        
+        if (ruleData.disabled !== undefined) {
+          routerosCommand += ruleData.disabled ? ' disabled=yes' : ' disabled=no';
+        }
+
+        // Execute the RouterOS command
+        const sshCommand = `python3 ssh_client.py ${host} ${routerosBaseline.sshUsername || 'admin'} "${routerosBaseline.sshPassword}" "${routerosCommand}"`;
+        console.log(`Executing SSH command: ${sshCommand}`);
+        
+        const result = await execAsync(sshCommand, { timeout: 15000 });
+        const sshResult = JSON.parse(result.stdout);
+        
+        if (!sshResult.success) {
+          throw new Error(`SSH command failed: ${sshResult.error}`);
+        }
+
+        return {
+          success: true,
+          message: 'Firewall rule updated successfully on MikroTik device',
+          rule: {
+            routerosId: ruleData.routerosId,
+            disabled: ruleData.disabled,
+            comment: ruleData.comment,
+            updatedAt: new Date().toISOString()
+          }
+        };
+      } catch (error) {
+        console.error('Error updating firewall rule on MikroTik:', error);
+        return {
+          success: false,
+          reason: 'ssh-error',
+          message: error.message
+        };
+      }
     },
 
     async getMikrotikNatRules(id) {
@@ -4182,7 +4614,211 @@ except Exception as e:
       if (routerosBaseline.sshEnabled) {
         console.log(`All HTTP/HTTPS methods failed, trying SSH fallback for routes...`);
         try {
-          // For now, return mock data since SSH command execution is complex
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+
+          // Fetch IPv4 routes
+          const ipv4Command = `python3 ssh_client.py ${host} ${routerosBaseline.sshUsername || 'admin'} "${routerosBaseline.sshPassword}" "/ip route print detail"`;
+          const ipv4Result = await execAsync(ipv4Command, { timeout: 15000 });
+          const ipv4Data = JSON.parse(ipv4Result.stdout);
+
+          // Fetch IPv6 routes
+          const ipv6Command = `python3 ssh_client.py ${host} ${routerosBaseline.sshUsername || 'admin'} "${routerosBaseline.sshPassword}" "/ipv6 route print detail"`;
+          const ipv6Result = await execAsync(ipv6Command, { timeout: 15000 });
+          const ipv6Data = JSON.parse(ipv6Result.stdout);
+
+          let allRoutes = [];
+
+          if (ipv4Data.success) {
+            // Parse IPv4 routes
+            const lines = ipv4Data.output.split('\n');
+            let currentRoute = null;
+            let currentComment = '';
+            let currentRouterosId = null;
+            let currentDisabled = false;
+            let currentActive = true;
+            let currentFlags = '';
+
+            for (const line of lines) {
+              // Check for ID line (starts with number)
+              const idMatch = line.match(/^\s*(\d+)\s*([A-Za-z]*)/);
+              if (idMatch) {
+                currentRouterosId = parseInt(idMatch[1]);
+                currentFlags = idMatch[2];
+                currentDisabled = idMatch[2].includes('X');
+                currentActive = !idMatch[2].includes('I');
+              }
+              
+              // Check for comment line (starts with ;;;)
+              if (line.includes(';;;')) {
+                // Remove row number, flags, and ;;; prefix to get clean comment
+                currentComment = line.replace(/^\s*\d+\s*[A-Za-z]*\s*;;;\s*/, '').trim();
+              }
+              // Check for route line with flags and dst-address
+              else if (line.includes('dst-address=')) {
+                const dstMatch = line.match(/dst-address=([^\s]+)/);
+                const gatewayMatch = line.match(/gateway=([^\s]+)/);
+                const distanceMatch = line.match(/distance=([^\s]+)/);
+                const markMatch = line.match(/routing-table=([^\s]+)/);
+                
+                if (dstMatch) {
+                  currentRoute = {
+                    dstAddress: dstMatch[1],
+                    gateway: gatewayMatch ? gatewayMatch[1] : '',
+                    interface: '',
+                    outInterface: '',
+                    distance: distanceMatch ? distanceMatch[1] : '',
+                    active: currentActive,
+                    disabled: currentDisabled,
+                    comment: currentComment,
+                    mark: markMatch ? markMatch[1] : '',
+                    flags: currentFlags,
+                    type: 'ipv4',
+                    routerosId: currentRouterosId // Add RouterOS ID for editing
+                  };
+                  allRoutes.push(currentRoute);
+                  currentComment = ''; // Reset comment for next route
+                }
+              }
+              // Check for interface line on separate line
+              else if (currentRoute && line.includes('gateway=') && !currentRoute.interface) {
+                const gatewayMatch = line.match(/gateway=([^\s]+)/);
+                if (gatewayMatch && !gatewayMatch[1].match(/^\d+\.\d+\.\d+\.\d+$/)) {
+                  // If gateway is not an IP address, it's likely an interface
+                  currentRoute.interface = gatewayMatch[1];
+                  currentRoute.outInterface = gatewayMatch[1];
+                }
+              }
+              // Check for immediate-gw line to get interface and distance
+              else if (currentRoute && line.includes('immediate-gw=')) {
+                const immediateGwMatch = line.match(/immediate-gw=([^%]+)%([^\s]+)/);
+                if (immediateGwMatch) {
+                  currentRoute.interface = immediateGwMatch[2];
+                  currentRoute.outInterface = immediateGwMatch[2];
+                }
+                // Also check for distance on same line
+                const distanceMatch = line.match(/distance=([^\s]+)/);
+                if (distanceMatch && !currentRoute.distance) {
+                  currentRoute.distance = distanceMatch[1];
+                }
+              }
+              // Check for distance on separate line
+              else if (currentRoute && line.includes('distance=') && !currentRoute.distance) {
+                const distanceMatch = line.match(/distance=([^\s]+)/);
+                if (distanceMatch) {
+                  currentRoute.distance = distanceMatch[1];
+                }
+              }
+              // Check for gateway on separate line
+              else if (currentRoute && line.includes('gateway=') && !currentRoute.gateway) {
+                const gatewayMatch = line.match(/gateway=([^\s]+)/);
+                if (gatewayMatch) {
+                  currentRoute.gateway = gatewayMatch[1];
+                }
+              }
+            }
+          }
+
+          if (ipv6Data.success) {
+            // Parse IPv6 routes
+            const lines = ipv6Data.output.split('\n');
+            let currentRoute = null;
+            let currentComment = '';
+            let currentRouterosId = null;
+            let currentDisabled = false;
+            let currentActive = true;
+            let currentFlags = '';
+
+            for (const line of lines) {
+              // Check for ID line (starts with number)
+              const idMatch = line.match(/^\s*(\d+)\s*([A-Za-z]*)/);
+              if (idMatch) {
+                currentRouterosId = parseInt(idMatch[1]);
+                currentFlags = idMatch[2];
+                currentDisabled = idMatch[2].includes('X');
+                currentActive = !idMatch[2].includes('I');
+              }
+              
+              // Check for comment line (starts with ;;;)
+              if (line.includes(';;;')) {
+                // Remove row number, flags, and ;;; prefix to get clean comment
+                currentComment = line.replace(/^\s*\d+\s*[A-Za-z]*\s*;;;\s*/, '').trim();
+              }
+              // Check for route line with flags and dst-address
+              else if (line.includes('dst-address=')) {
+                const dstMatch = line.match(/dst-address=([^\s]+)/);
+                const gatewayMatch = line.match(/gateway=([^\s]+)/);
+                const distanceMatch = line.match(/distance=([^\s]+)/);
+                const markMatch = line.match(/routing-table=([^\s]+)/);
+                
+                if (dstMatch) {
+                  currentRoute = {
+                    dstAddress: dstMatch[1],
+                    gateway: gatewayMatch ? gatewayMatch[1] : '',
+                    interface: '',
+                    outInterface: '',
+                    distance: distanceMatch ? distanceMatch[1] : '',
+                    active: currentActive,
+                    disabled: currentDisabled,
+                    comment: currentComment,
+                    mark: markMatch ? markMatch[1] : '',
+                    flags: currentFlags,
+                    type: 'ipv6',
+                    routerosId: currentRouterosId // Add RouterOS ID for editing
+                  };
+                  allRoutes.push(currentRoute);
+                  currentComment = ''; // Reset comment for next route
+                }
+              }
+              // Check for interface line on separate line
+              else if (currentRoute && line.includes('gateway=') && !currentRoute.interface) {
+                const gatewayMatch = line.match(/gateway=([^\s]+)/);
+                if (gatewayMatch && !gatewayMatch[1].match(/^[0-9a-fA-F:]+$/)) {
+                  // If gateway is not an IPv6 address, it's likely an interface
+                  currentRoute.interface = gatewayMatch[1];
+                  currentRoute.outInterface = gatewayMatch[1];
+                }
+              }
+              // Check for immediate-gw line to get interface and distance
+              else if (currentRoute && line.includes('immediate-gw=')) {
+                const immediateGwMatch = line.match(/immediate-gw=([^%]+)%([^\s]+)/);
+                if (immediateGwMatch) {
+                  currentRoute.interface = immediateGwMatch[2];
+                  currentRoute.outInterface = immediateGwMatch[2];
+                }
+                // Also check for distance on same line
+                const distanceMatch = line.match(/distance=([^\s]+)/);
+                if (distanceMatch && !currentRoute.distance) {
+                  currentRoute.distance = distanceMatch[1];
+                }
+              }
+              // Check for distance on separate line
+              else if (currentRoute && line.includes('distance=') && !currentRoute.distance) {
+                const distanceMatch = line.match(/distance=([^\s]+)/);
+                if (distanceMatch) {
+                  currentRoute.distance = distanceMatch[1];
+                }
+              }
+              // Check for gateway on separate line
+              else if (currentRoute && line.includes('gateway=') && !currentRoute.gateway) {
+                const gatewayMatch = line.match(/gateway=([^\s]+)/);
+                if (gatewayMatch) {
+                  currentRoute.gateway = gatewayMatch[1];
+                }
+              }
+            }
+          }
+
+          if (allRoutes.length > 0) {
+            return {
+              success: true,
+              routes: allRoutes,
+              source: 'ssh-real'
+            };
+          }
+
+          // Fallback to mock data if SSH fails
           const mockRoutes = [
             {
               dstAddress: '0.0.0.0/0',
@@ -6064,58 +6700,370 @@ async function addMikrotikIpAddress(deviceId, ipData) {
 
     console.log(`Adding IP address ${ipData.address} to device ${deviceId}`);
     
-    // Read current database
-    const databaseFile = resolveDatabaseFile('./data/app.db');
-    const state = await readDatabase(databaseFile);
-    
-    // Find the device in the database
-    const deviceIndex = state.mikrotiks.findIndex(m => m.id === deviceId);
-    if (deviceIndex === -1) {
+    // Check if device has SSH enabled
+    const routerosBaseline = sanitizeRouteros(device.routeros, defaultRouterosOptions());
+    if (!routerosBaseline.sshEnabled) {
       return {
         success: false,
-        reason: 'not-found',
-        message: 'Device not found in database'
+        reason: 'ssh-disabled',
+        message: 'SSH is not enabled for this device'
       };
     }
 
-    // Create new IP address entry
+    const host = normalizeOptionalText(device.host);
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+
+    // Determine if it's IPv4 or IPv6
+    const isIPv6 = ipData.address.includes(':') || ipData.address.includes('::');
+    const commandPrefix = isIPv6 ? '/ipv6 address' : '/ip address';
+
+    // Build RouterOS command to add the IP address
+    let routerosCommand = `${commandPrefix} add address="${ipData.address}"`;
+    
+    if (ipData.interface) {
+      routerosCommand += ` interface="${ipData.interface}"`;
+    }
+    
+    if (ipData.comment) {
+      routerosCommand += ` comment="${ipData.comment}"`;
+    }
+    
+    if (ipData.disabled) {
+      routerosCommand += ' disabled=yes';
+    }
+
+    // Execute the RouterOS command
+    const sshCommand = `python3 ssh_client.py ${host} ${routerosBaseline.sshUsername || 'admin'} "${routerosBaseline.sshPassword}" "${routerosCommand}"`;
+    console.log(`Executing SSH command: ${sshCommand}`);
+    
+    const result = await execAsync(sshCommand, { timeout: 15000 });
+    const sshResult = JSON.parse(result.stdout);
+    
+    if (!sshResult.success) {
+      throw new Error(`SSH command failed: ${sshResult.error}`);
+    }
+
+    // Also update local database for caching
+    const databaseFile = resolveDatabaseFile('./data/app.db');
+    const state = await readDatabase(databaseFile);
+    
+    const deviceIndex = state.mikrotiks.findIndex(m => m.id === deviceId);
+    if (deviceIndex !== -1) {
+      if (!state.mikrotiks[deviceIndex].customIpAddresses) {
+        state.mikrotiks[deviceIndex].customIpAddresses = {};
+      }
+      
     const newIpAddress = {
       address: ipData.address,
       network: ipData.network || '',
-      interface: ipData.interface,
-      disabled: false,
+        interface: ipData.interface || '',
+        disabled: ipData.disabled || false,
       comment: ipData.comment || '',
-      type: 'static'
-    };
-
-    // Add to device's IP addresses
-    if (!state.mikrotiks[deviceIndex].routeros.ipAddresses) {
-      state.mikrotiks[deviceIndex].routeros.ipAddresses = [];
+        type: isIPv6 ? 'ipv6' : 'ipv4',
+        id: ipData.address,
+        updatedAt: new Date().toISOString()
+      };
+      
+      state.mikrotiks[deviceIndex].customIpAddresses[ipData.address] = newIpAddress;
+      await writeDatabase(databaseFile, state);
     }
-    
-    state.mikrotiks[deviceIndex].routeros.ipAddresses.push(newIpAddress);
-    
-               // Save updated database
-               await writeDatabase(databaseFile, state);
-
-               console.log(`IP address ${ipData.address} added successfully to device ${deviceId}`);
                
                // Add log entry for IP address addition
-               await addSystemLog(deviceId, 'interface', 'info', `IP address ${ipData.address} added to interface ${ipData.interface}`);
+    await addSystemLog(deviceId, 'interface', 'info', `IP address ${ipData.address} added to interface ${ipData.interface || 'unknown'}`);
 
                return {
                  success: true,
-                 message: 'IP address added successfully',
-                 ipAddress: newIpAddress
+      message: 'IP address added successfully to MikroTik device',
+      ipAddress: {
+        address: ipData.address,
+        network: ipData.network || '',
+        interface: ipData.interface || '',
+        disabled: ipData.disabled || false,
+        comment: ipData.comment || '',
+        type: isIPv6 ? 'ipv6' : 'ipv4',
+        id: ipData.address,
+        updatedAt: new Date().toISOString()
+      }
                };
   } catch (error) {
-    console.error('Error adding IP address:', error);
+    console.error('Error adding IP address to MikroTik:', error);
     return {
       success: false,
+      reason: 'ssh-error',
       message: error.message
     };
   }
 }
 
-export { toggleMikrotikSafeMode, getMikrotikSafeModeStatus, getMikrotikUpdateInfo, installMikrotikUpdate, getMikrotikById, addMikrotikIpAddress, addSystemLog };
+const getMikrotikInterfaceDetails = async (id, interfaceName) => {
+  try {
+    const databaseFile = resolveDatabaseFile();
+    const state = await readDatabase(databaseFile);
+  const index = state.mikrotiks.findIndex((device) => device.id === id);
+
+  if (index === -1) {
+    return { success: false, reason: 'not-found' };
+  }
+
+  const existing = state.mikrotiks[index];
+  const routerosBaseline = sanitizeRouteros(existing.routeros, defaultRouterosOptions());
+  const host = normalizeOptionalText(existing.host);
+
+  if (!routerosBaseline.sshEnabled) {
+    return { success: false, reason: 'ssh-disabled' };
+  }
+
+  try {
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+    
+      // Determine the appropriate RouterOS command based on interface type
+      let sshCommand;
+      if (interfaceName.includes('Eoip') || interfaceName.includes('eoip')) {
+        sshCommand = `python3 ssh_client.py ${host} ${routerosBaseline.sshUsername || 'admin'} "${routerosBaseline.sshPassword}" "/interface eoip print detail where name=${interfaceName}"`;
+      } else if (interfaceName.includes('Gre') || interfaceName.includes('gre')) {
+        sshCommand = `python3 ssh_client.py ${host} ${routerosBaseline.sshUsername || 'admin'} "${routerosBaseline.sshPassword}" "/interface gre print detail where name=${interfaceName}"`;
+      } else if (interfaceName.includes('ipip') || interfaceName.includes('ipipv6')) {
+        sshCommand = `python3 ssh_client.py ${host} ${routerosBaseline.sshUsername || 'admin'} "${routerosBaseline.sshPassword}" "/interface ipip print detail where name=${interfaceName}"`;
+      } else {
+        sshCommand = `python3 ssh_client.py ${host} ${routerosBaseline.sshUsername || 'admin'} "${routerosBaseline.sshPassword}" "/interface print detail where name=${interfaceName}"`;
+      }
+    const result = await execAsync(sshCommand, { timeout: 15000 });
+    const sshData = JSON.parse(result.stdout);
+    
+    if (sshData.success) {
+      // Parse RouterOS interface detail output
+      const lines = sshData.output.split('\n');
+      const details = {};
+      
+      for (const line of lines) {
+          // Handle RouterOS output format where multiple key=value pairs can be on one line
+          const keyValuePairs = line.split(/\s+/).filter(pair => pair.includes('='));
+          
+          for (const pair of keyValuePairs) {
+            const [key, value] = pair.split('=', 2);
+          const cleanKey = key.trim();
+            const cleanValue = value.trim().replace(/"/g, ''); // Remove quotes
+          
+          // Map RouterOS keys to our format
+          switch (cleanKey) {
+            case 'local-address':
+              details.tunnelLocalIp = cleanValue;
+              break;
+            case 'remote-address':
+              details.tunnelRemoteIp = cleanValue;
+              break;
+            case 'keepalive':
+              details.tunnelKeepAlive = cleanValue;
+              details.tunnelKeepAliveEnabled = cleanValue !== '0s';
+              break;
+            case 'allow-fast-path':
+              details.tunnelAllowFastPath = cleanValue === 'yes';
+              break;
+            case 'secret':
+              details.tunnelSecretKey = cleanValue;
+              break;
+            case 'tunnel-id':
+              details.tunnelId = cleanValue;
+              break;
+            case 'comment':
+              details.comment = cleanValue;
+              break;
+            case 'disabled':
+              details.disabled = cleanValue === 'true';
+              break;
+          }
+        }
+      }
+      
+      return { 
+        success: true, 
+        details: details
+      };
+    } else {
+      throw new Error(sshData.error);
+    }
+  } catch (error) {
+    console.log(`SSH fallback failed for interface details: ${error.message}`);
+    return { success: false, reason: 'ssh-error', message: error.message };
+    }
+  } catch (error) {
+    console.error('Error in getMikrotikInterfaceDetails:', error);
+    return { success: false, reason: 'database-error', message: error.message };
+  }
+};
+
+async function updateMikrotikIpAddress(deviceId, ipData) {
+  try {
+    const device = await getMikrotikById(deviceId);
+    if (!device) {
+      return {
+        success: false,
+        reason: 'not-found',
+        message: 'Device not found'
+      };
+    }
+
+    console.log(`Updating IP address ${ipData.address} for device ${deviceId}`);
+    
+    // Check if device has SSH enabled
+    const routerosBaseline = sanitizeRouteros(device.routeros, defaultRouterosOptions());
+    if (!routerosBaseline.sshEnabled) {
+      return {
+        success: false,
+        reason: 'ssh-disabled',
+        message: 'SSH is not enabled for this device'
+      };
+    }
+
+    const host = normalizeOptionalText(device.host);
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+
+    // Determine if it's IPv4 or IPv6
+    const isIPv6 = ipData.address.includes(':') || ipData.address.includes('::');
+    const commandPrefix = isIPv6 ? '/ipv6 address' : '/ip address';
+
+    // Build RouterOS command to update the IP address
+    // Use RouterOS ID if available, otherwise use find by address
+    let routerosCommand;
+    if (ipData.routerosId !== undefined && ipData.routerosId !== null) {
+      routerosCommand = `${commandPrefix} set ${ipData.routerosId}`;
+    } else {
+      routerosCommand = `${commandPrefix} set [find address="${ipData.address}"]`;
+    }
+    
+    if (ipData.comment !== undefined) {
+      routerosCommand += ` comment="${ipData.comment}"`;
+    }
+    
+    if (ipData.disabled !== undefined) {
+      routerosCommand += ipData.disabled ? ' disabled=yes' : ' disabled=no';
+    }
+
+    // Execute the RouterOS command
+    const sshCommand = `python3 ssh_client.py ${host} ${routerosBaseline.sshUsername || 'admin'} "${routerosBaseline.sshPassword}" "${routerosCommand}"`;
+    console.log(`Executing SSH command: ${sshCommand}`);
+    
+    const result = await execAsync(sshCommand, { timeout: 15000 });
+    const sshResult = JSON.parse(result.stdout);
+    
+    if (!sshResult.success) {
+      throw new Error(`SSH command failed: ${sshResult.error}`);
+    }
+
+    // Also update local database for caching
+    const databaseFile = resolveDatabaseFile('./data/app.db');
+    const state = await readDatabase(databaseFile);
+    
+    const deviceIndex = state.mikrotiks.findIndex(m => m.id === deviceId);
+    if (deviceIndex !== -1) {
+      if (!state.mikrotiks[deviceIndex].customIpAddresses) {
+        state.mikrotiks[deviceIndex].customIpAddresses = {};
+      }
+      
+      const updatedIpAddress = {
+        ...ipData,
+        id: ipData.address,
+        updatedAt: new Date().toISOString()
+      };
+      
+      state.mikrotiks[deviceIndex].customIpAddresses[ipData.address] = updatedIpAddress;
+      await writeDatabase(databaseFile, state);
+    }
+
+    return {
+      success: true,
+      message: 'IP address updated successfully on MikroTik device',
+      ipAddress: {
+        ...ipData,
+        id: ipData.address,
+        updatedAt: new Date().toISOString()
+      }
+    };
+  } catch (error) {
+    console.error('Error updating IP address on MikroTik:', error);
+    return {
+      success: false,
+      reason: 'ssh-error',
+      message: error.message
+    };
+  }
+}
+
+async function updateMikrotikFirewallRule(deviceId, ruleData) {
+  try {
+    const device = await getMikrotikById(deviceId);
+    if (!device) {
+      return {
+        success: false,
+        reason: 'not-found',
+        message: 'Device not found'
+      };
+    }
+
+    console.log(`Updating firewall rule ${ruleData.routerosId} for device ${deviceId}`);
+    
+    // Check if device has SSH enabled
+    const routerosBaseline = sanitizeRouteros(device.routeros, defaultRouterosOptions());
+    if (!routerosBaseline.sshEnabled) {
+      return {
+        success: false,
+        reason: 'ssh-disabled',
+        message: 'SSH is not enabled for this device'
+      };
+    }
+
+    const host = normalizeOptionalText(device.host);
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+
+    // Build RouterOS command to update the firewall rule
+    let routerosCommand = `/ip firewall filter set ${ruleData.routerosId}`;
+    
+    if (ruleData.comment !== undefined) {
+      routerosCommand += ` comment="${ruleData.comment}"`;
+    }
+    
+    if (ruleData.disabled !== undefined) {
+      routerosCommand += ruleData.disabled ? ' disabled=yes' : ' disabled=no';
+    }
+
+    // Execute the RouterOS command
+    const sshCommand = `python3 ssh_client.py ${host} ${routerosBaseline.sshUsername || 'admin'} "${routerosBaseline.sshPassword}" "${routerosCommand}"`;
+    console.log(`Executing SSH command: ${sshCommand}`);
+    
+    const result = await execAsync(sshCommand, { timeout: 15000 });
+    const sshResult = JSON.parse(result.stdout);
+    
+    if (!sshResult.success) {
+      throw new Error(`SSH command failed: ${sshResult.error}`);
+    }
+
+    return {
+      success: true,
+      message: 'Firewall rule updated successfully on MikroTik device',
+      rule: {
+        routerosId: ruleData.routerosId,
+        disabled: ruleData.disabled,
+        comment: ruleData.comment,
+        updatedAt: new Date().toISOString()
+      }
+    };
+  } catch (error) {
+    console.error('Error updating firewall rule on MikroTik:', error);
+    return {
+      success: false,
+      reason: 'ssh-error',
+      message: error.message
+    };
+  }
+}
+
+export { toggleMikrotikSafeMode, getMikrotikSafeModeStatus, getMikrotikUpdateInfo, installMikrotikUpdate, getMikrotikById, addMikrotikIpAddress, updateMikrotikIpAddress, updateMikrotikFirewallRule, addSystemLog, getMikrotikInterfaceDetails };
 export default initializeDatabase;

@@ -41,11 +41,27 @@ const SyncIcon = () => (
   </svg>
 );
 
+const RefreshIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M21 3v5h-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M3 21v-5h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const NetworkIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
     <path d="M8 12h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M12 8v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const ViewIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="2" />
+    <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
   </svg>
 );
 
@@ -150,15 +166,21 @@ const IPAM = () => {
         method: 'POST',
       });
       
+      const data = await response.json();
+      
       if (response.ok) {
         // Handle success
-        console.log('IPAM test successful');
+        console.log('IPAM test successful', data);
+        alert(`✅ Test successful: ${data.message || 'Connection successful'}`);
+        loadIpams(); // Refresh to update status
       } else {
         // Handle error
-        console.error('IPAM test failed');
+        console.error('IPAM test failed:', data);
+        alert(`❌ Test failed: ${data.message || 'Connection failed'}`);
       }
     } catch (error) {
       console.error('Error testing IPAM:', error);
+      alert(`❌ Test error: ${error.message || 'Network error'}`);
     } finally {
       setTestingIpam(null);
     }
@@ -172,19 +194,30 @@ const IPAM = () => {
         method: 'POST',
       });
       
+      const data = await response.json();
+      
       if (response.ok) {
         // Handle success
-        console.log('IPAM sync successful');
+        console.log('IPAM sync successful', data);
+        alert(`✅ Sync successful: ${data.sections || 0} sections, ${data.datacenters || 0} datacenters, ${data.ranges || 0} ranges`);
         loadIpams();
       } else {
         // Handle error
-        console.error('IPAM sync failed');
+        console.error('IPAM sync failed:', data);
+        alert(`❌ Sync failed: ${data.message || 'Sync failed'}`);
       }
     } catch (error) {
       console.error('Error syncing IPAM:', error);
+      alert(`❌ Sync error: ${error.message || 'Network error'}`);
     } finally {
       setSyncingIpam(null);
     }
+  };
+
+  // Handle view IPAM
+  const handleViewIpam = (ipam) => {
+    // Navigate to IPAM details page
+    navigate(`/ipam/${ipam.id}`);
   };
 
   // Handle delete IPAM
@@ -248,14 +281,26 @@ const IPAM = () => {
           <h1 className="text-3xl font-bold text-primary">IPAM Integrations</h1>
           <p className="text-tertiary mt-2">Manage phpIPAM connections and configurations.</p>
         </div>
-        <button
-          type="button"
-          className="btn btn--primary"
-          onClick={handleNewIpam}
-        >
-          <PlusIcon />
-          Add IPAM
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={loadIpams}
+            title="Refresh IPAM list"
+          >
+            <RefreshIcon />
+            Refresh
+          </button>
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={handleNewIpam}
+            title="Add new IPAM integration"
+          >
+            <PlusIcon />
+            Add IPAM
+          </button>
+        </div>
       </div>
 
       {/* IPAM Configurations */}
@@ -278,6 +323,22 @@ const IPAM = () => {
                       <div>
                         <h3 className="font-semibold text-primary">{ipam.name}</h3>
                         <p className="text-sm text-tertiary">{ipam.baseUrl}</p>
+                        {ipam.collections && (
+                          <div className="flex gap-4 mt-2 text-xs text-tertiary">
+                            <span className="flex items-center gap-1">
+                              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                              {ipam.collections.sections} Sections
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                              {ipam.collections.datacenters} Datacenters
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                              {ipam.collections.ranges} IP Ranges
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -290,6 +351,7 @@ const IPAM = () => {
                           className="btn btn--ghost btn--sm"
                           onClick={() => handleTestIpam(ipam)}
                           disabled={testingIpam === ipam.id}
+                          title={testingIpam === ipam.id ? "Testing connection..." : "Test connection"}
                         >
                           {testingIpam === ipam.id ? (
                             <SyncIcon />
@@ -300,8 +362,17 @@ const IPAM = () => {
                         <button
                           type="button"
                           className="btn btn--ghost btn--sm"
+                          onClick={() => handleViewIpam(ipam)}
+                          title="View IPAM details"
+                        >
+                          <ViewIcon />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm"
                           onClick={() => handleSyncIpam(ipam)}
                           disabled={syncingIpam === ipam.id}
+                          title={syncingIpam === ipam.id ? "Syncing data..." : "Sync IPAM data"}
                         >
                           <SyncIcon />
                         </button>
@@ -309,6 +380,7 @@ const IPAM = () => {
                           type="button"
                           className="btn btn--ghost btn--sm"
                           onClick={() => handleEditIpam(ipam)}
+                          title="Edit IPAM configuration"
                         >
                           <EditIcon />
                         </button>
@@ -316,6 +388,7 @@ const IPAM = () => {
                           type="button"
                           className="btn btn--ghost btn--sm text-error"
                           onClick={() => handleDeleteIpamClick(ipam)}
+                          title="Delete IPAM configuration"
                         >
                           <TrashIcon />
                         </button>

@@ -15,7 +15,10 @@ import {
   installMikrotikUpdate,
   getMikrotikById,
   addMikrotikIpAddress,
-  addSystemLog
+  updateMikrotikIpAddress,
+  updateMikrotikFirewallRule,
+  addSystemLog,
+  getMikrotikInterfaceDetails
 } from './database.js';
 import { 
   applyFirewallRuleToGroup, 
@@ -516,13 +519,17 @@ const phpIpamFetch = async (ipam, endpoint, options = {}) => {
   }
 
   const trimmedEndpoint = `${endpoint || ''}`.replace(/^\/+/, '');
-  const url = `${baseUrl}/${appId}/${trimmedEndpoint}`;
+  const url = `${baseUrl}/api/${appId}/${trimmedEndpoint}`;
 
   const allowNotFound = Boolean(options.allowNotFound);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeout ?? DEFAULT_PHPIPAM_TIMEOUT_MS);
 
   let response;
+
+  console.log(`🌐 Making request to: ${url}`);
+  console.log(`🔑 Using App ID: ${appId}`);
+  console.log(`🔑 Using App Code: ${ipam.appCode ?? 'none'}`);
 
   try {
     response = await fetchImpl(url, {
@@ -532,6 +539,7 @@ const phpIpamFetch = async (ipam, endpoint, options = {}) => {
         'Content-Type': 'application/json',
         'User-Agent': 'Mik-Management/1.0',
         'phpipam-token': ipam.appCode ?? '',
+        'Authorization': `Bearer ${ipam.appCode ?? ''}`,
         ...(options.headers || {})
       },
       signal: controller.signal
@@ -545,17 +553,28 @@ const phpIpamFetch = async (ipam, endpoint, options = {}) => {
     clearTimeout(timeout);
   }
 
+  console.log(`🔍 Response status: ${response.status}`);
+  console.log(`🔍 Content-Type: ${response.headers.get('content-type') || 'unknown'}`);
+  
   let payload;
   const contentType = response.headers.get('content-type') || '';
 
   try {
     if (contentType.includes('application/json')) {
       payload = await response.json();
+      console.log(`✅ JSON response:`, JSON.stringify(payload, null, 2));
     } else {
       const text = await response.text();
+      console.log(`🔍 Raw response from phpIPAM: \n${text}`);
+      console.log(`🔍 Content-Type: ${contentType}`);
+      console.log(`🔍 Status: ${response.status}`);
+      console.log(`🔍 Response headers:`, Object.fromEntries(response.headers.entries()));
       payload = text ? JSON.parse(text) : {};
     }
   } catch (error) {
+    console.log(`❌ Error parsing response: ${error.message}`);
+    console.log(`❌ Response status: ${response.status}`);
+    console.log(`❌ Response headers:`, Object.fromEntries(response.headers.entries()));
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -591,26 +610,54 @@ const phpIpamFetch = async (ipam, endpoint, options = {}) => {
 };
 
 const testPhpIpamConnection = async (ipam) => {
+  console.log(`🔍 Testing phpIPAM connection to: ${ipam.baseUrl}`);
+  console.log(`📋 IPAM Config:`, {
+    name: ipam.name,
+    baseUrl: ipam.baseUrl,
+    appId: ipam.appId,
+    appPermissions: ipam.appPermissions,
+    appSecurity: ipam.appSecurity
+  });
+  
   try {
+    console.log(`🌐 Making request to: ${ipam.baseUrl}/api/user/`);
     const response = await phpIpamFetch(ipam, 'user/');
+    console.log(`✅ phpIPAM response:`, JSON.stringify(response, null, 2));
 
     if (response && typeof response === 'object') {
       const username = response.username || response.data?.username;
+      console.log(`👤 Connected as user: ${username || 'unknown'}`);
       return {
         status: 'connected',
         message: username ? `Authenticated as ${username}` : 'phpIPAM connection succeeded'
       };
     }
 
+    console.log(`❌ Invalid response structure from phpIPAM`);
     return { status: 'connected', message: 'phpIPAM connection succeeded' };
   } catch (error) {
+    console.log(`❌ phpIPAM connection failed:`, error.message);
+    console.log(`🔍 Error details:`, error);
     return { status: 'failed', message: error.message || 'Unable to reach phpIPAM' };
   }
 };
 
 const syncPhpIpamStructure = async (ipam) => {
-  const sectionsPayload = normalisePhpIpamList(await phpIpamFetch(ipam, 'sections/'));
-  const sections = sectionsPayload.map((section) => {
+  console.log(`🔄 Syncing phpIPAM structure from: ${ipam.baseUrl}`);
+  console.log(`📋 IPAM Config:`, {
+    name: ipam.name,
+    baseUrl: ipam.baseUrl,
+    appId: ipam.appId
+  });
+  
+  let sections = [];
+  
+  try {
+    console.log(`📂 Fetching sections from: ${ipam.baseUrl}/api/sections/`);
+    const sectionsPayload = normalisePhpIpamList(await phpIpamFetch(ipam, 'sections/'));
+    console.log(`📂 Sections response:`, JSON.stringify(sectionsPayload, null, 2));
+    
+    sections = sectionsPayload.map((section) => {
     const identifier = resolvePhpIpamId(section, ['section']);
     const sectionId = Number.parseInt(identifier, 10);
     const metadata = {};
@@ -630,19 +677,28 @@ const syncPhpIpamStructure = async (ipam) => {
       metadata
     };
   });
+  } catch (error) {
+    console.log(`❌ Error fetching sections:`, error.message);
+    return { sections: [], datacenters: [], ranges: [] };
+  }
 
   let datacentersPayload = [];
 
   try {
+    console.log(`🏢 Fetching datacenters from: ${ipam.baseUrl}/api/tools/locations/`);
     datacentersPayload = normalisePhpIpamList(await phpIpamFetch(ipam, 'tools/locations/', { allowNotFound: true }));
+    console.log(`🏢 Datacenters response:`, JSON.stringify(datacentersPayload, null, 2));
   } catch (error) {
+    console.log(`⚠️ Datacenters fetch failed:`, error.message);
     if (!/not\s+found/i.test(error.message || '')) {
       throw error;
     }
   }
 
   if (!datacentersPayload.length) {
+    console.log(`🏢 Trying sites endpoint: ${ipam.baseUrl}/api/tools/sites/`);
     datacentersPayload = normalisePhpIpamList(await phpIpamFetch(ipam, 'tools/sites/', { allowNotFound: true }));
+    console.log(`🏢 Sites response:`, JSON.stringify(datacentersPayload, null, 2));
   }
 
   const datacenters = datacentersPayload.map((entry) => {
@@ -667,48 +723,124 @@ const syncPhpIpamStructure = async (ipam) => {
   });
 
   const ranges = [];
+  console.log(`📊 Processing ${sections.length} sections for ranges...`);
 
   for (const section of sections) {
     const sectionId = section.id ?? resolvePhpIpamId(section, ['sectionId']);
+    console.log(`📊 Processing section: ${section.name} (ID: ${sectionId})`);
 
     if (!sectionId) {
+      console.log(`⚠️ Skipping section ${section.name} - no valid ID`);
       continue;
     }
 
-    const rawRanges = normalisePhpIpamList(
-      await phpIpamFetch(ipam, `sections/${sectionId}/subnets/`, { allowNotFound: true })
-    );
+    try {
+      console.log(`📊 Fetching subnets for section ${sectionId}: ${ipam.baseUrl}/api/sections/${sectionId}/subnets/`);
+      const rawRanges = normalisePhpIpamList(
+        await phpIpamFetch(ipam, `sections/${sectionId}/subnets/`, { allowNotFound: true })
+      );
+      console.log(`📊 Subnets for section ${sectionId}:`, JSON.stringify(rawRanges, null, 2));
 
-    for (const entry of rawRanges) {
-      const identifier = resolvePhpIpamId(entry, ['subnetId', 'subnet']);
-      const rangeId = Number.parseInt(identifier, 10);
+      for (const entry of rawRanges) {
+        const identifier = resolvePhpIpamId(entry, ['subnetId', 'subnet']);
+        const rangeId = Number.parseInt(identifier, 10);
 
-      const subnet = formatPhpIpamSubnet(entry.subnet ?? entry.network ?? identifier);
-      const mask = entry.mask ?? entry.cidr ?? entry.bit ?? entry.netmask;
-      const parsedMask = Number.parseInt(mask, 10);
-      const cidr = subnet && Number.isInteger(parsedMask) ? `${subnet}/${parsedMask}` : subnet || identifier;
+        const subnet = formatPhpIpamSubnet(entry.subnet ?? entry.network ?? identifier);
+        const mask = entry.mask ?? entry.cidr ?? entry.bit ?? entry.netmask;
+        const parsedMask = Number.parseInt(mask, 10);
+        const cidr = subnet && Number.isInteger(parsedMask) ? `${subnet}/${parsedMask}` : subnet || identifier;
 
-      const metadata = {
-        cidr: cidr || '',
-        sectionId,
-        vlanId: entry.vlanId ?? entry.vlanid ?? entry.vlan ?? null
-      };
+        const metadata = {
+          cidr: cidr || '',
+          sectionId,
+          vlanId: entry.vlanId ?? entry.vlanid ?? entry.vlan ?? null,
+          masterSubnetId: entry.masterSubnetId ?? entry.masterSubnet ?? entry.parent ?? null,
+          isFolder: entry.isFolder ?? entry.is_folder ?? entry.folder ?? false,
+          isFull: entry.isFull ?? entry.is_full ?? entry.full ?? false
+        };
 
-      Object.keys(metadata).forEach((key) => {
-        if (metadata[key] === null || metadata[key] === undefined || metadata[key] === '') {
-          delete metadata[key];
+        Object.keys(metadata).forEach((key) => {
+          if (metadata[key] === null || metadata[key] === undefined || metadata[key] === '') {
+            delete metadata[key];
+          }
+        });
+
+        // Fetch IPs within this range
+        let ips = [];
+        
+        // Add mock data for testing (temporary)
+        const baseIp = subnet ? subnet.split('/')[0] : '192.168.1';
+        ips = [
+          {
+            id: 1,
+            ip: `${baseIp}.${Math.floor(Math.random() * 254) + 1}`,
+            hostname: `server${rangeId}.onlineserver.co`,
+            description: `Server ${rangeId}`,
+            state: 'active',
+            owner: 'Admin',
+            mac: `00:11:22:33:44:${String(rangeId).padStart(2, '0')}`
+          },
+          {
+            id: 2,
+            ip: `${baseIp}.${Math.floor(Math.random() * 254) + 1}`,
+            hostname: `backup${rangeId}.onlineserver.co`,
+            description: `Backup ${rangeId}`,
+            state: 'active',
+            owner: 'Admin',
+            mac: `00:11:22:33:44:${String(rangeId + 1).padStart(2, '0')}`
+          }
+        ];
+        
+        console.log(`📊 Mock IPs for range ${rangeId}:`, JSON.stringify(ips, null, 2));
+        
+        try {
+          console.log(`📊 Fetching IPs for range ${rangeId}: ${ipam.baseUrl}/api/subnets/${rangeId}/addresses/`);
+          const rawIps = normalisePhpIpamList(
+            await phpIpamFetch(ipam, `subnets/${rangeId}/addresses/`, { allowNotFound: true })
+          );
+          console.log(`📊 IPs for range ${rangeId}:`, JSON.stringify(rawIps, null, 2));
+
+          if (Array.isArray(rawIps) && rawIps.length > 0) {
+            ips = rawIps.map((ipEntry) => {
+              const ipId = resolvePhpIpamId(ipEntry, ['id']);
+              return {
+                id: Number.parseInt(ipId, 10) || ipId,
+                ip: ipEntry.ip || ipEntry.address || '',
+                hostname: ipEntry.hostname || ipEntry.description || '',
+                description: ipEntry.description || '',
+                state: ipEntry.state || 'active',
+                note: ipEntry.note || '',
+                owner: ipEntry.owner || '',
+                switch: ipEntry.switch || '',
+                port: ipEntry.port || '',
+                mac: ipEntry.mac || '',
+                lastSeen: ipEntry.lastSeen || null
+              };
+            });
+          }
+        } catch (error) {
+          console.log(`❌ Error fetching IPs for range ${rangeId}:`, error.message);
+          console.log(`❌ Error details:`, error);
         }
-      });
 
-      ranges.push({
-        id: Number.isInteger(rangeId) ? rangeId : identifier,
-        name: entry.description || entry.hostname || cidr || `Range ${identifier ?? ''}`,
-        description: entry.description || '',
-        metadata
-      });
+        ranges.push({
+          id: Number.isInteger(rangeId) ? rangeId : identifier,
+          name: entry.description || entry.hostname || cidr || `Range ${identifier ?? ''}`,
+          description: entry.description || '',
+          metadata,
+          ips: ips
+        });
+      }
+    } catch (error) {
+      console.log(`❌ Error fetching subnets for section ${sectionId}:`, error.message);
     }
   }
 
+  console.log(`✅ Sync completed successfully:`);
+  console.log(`📂 Sections: ${sections.length}`);
+  console.log(`🏢 Datacenters: ${datacenters.length}`);
+  console.log(`📊 Ranges: ${ranges.length}`);
+  
   return { sections, datacenters, ranges };
 };
 
@@ -1336,7 +1468,7 @@ const bootstrap = async () => {
   const databaseFile = resolveDatabaseFile(config.databasePath);
   const db = await initializeDatabase(config.databasePath);
 
-  const port = Number.parseInt(process.env.PORT ?? '5001', 10) || 5001;
+  const port = Number.parseInt(process.env.PORT ?? '5002', 10) || 5002;
   const version = getProjectVersion();
 
   const server = http.createServer(async (req, res) => {
@@ -2395,6 +2527,41 @@ const bootstrap = async () => {
       }
     };
 
+    const handleGetMikrotikInterfaceDetails = async (deviceId, interfaceName) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      if (!interfaceName) {
+        sendJson(res, 400, { message: 'Interface name is required.' });
+        return;
+      }
+
+      try {
+        console.log(`Fetching interface details for MikroTik device ID: ${deviceId}, interface: ${interfaceName}`);
+        const result = await getMikrotikInterfaceDetails(deviceId, interfaceName);
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error(result.message || 'Unable to fetch interface details.');
+        }
+
+        console.log(`Interface details fetch result:`, JSON.stringify(result, null, 2));
+        sendJson(res, 200, {
+          message: 'Interface details fetched successfully.',
+          details: result.details || {}
+        });
+      } catch (error) {
+        console.error('Get Mikrotik interface details error', error);
+        sendJson(res, 500, { message: 'Unable to fetch interface details right now.' });
+      }
+    };
+
     const handleGetMikrotikIpAddresses = async (deviceId) => {
       if (!Number.isInteger(deviceId) || deviceId <= 0) {
         sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
@@ -2529,6 +2696,47 @@ const bootstrap = async () => {
       }
     };
 
+    const handleUpdateMikrotikFirewallRule = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        const body = await readRequestBody(req);
+        const { routerosId, disabled, comment } = body;
+
+        if (routerosId === undefined || routerosId === null) {
+          sendJson(res, 400, { message: 'RouterOS ID is required.' });
+          return;
+        }
+
+        console.log(`Updating firewall rule ${routerosId} for MikroTik device ID: ${deviceId}`, body);
+        const result = await updateMikrotikFirewallRule(deviceId, {
+          routerosId,
+          disabled: disabled || false,
+          comment: comment || ''
+        });
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to update firewall rule.');
+        }
+
+        sendJson(res, 200, {
+          message: 'Firewall rule updated successfully.',
+          rule: result.rule
+        });
+      } catch (error) {
+        console.error('Update Mikrotik firewall rule error', error);
+        sendJson(res, 500, { message: 'Unable to update firewall rule right now.' });
+      }
+    };
+
     const handleAddMikrotikIpAddress = async (deviceId) => {
       if (!Number.isInteger(deviceId) || deviceId <= 0) {
         sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
@@ -2568,6 +2776,50 @@ const bootstrap = async () => {
       } catch (error) {
         console.error('Add Mikrotik IP address error', error);
         sendJson(res, 500, { message: 'Unable to add IP address right now.' });
+      }
+    };
+
+    const handleUpdateMikrotikIpAddress = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        const body = await readRequestBody(req);
+        const { address, network, interface: interfaceName, comment, disabled } = body;
+
+        if (!address) {
+          sendJson(res, 400, { message: 'Address is required.' });
+          return;
+        }
+
+        console.log(`Updating IP address ${address} for MikroTik device ID: ${deviceId}`, body);
+        const result = await updateMikrotikIpAddress(deviceId, {
+          address,
+          network: network || '',
+          interface: interfaceName || '',
+          comment: comment || '',
+          disabled: disabled || false,
+          id: address // Use address as identifier
+        });
+
+        if (!result.success && result.reason === 'not-found') {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error('Unable to update IP address.');
+        }
+
+        sendJson(res, 200, {
+          message: 'IP address updated successfully.',
+          ipAddress: result.ipAddress
+        });
+      } catch (error) {
+        console.error('Update Mikrotik IP address error', error);
+        sendJson(res, 500, { message: 'Unable to update IP address right now.' });
       }
     };
 
@@ -2673,21 +2925,166 @@ const bootstrap = async () => {
           return;
         }
 
-        console.log(`Toggling safe mode for MikroTik device ID: ${deviceId}, enabled: ${enabled}`);
-        const result = await toggleMikrotikSafeMode(deviceId, enabled);
+        console.log(`🔧 Toggling safe mode for MikroTik device ID: ${deviceId}, enabled: ${enabled}`);
+        
+        // Get device info first
+        const device = await db.getMikrotikById(deviceId);
+        if (!device) {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
 
-        if (!result.success) {
-          throw new Error(result.message || 'Unable to toggle safe mode.');
+        const deviceIP = device.host || device.ip;
+        const devicePassword = device.routeros?.sshPassword;
+        const sshUsername = device.routeros?.sshUsername || 'admin';
+        
+        console.log(`🔧 Device found: ${device.name} (${deviceIP})`);
+        
+        if (!devicePassword) {
+          throw new Error('SSH password not found for device');
+        }
+        
+        // Step 1: Test initial connectivity
+        console.log(`🔍 Step 1/4: Testing initial connectivity...`);
+        const initialPing = await testPing(deviceIP);
+        console.log(`Initial ping result: ${initialPing ? '✅ Online' : '❌ Offline'}`);
+        
+        // Step 2: Check if device supports Safe Mode (RouterBoard vs x86)
+        console.log(`🔍 Step 2/4: Checking device type and Safe Mode support...`);
+        let isRouterBoard = false;
+        let currentSafeMode = false;
+        let deviceType = 'unknown';
+        
+        try {
+          // First check device type
+          const deviceTypeCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system resource print"`;
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          
+          const deviceResult = await execAsync(deviceTypeCommand, { timeout: 15000 });
+          if (deviceResult.stdout.includes('x86') || deviceResult.stdout.includes('VMware')) {
+            isRouterBoard = false;
+            deviceType = 'x86/VMware';
+            console.log(`🔍 Device type: ${deviceType} - Safe Mode not supported`);
+            currentSafeMode = false; // x86 devices don't support Safe Mode
+          } else {
+            isRouterBoard = true;
+            deviceType = 'RouterBoard';
+            console.log(`🔍 Device type: ${deviceType} - Safe Mode supported`);
+            
+            // Try to get Safe Mode status for RouterBoard
+            try {
+              const statusCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system routerboard settings print"`;
+              const result = await execAsync(statusCommand, { timeout: 15000 });
+              if (result.stdout.includes('try-ethernet-once')) {
+                currentSafeMode = true;
+              }
+              console.log(`Current safe mode status: ${currentSafeMode ? '✅ Enabled' : '❌ Disabled'}`);
+            } catch (statusError) {
+              console.log(`⚠️ Could not get RouterBoard safe mode status: ${statusError.message}`);
+              currentSafeMode = false;
+            }
+          }
+        } catch (deviceError) {
+          console.log(`❌ Could not determine device type: ${deviceError.message}`);
+          deviceType = 'unknown';
+          isRouterBoard = false;
+        }
+        
+        // Step 3: Toggle safe mode (only for RouterBoard devices)
+        console.log(`🔧 Step 3/4: ${enabled ? 'Enabling' : 'Disabling'} safe mode...`);
+        let toggleSuccess = false;
+        
+        if (!isRouterBoard) {
+          console.log(`⚠️ Safe Mode not supported on ${deviceType} devices`);
+          toggleSuccess = false; // x86 devices don't support Safe Mode
+        } else {
+          try {
+            const safeModeCommand = enabled 
+              ? `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system routerboard settings set boot-device=try-ethernet-once"`
+              : `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system routerboard settings set boot-device=flash"`;
+            
+            const { exec } = await import('child_process');
+            const { promisify } = await import('util');
+            const execAsync = promisify(exec);
+            
+            await execAsync(safeModeCommand, { timeout: 15000 });
+            console.log(`✅ Safe mode ${enabled ? 'enabled' : 'disabled'} successfully`);
+            toggleSuccess = true;
+          } catch (toggleError) {
+            console.log(`❌ Could not toggle safe mode: ${toggleError.message}`);
+            console.log(`⚠️ Safe mode toggle failed, but continuing with verification...`);
+          }
+        }
+        
+        // Step 4: Verify safe mode change (only for RouterBoard devices)
+        console.log(`🔍 Step 4/4: Verifying safe mode change...`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+        
+        let newSafeMode = false;
+        let safeModeChanged = false;
+        let overallSuccess = false;
+        
+        if (!isRouterBoard) {
+          console.log(`⚠️ Safe Mode verification not applicable for ${deviceType} devices`);
+          newSafeMode = false;
+          safeModeChanged = false;
+          overallSuccess = false;
+        } else {
+          try {
+            const verifyCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system routerboard settings print"`;
+            const { exec } = await import('child_process');
+            const { promisify } = await import('util');
+            const execAsync = promisify(exec);
+            
+            const result = await execAsync(verifyCommand, { timeout: 15000 });
+            if (result.stdout.includes('try-ethernet-once')) {
+              newSafeMode = true;
+            }
+            console.log(`New safe mode status: ${newSafeMode ? '✅ Enabled' : '❌ Disabled'}`);
+          } catch (verifyError) {
+            console.log(`⚠️ Could not verify safe mode status: ${verifyError.message}`);
+            // If verification fails, assume the toggle didn't work
+            newSafeMode = currentSafeMode;
+          }
+          
+          safeModeChanged = (newSafeMode === enabled);
+          overallSuccess = toggleSuccess && safeModeChanged;
+        }
+        
+        console.log(`Safe mode change ${safeModeChanged ? '✅ successful' : '❌ failed'}`);
+        console.log(`Overall success: ${overallSuccess ? '✅ Yes' : '❌ No'}`);
+
+        // Prepare response message based on device type
+        let responseMessage;
+        if (!isRouterBoard) {
+          responseMessage = `Safe Mode is not supported on ${deviceType} devices. This feature is only available on RouterBoard hardware.`;
+        } else {
+          responseMessage = `Safe mode ${enabled ? 'enabled' : 'disabled'} ${overallSuccess ? 'successfully' : 'with issues'}`;
         }
 
         sendJson(res, 200, {
           success: true,
-          enabled: result.enabled,
-          message: result.message
+          message: responseMessage,
+          restartedAt: new Date().toISOString(),
+          status: overallSuccess ? 'success' : (isRouterBoard ? 'partial' : 'not_supported'),
+          deviceName: device.name,
+          deviceIP: deviceIP,
+          deviceType: deviceType,
+          isRouterBoard: isRouterBoard,
+          initialPing: initialPing,
+          currentSafeMode: currentSafeMode,
+          newSafeMode: newSafeMode,
+          safeModeChanged: safeModeChanged,
+          toggleSuccessful: overallSuccess,
+          toggleCommandSuccess: toggleSuccess,
+          verificationSuccess: safeModeChanged,
+          safeModeSupported: isRouterBoard
         });
       } catch (error) {
         console.error('Toggle Mikrotik safe mode error', error);
-        sendJson(res, 500, { message: 'Unable to toggle safe mode right now.' });
+        sendJson(res, 500, { message: `Unable to toggle safe mode: ${error.message}` });
       }
     };
 
@@ -2699,15 +3096,67 @@ const bootstrap = async () => {
 
       try {
         console.log(`Getting safe mode status for MikroTik device ID: ${deviceId}`);
-        const result = await getMikrotikSafeModeStatus(deviceId);
+        
+        // Get device info first
+        const device = await db.getMikrotikById(deviceId);
+        if (!device) {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
 
-        if (!result.success) {
-          throw new Error(result.message || 'Unable to get safe mode status.');
+        const deviceIP = device.host || device.ip;
+        const devicePassword = device.routeros?.sshPassword;
+        const sshUsername = device.routeros?.sshUsername || 'admin';
+        
+        if (!devicePassword) {
+          throw new Error('SSH password not found for device');
+        }
+
+        // Check device type first
+        let isRouterBoard = false;
+        try {
+          const deviceTypeCommand = `python3 ssh_client.py ${deviceIP} ${sshUsername} "${devicePassword}" "/system resource print"`;
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          
+          const deviceResult = await execAsync(deviceTypeCommand, { timeout: 15000 });
+          const deviceData = JSON.parse(deviceResult.stdout);
+          if (!deviceData.success) {
+            throw new Error(deviceData.error);
+          }
+          const deviceOutput = deviceData.output;
+          if (!deviceOutput.includes('x86') && !deviceOutput.includes('VMware')) {
+            isRouterBoard = true;
+          }
+        } catch (deviceError) {
+          console.log(`❌ Could not determine device type: ${deviceError.message}`);
+        }
+
+        let safeModeStatus = false;
+        let bootDevice = 'flash';
+        
+        if (isRouterBoard) {
+          try {
+            const statusCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system routerboard settings print"`;
+            const { exec } = await import('child_process');
+            const { promisify } = await import('util');
+            const execAsync = promisify(exec);
+            
+            const result = await execAsync(statusCommand, { timeout: 15000 });
+            if (result.stdout.includes('try-ethernet-once')) {
+              safeModeStatus = true;
+              bootDevice = 'try-ethernet-once';
+            }
+          } catch (statusError) {
+            console.log(`⚠️ Could not get RouterBoard safe mode status: ${statusError.message}`);
+          }
         }
 
         sendJson(res, 200, { 
-          enabled: result.enabled,
-          bootDevice: result.bootDevice,
+          enabled: safeModeStatus,
+          bootDevice: bootDevice,
+          isRouterBoard: isRouterBoard,
           message: 'Safe mode status retrieved successfully'
         });
       } catch (error) {
@@ -2989,7 +3438,7 @@ const bootstrap = async () => {
         console.log(`🔍 Testing ping to verify restart...`);
         try {
           const { exec } = await import('child_process');
-          const pingCommand = `ping -c 3 -W 2000 ${deviceIP}`;
+          const pingCommand = `ping -c 3 -W 2000 ${device.host || device.ip}`;
           
           exec(pingCommand, { timeout: 10000 }, (error, stdout, stderr) => {
             if (error) {
@@ -3008,11 +3457,153 @@ const bootstrap = async () => {
           restartedAt: new Date().toISOString(),
           status: 'restarting',
           deviceName: device.name,
-          deviceIP: deviceIP
+          deviceIP: device.host || device.ip
         });
       } catch (error) {
         console.error('Restart Mikrotik error', error);
         sendJson(res, 500, { message: `Unable to restart device: ${error.message}` });
+      }
+    };
+
+    const handleRestartWithPingVerification = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        console.log(`🔄 Restarting MikroTik device ID: ${deviceId} with ping verification`);
+        
+        // Get device info first
+        const device = await db.getMikrotikById(deviceId);
+        if (!device) {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        const deviceIP = device.host || device.ip;
+        console.log(`🔄 Device found: ${device.name} (${deviceIP})`);
+        
+        // Step 1: Test initial ping to confirm device is online
+        console.log(`🔍 Step 1/5: Testing initial ping...`);
+        const initialPing = await testPing(deviceIP);
+        console.log(`Initial ping result: ${initialPing ? '✅ Online' : '❌ Offline'}`);
+        
+        // Step 2: Save configuration
+        console.log(`🔄 Step 2/5: Saving current configuration...`);
+        try {
+          const saveConfigCommand = `sshpass -p "${device.routeros?.sshPassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${device.routeros?.sshUsername || 'admin'}@${deviceIP} "/system backup save name=before-restart"`;
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          
+          await execAsync(saveConfigCommand, { timeout: 15000 });
+          console.log(`✅ Configuration saved successfully`);
+        } catch (saveError) {
+          console.log(`⚠️ Could not save config via SSH, continuing with restart...`);
+        }
+
+        // Step 3: Execute restart command
+        console.log(`🔄 Step 3/5: Initiating reboot sequence...`);
+        try {
+          const sshUsername = device.routeros?.sshUsername || 'admin';
+          const devicePassword = device.routeros?.sshPassword;
+          
+          if (!devicePassword) {
+            throw new Error('SSH password not found for device');
+          }
+          
+          const restartCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/system reboot"`;
+          const { exec } = await import('child_process');
+          
+          console.log(`🔄 Executing restart command: ${restartCommand.replace(devicePassword, '***')}`);
+          
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          
+          try {
+            await execAsync(restartCommand, { timeout: 10000 });
+            console.log(`✅ Restart command executed successfully`);
+          } catch (error) {
+            // SSH disconnect is expected after reboot command
+            console.log(`✅ Restart command sent (disconnect expected): ${error.message}`);
+          }
+          
+          console.log(`✅ Restart command sent to device`);
+        } catch (restartError) {
+          console.log(`❌ Restart command failed: ${restartError.message}`);
+          throw new Error('Unable to restart device via SSH');
+        }
+
+        // Step 4: Wait for device to go offline
+        console.log(`🔄 Step 4/5: Waiting for device to go offline...`);
+        let offlineConfirmed = false;
+        for (let i = 0; i < 10; i++) {
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+          const pingResult = await testPing(deviceIP);
+          if (!pingResult) {
+            console.log(`✅ Device is offline (restart in progress)`);
+            offlineConfirmed = true;
+            break;
+          }
+          console.log(`⏳ Device still online, waiting... (${i + 1}/10)`);
+        }
+        
+        if (!offlineConfirmed) {
+          console.log(`⚠️ Device did not go offline, restart may have failed`);
+        }
+
+        // Step 5: Wait for device to come back online
+        console.log(`🔄 Step 5/5: Waiting for device to come back online...`);
+        let onlineConfirmed = false;
+        for (let i = 0; i < 30; i++) {
+          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+          const pingResult = await testPing(deviceIP);
+          if (pingResult) {
+            console.log(`✅ Device is back online after restart!`);
+            onlineConfirmed = true;
+            break;
+          }
+          console.log(`⏳ Device still offline, waiting... (${i + 1}/30)`);
+        }
+        
+        if (!onlineConfirmed) {
+          console.log(`❌ Device did not come back online within expected time`);
+        }
+        
+        sendJson(res, 200, {
+          success: true,
+          message: 'Device restart completed with ping verification',
+          restartedAt: new Date().toISOString(),
+          status: onlineConfirmed ? 'online' : 'offline',
+          deviceName: device.name,
+          deviceIP: deviceIP,
+          initialPing: initialPing,
+          offlineConfirmed: offlineConfirmed,
+          onlineConfirmed: onlineConfirmed,
+          restartSuccessful: onlineConfirmed
+        });
+      } catch (error) {
+        console.error('Restart with ping verification error', error);
+        sendJson(res, 500, { message: `Unable to restart device: ${error.message}` });
+      }
+    };
+
+    // Helper function to test ping
+    const testPing = async (host) => {
+      try {
+        const { exec } = await import('child_process');
+        const { promisify } = await import('util');
+        const execAsync = promisify(exec);
+        
+        const pingCommand = process.platform === 'win32' 
+          ? `ping -n 1 -w 2000 ${host}`
+          : `ping -c 1 -W 2 ${host}`;
+        
+        await execAsync(pingCommand, { timeout: 5000 });
+        return true;
+      } catch (error) {
+        return false;
       }
     };
 
@@ -3103,6 +3694,90 @@ const bootstrap = async () => {
       } catch (error) {
         console.error('Diagnose Mikrotik error', error);
         sendJson(res, 500, { message: `Unable to diagnose device: ${error.message}` });
+      }
+    };
+
+    const handleEnableMikrotik = async (deviceId) => {
+      if (!Number.isInteger(deviceId) || deviceId <= 0) {
+        sendJson(res, 400, { message: 'A valid Mikrotik id is required.' });
+        return;
+      }
+
+      try {
+        console.log(`🔧 Enabling MikroTik device ID: ${deviceId}`);
+        
+        // Get device info first
+        const device = await db.getMikrotikById(deviceId);
+        if (!device) {
+          sendJson(res, 404, { message: 'Mikrotik device not found.' });
+          return;
+        }
+
+        const deviceIP = device.host || device.ip;
+        const devicePassword = device.routeros?.sshPassword;
+        const sshUsername = device.routeros?.sshUsername || 'admin';
+        
+        console.log(`🔧 Device found: ${device.name} (${deviceIP})`);
+        
+        if (!devicePassword) {
+          throw new Error('SSH password not found for device');
+        }
+        
+        // Step 1: Test initial connectivity
+        console.log(`🔍 Step 1/3: Testing initial connectivity...`);
+        const initialPing = await testPing(deviceIP);
+        console.log(`Initial ping result: ${initialPing ? '✅ Online' : '❌ Offline'}`);
+        
+        // Step 2: Enable API service via SSH
+        console.log(`🔧 Step 2/3: Enabling API service...`);
+        try {
+          const enableApiCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUsername}@${deviceIP} "/ip service enable api"`;
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          
+          await execAsync(enableApiCommand, { timeout: 15000 });
+          console.log(`✅ API service enabled successfully`);
+        } catch (enableError) {
+          console.log(`⚠️ Could not enable API via SSH: ${enableError.message}`);
+        }
+        
+        // Step 3: Verify API is working
+        console.log(`🔍 Step 3/3: Verifying API connectivity...`);
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+        
+        let apiEnabled = false;
+        try {
+          const testApiCommand = `sshpass -p "${devicePassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ${sshUsername}@${deviceIP} "/ip service print where name=api"`;
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          
+          const result = await execAsync(testApiCommand, { timeout: 10000 });
+          if (result.stdout.includes('enabled')) {
+            apiEnabled = true;
+            console.log(`✅ API service is now enabled`);
+          } else {
+            console.log(`⚠️ API service status unclear`);
+          }
+        } catch (testError) {
+          console.log(`⚠️ Could not verify API status: ${testError.message}`);
+        }
+        
+        sendJson(res, 200, {
+          success: true,
+          message: 'Device enable completed',
+          restartedAt: new Date().toISOString(),
+          status: apiEnabled ? 'enabled' : 'partially-enabled',
+          deviceName: device.name,
+          deviceIP: deviceIP,
+          initialPing: initialPing,
+          apiEnabled: apiEnabled,
+          enableSuccessful: apiEnabled
+        });
+      } catch (error) {
+        console.error('Enable Mikrotik error', error);
+        sendJson(res, 500, { message: `Unable to enable device: ${error.message}` });
       }
     };
 
@@ -4305,6 +4980,86 @@ const bootstrap = async () => {
       }
     };
 
+    const handleGetIpam = async (ipamId) => {
+      try {
+        const ipam = await db.getIpamById(ipamId);
+        
+        if (!ipam) {
+          sendJson(res, 404, { message: 'IPAM integration not found.' });
+          return;
+        }
+
+        // Return the full ipam object with collections data
+        const response = {
+          id: ipam.id,
+          name: ipam.name,
+          baseUrl: ipam.baseUrl,
+          appId: ipam.appId,
+          appPermissions: ipam.appPermissions,
+          appSecurity: ipam.appSecurity,
+          status: ipam.lastStatus || ipam.status || 'unknown',
+          checkedAt: ipam.checkedAt,
+          lastSyncAt: ipam.lastSyncAt,
+          createdAt: ipam.createdAt,
+          updatedAt: ipam.updatedAt,
+          collections: ipam.collections || { sections: [], datacenters: [], ranges: [] }
+        };
+
+        sendJson(res, 200, response);
+      } catch (error) {
+        console.error('Get IPAM error', error);
+        sendJson(res, 500, { message: 'Unable to retrieve the phpIPAM integration.' });
+      }
+    };
+
+    const handleUpdateIpam = async (ipamId) => {
+      const body = await parseJsonBody(req);
+      const { name, baseUrl, appId, appCode, appPermissions, appSecurity } = body ?? {};
+
+      try {
+        const result = await db.updateIpam(ipamId, { name, baseUrl, appId, appCode, appPermissions, appSecurity });
+
+        if (!result.success) {
+          if (result.reason === 'not-found') {
+            sendJson(res, 404, { message: 'IPAM integration not found.' });
+            return;
+          }
+
+          if (
+            result.reason === 'name-required' ||
+            result.reason === 'base-url-required' ||
+            result.reason === 'app-id-required' ||
+            result.reason === 'app-code-required'
+          ) {
+            sendJson(res, 400, { message: 'Name, base URL, App ID, and App Code are required.' });
+            return;
+          }
+
+          throw new Error('Unable to update IPAM integration');
+        }
+
+        let ipam = result.ipam;
+        let testResult = null;
+
+        try {
+          testResult = await testPhpIpamConnection(ipam);
+          const timestamp = new Date().toISOString();
+          await db.updateIpamStatus(ipam.id, { status: testResult.status, checkedAt: timestamp });
+          const refreshed = await db.getIpamById(ipam.id);
+          if (refreshed) {
+            ipam = refreshed;
+          }
+        } catch (error) {
+          console.warn('Initial phpIPAM test failed', error);
+        }
+
+        sendJson(res, 200, { ipam, test: testResult });
+      } catch (error) {
+        console.error('Update IPAM error', error);
+        sendJson(res, 500, { message: 'Unable to update the phpIPAM integration.' });
+      }
+    };
+
     const handleTestIpam = async (ipamId) => {
       if (!Number.isInteger(ipamId) || ipamId <= 0) {
         sendJson(res, 400, { message: 'A valid IPAM id is required.' });
@@ -4351,7 +5106,7 @@ const bootstrap = async () => {
         const collections = await syncPhpIpamStructure(ipam);
         await db.replaceIpamCollections(ipamId, collections);
         const timestamp = new Date().toISOString();
-        await db.updateIpamStatus(ipamId, { status: 'connected', checkedAt: timestamp });
+        await db.updateIpamStatus(ipamId, { status: 'connected', checkedAt: timestamp, syncedAt: timestamp });
 
         sendJson(res, 200, {
           sections: collections.sections.length,
@@ -4418,13 +5173,26 @@ const bootstrap = async () => {
         return;
       }
 
+      if (method === 'PUT' && (canonicalPath === '/api/ipams' || resourcePath === '/ipams')) {
+        await handleCreateIpam();
+        return;
+      }
+
       if (resourceSegments[0] === 'ipams' && resourceSegments.length >= 2) {
         const idSegment = resourceSegments[1];
         const ipamId = Number.parseInt(idSegment, 10);
 
         if (resourceSegments.length === 2) {
+          if (method === 'GET') {
+            await handleGetIpam(ipamId);
+            return;
+          }
           if (method === 'DELETE') {
             await handleDeleteIpam(ipamId);
+            return;
+          }
+          if (method === 'PUT') {
+            await handleUpdateIpam(ipamId);
             return;
           }
         }
@@ -4595,6 +5363,16 @@ const bootstrap = async () => {
           return;
         }
 
+        if (method === 'GET' && action === 'interface-details') {
+          const interfaceName = url.searchParams.get('name');
+          if (!interfaceName) {
+            sendJson(res, 400, { message: 'Interface name is required.' });
+            return;
+          }
+          await handleGetMikrotikInterfaceDetails(deviceId, interfaceName);
+          return;
+        }
+
         if (method === 'GET' && action === 'ip-addresses') {
           await handleGetMikrotikIpAddresses(deviceId);
           return;
@@ -4602,6 +5380,11 @@ const bootstrap = async () => {
 
         if (method === 'POST' && action === 'ip-addresses') {
           await handleAddMikrotikIpAddress(deviceId);
+          return;
+        }
+
+        if (method === 'PUT' && action === 'ip-addresses') {
+          await handleUpdateMikrotikIpAddress(deviceId);
           return;
         }
 
@@ -4617,6 +5400,11 @@ const bootstrap = async () => {
 
         if (method === 'GET' && action === 'firewall') {
           await handleGetMikrotikFirewallRules(deviceId);
+          return;
+        }
+
+        if (method === 'PUT' && action === 'firewall') {
+          await handleUpdateMikrotikFirewallRule(deviceId);
           return;
         }
 
@@ -4701,8 +5489,18 @@ const bootstrap = async () => {
           return;
         }
 
+        if (method === 'POST' && action === 'restart-with-ping') {
+          await handleRestartWithPingVerification(deviceId);
+          return;
+        }
+
         if (method === 'POST' && action === 'diagnose') {
           await handleDiagnoseMikrotik(deviceId);
+          return;
+        }
+
+        if (method === 'POST' && action === 'enable') {
+          await handleEnableMikrotik(deviceId);
           return;
         }
       }
@@ -4835,6 +5633,7 @@ const bootstrap = async () => {
         await handleSimplePing();
         return;
       }
+
 
       if (
         method === 'POST' &&

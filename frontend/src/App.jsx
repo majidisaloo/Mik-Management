@@ -11,6 +11,7 @@ import Tunnels from './pages/Tunnels.jsx';
 import RoutesPage from './pages/Routes.jsx';
 import Firewall from './pages/Firewall.jsx';
 import IPAM from './pages/IPAM.jsx';
+import IPAMDetails from './pages/IPAMDetails.jsx';
 import Settings from './pages/Settings.jsx';
 import { UpdateProvider } from './context/UpdateContext.jsx';
 
@@ -33,6 +34,7 @@ const managementRoutes = [
   { path: 'routes', Component: RoutesPage },
   { path: 'firewall', Component: Firewall },
   { path: 'ipam', Component: IPAM },
+  { path: 'ipam/:id', Component: IPAMDetails },
   { path: 'settings', Component: Settings }
 ];
 
