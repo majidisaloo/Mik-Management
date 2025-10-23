@@ -17,9 +17,15 @@ const DeviceDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [activeIpTab, setActiveIpTab] = useState('ipv4');
+  const [activeRouteTab, setActiveRouteTab] = useState('v4');
+  const [ipSearchTerm, setIpSearchTerm] = useState('');
   const [interfaces, setInterfaces] = useState([]);
   const [ipAddresses, setIpAddresses] = useState([]);
+  const [ipv6Addresses, setIpv6Addresses] = useState([]);
   const [routes, setRoutes] = useState([]);
+  const [ipv6Routes, setIpv6Routes] = useState([]);
+  const [routeMarks, setRouteMarks] = useState([]);
   const [firewallRules, setFirewallRules] = useState([]);
   const [natRules, setNatRules] = useState([]);
   const [mangleRules, setMangleRules] = useState([]);
@@ -45,18 +51,29 @@ const DeviceDetails = () => {
   const [sortColumn, setSortColumn] = useState(null);
   const [sortDirection, setSortDirection] = useState('asc');
   
+  // Loading states
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
   // Modal states
   const [showAddIpModal, setShowAddIpModal] = useState(false);
+  const [showEditIpModal, setShowEditIpModal] = useState(false);
+  const [editingIp, setEditingIp] = useState(null);
   const [showAddInterfaceModal, setShowAddInterfaceModal] = useState(false);
+  const [showEditInterfaceModal, setShowEditInterfaceModal] = useState(false);
+  const [editingInterface, setEditingInterface] = useState(null);
   const [showAddRouteModal, setShowAddRouteModal] = useState(false);
+  const [showEditRouteModal, setShowEditRouteModal] = useState(false);
+  const [editingRoute, setEditingRoute] = useState(null);
   const [showAddFirewallModal, setShowAddFirewallModal] = useState(false);
   const [showEditFirewallModal, setShowEditFirewallModal] = useState(false);
+  const [editingFirewall, setEditingFirewall] = useState(null);
   const [showEditMangleModal, setShowEditMangleModal] = useState(false);
   
   // Form data
   const [formData, setFormData] = useState({
     address: '',
     network: '',
+    networkEnabled: false,
     interface: '',
     comment: '',
     distance: '',
@@ -67,7 +84,18 @@ const DeviceDetails = () => {
     destinationAddressList: '',
     protocol: '',
     port: '',
-    action: 'accept'
+    action: 'accept',
+    // Interface fields
+    interfaceName: '',
+    interfaceType: '',
+    // Tunnel specific fields
+    tunnelLocalIp: '',
+    tunnelRemoteIp: '',
+    tunnelKeepAliveEnabled: false,
+    tunnelKeepAlive: '',
+    tunnelAllowFastPath: false,
+    tunnelSecretKey: '',
+    tunnelId: ''
   });
 
   useEffect(() => {
@@ -138,42 +166,121 @@ const DeviceDetails = () => {
   };
 
   const loadInterfaces = async () => {
+    setIsRefreshing(true);
     try {
       const response = await fetch(`/api/mikrotiks/${id}/interfaces`);
       if (response.ok) {
         const data = await response.json();
-        setInterfaces(data.interfaces || []);
+        let interfaces = data.interfaces || [];
+        
+        // Fetch detailed information for tunnel interfaces
+        const tunnelTypes = ['eoip', 'eoipv6-', 'gre', 'gre6-tunnel', 'ipip', 'ipipv6-tunnel', 'l2tp', 'pptp', 'sstp'];
+        const tunnelInterfaces = interfaces.filter(iface => 
+          tunnelTypes.includes(iface.type) || iface.type.includes('tunnel')
+        );
+        
+        // Fetch details for each tunnel interface
+        const enhancedInterfaces = await Promise.all(
+          interfaces.map(async (iface) => {
+            if (tunnelTypes.includes(iface.type) || iface.type.includes('tunnel')) {
+              try {
+                const detailResponse = await fetch(`/api/mikrotiks/${id}/interface-details?name=${encodeURIComponent(iface.name)}`);
+                if (detailResponse.ok) {
+                  const detailData = await detailResponse.json();
+                  console.log(`Details for ${iface.name}:`, detailData);
+                  if (detailData.details) {
+                    return {
+                      ...iface,
+                      tunnelLocalIp: detailData.details.tunnelLocalIp,
+                      tunnelRemoteIp: detailData.details.tunnelRemoteIp,
+                      tunnelKeepAlive: detailData.details.tunnelKeepAlive,
+                      tunnelKeepAliveEnabled: detailData.details.tunnelKeepAliveEnabled,
+                      tunnelSecretKey: detailData.details.tunnelSecretKey,
+                      tunnelId: detailData.details.tunnelId
+                    };
+                  }
+                }
+              } catch (error) {
+                console.error(`Error fetching details for interface ${iface.name}:`, error);
+              }
+            }
+            return iface;
+          })
+        );
+        
+        console.log('Enhanced interfaces:', enhancedInterfaces);
+        setInterfaces(enhancedInterfaces);
       }
     } catch (err) {
       console.error('Error loading interfaces:', err);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
   const loadIpAddresses = async () => {
+    setIsRefreshing(true);
     try {
-      const response = await fetch(`/api/mikrotiks/${id}/ip-addresses`);
+      console.log('Loading IP addresses...');
+      const response = await fetch(`/api/mikrotiks/${id}/ip-addresses?t=${Date.now()}`);
       if (response.ok) {
         const data = await response.json();
-        setIpAddresses(data.addresses || []);
+        const addresses = data.ipAddresses || [];
+        console.log('Loaded IP addresses:', addresses);
+        
+        // Separate IPv4 and IPv6 addresses
+        const ipv4Addresses = addresses.filter(addr => 
+          addr.address && !addr.address.includes(':') && !addr.address.includes('::')
+        );
+        const ipv6Addresses = addresses.filter(addr => 
+          addr.address && (addr.address.includes(':') || addr.address.includes('::'))
+        );
+        
+        console.log('IPv4 addresses:', ipv4Addresses);
+        console.log('IPv6 addresses:', ipv6Addresses);
+        
+        setIpAddresses(ipv4Addresses);
+        setIpv6Addresses(ipv6Addresses);
       }
     } catch (err) {
       console.error('Error loading IP addresses:', err);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
   const loadRoutes = async () => {
+    setIsRefreshing(true);
     try {
       const response = await fetch(`/api/mikrotiks/${id}/routes`);
       if (response.ok) {
         const data = await response.json();
-        setRoutes(data.routes || []);
+        const routes = data.routes || [];
+        
+        // Separate IPv4 and IPv6 routes
+        const ipv4Routes = routes.filter(route => 
+          route.dstAddress && !route.dstAddress.includes(':') && !route.dstAddress.includes('::')
+        );
+        const ipv6Routes = routes.filter(route => 
+          route.dstAddress && (route.dstAddress.includes(':') || route.dstAddress.includes('::'))
+        );
+        
+        setRoutes(ipv4Routes);
+        setIpv6Routes(ipv6Routes);
+        
+        // Extract unique route marks from all routes
+        const marks = [...new Set(routes.map(route => route.mark).filter(mark => mark && mark !== ''))];
+        setRouteMarks(marks);
       }
     } catch (err) {
       console.error('Error loading routes:', err);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
   const loadFirewallRules = async () => {
+    setIsRefreshing(true);
     try {
       const response = await fetch(`/api/mikrotiks/${id}/firewall`);
       if (response.ok) {
@@ -182,10 +289,13 @@ const DeviceDetails = () => {
       }
     } catch (err) {
       console.error('Error loading firewall rules:', err);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
   const loadNatRules = async () => {
+    setIsRefreshing(true);
     try {
       const response = await fetch(`/api/mikrotiks/${id}/nat`);
       if (response.ok) {
@@ -194,10 +304,13 @@ const DeviceDetails = () => {
       }
     } catch (err) {
       console.error('Error loading NAT rules:', err);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
   const loadMangleRules = async () => {
+    setIsRefreshing(true);
     try {
       const response = await fetch(`/api/mikrotiks/${id}/mangle`);
       if (response.ok) {
@@ -206,6 +319,8 @@ const DeviceDetails = () => {
       }
     } catch (err) {
       console.error('Error loading mangle rules:', err);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -348,8 +463,48 @@ const DeviceDetails = () => {
         await loadIpAddresses();
         await loadSystemLogs();
         setShowAddIpModal(false);
-        setFormData({ address: '', network: '', interface: '', comment: '' });
+        setFormData({ address: '', network: '', networkEnabled: false, interface: '', comment: '' });
         alert('IP address added successfully!');
+      } else {
+        const error = await response.json();
+        console.error('Error response:', error);
+        alert(`Error: ${error.message}`);
+      }
+    } catch (err) {
+      console.error('Error:', err);
+      alert(`Error: ${err.message}`);
+    }
+  };
+
+  const handleEditIpAddress = async (e) => {
+    e.preventDefault();
+    console.log('Editing IP address with formData:', formData);
+    try {
+      const response = await fetch(`/api/mikrotiks/${id}/ip-addresses`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          address: formData.address,
+          network: formData.network || '',
+          interface: formData.interface || '',
+          comment: formData.comment || '',
+          disabled: formData.disabled || false,
+          routerosId: formData.routerosId
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('IP address updated successfully:', result);
+        console.log('Reloading IP addresses...');
+        await loadIpAddresses();
+        await loadSystemLogs();
+        setShowEditIpModal(false);
+        setEditingIp(null);
+        setFormData({ address: '', network: '', networkEnabled: false, interface: '', comment: '' });
+        alert('IP address updated successfully!');
       } else {
         const error = await response.json();
         console.error('Error response:', error);
@@ -375,7 +530,7 @@ const DeviceDetails = () => {
           interface: formData.interface,
           distance: formData.distance,
           markRoute: formData.markRoute,
-          comment: formData.comment || 'test'
+          comment: formData.comment || ''
         }),
       });
 
@@ -387,6 +542,45 @@ const DeviceDetails = () => {
         setShowAddRouteModal(false);
         setFormData({ ...formData, destination: '', gateway: '', distance: '', markRoute: '' });
         alert('Route added successfully!');
+      } else {
+        const error = await response.json();
+        console.error('Error response:', error);
+        alert(`Error: ${error.message}`);
+      }
+    } catch (err) {
+      console.error('Error:', err);
+      alert(`Error: ${err.message}`);
+    }
+  };
+
+  const handleEditRoute = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`/api/mikrotiks/${id}/routes/${editingRoute.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          destination: formData.destination,
+          gateway: formData.gateway,
+          interface: formData.interface,
+          distance: formData.distance,
+          markRoute: formData.markRoute,
+          comment: formData.comment || '',
+          disabled: formData.disabled || false
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Route updated successfully:', result);
+        await loadRoutes();
+        await loadSystemLogs();
+        setShowEditRouteModal(false);
+        setEditingRoute(null);
+        setFormData({ ...formData, destination: '', gateway: '', distance: '', markRoute: '', comment: '' });
+        alert('Route updated successfully!');
       } else {
         const error = await response.json();
         console.error('Error response:', error);
@@ -460,6 +654,41 @@ const DeviceDetails = () => {
         setShowAddInterfaceModal(false);
         setFormData({ ...formData, interfaceName: '', interfaceType: '', comment: '' });
         alert('Interface added successfully!');
+      } else {
+        const error = await response.json();
+        console.error('Error response:', error);
+        alert(`Error: ${error.message}`);
+      }
+    } catch (err) {
+      console.error('Error:', err);
+      alert(`Error: ${err.message}`);
+    }
+  };
+
+  const handleEditInterface = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`/api/mikrotiks/${id}/interfaces/${editingInterface.name}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.interfaceName,
+          type: formData.interfaceType,
+          comment: formData.comment || 'test'
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Interface updated successfully:', result);
+        await loadInterfaces();
+        await loadSystemLogs();
+        setShowEditInterfaceModal(false);
+        setEditingInterface(null);
+        setFormData({ ...formData, interfaceName: '', interfaceType: '', comment: '' });
+        alert('Interface updated successfully!');
       } else {
         const error = await response.json();
         console.error('Error response:', error);
@@ -1059,20 +1288,15 @@ const DeviceDetails = () => {
   const handleEditFirewallRule = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`/api/mikrotiks/${id}/firewall/edit`, {
+      const response = await fetch(`/api/mikrotiks/${id}/firewall`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sourceAddress: formData.sourceAddress,
-          sourceAddressList: formData.sourceAddressList,
-          destinationAddress: formData.destinationAddress,
-          destinationAddressList: formData.destinationAddressList,
-          protocol: formData.protocol,
-          port: formData.port,
-          action: formData.action,
-          comment: formData.comment || 'test'
+          routerosId: formData.routerosId,
+          disabled: formData.disabled,
+          comment: formData.comment || ''
         }),
       });
 
@@ -1145,12 +1369,124 @@ const DeviceDetails = () => {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        setSafeMode(data.enabled);
-        await loadSystemLogs();
-        alert(`Safe mode ${data.enabled ? 'enabled' : 'disabled'} successfully!`);
+        const result = await response.json();
         
-        // Start checking safe mode status every 10 seconds
+        // Create beautiful safe mode result modal
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.6);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 10000;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+
+        const isSuccess = result.toggleSuccessful;
+        const isNotSupported = result.status === 'not_supported';
+        const statusColor = isNotSupported ? '#6b7280' : (isSuccess ? '#10b981' : '#f59e0b');
+        const statusIcon = isNotSupported ? 'ℹ️' : (isSuccess ? '✅' : '⚠️');
+        let statusText;
+        if (isNotSupported) {
+          statusText = 'Safe Mode Not Supported';
+        } else if (isSuccess) {
+          statusText = 'Safe Mode Toggle Successful';
+        } else {
+          statusText = 'Safe Mode Toggle Partially Successful';
+        }
+
+        modal.innerHTML = `
+          <div style="
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            text-align: center;
+          ">
+            <div style="
+              width: 64px;
+              height: 64px;
+              background: ${statusColor};
+              border-radius: 50%;
+              margin: 0 auto 24px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 32px;
+            ">
+              ${statusIcon}
+            </div>
+            <h2 style="
+              margin: 0 0 16px 0;
+              color: #1a1a1a;
+              font-size: 24px;
+              font-weight: 600;
+            ">${statusText}</h2>
+            <p style="
+              margin: 0 0 24px 0;
+              color: #666;
+              font-size: 16px;
+              line-height: 1.5;
+            ">${result.message}</p>
+
+            <div style="
+              background: #f5f5f5;
+              border-radius: 8px;
+              padding: 16px;
+              margin: 16px 0;
+              font-size: 14px;
+              color: #666;
+              text-align: left;
+            ">
+              <div><strong>Device:</strong> ${result.deviceName} (${result.deviceIP})</div>
+              <div><strong>Device Type:</strong> ${result.deviceType || 'Unknown'}</div>
+              <div><strong>Safe Mode Supported:</strong> ${result.safeModeSupported ? '✅ Yes' : '❌ No'}</div>
+              <div><strong>Initial Ping:</strong> ${result.initialPing ? '✅ Online' : '❌ Offline'}</div>
+              ${result.safeModeSupported ? `
+                <div><strong>Previous Safe Mode:</strong> ${result.currentSafeMode ? '✅ Enabled' : '❌ Disabled'}</div>
+                <div><strong>New Safe Mode:</strong> ${result.newSafeMode ? '✅ Enabled' : '❌ Disabled'}</div>
+                <div><strong>Change Verified:</strong> ${result.safeModeChanged ? '✅ Yes' : '❌ No'}</div>
+              ` : `
+                <div><strong>Note:</strong> Safe Mode is only available on RouterBoard hardware</div>
+              `}
+              <div><strong>Toggle Time:</strong> ${new Date(result.restartedAt).toLocaleString()}</div>
+            </div>
+
+            <button onclick="this.closest('.safe-mode-result-modal').remove()" style="
+              background: ${statusColor};
+              color: white;
+              border: none;
+              padding: 12px 24px;
+              border-radius: 8px;
+              font-size: 16px;
+              font-weight: 500;
+              cursor: pointer;
+              transition: transform 0.2s;
+            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+              Close
+            </button>
+          </div>
+        `;
+
+        modal.className = 'safe-mode-result-modal';
+        document.body.appendChild(modal);
+
+        // Auto-remove modal after 10 seconds
+        setTimeout(() => {
+          if (modal.parentNode) {
+            modal.remove();
+          }
+        }, 10000);
+
+        setSafeMode(result.newSafeMode);
+        await loadSystemLogs();
         startSafeModeStatusCheck();
       } else {
         const error = await response.json();
@@ -1196,14 +1532,14 @@ const DeviceDetails = () => {
   const handleRestartDevice = async () => {
     if (window.confirm('Are you sure you want to restart this device? This will disconnect the device temporarily.')) {
       try {
-        const response = await fetch(`/api/mikrotiks/${id}/restart`, {
+        const response = await fetch(`/api/mikrotiks/${id}/restart-with-ping`, {
         method: 'POST',
       });
 
       if (response.ok) {
           const result = await response.json();
           
-          // Create beautiful restart modal instead of simple alert
+          // Create beautiful restart result modal
           const modal = document.createElement('div');
           modal.style.cssText = `
             position: fixed;
@@ -1220,12 +1556,17 @@ const DeviceDetails = () => {
             backdrop-filter: blur(4px);
           `;
           
+          const isSuccess = result.restartSuccessful;
+          const statusColor = isSuccess ? '#10b981' : '#ef4444';
+          const statusIcon = isSuccess ? '✅' : '❌';
+          const statusText = isSuccess ? 'Restart Successful' : 'Restart Failed';
+          
           const modalContent = document.createElement('div');
           modalContent.style.cssText = `
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            background: linear-gradient(135deg, ${statusColor} 0%, ${isSuccess ? '#059669' : '#dc2626'} 100%);
             border-radius: 20px;
             padding: 0;
-            max-width: 500px;
+            max-width: 600px;
             width: 90%;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
             animation: modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -1269,32 +1610,44 @@ const DeviceDetails = () => {
               text-align: center;
               position: relative;
             ">
-              <!-- Restart Icon with Animation -->
+              <!-- Close Button (X) -->
+              <button id="closeModalX" style="
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                border-radius: 50%;
+                width: 35px;
+                height: 35px;
+                color: white;
+                font-size: 18px;
+                font-weight: bold;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.3s ease;
+                z-index: 10001;
+              " onmouseover="this.style.background='rgba(255, 255, 255, 0.3)'; this.style.transform='scale(1.1)'" onmouseout="this.style.background='rgba(255, 255, 255, 0.2)'; this.style.transform='scale(1)'">
+                ×
+              </button>
+              
+              <!-- Status Icon -->
               <div style="
                 width: 80px;
                 height: 80px;
-                background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+                background: rgba(255, 255, 255, 0.2);
                 border-radius: 50%;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 margin: 0 auto 20px;
-                box-shadow: 0 10px 25px rgba(255, 107, 107, 0.3);
+                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
                 animation: float 3s ease-in-out infinite;
                 position: relative;
               ">
-                <div style="
-                  width: 60px;
-                  height: 60px;
-                  background: rgba(255, 255, 255, 0.2);
-                  border-radius: 50%;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  animation: pulse 2s ease-in-out infinite;
-                ">
-                  <span style="color: white; font-size: 32px; font-weight: bold; animation: spin 2s linear infinite;">🔄</span>
-                </div>
+                <span style="color: white; font-size: 40px; font-weight: bold;">${statusIcon}</span>
               </div>
               
               <!-- Title -->
@@ -1304,14 +1657,14 @@ const DeviceDetails = () => {
                 font-size: 24px; 
                 font-weight: 700;
                 text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-              ">Device Restarting!</h2>
+              ">${statusText}</h2>
               
               <p style="
                 margin: 0 0 25px 0; 
                 color: rgba(255, 255, 255, 0.9); 
                 font-size: 16px;
                 line-height: 1.5;
-              ">Please wait 1-2 minutes for the device to come back online</p>
+              ">${result.message}</p>
             </div>
             
             <!-- Content Section -->
@@ -1321,64 +1674,25 @@ const DeviceDetails = () => {
               border-radius: 0 0 20px 20px;
             ">
               <div style="
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 20px;
-                margin-bottom: 25px;
+                background: #f5f5f5;
+                border-radius: 8px;
+                padding: 16px;
+                margin: 16px 0;
+                font-size: 14px;
+                color: #666;
+                text-align: left;
               ">
-                <div style="
-                  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
-                  border-radius: 12px;
-                  padding: 15px;
-                  text-align: center;
-                  border: 2px solid #e2e8f0;
-                  transition: all 0.3s ease;
-                " onmouseover="this.style.borderColor='#ff6b6b'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
-                  <div style="color: #64748B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Device</div>
-                  <div style="color: #1E293B; font-size: 16px; font-weight: 700;">${result.deviceName}</div>
-                </div>
-                
-                <div style="
-                  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
-                  border-radius: 12px;
-                  padding: 15px;
-                  text-align: center;
-                  border: 2px solid #e2e8f0;
-                  transition: all 0.3s ease;
-                " onmouseover="this.style.borderColor='#ff6b6b'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
-                  <div style="color: #64748B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">IP Address</div>
-                  <div style="color: #1E293B; font-size: 16px; font-weight: 700;">${result.deviceIP || device?.host || device?.ip || 'Unknown'}</div>
-                </div>
-                
-                <div style="
-                  background: linear-gradient(135deg, #fef3c7, #fde68a);
-                  border-radius: 12px;
-                  padding: 15px;
-                  text-align: center;
-                  border: 2px solid #f59e0b;
-                  transition: all 0.3s ease;
-                " onmouseover="this.style.borderColor='#D97706'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#f59e0b'; this.style.transform='translateY(0)'">
-                  <div style="color: #92400E; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Status</div>
-                  <div style="color: #B45309; font-size: 16px; font-weight: 700;">🔄 Restarting</div>
-                </div>
-                
-                <div style="
-                  background: linear-gradient(135deg, #fef3c7, #fde68a);
-                  border-radius: 12px;
-                  padding: 15px;
-                  text-align: center;
-                  border: 2px solid #f59e0b;
-                  transition: all 0.3s ease;
-                " onmouseover="this.style.borderColor='#D97706'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#f59e0b'; this.style.transform='translateY(0)'">
-                  <div style="color: #92400E; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">ETA</div>
-                  <div style="color: #B45309; font-size: 16px; font-weight: 700;">1-2 min</div>
-                </div>
+                <div><strong>Device:</strong> ${result.deviceName} (${result.deviceIP})</div>
+                <div><strong>Initial Ping:</strong> ${result.initialPing ? '✅ Online' : '❌ Offline'}</div>
+                <div><strong>Offline Confirmed:</strong> ${result.offlineConfirmed ? '✅ Yes' : '❌ No'}</div>
+                <div><strong>Online Confirmed:</strong> ${result.onlineConfirmed ? '✅ Yes' : '❌ No'}</div>
+                <div><strong>Restart Time:</strong> ${new Date(result.restartedAt).toLocaleString()}</div>
               </div>
               
               <!-- Action Button -->
               <div style="text-align: center;">
                 <button id="closeModal" style="
-                  background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+                  background: linear-gradient(135deg, ${statusColor}, ${isSuccess ? '#059669' : '#dc2626'});
                   color: white;
                   border: none;
                   border-radius: 12px;
@@ -1387,10 +1701,10 @@ const DeviceDetails = () => {
                   font-weight: 600;
                   cursor: pointer;
                   transition: all 0.3s ease;
-                  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+                  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
                   text-transform: uppercase;
                   letter-spacing: 0.5px;
-                " onmouseover="this.style.background='linear-gradient(135deg, #ee5a24, #d63031)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(255, 107, 107, 0.4)'" onmouseout="this.style.background='linear-gradient(135deg, #ff6b6b, #ee5a24)'; this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(255, 107, 107, 0.3)'">
+                " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(0, 0, 0, 0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(0, 0, 0, 0.2)'">
                   ✨ Close
                 </button>
               </div>
@@ -1410,9 +1724,17 @@ const DeviceDetails = () => {
           };
           
           modalContent.querySelector('#closeModal').onclick = closeModal;
+          modalContent.querySelector('#closeModalX').onclick = closeModal;
           modal.onclick = (e) => {
             if (e.target === modal) closeModal();
           };
+          
+          // Auto-remove modal after 10 seconds
+          setTimeout(() => {
+            if (modal.parentNode) {
+              closeModal();
+            }
+          }, 10000);
           
         await loadSystemLogs();
       } else {
@@ -1570,7 +1892,106 @@ const DeviceDetails = () => {
       });
 
       if (response.ok) {
-        alert('Device enabled');
+        const result = await response.json();
+        
+        // Create beautiful enable result modal
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.6);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 10000;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+
+        const isSuccess = result.enableSuccessful;
+        const statusColor = isSuccess ? '#10b981' : '#f59e0b';
+        const statusIcon = isSuccess ? '✅' : '⚠️';
+        const statusText = isSuccess ? 'Device Enabled' : 'Enable Partially Successful';
+
+        modal.innerHTML = `
+          <div style="
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            text-align: center;
+          ">
+            <div style="
+              width: 64px;
+              height: 64px;
+              background: ${statusColor};
+              border-radius: 50%;
+              margin: 0 auto 24px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 32px;
+            ">
+              ${statusIcon}
+            </div>
+            <h2 style="
+              margin: 0 0 16px 0;
+              color: #1a1a1a;
+              font-size: 24px;
+              font-weight: 600;
+            ">${statusText}</h2>
+            <p style="
+              margin: 0 0 24px 0;
+              color: #666;
+              font-size: 16px;
+              line-height: 1.5;
+            ">${result.message}</p>
+
+            <div style="
+              background: #f5f5f5;
+              border-radius: 8px;
+              padding: 16px;
+              margin: 16px 0;
+              font-size: 14px;
+              color: #666;
+              text-align: left;
+            ">
+              <div><strong>Device:</strong> ${result.deviceName} (${result.deviceIP})</div>
+              <div><strong>Initial Ping:</strong> ${result.initialPing ? '✅ Online' : '❌ Offline'}</div>
+              <div><strong>API Enabled:</strong> ${result.apiEnabled ? '✅ Yes' : '❌ No'}</div>
+              <div><strong>Enable Time:</strong> ${new Date(result.restartedAt).toLocaleString()}</div>
+            </div>
+
+            <button onclick="this.closest('.enable-result-modal').remove()" style="
+              background: ${statusColor};
+              color: white;
+              border: none;
+              padding: 12px 24px;
+              border-radius: 8px;
+              font-size: 16px;
+              font-weight: 500;
+              cursor: pointer;
+              transition: transform 0.2s;
+            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+              Close
+            </button>
+          </div>
+        `;
+
+        modal.className = 'enable-result-modal';
+        document.body.appendChild(modal);
+
+        // Auto-remove modal after 10 seconds
+        setTimeout(() => {
+          if (modal.parentNode) {
+            modal.remove();
+          }
+        }, 10000);
+
         await loadSystemLogs();
       } else {
         const error = await response.json();
@@ -1958,20 +2379,25 @@ const DeviceDetails = () => {
               </button>
               <button
                 onClick={loadInterfaces}
+                disabled={isRefreshing}
                 style={{
                   padding: '10px 20px',
-                  backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
+                  backgroundColor: isRefreshing ? '#666' : (theme === 'dark' ? '#333' : '#e0e0e0'),
                   color: theme === 'dark' ? '#fff' : '#000',
                   border: 'none',
                   borderRadius: '5px',
-                  cursor: 'pointer'
+                  cursor: isRefreshing ? 'not-allowed' : 'pointer',
+                  opacity: isRefreshing ? 0.6 : 1
                 }}
               >
-                Refresh
+                {isRefreshing ? '⏳ Loading...' : '🔄 Refresh'}
               </button>
                       </div>
                     </div>
           
+          {/* Physical Interfaces Section */}
+          <div style={{ marginBottom: '30px' }}>
+            <h3 style={{ marginBottom: '15px', color: theme === 'dark' ? '#fff' : '#333' }}>Physical Interfaces</h3>
           <div style={{
             backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff',
             borderRadius: '10px',
@@ -1980,35 +2406,245 @@ const DeviceDetails = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}` }}>
+                    <th style={{ padding: '15px', textAlign: 'left' }}>Status</th>
                   <th style={{ padding: '15px', textAlign: 'left' }}>Name</th>
                   <th style={{ padding: '15px', textAlign: 'left' }}>Type</th>
-                  <th style={{ padding: '15px', textAlign: 'left' }}>Status</th>
-                  <th style={{ padding: '15px', textAlign: 'left' }}>RX</th>
-                  <th style={{ padding: '15px', textAlign: 'left' }}>TX</th>
+                    <th style={{ padding: '15px', textAlign: 'left' }}>RX Bytes</th>
+                    <th style={{ padding: '15px', textAlign: 'left' }}>TX Bytes</th>
                   <th style={{ padding: '15px', textAlign: 'left' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {interfaces.map((iface, index) => (
-                  <tr key={index} style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}` }}>
+                  {interfaces.filter(iface => iface.type === 'ether' || iface.type === 'loopback').map((iface, index) => (
+                  <tr key={index} style={{ 
+                    borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    opacity: iface.disabled ? 0.5 : 1
+                  }}>
+                    <td style={{ padding: '15px' }}>
+                      {iface.running && (
+                        <span style={{
+                          backgroundColor: '#28a745',
+                          color: '#fff',
+                          padding: '2px 6px',
+                          borderRadius: '3px',
+                          fontSize: '0.7rem',
+                          fontWeight: 'bold'
+                        }}>
+                          R
+                        </span>
+                      )}
+                    </td>
                     <td style={{ padding: '15px' }}>{iface.name}</td>
                     <td style={{ padding: '15px' }}>{iface.type}</td>
                     <td style={{ padding: '15px' }}>
-                      <span style={{
-                        padding: '5px 10px',
-                        borderRadius: '15px',
-                        backgroundColor: iface.status === 'up' ? '#28a745' : '#dc3545',
-                        color: '#fff',
-                        fontSize: '0.8rem'
-                      }}>
-                        {iface.status}
-                      </span>
+                      {iface.rxBytes ? 
+                        iface.rxBytes >= 1024 * 1024 ? 
+                          (iface.rxBytes / 1024 / 1024).toFixed(2) + ' MB' : 
+                          (iface.rxBytes / 1024).toFixed(2) + ' KB' 
+                        : '0 B'}
                     </td>
-                    <td style={{ padding: '15px' }}>{iface.rx || '0'}</td>
-                    <td style={{ padding: '15px' }}>{iface.tx || '0'}</td>
+                    <td style={{ padding: '15px' }}>
+                      {iface.txBytes ? 
+                        iface.txBytes >= 1024 * 1024 ? 
+                          (iface.txBytes / 1024 / 1024).toFixed(2) + ' MB' : 
+                          (iface.txBytes / 1024).toFixed(2) + ' KB' 
+                        : '0 B'}
+                    </td>
                     <td style={{ padding: '15px' }}>
                       <button
-                        onClick={() => setShowEditInterfaceModal(true)}
+                        onClick={async () => {
+                          setEditingInterface(iface);
+                          
+                          // Initialize form data with basic interface info
+                          let formData = {
+                            interfaceName: iface.name || '',
+                            interfaceType: iface.type || '',
+                            comment: iface.comment || '',
+                            disabled: iface.disabled || false,
+                            // Tunnel specific fields
+                            tunnelLocalIp: iface.tunnelLocalIp || '',
+                            tunnelRemoteIp: iface.tunnelRemoteIp || '',
+                            tunnelKeepAliveEnabled: iface.tunnelKeepAliveEnabled || false,
+                            tunnelKeepAlive: iface.tunnelKeepAlive || '',
+                            tunnelAllowFastPath: iface.tunnelAllowFastPath || false,
+                            tunnelSecretKey: iface.tunnelSecretKey || '',
+                            tunnelId: iface.tunnelId || ''
+                          };
+
+                          // If it's a tunnel interface, fetch detailed configuration
+                          if (iface.type === 'eoip' || iface.type === 'eoipv6-' || 
+                              iface.type === 'gre' || iface.type === 'gre6-tunnel' ||
+                              iface.type === 'ipip' || iface.type === 'ipipv6-tunnel' ||
+                              iface.type === 'l2tp' || iface.type === 'pptp' ||
+                              iface.type === 'sstp' || iface.type.includes('tunnel')) {
+                            
+                            try {
+                              const response = await fetch(`/api/mikrotiks/${id}/interface-details?name=${encodeURIComponent(iface.name)}`);
+                              const result = await response.json();
+                              
+                              if (result.success && result.details) {
+                                const details = result.details;
+                                formData = {
+                                  ...formData,
+                                  comment: details.comment || iface.comment || '',
+                                  disabled: details.disabled !== undefined ? details.disabled : iface.disabled || false,
+                                  tunnelLocalIp: details.tunnelLocalIp || '',
+                                  tunnelRemoteIp: details.tunnelRemoteIp || '',
+                                  tunnelKeepAliveEnabled: details.tunnelKeepAliveEnabled || false,
+                                  tunnelKeepAlive: details.tunnelKeepAlive || '',
+                                  tunnelAllowFastPath: details.tunnelAllowFastPath || false,
+                                  tunnelSecretKey: details.tunnelSecretKey || '',
+                                  tunnelId: details.tunnelId || ''
+                                };
+                              }
+                            } catch (error) {
+                              console.error('Error fetching interface details:', error);
+                              // Continue with basic form data if fetch fails
+                            }
+                          }
+                          
+                          setFormData(formData);
+                          setShowEditInterfaceModal(true);
+                        }}
+                        style={{
+                        padding: '5px 10px',
+                          backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
+                          color: theme === 'dark' ? '#fff' : '#000',
+                          border: 'none',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                        fontSize: '0.8rem'
+                        }}
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            </div>
+          </div>
+          
+          {/* Tunnels Section */}
+          <div style={{ marginBottom: '30px' }}>
+            <h3 style={{ marginBottom: '15px', color: theme === 'dark' ? '#fff' : '#333' }}>Tunnels</h3>
+            <div style={{
+              backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff',
+              borderRadius: '10px',
+              border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`
+            }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}` }}>
+                    <th style={{ padding: '15px', textAlign: 'left' }}>Status</th>
+                    <th style={{ padding: '15px', textAlign: 'left' }}>Name</th>
+                    <th style={{ padding: '15px', textAlign: 'left' }}>Type</th>
+                    <th style={{ padding: '15px', textAlign: 'left' }}>Local IP</th>
+                    <th style={{ padding: '15px', textAlign: 'left' }}>Remote IP</th>
+                    <th style={{ padding: '15px', textAlign: 'left' }}>RX Bytes</th>
+                    <th style={{ padding: '15px', textAlign: 'left' }}>TX Bytes</th>
+                    <th style={{ padding: '15px', textAlign: 'left' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {interfaces.filter(iface => iface.type !== 'ether' && iface.type !== 'loopback').map((iface, index) => (
+                    <tr key={index} style={{ 
+                      borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                      opacity: iface.disabled ? 0.5 : 1
+                    }}>
+                      <td style={{ padding: '15px' }}>
+                        {iface.running && (
+                          <span style={{
+                            backgroundColor: '#28a745',
+                            color: '#fff',
+                            padding: '2px 6px',
+                            borderRadius: '3px',
+                            fontSize: '0.7rem',
+                            fontWeight: 'bold'
+                          }}>
+                            R
+                      </span>
+                        )}
+                    </td>
+                      <td style={{ padding: '15px' }}>{iface.name}</td>
+                      <td style={{ padding: '15px' }}>{iface.type}</td>
+                      <td style={{ padding: '15px' }}>
+                        {iface.tunnelLocalIp || iface.localAddress || '-'}
+                      </td>
+                      <td style={{ padding: '15px' }}>
+                        {iface.tunnelRemoteIp || iface.remoteAddress || '-'}
+                      </td>
+                      <td style={{ padding: '15px' }}>
+                        {iface.rxBytes ? 
+                        iface.rxBytes >= 1024 * 1024 ? 
+                          (iface.rxBytes / 1024 / 1024).toFixed(2) + ' MB' : 
+                          (iface.rxBytes / 1024).toFixed(2) + ' KB' 
+                        : '0 B'}
+                      </td>
+                      <td style={{ padding: '15px' }}>
+                        {iface.txBytes ? 
+                        iface.txBytes >= 1024 * 1024 ? 
+                          (iface.txBytes / 1024 / 1024).toFixed(2) + ' MB' : 
+                          (iface.txBytes / 1024).toFixed(2) + ' KB' 
+                        : '0 B'}
+                      </td>
+                    <td style={{ padding: '15px' }}>
+                      <button
+                        onClick={async () => {
+                          setEditingInterface(iface);
+                          
+                          // Initialize form data with basic interface info
+                          let formData = {
+                            interfaceName: iface.name || '',
+                            interfaceType: iface.type || '',
+                            comment: iface.comment || '',
+                            disabled: iface.disabled || false,
+                            // Tunnel specific fields
+                            tunnelLocalIp: iface.tunnelLocalIp || '',
+                            tunnelRemoteIp: iface.tunnelRemoteIp || '',
+                            tunnelKeepAliveEnabled: iface.tunnelKeepAliveEnabled || false,
+                            tunnelKeepAlive: iface.tunnelKeepAlive || '',
+                            tunnelAllowFastPath: iface.tunnelAllowFastPath || false,
+                            tunnelSecretKey: iface.tunnelSecretKey || '',
+                            tunnelId: iface.tunnelId || ''
+                          };
+
+                          // If it's a tunnel interface, fetch detailed configuration
+                          if (iface.type === 'eoip' || iface.type === 'eoipv6-' || 
+                              iface.type === 'gre' || iface.type === 'gre6-tunnel' ||
+                              iface.type === 'ipip' || iface.type === 'ipipv6-tunnel' ||
+                              iface.type === 'l2tp' || iface.type === 'pptp' ||
+                              iface.type === 'sstp' || iface.type.includes('tunnel')) {
+                            
+                            try {
+                              const response = await fetch(`/api/mikrotiks/${id}/interface-details?name=${encodeURIComponent(iface.name)}`);
+                              const result = await response.json();
+                              
+                              if (result.success && result.details) {
+                                const details = result.details;
+                                formData = {
+                                  ...formData,
+                                  comment: details.comment || iface.comment || '',
+                                  disabled: details.disabled !== undefined ? details.disabled : iface.disabled || false,
+                                  tunnelLocalIp: details.tunnelLocalIp || '',
+                                  tunnelRemoteIp: details.tunnelRemoteIp || '',
+                                  tunnelKeepAliveEnabled: details.tunnelKeepAliveEnabled || false,
+                                  tunnelKeepAlive: details.tunnelKeepAlive || '',
+                                  tunnelAllowFastPath: details.tunnelAllowFastPath || false,
+                                  tunnelSecretKey: details.tunnelSecretKey || '',
+                                  tunnelId: details.tunnelId || ''
+                                };
+                              }
+                            } catch (error) {
+                              console.error('Error fetching interface details:', error);
+                              // Continue with basic form data if fetch fails
+                            }
+                          }
+                          
+                          setFormData(formData);
+                          setShowEditInterfaceModal(true);
+                        }}
                         style={{
                           padding: '5px 10px',
                           backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
@@ -2026,6 +2662,7 @@ const DeviceDetails = () => {
                 ))}
               </tbody>
             </table>
+            </div>
               </div>
             </div>
           )}
@@ -2050,16 +2687,71 @@ const DeviceDetails = () => {
               </button>
               <button
                 onClick={loadIpAddresses}
+                disabled={isRefreshing}
                 style={{
                   padding: '10px 20px',
-                  backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
+                  backgroundColor: isRefreshing ? '#666' : (theme === 'dark' ? '#333' : '#e0e0e0'),
                   color: theme === 'dark' ? '#fff' : '#000',
                   border: 'none',
                   borderRadius: '5px',
-                  cursor: 'pointer'
+                  cursor: isRefreshing ? 'not-allowed' : 'pointer',
+                  opacity: isRefreshing ? 0.6 : 1
                 }}
               >
-                Refresh
+                {isRefreshing ? '⏳ Loading...' : '🔄 Refresh'}
+              </button>
+            </div>
+          </div>
+
+          {/* Search */}
+          <div style={{ marginBottom: '20px' }}>
+            <input
+              type="text"
+              placeholder="Search IP addresses..."
+              value={ipSearchTerm}
+              onChange={(e) => setIpSearchTerm(e.target.value)}
+              style={{
+                width: '100%',
+                maxWidth: '400px',
+                padding: '10px',
+                border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                borderRadius: '5px',
+                backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                color: theme === 'dark' ? '#fff' : '#000'
+              }}
+            />
+          </div>
+
+          {/* IP Address Tabs */}
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ display: 'flex', borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}` }}>
+              <button
+                onClick={() => setActiveIpTab('ipv4')}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: activeIpTab === 'ipv4' ? (theme === 'dark' ? '#007acc' : '#0066cc') : 'transparent',
+                  color: activeIpTab === 'ipv4' ? '#fff' : (theme === 'dark' ? '#fff' : '#000'),
+                  border: 'none',
+                  borderBottom: activeIpTab === 'ipv4' ? `2px solid ${theme === 'dark' ? '#007acc' : '#0066cc'}` : 'none',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                IPv4 ({ipAddresses.length})
+              </button>
+              <button
+                onClick={() => setActiveIpTab('ipv6')}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: activeIpTab === 'ipv6' ? (theme === 'dark' ? '#007acc' : '#0066cc') : 'transparent',
+                  color: activeIpTab === 'ipv6' ? '#fff' : (theme === 'dark' ? '#fff' : '#000'),
+                  border: 'none',
+                  borderBottom: activeIpTab === 'ipv6' ? `2px solid ${theme === 'dark' ? '#007acc' : '#0066cc'}` : 'none',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                IPv6 ({ipv6Addresses.length})
               </button>
             </div>
           </div>
@@ -2080,15 +2772,38 @@ const DeviceDetails = () => {
                 </tr>
               </thead>
               <tbody>
-                {ipAddresses.map((ip, index) => (
-                  <tr key={index} style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}` }}>
+                {(activeIpTab === 'ipv4' ? ipAddresses : ipv6Addresses)
+                  .filter(ip => 
+                    !ipSearchTerm || 
+                    ip.address.toLowerCase().includes(ipSearchTerm.toLowerCase()) ||
+                    ip.network.toLowerCase().includes(ipSearchTerm.toLowerCase()) ||
+                    ip.interface.toLowerCase().includes(ipSearchTerm.toLowerCase()) ||
+                    (ip.comment && ip.comment.toLowerCase().includes(ipSearchTerm.toLowerCase()))
+                  )
+                  .map((ip, index) => (
+                  <tr key={index} style={{ 
+                    borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    opacity: ip.disabled ? 0.5 : 1
+                  }}>
                     <td style={{ padding: '15px' }}>{ip.address}</td>
                     <td style={{ padding: '15px' }}>{ip.network}</td>
                     <td style={{ padding: '15px' }}>{ip.interface}</td>
                     <td style={{ padding: '15px' }}>{ip.comment}</td>
                     <td style={{ padding: '15px' }}>
                       <button
-                        onClick={() => setShowEditIpModal(true)}
+                        onClick={() => {
+                          setEditingIp(ip);
+                          setFormData({
+                            ...formData,
+                            address: ip.address || '',
+                            network: ip.network || '',
+                            interface: ip.interface || '',
+                            comment: ip.comment || '',
+                            disabled: ip.disabled || false,
+                            routerosId: ip.routerosId
+                          });
+                          setShowEditIpModal(true);
+                        }}
                         style={{
                           padding: '5px 10px',
                           backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
@@ -2130,16 +2845,52 @@ const DeviceDetails = () => {
               </button>
               <button
                 onClick={loadRoutes}
+                disabled={isRefreshing}
                 style={{
                   padding: '10px 20px',
-                  backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
+                  backgroundColor: isRefreshing ? '#666' : (theme === 'dark' ? '#333' : '#e0e0e0'),
                   color: theme === 'dark' ? '#fff' : '#000',
                   border: 'none',
                   borderRadius: '5px',
-                  cursor: 'pointer'
+                  cursor: isRefreshing ? 'not-allowed' : 'pointer',
+                  opacity: isRefreshing ? 0.6 : 1
                 }}
               >
-                Refresh
+                {isRefreshing ? '⏳ Loading...' : '🔄 Refresh'}
+              </button>
+            </div>
+          </div>
+
+          {/* Routes Tabs */}
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ display: 'flex', borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}` }}>
+              <button
+                onClick={() => setActiveRouteTab('v4')}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: activeRouteTab === 'v4' ? (theme === 'dark' ? '#007acc' : '#0066cc') : 'transparent',
+                  color: activeRouteTab === 'v4' ? '#fff' : (theme === 'dark' ? '#fff' : '#000'),
+                  border: 'none',
+                  borderBottom: activeRouteTab === 'v4' ? `2px solid ${theme === 'dark' ? '#007acc' : '#0066cc'}` : 'none',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                IPv4 ({routes.length})
+              </button>
+              <button
+                onClick={() => setActiveRouteTab('v6')}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: activeRouteTab === 'v6' ? (theme === 'dark' ? '#007acc' : '#0066cc') : 'transparent',
+                  color: activeRouteTab === 'v6' ? '#fff' : (theme === 'dark' ? '#fff' : '#000'),
+                  border: 'none',
+                  borderBottom: activeRouteTab === 'v6' ? `2px solid ${theme === 'dark' ? '#007acc' : '#0066cc'}` : 'none',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                IPv6 ({ipv6Routes.length})
               </button>
             </div>
           </div>
@@ -2152,31 +2903,93 @@ const DeviceDetails = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}` }}>
-                  <th style={{ padding: '15px', textAlign: 'left' }}>Destination</th>
-                  <th style={{ padding: '15px', textAlign: 'left' }}>Gateway</th>
-                  <th style={{ padding: '15px', textAlign: 'left' }}>Interface</th>
-                  <th style={{ padding: '15px', textAlign: 'left' }}>Distance</th>
-                  <th style={{ padding: '15px', textAlign: 'left' }}>Actions</th>
+                  <th style={{ padding: '8px', textAlign: 'left', maxWidth: '120px' }}>Destination</th>
+                  <th style={{ padding: '8px', textAlign: 'left', maxWidth: '120px' }}>Gateway</th>
+                  <th style={{ padding: '8px', textAlign: 'left', maxWidth: '150px' }}>Interface</th>
+                  <th style={{ padding: '8px', textAlign: 'left', maxWidth: '60px' }}>Dst</th>
+                  <th style={{ padding: '8px', textAlign: 'left', maxWidth: '80px' }}>Route Mark</th>
+                  <th style={{ padding: '8px', textAlign: 'left', maxWidth: '60px' }}>Flags</th>
+                  <th style={{ padding: '8px', textAlign: 'left', maxWidth: '70px' }}>Active</th>
+                  <th style={{ padding: '8px', textAlign: 'left', maxWidth: '120px' }}>Comment</th>
+                  <th style={{ padding: '8px', textAlign: 'left', maxWidth: '80px' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {routes.map((route, index) => (
-                  <tr key={index} style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}` }}>
-                    <td style={{ padding: '15px' }}>{route.destination}</td>
-                    <td style={{ padding: '15px' }}>{route.gateway}</td>
-                    <td style={{ padding: '15px' }}>{route.interface}</td>
-                    <td style={{ padding: '15px' }}>{route.distance}</td>
-                    <td style={{ padding: '15px' }}>
+                {(activeRouteTab === 'v4' ? routes : ipv6Routes).map((route, index) => (
+                  <tr key={index} style={{ 
+                    borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    opacity: route.disabled ? 0.5 : 1
+                  }}>
+                    <td style={{ padding: '8px', maxWidth: '120px', wordBreak: 'break-word' }}>{route.dstAddress || route.destination}</td>
+                    <td style={{ padding: '8px', maxWidth: '120px', wordBreak: 'break-word' }}>{route.gateway}</td>
+                    <td style={{ padding: '5px', maxWidth: '150px', wordBreak: 'break-word' }}>
+                      {route.outInterface || route.interface || 
+                       (route.gateway && !route.gateway.match(/^\d+\.\d+\.\d+\.\d+/) ? route.gateway : '-')}
+                    </td>
+                    <td style={{ padding: '8px', maxWidth: '60px' }}>{route.distance}</td>
+                    <td style={{ padding: '8px', maxWidth: '80px', wordBreak: 'break-word' }}>{route.mark || '-'}</td>
+                    <td style={{ padding: '8px', maxWidth: '60px' }}>
+                      <span style={{
+                        backgroundColor: theme === 'dark' ? '#444' : '#f0f0f0',
+                        color: theme === 'dark' ? '#fff' : '#000',
+                        padding: '2px 4px',
+                        borderRadius: '3px',
+                        fontSize: '0.7rem',
+                        fontWeight: 'bold'
+                      }}>
+                        {route.flags || '-'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px', maxWidth: '70px' }}>
+                      {route.active ? (
+                        <span style={{
+                          backgroundColor: '#28a745',
+                          color: '#fff',
+                          padding: '2px 4px',
+                          borderRadius: '3px',
+                          fontSize: '0.7rem',
+                          fontWeight: 'bold'
+                        }}>
+                          Active
+                        </span>
+                      ) : (
+                        <span style={{
+                          backgroundColor: '#dc3545',
+                          color: '#fff',
+                          padding: '2px 4px',
+                          borderRadius: '3px',
+                          fontSize: '0.7rem',
+                          fontWeight: 'bold'
+                        }}>
+                          Inactive
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '8px', maxWidth: '120px', wordBreak: 'break-word' }}>{route.comment || ''}</td>
+                    <td style={{ padding: '8px', maxWidth: '80px' }}>
                       <button
-                        onClick={() => setShowEditRouteModal(true)}
+                        onClick={() => {
+                          setEditingRoute(route);
+                          setFormData({
+                            ...formData,
+                            destination: route.dstAddress || route.destination || '',
+                            gateway: route.gateway || '',
+                            interface: route.outInterface || route.interface || '',
+                            distance: route.distance || '',
+                            markRoute: route.mark || '',
+                            comment: route.comment || '',
+                            disabled: route.disabled || false
+                          });
+                          setShowEditRouteModal(true);
+                        }}
                         style={{
-                          padding: '5px 10px',
+                          padding: '4px 8px',
                           backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
                           color: theme === 'dark' ? '#fff' : '#000',
                           border: 'none',
                           borderRadius: '3px',
                           cursor: 'pointer',
-                          fontSize: '0.8rem'
+                          fontSize: '0.7rem'
                         }}
                       >
                         Edit
@@ -2210,16 +3023,18 @@ const DeviceDetails = () => {
               </button>
               <button
                 onClick={loadFirewallRules}
+                disabled={isRefreshing}
                 style={{
                   padding: '10px 20px',
-                  backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
+                  backgroundColor: isRefreshing ? '#666' : (theme === 'dark' ? '#333' : '#e0e0e0'),
                   color: theme === 'dark' ? '#fff' : '#000',
                   border: 'none',
                   borderRadius: '5px',
-                  cursor: 'pointer'
+                  cursor: isRefreshing ? 'not-allowed' : 'pointer',
+                  opacity: isRefreshing ? 0.6 : 1
                 }}
               >
-                Refresh
+                {isRefreshing ? '⏳ Loading...' : '🔄 Refresh'}
               </button>
           </div>
         </div>
@@ -2240,19 +3055,23 @@ const DeviceDetails = () => {
                   <th style={{ padding: '15px', textAlign: 'left' }}>Protocol</th>
                   <th style={{ padding: '15px', textAlign: 'left' }}>Port</th>
                   <th style={{ padding: '15px', textAlign: 'left' }}>Action</th>
+                  <th style={{ padding: '15px', textAlign: 'left' }}>Comment</th>
                   <th style={{ padding: '15px', textAlign: 'left' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {firewallRules.map((rule, index) => (
-                  <tr key={index} style={{ borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}` }}>
+                  <tr key={index} style={{ 
+                    borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    opacity: rule.disabled ? 0.5 : 1
+                  }}>
                     <td style={{ padding: '15px' }}>{rule.chain}</td>
-                    <td style={{ padding: '15px' }}>{rule.sourceAddress}</td>
-                    <td style={{ padding: '15px' }}>{rule.sourceAddressList}</td>
-                    <td style={{ padding: '15px' }}>{rule.destinationAddress}</td>
-                    <td style={{ padding: '15px' }}>{rule.destinationAddressList}</td>
+                    <td style={{ padding: '15px' }}>{rule.srcAddress || '-'}</td>
+                    <td style={{ padding: '15px' }}>{rule.srcAddressList || '-'}</td>
+                    <td style={{ padding: '15px' }}>{rule.dstAddress || '-'}</td>
+                    <td style={{ padding: '15px' }}>{rule.dstAddressList || '-'}</td>
                     <td style={{ padding: '15px' }}>{rule.protocol}</td>
-                    <td style={{ padding: '15px' }}>{rule.port}</td>
+                    <td style={{ padding: '15px' }}>{rule.dstPort || rule.port || '-'}</td>
                     <td style={{ padding: '15px' }}>
                       <span style={{
                         padding: '5px 10px',
@@ -2264,9 +3083,26 @@ const DeviceDetails = () => {
                         {rule.action}
                 </span>
                     </td>
+                    <td style={{ padding: '15px' }}>{rule.comment || '-'}</td>
                     <td style={{ padding: '15px' }}>
                       <button
-                        onClick={() => setShowEditFirewallModal(true)}
+                        onClick={() => {
+                          setEditingFirewall(rule);
+                          setFormData({
+                            ...formData,
+                            sourceAddress: rule.srcAddress || '',
+                            sourceAddressList: rule.srcAddressList || '',
+                            destinationAddress: rule.dstAddress || '',
+                            destinationAddressList: rule.dstAddressList || '',
+                            protocol: rule.protocol || '',
+                            port: rule.dstPort || rule.port || '',
+                            action: rule.action || '',
+                            comment: rule.comment || '',
+                            routerosId: rule.routerosId,
+                            disabled: rule.disabled || false
+                          });
+                          setShowEditFirewallModal(true);
+                        }}
                         style={{
                           padding: '5px 10px',
                           backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
@@ -2308,16 +3144,18 @@ const DeviceDetails = () => {
               </button>
               <button
                 onClick={loadNatRules}
+                disabled={isRefreshing}
                 style={{
                   padding: '10px 20px',
-                  backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
+                  backgroundColor: isRefreshing ? '#666' : (theme === 'dark' ? '#333' : '#e0e0e0'),
                   color: theme === 'dark' ? '#fff' : '#000',
                   border: 'none',
                   borderRadius: '5px',
-                  cursor: 'pointer'
+                  cursor: isRefreshing ? 'not-allowed' : 'pointer',
+                  opacity: isRefreshing ? 0.6 : 1
                 }}
               >
-                Refresh
+                {isRefreshing ? '⏳ Loading...' : '🔄 Refresh'}
               </button>
             </div>
           </div>
@@ -2406,16 +3244,18 @@ const DeviceDetails = () => {
               </button>
               <button
                 onClick={loadMangleRules}
+                disabled={isRefreshing}
                 style={{
                   padding: '10px 20px',
-                  backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
+                  backgroundColor: isRefreshing ? '#666' : (theme === 'dark' ? '#333' : '#e0e0e0'),
                   color: theme === 'dark' ? '#fff' : '#000',
                   border: 'none',
                   borderRadius: '5px',
-                  cursor: 'pointer'
+                  cursor: isRefreshing ? 'not-allowed' : 'pointer',
+                  opacity: isRefreshing ? 0.6 : 1
                 }}
               >
-                Refresh
+                {isRefreshing ? '⏳ Loading...' : '🔄 Refresh'}
               </button>
             </div>
           </div>
@@ -3387,9 +4227,10 @@ const DeviceDetails = () => {
                 <label style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <input
                     type="checkbox"
-                    checked={formData.network !== ''}
+                    checked={formData.networkEnabled || false}
                     onChange={(e) => setFormData({ 
                       ...formData, 
+                      networkEnabled: e.target.checked,
                       network: e.target.checked ? formData.network : '' 
                     })}
                   />
@@ -3400,7 +4241,7 @@ const DeviceDetails = () => {
                   value={formData.network}
                   onChange={(e) => setFormData({ ...formData, network: e.target.value })}
                   placeholder="192.168.1.0/24"
-                  disabled={formData.network === ''}
+                  disabled={!formData.networkEnabled}
                   style={{
                     width: '100%',
                     padding: '10px',
@@ -3409,7 +4250,7 @@ const DeviceDetails = () => {
                     backgroundColor: theme === 'dark' ? '#333' : '#fff',
                     color: theme === 'dark' ? '#fff' : '#000',
                     marginTop: '5px',
-                    opacity: formData.network === '' ? 0.5 : 1
+                    opacity: formData.networkEnabled ? 1 : 0.5
                   }}
                 />
               </div>
@@ -3481,6 +4322,169 @@ const DeviceDetails = () => {
                   }}
                 >
                   Add IP Address
+              </button>
+            </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Edit IP Address Modal */}
+      {showEditIpModal && editingIp && createPortal(
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff',
+            padding: '30px',
+            borderRadius: '10px',
+            width: '500px',
+            maxWidth: '90vw'
+          }}>
+            <h3 style={{ marginTop: 0 }}>Edit IP Address</h3>
+            <form onSubmit={handleEditIpAddress}>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="checkbox"
+                    checked={!formData.disabled}
+                    onChange={(e) => setFormData({ ...formData, disabled: !e.target.checked })}
+                  />
+                  Enabled
+                </label>
+              </div>
+              
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Address:</label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  placeholder="192.168.1.1/24"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    borderRadius: '5px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                    color: theme === 'dark' ? '#fff' : '#000'
+                  }}
+                />
+              </div>
+              
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.networkEnabled || false}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      networkEnabled: e.target.checked,
+                      network: e.target.checked ? formData.network : ''
+                    })}
+                  />
+                  Network
+                </label>
+                <input
+                  type="text"
+                  value={formData.network}
+                  onChange={(e) => setFormData({ ...formData, network: e.target.value })}
+                  placeholder="192.168.1.0/24"
+                  disabled={!formData.networkEnabled}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    borderRadius: '5px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                    color: theme === 'dark' ? '#fff' : '#000',
+                    marginTop: '5px',
+                    opacity: formData.networkEnabled ? 1 : 0.5
+                  }}
+                />
+              </div>
+              
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Interface:</label>
+                <select
+                  value={formData.interface}
+                  onChange={(e) => setFormData({ ...formData, interface: e.target.value })}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    borderRadius: '5px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                    color: theme === 'dark' ? '#fff' : '#000'
+                  }}
+                >
+                  <option value="">Select Interface</option>
+                  {interfaces.map((iface, index) => (
+                    <option key={index} value={iface.name}>{iface.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Comment:</label>
+                <input
+                  type="text"
+                  value={formData.comment}
+                  onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
+                  placeholder="IP address comment"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    borderRadius: '5px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                    color: theme === 'dark' ? '#fff' : '#000'
+                  }}
+                />
+              </div>
+              
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditIpModal(false);
+                    setEditingIp(null);
+                  }}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
+                    color: theme === 'dark' ? '#fff' : '#000',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: theme === 'dark' ? '#007acc' : '#0066cc',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Update IP Address
               </button>
             </div>
             </form>
@@ -3592,11 +4596,9 @@ const DeviceDetails = () => {
               
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ display: 'block', marginBottom: '5px' }}>Mark Route:</label>
-                <input
-                  type="text"
+                <select
                   value={formData.markRoute}
                   onChange={(e) => setFormData({ ...formData, markRoute: e.target.value })}
-                  placeholder="test-route"
                   style={{
                     width: '100%',
                     padding: '10px',
@@ -3605,7 +4607,12 @@ const DeviceDetails = () => {
                     backgroundColor: theme === 'dark' ? '#333' : '#fff',
                     color: theme === 'dark' ? '#fff' : '#000'
                   }}
-                />
+                >
+                  <option value="">Select Route Mark</option>
+                  {routeMarks.map((mark, index) => (
+                    <option key={index} value={mark}>{mark}</option>
+                  ))}
+                </select>
               </div>
               
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
@@ -3635,6 +4642,195 @@ const DeviceDetails = () => {
                   }}
                 >
                   Add Route
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Edit Route Modal */}
+      {showEditRouteModal && editingRoute && createPortal(
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff',
+            padding: '30px',
+            borderRadius: '10px',
+            width: '500px',
+            maxWidth: '90vw'
+          }}>
+            <h3 style={{ marginTop: 0 }}>Edit Route</h3>
+            <form onSubmit={handleEditRoute}>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="checkbox"
+                    checked={!formData.disabled}
+                    onChange={(e) => setFormData({ ...formData, disabled: !e.target.checked })}
+                  />
+                  Enabled
+                </label>
+              </div>
+              
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Destination:</label>
+                <input
+                  type="text"
+                  value={formData.destination || ''}
+                  onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
+                  placeholder="0.0.0.0/0"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    borderRadius: '5px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                    color: theme === 'dark' ? '#fff' : '#000'
+                  }}
+                />
+              </div>
+              
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Gateway:</label>
+                <input
+                  type="text"
+                  value={formData.gateway || ''}
+                  onChange={(e) => setFormData({ ...formData, gateway: e.target.value })}
+                  placeholder="192.168.1.1"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    borderRadius: '5px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                    color: theme === 'dark' ? '#fff' : '#000'
+                  }}
+                />
+              </div>
+              
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Interface:</label>
+                <select
+                  value={formData.interface}
+                  onChange={(e) => setFormData({ ...formData, interface: e.target.value })}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    borderRadius: '5px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                    color: theme === 'dark' ? '#fff' : '#000'
+                  }}
+                >
+                  <option value="">Select Interface</option>
+                  {interfaces.map((iface, index) => (
+                    <option key={index} value={iface.name}>{iface.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Distance:</label>
+                <input
+                  type="number"
+                  value={formData.distance}
+                  onChange={(e) => setFormData({ ...formData, distance: e.target.value })}
+                  placeholder="1"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    borderRadius: '5px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                    color: theme === 'dark' ? '#fff' : '#000'
+                  }}
+                />
+              </div>
+              
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Mark Route:</label>
+                <select
+                  value={formData.markRoute}
+                  onChange={(e) => setFormData({ ...formData, markRoute: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    borderRadius: '5px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                    color: theme === 'dark' ? '#fff' : '#000'
+                  }}
+                >
+                  <option value="">Select Route Mark</option>
+                  {routeMarks.map((mark, index) => (
+                    <option key={index} value={mark}>{mark}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Comment:</label>
+                <input
+                  type="text"
+                  value={formData.comment}
+                  onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
+                  placeholder="Route comment"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                    borderRadius: '5px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                    color: theme === 'dark' ? '#fff' : '#000'
+                  }}
+                />
+              </div>
+              
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditRouteModal(false);
+                    setEditingRoute(null);
+                  }}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
+                    color: theme === 'dark' ? '#fff' : '#000',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: theme === 'dark' ? '#007acc' : '#0066cc',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Update Route
                 </button>
               </div>
             </form>
@@ -3975,6 +5171,34 @@ const DeviceDetails = () => {
                   <option value="reject">Reject</option>
                 </select>
               </div>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Comment:</label>
+                <input
+                  type="text"
+                  value={formData.comment}
+                  onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
+                  placeholder="Enter comment for this rule"
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: `1px solid ${theme === 'dark' ? '#555' : '#ddd'}`,
+                    borderRadius: '4px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                    color: theme === 'dark' ? '#fff' : '#000'
+                  }}
+                />
+              </div>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.disabled}
+                    onChange={(e) => setFormData({ ...formData, disabled: e.target.checked })}
+                    style={{ margin: 0 }}
+                  />
+                  Disabled
+                </label>
+              </div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                 <button
                   type="button"
@@ -4005,21 +5229,6 @@ const DeviceDetails = () => {
                 </button>
               </div>
             </form>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setShowEditFirewallModal(false)}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
-                  color: theme === 'dark' ? '#fff' : '#000',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer'
-                }}
-              >
-                Close
-              </button>
-          </div>
             </div>
         </div>,
         document.body
@@ -4344,6 +5553,259 @@ const DeviceDetails = () => {
                 Close
               </button>
       </div>
+          </div>
+        </div>,
+        document.body
+    )}
+
+      {/* Edit Interface Modal */}
+      {showEditInterfaceModal && editingInterface && createPortal(
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff',
+            padding: '30px',
+            borderRadius: '10px',
+            width: '500px',
+            maxWidth: '90vw'
+          }}>
+            <h3 style={{ marginTop: 0 }}>Edit Interface: {editingInterface.name}</h3>
+            <form onSubmit={handleEditInterface}>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Interface Name:</label>
+                <input
+                  type="text"
+                  value={formData.interfaceName || editingInterface.name}
+                  onChange={(e) => setFormData({ ...formData, interfaceName: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: `1px solid ${theme === 'dark' ? '#555' : '#ddd'}`,
+                    borderRadius: '4px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                    color: theme === 'dark' ? '#fff' : '#000'
+                  }}
+                  required
+                />
+              </div>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Interface Type:</label>
+                <select
+                  value={formData.interfaceType || editingInterface.type}
+                  onChange={(e) => setFormData({ ...formData, interfaceType: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: `1px solid ${theme === 'dark' ? '#555' : '#ddd'}`,
+                    borderRadius: '4px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                    color: theme === 'dark' ? '#fff' : '#000'
+                  }}
+                  required
+                >
+                  <option value="ether">Ethernet</option>
+                  <option value="eoip">EoIP</option>
+                  <option value="eoipv6-">EoIP IPv6</option>
+                  <option value="gre">GRE</option>
+                  <option value="gre6-tunnel">GRE IPv6 Tunnel</option>
+                  <option value="ipip">IPIP</option>
+                  <option value="ipipv6-tunnel">IPIP IPv6 Tunnel</option>
+                  <option value="l2tp">L2TP</option>
+                  <option value="pptp">PPTP</option>
+                  <option value="sstp">SSTP</option>
+                  <option value="vlan">VLAN</option>
+                  <option value="bridge">Bridge</option>
+                  <option value="bonding">Bonding</option>
+                </select>
+              </div>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Comment:</label>
+                <input
+                  type="text"
+                  value={formData.comment || editingInterface.comment || ''}
+                  onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: `1px solid ${theme === 'dark' ? '#555' : '#ddd'}`,
+                    borderRadius: '4px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                    color: theme === 'dark' ? '#fff' : '#000'
+                  }}
+                />
+              </div>
+
+              {/* Tunnel specific fields - only show for tunnel types */}
+              {(editingInterface.type === 'eoip' || editingInterface.type === 'eoipv6-' || 
+                editingInterface.type === 'gre' || editingInterface.type === 'gre6-tunnel' ||
+                editingInterface.type === 'ipip' || editingInterface.type === 'ipipv6-tunnel' ||
+                editingInterface.type === 'l2tp' || editingInterface.type === 'pptp' || 
+                editingInterface.type === 'sstp' || editingInterface.type.includes('tunnel')) && (
+                <>
+                  <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: theme === 'dark' ? '#333' : '#f5f5f5', borderRadius: '5px' }}>
+                    <h4 style={{ margin: '0 0 10px 0', color: theme === 'dark' ? '#fff' : '#333' }}>Tunnel Configuration</h4>
+                    
+                    <div style={{ marginBottom: '15px' }}>
+                      <label style={{ display: 'block', marginBottom: '5px' }}>Local IP:</label>
+                      <input
+                        type="text"
+                        value={formData.tunnelLocalIp || ''}
+                        onChange={(e) => setFormData({ ...formData, tunnelLocalIp: e.target.value })}
+                        placeholder="e.g., 192.168.1.1"
+                        style={{
+                          width: '100%',
+                          padding: '8px',
+                          border: `1px solid ${theme === 'dark' ? '#555' : '#ddd'}`,
+                          borderRadius: '4px',
+                          backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                          color: theme === 'dark' ? '#fff' : '#000'
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: '15px' }}>
+                      <label style={{ display: 'block', marginBottom: '5px' }}>Remote IP:</label>
+                      <input
+                        type="text"
+                        value={formData.tunnelRemoteIp || ''}
+                        onChange={(e) => setFormData({ ...formData, tunnelRemoteIp: e.target.value })}
+                        placeholder="e.g., 10.0.0.1"
+                        style={{
+                          width: '100%',
+                          padding: '8px',
+                          border: `1px solid ${theme === 'dark' ? '#555' : '#ddd'}`,
+                          borderRadius: '4px',
+                          backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                          color: theme === 'dark' ? '#fff' : '#000'
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: '15px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', marginBottom: '5px' }}>
+                        <input
+                          type="checkbox"
+                          checked={formData.tunnelKeepAliveEnabled}
+                          onChange={(e) => setFormData({ ...formData, tunnelKeepAliveEnabled: e.target.checked })}
+                          style={{ marginRight: '8px' }}
+                        />
+                        Enable Keep Alive
+                      </label>
+                      {formData.tunnelKeepAliveEnabled && (
+                        <input
+                          type="text"
+                          value={formData.tunnelKeepAlive || ''}
+                          onChange={(e) => setFormData({ ...formData, tunnelKeepAlive: e.target.value })}
+                          placeholder="e.g., 10s,30s,10"
+                          style={{
+                            width: '100%',
+                            padding: '8px',
+                            border: `1px solid ${theme === 'dark' ? '#555' : '#ddd'}`,
+                            borderRadius: '4px',
+                            backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                            color: theme === 'dark' ? '#fff' : '#000',
+                            marginTop: '5px'
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    <div style={{ marginBottom: '15px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', marginBottom: '5px' }}>
+                        <input
+                          type="checkbox"
+                          checked={formData.tunnelAllowFastPath}
+                          onChange={(e) => setFormData({ ...formData, tunnelAllowFastPath: e.target.checked })}
+                          style={{ marginRight: '8px' }}
+                        />
+                        Allow Fast Path
+                      </label>
+                    </div>
+
+                    <div style={{ marginBottom: '15px' }}>
+                      <label style={{ display: 'block', marginBottom: '5px' }}>Secret Key:</label>
+                      <input
+                        type="password"
+                        value={formData.tunnelSecretKey || ''}
+                        onChange={(e) => setFormData({ ...formData, tunnelSecretKey: e.target.value })}
+                        placeholder="Tunnel secret key"
+                        style={{
+                          width: '100%',
+                          padding: '8px',
+                          border: `1px solid ${theme === 'dark' ? '#555' : '#ddd'}`,
+                          borderRadius: '4px',
+                          backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                          color: theme === 'dark' ? '#fff' : '#000'
+                        }}
+                      />
+                    </div>
+
+                    {(editingInterface.type === 'eoip' || editingInterface.type === 'eoipv6-') && (
+                      <div style={{ marginBottom: '15px' }}>
+                        <label style={{ display: 'block', marginBottom: '5px' }}>Tunnel ID:</label>
+                        <input
+                          type="text"
+                          value={formData.tunnelId || ''}
+                          onChange={(e) => setFormData({ ...formData, tunnelId: e.target.value })}
+                          placeholder="e.g., 1, 100"
+                          style={{
+                            width: '100%',
+                            padding: '8px',
+                            border: `1px solid ${theme === 'dark' ? '#555' : '#ddd'}`,
+                            borderRadius: '4px',
+                            backgroundColor: theme === 'dark' ? '#333' : '#fff',
+                            color: theme === 'dark' ? '#fff' : '#000'
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: theme === 'dark' ? '#007acc' : '#0066cc',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Update Interface
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditInterfaceModal(false);
+                    setEditingInterface(null);
+                    setFormData({ ...formData, interfaceName: '', interfaceType: '', comment: '' });
+                  }}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: theme === 'dark' ? '#333' : '#e0e0e0',
+                    color: theme === 'dark' ? '#fff' : '#000',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>,
         document.body
