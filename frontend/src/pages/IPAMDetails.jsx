@@ -616,16 +616,25 @@ const IPAMDetails = () => {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      // First sync with PHP-IPAM to get latest data
-      await fetch(`/api/ipams/${id}/sync`, {
+      // Start sync in background (returns immediately)
+      const syncResponse = await fetch(`/api/ipams/${id}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
       
-      // Then reload IPAM details
-      await loadIpamDetails();
-      
-      showToast('IPAM data refreshed successfully', 'success');
+      if (syncResponse.ok || syncResponse.status === 202) {
+        showToast('Syncing data from PHP-IPAM...', 'info');
+        
+        // Wait a bit for sync to complete
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Then reload IPAM details
+        await loadIpamDetails();
+        
+        showToast('IPAM data refreshed successfully', 'success');
+      } else {
+        throw new Error('Sync failed');
+      }
     } catch (error) {
       console.error('Refresh error:', error);
       showToast('Failed to refresh IPAM data', 'error');
@@ -1882,24 +1891,21 @@ const IPAMDetails = () => {
                     const responseData = await response.json();
                     
                     if (response.ok) {
-                      showToast('IP added successfully. Syncing data...', 'success');
+                      showToast('IP added successfully. Syncing...', 'success');
                       setShowAddModal(false);
                       
                       // Clear inputs
                       document.getElementById('add-description').value = '';
                       
-                      // Sync IPAM data from PHP-IPAM
+                      // Sync IPAM data from PHP-IPAM (background sync, returns immediately)
                       try {
-                        const syncResponse = await fetch(`/api/ipams/${ipam.id}/sync`, {
+                        await fetch(`/api/ipams/${ipam.id}/sync`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' }
                         });
                         
-                        if (syncResponse.ok) {
-                          console.log('IPAM data synced successfully');
-                          // Wait a bit for sync to complete
-                          await new Promise(resolve => setTimeout(resolve, 500));
-                        }
+                        // Wait a bit for sync to complete (reduced from 500ms)
+                        await new Promise(resolve => setTimeout(resolve, 1500));
                       } catch (syncError) {
                         console.error('Error syncing IPAM data:', syncError);
                       }
@@ -2042,17 +2048,15 @@ const IPAMDetails = () => {
                       showToast('Range deleted successfully. Syncing...', 'success');
                       setShowDeleteModal(false);
                       
-                      // Sync IPAM data from PHP-IPAM
+                      // Sync IPAM data from PHP-IPAM (background sync, returns immediately)
                       try {
-                        const syncResponse = await fetch(`/api/ipams/${ipam.id}/sync`, {
+                        await fetch(`/api/ipams/${ipam.id}/sync`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' }
                         });
                         
-                        if (syncResponse.ok) {
-                          console.log('IPAM data synced after delete');
-                          await new Promise(resolve => setTimeout(resolve, 500));
-                        }
+                        console.log('IPAM sync started after delete');
+                        await new Promise(resolve => setTimeout(resolve, 1500));
                       } catch (syncError) {
                         console.error('Error syncing after delete:', syncError);
                       }

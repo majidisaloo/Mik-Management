@@ -5168,30 +5168,40 @@ const bootstrap = async () => {
           return;
         }
 
-        const collections = await syncPhpIpamStructure(ipam);
-        await db.replaceIpamCollections(ipamId, collections);
-        const timestamp = new Date().toISOString();
-        await db.updateIpamStatus(ipamId, { status: 'connected', checkedAt: timestamp, syncedAt: timestamp });
-
-        sendJson(res, 200, {
-          sections: collections.sections.length,
-          datacenters: collections.datacenters.length,
-          ranges: collections.ranges.length
+        // Return immediately and sync in background
+        sendJson(res, 202, { 
+          message: 'Sync started in background',
+          status: 'syncing'
         });
+
+        // Sync in background without blocking
+        (async () => {
+          try {
+            console.log(`🔄 Background sync started for IPAM ${ipamId}`);
+            const collections = await syncPhpIpamStructure(ipam);
+            await db.replaceIpamCollections(ipamId, collections);
+            const timestamp = new Date().toISOString();
+            await db.updateIpamStatus(ipamId, { status: 'connected', checkedAt: timestamp, syncedAt: timestamp });
+            console.log(`✅ Background sync completed for IPAM ${ipamId}:`, {
+              sections: collections.sections.length,
+              datacenters: collections.datacenters.length,
+              ranges: collections.ranges.length
+            });
+          } catch (error) {
+            console.error('Background sync error for IPAM', ipamId, error);
+            if (Number.isInteger(ipamId) && ipamId > 0) {
+              try {
+                await db.updateIpamStatus(ipamId, { status: 'failed', checkedAt: new Date().toISOString() });
+              } catch (updateError) {
+                console.error('Failed to record IPAM failure status', updateError);
+              }
+            }
+          }
+        })();
+
       } catch (error) {
         console.error('Sync IPAM error', error);
-
-        if (Number.isInteger(ipamId) && ipamId > 0) {
-          try {
-            await db.updateIpamStatus(ipamId, { status: 'failed', checkedAt: new Date().toISOString() });
-          } catch (updateError) {
-            console.error('Failed to record IPAM failure status', updateError);
-          }
-        }
-
-        sendJson(res, 502, {
-          message: error.message || 'Unable to synchronise phpIPAM structure.'
-        });
+        sendJson(res, 500, { message: 'Unable to start sync. Please try again.' });
       }
     };
 
