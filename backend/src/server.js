@@ -5326,10 +5326,10 @@ const bootstrap = async () => {
             
             if (isSingleIP) {
               // Add single IP address to PHP-IPAM
-              console.log(`Adding IP address: ${ipAddress} (from free range)`);
+              console.log(`Adding IP address: ${cidr} (from free range)`);
               
               const addressData = {
-                ip: ipAddress,
+                ip: cidr,  // Send full CIDR format (e.g., 2001:41d0:a:1918::0/128) instead of just IP
                 hostname: hostname,
                 description: body.description || ''
               };
