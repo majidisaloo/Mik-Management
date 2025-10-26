@@ -1482,11 +1482,9 @@ const IPAMDetails = () => {
             </h2>
           </div>
           <div className="card__content">
-            {(() => {
-              const list = (ipam.collections?.ranges || []).filter(r => !r?.metadata?.masterSubnetId || r?.metadata?.masterSubnetId == 0);
-              return list.length > 0 ? (
-                          <div className="space-y-2">
-                {list.map((range) => {
+            {(((ipam.collections?.ranges || []).filter(r => !r?.metadata?.masterSubnetId || r?.metadata?.masterSubnetId == 0)).length > 0) ? (
+              <div className="space-y-2">
+                {(ipam.collections?.ranges || []).filter(r => !r?.metadata?.masterSubnetId || r?.metadata?.masterSubnetId == 0).map((range) => {
                   const isExpanded = expandedRanges.has(range.id);
                               
                               return (
@@ -1569,7 +1567,7 @@ const IPAMDetails = () => {
                             })}
                           </div>
                         ) : (
-              <p className="text-tertiary text-center py-8">No IP ranges found</p>
+                          <p className="text-tertiary text-center py-8">No IP ranges found</p>
                         )}
           </div>
                       </div>
