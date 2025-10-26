@@ -1158,11 +1158,18 @@ const IPAMDetails = () => {
            { id: 'overview', label: 'Overview' },
            { id: 'sections', label: 'Sections' },
            { id: 'datacenters', label: 'Datacenters' },
-           { id: 'ranges', label: 'IP Ranges' }
+           { id: 'ranges', label: 'IP Ranges' },
+           { id: 'queue-logs', label: '📋 Queue & Logs' }
          ].map((tab) => (
            <button
              key={tab.id}
-             onClick={() => setActiveTab(tab.id)}
+             onClick={() => {
+               if (tab.id === 'queue-logs') {
+                 navigate(`/ipams/${id}/queue-logs`);
+               } else {
+                 setActiveTab(tab.id);
+               }
+             }}
              style={getTabButtonStyle(activeTab === tab.id)}
            >
              {tab.label}

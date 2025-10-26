@@ -12,6 +12,7 @@ import RoutesPage from './pages/Routes.jsx';
 import Firewall from './pages/Firewall.jsx';
 import IPAM from './pages/IPAM.jsx';
 import IPAMDetails from './pages/IPAMDetails.jsx';
+import QueueLogs from './pages/QueueLogs.jsx';
 import Settings from './pages/Settings.jsx';
 import { UpdateProvider } from './context/UpdateContext.jsx';
 
@@ -41,6 +42,8 @@ const managementRoutes = [
   { path: 'ipams/:id', Component: IPAMDetails },
   { path: 'ipams/:id/sections/:sectionId', Component: IPAMDetails },
   { path: 'ipams/:id/sections/:sectionId/ranges/:rangeId', Component: IPAMDetails },
+  { path: 'ipams/:id/queue-logs', Component: QueueLogs },
+  { path: 'ipam/:id/queue-logs', Component: QueueLogs },
   { path: 'settings', Component: Settings }
 ];
 
