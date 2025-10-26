@@ -640,8 +640,8 @@ const IPAMDetails = () => {
       navigate('/login');
       return;
     }
-    // Always load live data on initial load
-    loadIpamDetails(true); // useLive = true
+    // Initial load from cache (fast), user can refresh to get live data
+    loadIpamDetails(false); // useLive = false (from cache)
   }, [user, navigate, loadIpamDetails]);
 
   // Handle route parameters for sections and ranges
