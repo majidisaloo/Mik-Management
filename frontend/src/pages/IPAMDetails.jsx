@@ -1831,11 +1831,23 @@ const IPAMDetails = () => {
                       return;
                     }
                     
-                    // Find the parent subnet ID for this IP
-                    let subnetId = selectedSection?.id || null;
-                    
                     // Get parent range CIDR from selectedRangeForEdit metadata
                     const parentRangeCidr = selectedRangeForEdit?.metadata?.parentRangeCidr || '';
+                    
+                    // Find the actual parent subnet ID from the IPAM collections
+                    // This is the subnet/range that contains this free space
+                    let parentSubnetId = null;
+                    if (parentRangeCidr) {
+                      const parentSubnet = ipam.collections?.ranges?.find(range => {
+                        const rangeCidr = range.metadata?.cidr || '';
+                        return rangeCidr === parentRangeCidr;
+                      });
+                      
+                      if (parentSubnet && parentSubnet.id) {
+                        parentSubnetId = parseInt(parentSubnet.id);
+                        console.log(`Found parent subnet ID: ${parentSubnetId} for CIDR: ${parentRangeCidr}`);
+                      }
+                    }
                     
                     const response = await fetch(`/api/ipams/${ipam.id}/ranges`, {
                       method: 'POST',
@@ -1844,7 +1856,7 @@ const IPAMDetails = () => {
                         sectionId: selectedSection?.id,
                         metadata: { 
                           cidr,
-                          subnetId: subnetId,
+                          subnetId: parentSubnetId,
                           parentRangeCidr: parentRangeCidr
                         },
                         description,

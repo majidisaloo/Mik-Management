@@ -5309,7 +5309,8 @@ const bootstrap = async () => {
             
             const cidr = body.metadata?.cidr || '';
             const hostname = body.name || body.description || '';
-            const subnetId = body.metadata?.subnetId || '';
+            let subnetId = body.metadata?.subnetId;
+            const parentRangeCidr = body.metadata?.parentRangeCidr;
             
             // Parse CIDR to get IP address
             const [ipAddress] = cidr.split('/');
@@ -5333,68 +5334,38 @@ const bootstrap = async () => {
                 description: body.description || ''
               };
               
-              // Extract parent range ID from cidr metadata
-              const cidrNet = cidr.split('/')[0];
-              const parentRangeCidr = body.metadata?.parentRangeCidr;
+              console.log('Parent range CIDR:', parentRangeCidr);
+              console.log('Initial subnetId from body:', subnetId);
               
-              console.log('Looking for parent subnet with CIDR:', parentRangeCidr || cidr);
-              console.log(`Total ranges in collections: ${ipam.collections?.ranges?.length || 0}`);
-              
-              // First, try to get the actual subnet ID from PHP-IPAM by searching for the IP's subnet
-              let foundSubnetId = null;
-              
-              try {
-                // Try to query PHP-IPAM directly for subnets matching this IP
-                const subnetsResponse = await phpIpamFetch(ipam, 'subnets/', { allowNotFound: true });
-                const subnets = normalisePhpIpamList(subnetsResponse);
-                
-                console.log(`Found ${subnets.length} subnets in PHP-IPAM`);
-                
-                // Find the subnet that contains this IP
-                const matchingSubnet = subnets.find(subnet => {
-                  const subnetCidr = subnet.subnet && subnet.mask ? `${subnet.subnet}/${subnet.mask}` : '';
-                  return subnetCidr === parentRangeCidr;
-                });
-                
-                if (matchingSubnet && matchingSubnet.id) {
-                  foundSubnetId = parseInt(matchingSubnet.id);
-                  console.log(`✅ Found subnet ID from PHP-IPAM: ${foundSubnetId} for CIDR: ${parentRangeCidr}`);
-                }
-              } catch (error) {
-                console.log(`❌ Error querying PHP-IPAM for subnets: ${error.message}`);
-              }
-              
-              // If we didn't find it from PHP-IPAM, try local collections
-              if (!foundSubnetId) {
-                const parentSubnet = ipam.collections?.ranges?.find(range => {
-                  const rangeCidr = range.metadata?.cidr || '';
+              // If we don't have a subnet ID yet, try to get it from PHP-IPAM
+              if (!subnetId && parentRangeCidr) {
+                try {
+                  // Query PHP-IPAM for subnets
+                  const subnetsResponse = await phpIpamFetch(ipam, 'subnets/', { allowNotFound: true });
+                  const subnets = normalisePhpIpamList(subnetsResponse);
                   
-                  console.log(`Checking range CIDR: ${rangeCidr} against parent: ${parentRangeCidr}`);
+                  console.log(`Found ${subnets.length} subnets in PHP-IPAM`);
                   
-                  // Skip single IP addresses
-                  if (rangeCidr.includes('/128') || rangeCidr.includes('/32')) {
-                    return false;
+                  // Find the subnet that matches the parent range CIDR
+                  const matchingSubnet = subnets.find(subnet => {
+                    const subnetCidr = subnet.subnet && subnet.mask ? `${subnet.subnet}/${subnet.mask}` : '';
+                    return subnetCidr === parentRangeCidr;
+                  });
+                  
+                  if (matchingSubnet && matchingSubnet.id) {
+                    subnetId = parseInt(matchingSubnet.id);
+                    console.log(`✅ Found subnet ID from PHP-IPAM: ${subnetId} for CIDR: ${parentRangeCidr}`);
                   }
-                  
-                  // Try to match by checking if the CIDRs are exactly the same
-                  if (parentRangeCidr && rangeCidr === parentRangeCidr) {
-                    console.log(`Exact match found: ${rangeCidr}`);
-                    return true;
-                  }
-                  
-                  return false;
-                });
-                
-                if (parentSubnet && parentSubnet.id) {
-                  foundSubnetId = parseInt(parentSubnet.id);
-                  console.log(`✅ Found parent subnet ID from local: ${foundSubnetId} for CIDR: ${parentSubnet.metadata?.cidr}`);
+                } catch (error) {
+                  console.log(`❌ Error querying PHP-IPAM for subnets: ${error.message}`);
                 }
               }
               
-              if (foundSubnetId) {
-                addressData.subnetId = foundSubnetId;
+              if (subnetId) {
+                addressData.subnetId = subnetId;
+                console.log(`✅ Using subnet ID: ${subnetId}`);
               } else {
-                console.log('❌ Could not find parent subnet, PHP-IPAM will auto-detect');
+                console.log('⚠️ No subnet ID found, PHP-IPAM will auto-detect the subnet');
               }
               
               console.log('Address data to send:', JSON.stringify(addressData, null, 2));
