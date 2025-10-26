@@ -225,6 +225,77 @@
   transform: translateY(-1px);
 }
 
+/* Expand/Collapse Icons Styling */
+.ipam-expand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+}
+
+.ipam-expand-icon:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.5);
+}
+
+.ipam-expand-icon.expanded {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  transform: rotate(90deg);
+}
+
+.ipam-expand-icon.expanded:hover {
+  transform: rotate(90deg) scale(1.1);
+}
+
+.ipam-expand-icon svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s ease;
+}
+
+/* Scroll Arrow Indicators */
+.ipam-scroll-indicator {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.ipam-scroll-indicator:hover {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+}
+
+.ipam-scroll-indicator-left {
+  left: 8px;
+}
+
+.ipam-scroll-indicator-right {
+  right: 8px;
+}
+
 .ipam-range-card {
   background: var(--surface);
   border: 1px solid var(--border-color);

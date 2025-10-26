@@ -880,10 +880,14 @@ const IPAMDetails = () => {
         >
           {hasChildren && (
             <div 
-              style={{ marginTop: '4px', cursor: 'pointer' }}
-              onClick={() => toggleRangeItem(range.id)}
+              className={`ipam-expand-icon ${isExpanded ? 'expanded' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleRangeItem(range.id);
+              }}
+              title={isExpanded ? 'Collapse' : 'Expand'}
             >
-              {isExpanded ? <MinusIcon /> : <PlusIcon />}
+              <ChevronRightIcon />
             </div>
           )}
           <div 
