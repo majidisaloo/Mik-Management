@@ -884,7 +884,16 @@ const syncPhpIpamStructure = async (ipam) => {
         }
       };
 
-      for (const entry of rawRanges) {
+      // Only process top-level subnets (masterSubnetId = 0 or null)
+      // Nested subnets will be fetched recursively
+      const topLevelSubnets = rawRanges.filter(entry => {
+        const masterSubnetId = entry.masterSubnetId ?? entry.masterSubnet ?? entry.parent ?? 0;
+        return masterSubnetId == 0 || masterSubnetId === null;
+      });
+      
+      console.log(`📊 Processing ${topLevelSubnets.length} top-level subnets out of ${rawRanges.length} total`);
+      
+      for (const entry of topLevelSubnets) {
         await processSubnet(entry, sectionId);
       }
     } catch (error) {
