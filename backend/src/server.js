@@ -47,6 +47,26 @@ import {
   promoteBetaToStable 
 } from './version-manager.js';
 
+// Basic in-memory rate limiting for mutating requests
+const rateLimitBuckets = new Map(); // key: ip => { tokens, last }
+const RATE_LIMIT_CAPACITY = 120; // tokens
+const RATE_LIMIT_REFILL_PER_SEC = 2; // tokens per second
+const isMutatingMethod = (m) => m === 'POST' || m === 'PUT' || m === 'DELETE' || m === 'PATCH';
+const allowRequest = (ip, nowMs) => {
+  const nowSec = Math.floor(nowMs / 1000);
+  const bucket = rateLimitBuckets.get(ip) || { tokens: RATE_LIMIT_CAPACITY, last: nowSec };
+  const elapsed = Math.max(0, nowSec - bucket.last);
+  bucket.tokens = Math.min(RATE_LIMIT_CAPACITY, bucket.tokens + elapsed * RATE_LIMIT_REFILL_PER_SEC);
+  bucket.last = nowSec;
+  if (bucket.tokens < 1) {
+    rateLimitBuckets.set(ip, bucket);
+    return false;
+  }
+  bucket.tokens -= 1;
+  rateLimitBuckets.set(ip, bucket);
+  return true;
+};
+
 // Helper functions for version management
 const getCommitCount = async () => {
   try {
@@ -1040,6 +1060,15 @@ const processQueuedOperation = async (queueItem) => {
 
     await updateQueueStatus(queueItem.id, 'processing');
 
+    // Helper: normalize phpIPAM id from diverse response shapes
+    const extractPhpIpamId = (resp) => {
+      if (!resp) return null;
+      const candidate = resp.id ?? resp.data?.id ?? resp.data ?? resp.insertId ?? null;
+      if (candidate == null) return null;
+      const parsed = Number.parseInt(candidate, 10);
+      return Number.isInteger(parsed) ? parsed : candidate;
+    };
+
     switch (queueItem.type) {
       case 'add_ip': {
         const { ipAddress, cidr, mask, subnetId, parentRangeCidr, sectionId, hostname, description } = queueItem.data || {};
@@ -1055,11 +1084,12 @@ const processQueuedOperation = async (queueItem) => {
         if (!parentSubnetId) throw new Error('Parent subnet could not be resolved');
 
         // Create nested subnet
-        const subnetPayload = { subnet: ipAddress, mask: mask || (cidr?.split('/')[1] || '128'), sectionId, description: description || hostname, masterSubnetId: parentSubnetId };
+        const sid = Number.parseInt(sectionId, 10);
+        const subnetPayload = { subnet: ipAddress, mask: mask || (cidr?.split('/')[1] || '128'), sectionId: Number.isInteger(sid) ? sid : sectionId, description: description || hostname, masterSubnetId: parentSubnetId };
         const subnetResponse = await phpIpamFetch(ipam, 'subnets/', { method: 'POST', body: JSON.stringify(subnetPayload) });
-        const newSubnetId = subnetResponse.id || subnetResponse;
+        const newSubnetId = extractPhpIpamId(subnetResponse);
         // Add address
-        const ipPayload = { ip: ipAddress, hostname, description: description || '', subnetId: newSubnetId };
+        const ipPayload = { ip: ipAddress, hostname, description: description || '', subnetId: Number.parseInt(newSubnetId, 10) };
         await phpIpamFetch(ipam, 'addresses/', { method: 'POST', body: JSON.stringify(ipPayload) });
 
         const verificationResult = await verifyAddIp(ipam, ipAddress, newSubnetId);
@@ -1082,19 +1112,20 @@ const processQueuedOperation = async (queueItem) => {
           } catch (e) {}
         }
 
-        const [subnetPart, maskPart] = `${cidr}`.split('/')
+        const [subnetPart, maskPart] = `${cidr}`.split('/');
         const mask = maskPart || '32';
+        const sid = Number.parseInt(sectionId, 10);
         const subnetPayload = {
           subnet: subnetPart,
           mask,
-          sectionId,
+          sectionId: Number.isInteger(sid) ? sid : sectionId,
           description: description || cidr,
           ...(parentSubnetId ? { masterSubnetId: parentSubnetId } : {})
         };
 
         // Create subnet in phpIPAM
         const created = await phpIpamFetch(ipam, 'subnets/', { method: 'POST', body: JSON.stringify(subnetPayload) });
-        const newSubnetId = created?.id || created;
+        const newSubnetId = extractPhpIpamId(created);
 
         // Verify creation by fetching the subnet or listing and matching
         let verified = false;
@@ -1818,6 +1849,17 @@ const bootstrap = async () => {
     }
 
     const method = req.method.toUpperCase();
+
+    // Simple rate limit for mutating methods
+    try {
+      if (isMutatingMethod(method)) {
+        const ip = req.socket?.remoteAddress || 'unknown';
+        if (!allowRequest(ip, Date.now())) {
+          sendJson(res, 429, { message: 'Too many requests. Please slow down.' });
+          return;
+        }
+      }
+    } catch (_) {}
 
     if (method === 'OPTIONS') {
       sendNoContent(res);

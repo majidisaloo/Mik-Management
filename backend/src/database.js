@@ -7189,9 +7189,9 @@ const verifyAddIp = async (ipam, ipAddress, subnetId) => {
     console.log(`🔍 Verifying IP ${ipAddress} in subnet ${subnetId}`);
     
     // Fetch all IPs in the subnet
-    const response = await fetch(`${ipam.baseUrl}/api/${ipam.appId}/subnets/${subnetId}/addresses/`, {
+  const response = await fetch(`${ipam.baseUrl}/api/${ipam.appId}/subnets/${subnetId}/addresses/`, {
       headers: {
-        'token': ipam.apiToken
+        'token': ipam.appCode || ipam.apiToken || ''
       }
     });
     
@@ -7227,9 +7227,9 @@ const verifyDeleteIp = async (ipam, ipAddress, subnetId) => {
   try {
     console.log(`🔍 Verifying IP ${ipAddress} is deleted from subnet ${subnetId}`);
     
-    const response = await fetch(`${ipam.baseUrl}/api/${ipam.appId}/subnets/${subnetId}/addresses/`, {
+  const response = await fetch(`${ipam.baseUrl}/api/${ipam.appId}/subnets/${subnetId}/addresses/`, {
       headers: {
-        'token': ipam.apiToken
+        'token': ipam.appCode || ipam.apiToken || ''
       }
     });
     
