@@ -13,6 +13,88 @@
   border-bottom: 2px solid var(--border-color);
 }
 
+.ipam-status-card {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.ipam-status-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ipam-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ipam-status-dot.connected {
+  background: #28a745;
+  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.2);
+}
+
+.ipam-status-dot.failed {
+  background: #dc3545;
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.2);
+}
+
+.ipam-status-dot.unknown {
+  background: #6c757d;
+  box-shadow: 0 0 0 3px rgba(108, 117, 125, 0.2);
+}
+
+.ipam-refresh-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #007bff;
+  padding: 0;
+}
+
+.ipam-refresh-button:hover:not(:disabled) {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+}
+
+.ipam-refresh-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.ipam-refresh-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ipam-refresh-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .ipam-details-title {
   font-size: 28px;
   font-weight: 700;
