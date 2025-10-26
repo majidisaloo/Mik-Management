@@ -423,18 +423,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type'
 };
 
+const securityHeaders = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Cross-Origin-Opener-Policy': 'same-origin'
+};
+
 const sendJson = (res, statusCode, payload) => {
   const body = JSON.stringify(payload);
   res.writeHead(statusCode, {
     'Content-Type': 'application/json',
     'Content-Length': Buffer.byteLength(body),
-    ...corsHeaders
+    ...corsHeaders,
+    ...securityHeaders
   });
   res.end(body);
 };
 
 const sendNoContent = (res) => {
-  res.writeHead(204, corsHeaders);
+  res.writeHead(204, { ...corsHeaders, ...securityHeaders });
   res.end();
 };
 
