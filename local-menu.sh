@@ -3,6 +3,27 @@
 # Mik-Management Local Menu
 # Local management menu for Mik-Management project
 
+# Support direct command execution (non-interactive mode)
+if [ "$1" == "restart" ]; then
+    echo "🔄 Restarting services..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    
+    pkill -f "node.*backend/src/server.js" 2>/dev/null
+    pkill -f "vite" 2>/dev/null
+    sleep 2
+    
+    cd "$SCRIPT_DIR/backend" && node src/server.js > backend.log 2>&1 &
+    BACKEND_PID=$!
+    
+    cd "$SCRIPT_DIR/frontend" && npm run dev > frontend.log 2>&1 &
+    FRONTEND_PID=$!
+    
+    echo "✅ Services restarted"
+    echo "   Backend PID: $BACKEND_PID"
+    echo "   Frontend PID: $FRONTEND_PID"
+    exit 0
+fi
+
 clear
 echo "=========================================="
 echo "    🚀 Mik-Management Local Menu 🚀"

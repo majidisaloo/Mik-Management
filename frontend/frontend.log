@@ -3,29 +3,7 @@
 > vite
 
 
-  VITE v5.4.20  ready in 248 ms
+  VITE v5.4.20  ready in 194 ms
 
   ➜  Local:   http://localhost:5174/
   ➜  Network: use --host to expose
-2:30:42 PM [vite] hmr update /src/pages/IPAMDetails.css
-2:30:52 PM [vite] hmr update /src/pages/IPAMDetails.css
-2:31:39 PM [vite] hmr update /src/pages/IPAMDetails.css
-2:31:46 PM [vite] hmr update /src/pages/IPAMDetails.css
-2:32:33 PM [vite] hmr update /src/pages/IPAMDetails.css
-2:32:39 PM [vite] hmr update /src/pages/IPAMDetails.css
-2:33:58 PM [vite] hmr update /src/pages/IPAMDetails.jsx
-2:34:02 PM [vite] hmr update /src/pages/IPAMDetails.jsx
-2:34:11 PM [vite] hmr update /src/pages/IPAMDetails.jsx
-2:34:20 PM [vite] hmr update /src/pages/IPAMDetails.jsx
-2:34:28 PM [vite] hmr update /src/pages/IPAMDetails.jsx
-2:34:31 PM [vite] hmr update /src/pages/IPAMDetails.jsx
-2:36:51 PM [vite] hmr update /src/pages/IPAMDetails.jsx
-2:36:59 PM [vite] hmr update /src/pages/IPAMDetails.jsx
-2:39:25 PM [vite] hmr update /src/pages/IPAMDetails.jsx
-2:39:29 PM [vite] hmr update /src/pages/IPAMDetails.jsx
-2:40:03 PM [vite] hmr update /src/pages/IPAMDetails.jsx
-2:45:07 PM [vite] hmr update /src/pages/IPAMDetails.jsx
-2:45:17 PM [vite] hmr update /src/pages/IPAMDetails.jsx
-2:45:33 PM [vite] hmr update /src/pages/IPAMDetails.jsx
-2:48:32 PM [vite] hmr update /src/pages/IPAMDetails.jsx
-2:48:47 PM [vite] hmr update /src/pages/IPAMDetails.jsx

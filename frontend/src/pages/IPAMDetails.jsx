@@ -630,6 +630,8 @@ const IPAMDetails = () => {
   const loadQueueAndLogs = useCallback(async () => {
     if (!id) return;
     try {
+      console.log(`📊 Loading queue and logs for IPAM ${id}...`);
+      
       const [queueRes, logsRes] = await Promise.all([
         fetch(`/api/ipams/${id}/queue`),
         fetch(`/api/ipams/${id}/logs`)
@@ -637,15 +639,21 @@ const IPAMDetails = () => {
       
       if (queueRes.ok) {
         const queueData = await queueRes.json();
+        console.log(`📋 Queue loaded: ${queueData.length} items`, queueData);
         setQueue(queueData);
+      } else {
+        console.error(`❌ Queue fetch failed: ${queueRes.status}`);
       }
       
       if (logsRes.ok) {
         const logsData = await logsRes.json();
+        console.log(`📜 Logs loaded: ${logsData.length} items`, logsData);
         setLogs(logsData);
+      } else {
+        console.error(`❌ Logs fetch failed: ${logsRes.status}`);
       }
     } catch (err) {
-      console.error('Failed to load queue and logs:', err);
+      console.error('❌ Failed to load queue and logs:', err);
     }
   }, [id]);
 
@@ -666,15 +674,22 @@ const IPAMDetails = () => {
     }
 
     try {
-      const endpoint = useLive ? `/api/ipams/${id}/sections/${sectionId}/live` : `/api/ipams/${id}/sections/${sectionId}`;
+      // Correct path: /api/ipams/:id/sections/:sectionId or .../sections/:sectionId/live
+      const basePath = `/api/ipams/${id}/sections/${sectionId}`;
+      const endpoint = useLive ? `${basePath}/live` : basePath;
+      console.log(`📡 Loading section ranges from: ${endpoint}`);
+      
       const res = await fetch(endpoint);
       if (res.ok) {
         const data = await res.json();
         setSectionRanges(prev => ({ ...prev, [sectionId]: data.ranges || [] }));
         setSectionCache(prev => ({ ...prev, [sectionId]: { ts: Date.now(), ranges: data.ranges || [] } }));
+        console.log(`✅ Loaded ${data.ranges?.length || 0} ranges for section ${sectionId}`);
+      } else {
+        console.error(`❌ Failed to load section ${sectionId}: ${res.status} ${res.statusText}`);
       }
     } catch (e) {
-      console.error('Failed to load section ranges', e);
+      console.error('❌ Network error loading section ranges:', e);
     }
   }, [id, sectionCache]);
 
@@ -1351,61 +1366,71 @@ const IPAMDetails = () => {
       )}
 
       {activeTab === 'datacenters' && (
-      <div className="card">
-        <div className="card__header">
-          <h2 className="card__title flex items-center gap-2">
-              <BuildingIcon />
-              Datacenters ({ipam.collections?.datacenters?.length || 0})
-          </h2>
-        </div>
-        <div className="card__content">
-            {ipam.collections?.datacenters && ipam.collections.datacenters.length > 0 ? (
-            <div className="space-y-2">
-                {ipam.collections.datacenters.map((datacenter) => {
+      <>
+          {/* Horizontal scrollable datacenter cards */}
+          <div className="ipam-submenu-container">
+            <div 
+              className="ipam-submenu-wrapper"
+              style={{ 
+                display: 'flex', 
+                gap: '16px', 
+                overflowX: 'auto',
+                padding: '16px',
+                scrollbarWidth: 'thin'
+              }}
+            >
+              {ipam.collections?.datacenters && ipam.collections.datacenters.length > 0 ? (
+                ipam.collections.datacenters.map((datacenter) => {
                   const isExpanded = expandedDatacenters.has(datacenter.id);
-                
-                return (
-                    <div key={datacenter.id} className="border border-border rounded-lg">
+                  
+                  return (
                     <div 
-                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface-secondary"
-                        onClick={() => toggleDatacenter(datacenter.id)}
+                      key={datacenter.id} 
+                      className="border border-border rounded-lg"
+                      style={{
+                        minWidth: '280px',
+                        maxWidth: '320px',
+                        backgroundColor: 'var(--surface)',
+                        transition: 'all 0.2s'
+                      }}
                     >
-                      <div className="flex items-center gap-3">
-                        {isExpanded ? <MinusIcon /> : <PlusIcon />}
-                        <div>
+                      <div 
+                        className="flex flex-col p-4 cursor-pointer hover:bg-surface-secondary"
+                        onClick={() => toggleDatacenter(datacenter.id)}
+                        style={{ gap: '8px' }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {isExpanded ? <MinusIcon /> : <PlusIcon />}
                             <h3 className="font-semibold text-primary">{datacenter.name}</h3>
-                            <p className="text-sm text-tertiary">{datacenter.description || 'No description'}</p>
-                        </div>
-                      </div>
-                      <div className="text-sm text-tertiary">
-                          ID: {datacenter.id}
-                      </div>
-                    </div>
-
-                    {isExpanded && (
-                      <div className="border-t border-border p-4 bg-surface-secondary">
-                          <div className="text-sm text-tertiary space-y-2">
-                            <p><strong>ID:</strong> {datacenter.id}</p>
-                            <p><strong>Description:</strong> {datacenter.description || 'No description'}</p>
-                            <p><strong>Address:</strong> {datacenter.address || 'Not specified'}</p>
-                            {datacenter.location && (
-                              <p><strong>Location:</strong> {datacenter.location}</p>
-                            )}
-                            {datacenter.capacity && (
-                              <p><strong>Capacity:</strong> {datacenter.capacity}</p>
-                            )}
                           </div>
+                          <span className="text-sm text-tertiary">ID: {datacenter.id}</span>
                         </div>
-                      )}
+                        <p className="text-sm text-tertiary">{datacenter.description || 'No description'}</p>
+                        
+                        {isExpanded && (
+                          <div className="border-t border-border pt-3 mt-2">
+                            <div className="text-sm text-tertiary space-y-2">
+                              <p><strong>Address:</strong> {datacenter.address || 'Not specified'}</p>
+                              {datacenter.location && (
+                                <p><strong>Location:</strong> {datacenter.location}</p>
+                              )}
+                              {datacenter.capacity && (
+                                <p><strong>Capacity:</strong> {datacenter.capacity}</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
-                })}
-              </div>
-            ) : (
-              <p className="text-tertiary text-center py-8">No datacenters found</p>
-            )}
+                })
+              ) : (
+                <p className="text-tertiary text-center py-8" style={{ width: '100%' }}>No datacenters found</p>
+              )}
+            </div>
           </div>
-        </div>
+        </>
       )}
 
              {activeTab === 'sections' && (
@@ -2146,10 +2171,11 @@ const IPAMDetails = () => {
                               <pre style={{ 
                                 marginTop: '8px',
                                 padding: '8px',
-                                backgroundColor: 'white',
+                                backgroundColor: 'var(--surface-elevated)',
                                 borderRadius: '4px',
                                 fontSize: '12px',
-                                overflow: 'auto'
+                                overflow: 'auto',
+                                color: 'var(--primary)'
                               }}>
                                 {JSON.stringify(item.verificationDetails, null, 2)}
                               </pre>
@@ -2163,10 +2189,11 @@ const IPAMDetails = () => {
                             <pre style={{ 
                               marginTop: '8px',
                               padding: '8px',
-                              backgroundColor: 'white',
+                              backgroundColor: 'var(--surface-elevated)',
                               borderRadius: '4px',
                               fontSize: '12px',
-                              overflow: 'auto'
+                              overflow: 'auto',
+                              color: 'var(--primary)'
                             }}>
                               {JSON.stringify(item.data, null, 2)}
                             </pre>

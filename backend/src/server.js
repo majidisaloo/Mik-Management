@@ -1049,12 +1049,127 @@ const syncPhpIpamSection = async (ipam, sectionId) => {
   return { ranges };
 };
 
+// ============================================
+// Queue Management Helper Functions
+// ============================================
+
+/**
+ * Add an operation to the queue for background processing
+ */
+const addToQueue = async (operation) => {
+  const queueItem = await db.addToQueue(operation);
+  console.log(`✅ Added to queue: ${operation.type} (ID: ${queueItem.id})`);
+  return queueItem;
+};
+
+/**
+ * Update the status of a queue item
+ */
+const updateQueueStatus = async (queueId, status, error = null) => {
+  await db.updateQueueStatus(queueId, status, error);
+  console.log(`📊 Queue ${queueId}: ${status}${error ? ` - ${error}` : ''}`);
+};
+
+/**
+ * Move a completed queue item to the logs
+ * @param {number|object} queueIdOrItem - Queue ID or queue item object
+ * @param {object} verificationResult - Verification result with success, message, details
+ */
+const moveToLog = async (queueIdOrItem, verificationResult = null) => {
+  const queueId = typeof queueIdOrItem === 'object' ? queueIdOrItem.id : queueIdOrItem;
+  
+  if (verificationResult) {
+    // Update status based on verification result
+    const status = verificationResult.success ? 'completed' : 'failed';
+    const message = verificationResult.message || '';
+    await updateQueueStatus(queueId, status, message);
+  }
+  
+  await db.moveToLog(queueId);
+  console.log(`📜 Queue ${queueId}: moved to logs`);
+};
+
+// ============================================
+// Verification Functions
+// ============================================
+
+/**
+ * Verify that an IP was successfully added to phpIPAM
+ */
+const verifyAddIp = async (ipam, ipAddress, subnetId) => {
+  try {
+    const addresses = normalisePhpIpamList(await phpIpamFetch(ipam, `subnets/${subnetId}/addresses/`, { allowNotFound: true }));
+    const found = addresses.some(addr => addr.ip === ipAddress);
+    
+    return {
+      success: found,
+      message: found ? `IP ${ipAddress} verified in subnet ${subnetId}` : `IP ${ipAddress} not found in subnet ${subnetId}`,
+      details: { ipAddress, subnetId, found }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Verification failed: ${error.message}`,
+      details: { ipAddress, subnetId, error: error.message }
+    };
+  }
+};
+
+/**
+ * Verify that an IP was successfully deleted from phpIPAM
+ */
+const verifyDeleteIp = async (ipam, ipAddress, subnetId) => {
+  try {
+    const addresses = normalisePhpIpamList(await phpIpamFetch(ipam, `subnets/${subnetId}/addresses/`, { allowNotFound: true }));
+    const found = addresses.some(addr => addr.ip === ipAddress);
+    
+    return {
+      success: !found,
+      message: !found ? `IP ${ipAddress} verified deleted from subnet ${subnetId}` : `IP ${ipAddress} still exists in subnet ${subnetId}`,
+      details: { ipAddress, subnetId, found }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Verification failed: ${error.message}`,
+      details: { ipAddress, subnetId, error: error.message }
+    };
+  }
+};
+
+/**
+ * Verify that IPAM sync was successful
+ */
+const verifySync = async (ipam) => {
+  try {
+    const sections = normalisePhpIpamList(await phpIpamFetch(ipam, 'sections/', { allowNotFound: true }));
+    const subnets = normalisePhpIpamList(await phpIpamFetch(ipam, 'subnets/', { allowNotFound: true }));
+    
+    return {
+      success: sections.length > 0 || subnets.length > 0,
+      message: `Synced ${sections.length} sections and ${subnets.length} subnets`,
+      details: { sectionsCount: sections.length, subnetsCount: subnets.length }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Sync verification failed: ${error.message}`,
+      details: { error: error.message }
+    };
+  }
+};
+
+// ============================================
+// Queue Processor
+// ============================================
+
 const processQueuedOperation = async (queueItem) => {
   try {
     const ipamId = queueItem.ipamId;
     const ipam = await db.getIpamById(ipamId);
     if (!ipam) {
       await updateQueueStatus(queueItem.id, 'failed', 'IPAM not found');
+      await moveToLog(queueItem.id);
       return;
     }
 
@@ -1100,6 +1215,7 @@ const processQueuedOperation = async (queueItem) => {
         const { cidr, description, sectionId, parentSubnetId: inputParentSubnetId, parentRangeCidr } = queueItem.data || {};
         if (!cidr) {
           await updateQueueStatus(queueItem.id, 'failed', 'CIDR is required');
+          await moveToLog(queueItem.id);
           break;
         }
         let parentSubnetId = inputParentSubnetId;
@@ -1206,11 +1322,13 @@ const processQueuedOperation = async (queueItem) => {
       }
       default: {
         await updateQueueStatus(queueItem.id, 'failed', `Unknown type: ${queueItem.type}`);
+        await moveToLog(queueItem.id);
       }
     }
   } catch (error) {
     try {
       await updateQueueStatus(queueItem.id, 'failed', error.message);
+      await moveToLog(queueItem.id);
     } catch (_) {}
   }
 };
