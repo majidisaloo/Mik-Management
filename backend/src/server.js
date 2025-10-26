@@ -931,6 +931,9 @@ const syncPhpIpamStructure = async (ipam) => {
 // Lightweight per-section cache (memory only)
 const sectionCache = new Map(); // key: `${ipamId}:${sectionId}` => { ts, ranges }
 const SECTION_TTL_MS = 10 * 60 * 1000; // 10 minutes
+// Simple per-page cache (memory only)
+const pageCache = new Map(); // key: string => { ts, data }
+const PAGE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 const syncPhpIpamSection = async (ipam, sectionId) => {
   // Build only this section's ranges (top-level + nested)
@@ -1060,6 +1063,56 @@ const processQueuedOperation = async (queueItem) => {
         await phpIpamFetch(ipam, 'addresses/', { method: 'POST', body: JSON.stringify(ipPayload) });
 
         const verificationResult = await verifyAddIp(ipam, ipAddress, newSubnetId);
+        await moveToLog(queueItem, verificationResult);
+        break;
+      }
+      case 'add_range': {
+        const { cidr, description, sectionId, parentSubnetId: inputParentSubnetId, parentRangeCidr } = queueItem.data || {};
+        if (!cidr) {
+          await updateQueueStatus(queueItem.id, 'failed', 'CIDR is required');
+          break;
+        }
+        let parentSubnetId = inputParentSubnetId;
+        // Resolve parent subnet id if missing but CIDR of parent is provided
+        if (!parentSubnetId && parentRangeCidr) {
+          try {
+            const subnets = normalisePhpIpamList(await phpIpamFetch(ipam, 'subnets/', { allowNotFound: true }));
+            const match = subnets.find((s) => `${s.subnet}/${s.mask}` === parentRangeCidr);
+            if (match && match.id) parentSubnetId = Number.parseInt(match.id, 10);
+          } catch (e) {}
+        }
+
+        const [subnetPart, maskPart] = `${cidr}`.split('/')
+        const mask = maskPart || '32';
+        const subnetPayload = {
+          subnet: subnetPart,
+          mask,
+          sectionId,
+          description: description || cidr,
+          ...(parentSubnetId ? { masterSubnetId: parentSubnetId } : {})
+        };
+
+        // Create subnet in phpIPAM
+        const created = await phpIpamFetch(ipam, 'subnets/', { method: 'POST', body: JSON.stringify(subnetPayload) });
+        const newSubnetId = created?.id || created;
+
+        // Verify creation by fetching the subnet or listing and matching
+        let verified = false;
+        try {
+          const fetched = await phpIpamFetch(ipam, `subnets/${newSubnetId}/`, { allowNotFound: true });
+          verified = Boolean(fetched && (fetched.id || fetched.subnet));
+        } catch (e) {
+          try {
+            const subnets = normalisePhpIpamList(await phpIpamFetch(ipam, 'subnets/', { allowNotFound: true }));
+            verified = subnets.some((s) => `${s.subnet}/${s.mask}` === cidr);
+          } catch (_) {}
+        }
+
+        const verificationResult = {
+          success: Boolean(newSubnetId) && verified,
+          message: verified ? `Range ${cidr} created with ID ${newSubnetId}` : `Range ${cidr} creation unverified`,
+          details: { cidr, newSubnetId, sectionId, parentSubnetId }
+        };
         await moveToLog(queueItem, verificationResult);
         break;
       }
@@ -2403,6 +2456,8 @@ const bootstrap = async () => {
         }
 
         sendNoContent(res);
+        pageCache.delete('mikrotiks');
+        pageCache.delete('firewallInventory');
       } catch (error) {
         console.error('Delete role error', error);
         sendJson(res, 500, { message: 'Unable to delete the role right now.' });
@@ -2411,11 +2466,21 @@ const bootstrap = async () => {
 
     const handleListGroups = async () => {
       try {
+        const key = 'groups';
+        const now = Date.now();
+        const cached = pageCache.get(key);
+        if (cached && now - cached.ts < PAGE_TTL_MS) {
+          sendJson(res, 200, cached.data);
+          return;
+        }
+
         const groups = await db.listGroups();
         const mapped = groups.map(mapGroup);
         const tree = buildGroupTree(groups);
         const ordered = flattenGroupTree(tree);
-        sendJson(res, 200, { groups: mapped, tree, ordered });
+        const payload = { groups: mapped, tree, ordered };
+        pageCache.set(key, { ts: now, data: payload });
+        sendJson(res, 200, payload);
       } catch (error) {
         console.error('List groups error', error);
         sendJson(res, 500, { message: 'Unable to load groups.' });
@@ -2469,6 +2534,10 @@ const bootstrap = async () => {
         }
 
         sendJson(res, 201, { message: 'Group created successfully.', group: mapGroup(result.group) });
+        pageCache.delete('groups');
+        pageCache.delete('mikrotiks');
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Create group error', error);
         sendJson(res, 500, { message: 'Unable to create the group right now.' });
@@ -2537,6 +2606,10 @@ const bootstrap = async () => {
         }
 
         sendJson(res, 200, { message: 'Group updated successfully.', group: mapGroup(result.group) });
+        pageCache.delete('groups');
+        pageCache.delete('mikrotiks');
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Update group error', error);
         sendJson(res, 500, { message: 'Unable to update the group right now.' });
@@ -2572,6 +2645,10 @@ const bootstrap = async () => {
         }
 
         sendNoContent(res);
+        pageCache.delete('groups');
+        pageCache.delete('mikrotiks');
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Delete group error', error);
         sendJson(res, 500, { message: 'Unable to delete the group right now.' });
@@ -2580,12 +2657,22 @@ const bootstrap = async () => {
 
     const handleListMikrotiks = async () => {
       try {
+        const key = 'mikrotiks';
+        const now = Date.now();
+        const cached = pageCache.get(key);
+        if (cached && now - cached.ts < PAGE_TTL_MS) {
+          sendJson(res, 200, cached.data);
+          return;
+        }
+
         const [devices, groups] = await Promise.all([db.listMikrotiks(), db.listGroups()]);
-        sendJson(res, 200, {
+        const payload = {
           mikrotiks: devices.map((device) => mapMikrotik(device, groups)),
           groups: groups.map(mapGroup),
           targetRouterOs: TARGET_ROUTEROS_VERSION
-        });
+        };
+        pageCache.set(key, { ts: now, data: payload });
+        sendJson(res, 200, payload);
       } catch (error) {
         console.error('List Mikrotiks error', error);
         sendJson(res, 500, { message: 'Unable to load Mikrotik devices.' });
@@ -2667,6 +2754,8 @@ const bootstrap = async () => {
           mikrotik: mapMikrotik(result.mikrotik, groups),
           targetRouterOs: TARGET_ROUTEROS_VERSION
         });
+        pageCache.delete('mikrotiks');
+        pageCache.delete('firewallInventory');
       } catch (error) {
         console.error('Create Mikrotik error', error);
         sendJson(res, 500, { message: 'Unable to add the Mikrotik device right now.' });
@@ -2745,6 +2834,8 @@ const bootstrap = async () => {
           mikrotik: mapMikrotik(result.mikrotik, groups),
           targetRouterOs: TARGET_ROUTEROS_VERSION
         });
+        pageCache.delete('mikrotiks');
+        pageCache.delete('firewallInventory');
       } catch (error) {
         console.error('Update Mikrotik error', error);
         sendJson(res, 500, { message: 'Unable to update the Mikrotik device right now.' });
@@ -4070,6 +4161,14 @@ const bootstrap = async () => {
 
     const handleListFirewallInventory = async () => {
       try {
+        const key = 'firewallInventory';
+        const now = Date.now();
+        const cached = pageCache.get(key);
+        if (cached && now - cached.ts < PAGE_TTL_MS) {
+          sendJson(res, 200, cached.data);
+          return;
+        }
+
         const [addressLists, filters, groups, mikrotiks] = await Promise.all([
           db.listAddressLists(),
           db.listFirewallFilters(),
@@ -4080,13 +4179,15 @@ const bootstrap = async () => {
         const mappedAddressLists = addressLists.map((entry) => mapAddressList(entry, groups, mikrotiks));
         const mappedFilters = filters.map((filter) => mapFirewallFilter(filter, groups, addressLists));
 
-        sendJson(res, 200, {
+        const payload = {
           addressLists: mappedAddressLists,
           filters: mappedFilters,
           groups: groups.map(mapGroup),
           mikrotiks: mikrotiks.map((device) => mapMikrotik(device, groups)),
           targetRouterOs: TARGET_ROUTEROS_VERSION
-        });
+        };
+        pageCache.set(key, { ts: now, data: payload });
+        sendJson(res, 200, payload);
       } catch (error) {
         console.error('List firewall inventory error', error);
         sendJson(res, 500, { message: 'Unable to load firewall inventory.' });
@@ -4124,6 +4225,8 @@ const bootstrap = async () => {
           message: 'Address list entry created successfully.',
           addressList: mapAddressList(result.addressList, groups, mikrotiks)
         });
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Create address list error', error);
         sendJson(res, 500, { message: 'Unable to create the address list entry right now.' });
@@ -4166,6 +4269,8 @@ const bootstrap = async () => {
           message: 'Address list entry updated successfully.',
           addressList: mapAddressList(result.addressList, groups, mikrotiks)
         });
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Update address list error', error);
         sendJson(res, 500, { message: 'Unable to update the address list entry right now.' });
@@ -4191,6 +4296,8 @@ const bootstrap = async () => {
         }
 
         sendNoContent(res);
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Delete address list error', error);
         sendJson(res, 500, { message: 'Unable to delete the address list entry right now.' });
@@ -4262,6 +4369,8 @@ const bootstrap = async () => {
           message: 'Firewall filter created successfully.',
           filter: mapFirewallFilter(result.firewallFilter, groups, addressLists)
         });
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Create firewall filter error', error);
         sendJson(res, 500, { message: 'Unable to create the firewall filter right now.' });
@@ -4343,6 +4452,8 @@ const bootstrap = async () => {
           message: 'Firewall filter updated successfully.',
           filter: mapFirewallFilter(result.firewallFilter, groups, addressLists)
         });
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Update firewall filter error', error);
         sendJson(res, 500, { message: 'Unable to update the firewall filter right now.' });
@@ -4368,6 +4479,8 @@ const bootstrap = async () => {
         }
 
         sendNoContent(res);
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Delete firewall filter error', error);
         sendJson(res, 500, { message: 'Unable to delete the firewall filter right now.' });
@@ -4441,17 +4554,27 @@ const bootstrap = async () => {
 
     const handleListFirewall = async () => {
       try {
+        const key = 'firewallConfig';
+        const now = Date.now();
+        const cached = pageCache.get(key);
+        if (cached && now - cached.ts < PAGE_TTL_MS) {
+          sendJson(res, 200, cached.data);
+          return;
+        }
+
         const [filters, addressLists, groups] = await Promise.all([
           db.listFirewallFilters(),
           db.listAddressLists(),
           db.listGroups()
         ]);
 
-        sendJson(res, 200, {
+        const payload = {
           filters: filters.map((filter) => mapFirewallFilter(filter, groups)),
           addressLists: addressLists.map((list) => mapAddressList(list, groups)),
           groups: groups.map(mapGroup)
-        });
+        };
+        pageCache.set(key, { ts: now, data: payload });
+        sendJson(res, 200, payload);
       } catch (error) {
         console.error('List firewall error', error);
         sendJson(res, 500, { message: 'Unable to load firewall configuration.' });
@@ -5534,6 +5657,12 @@ const bootstrap = async () => {
             // Fetch fresh data from PHP-IPAM
             const collections = await syncPhpIpamStructure(ipam);
             
+            // Log a non-blocking refresh in the background
+            try {
+              const queueItem = await addToQueue({ type: 'refresh', ipamId, data: { scope: 'live', at: new Date().toISOString() } });
+              (async () => { await processQueuedOperation(queueItem); })();
+            } catch (_) {}
+
             // Return directly without saving to database
             sendJson(res, 200, {
               id: ipam.id,
@@ -5737,27 +5866,20 @@ const bootstrap = async () => {
                 queueId: queueItem.id
               });
             } else {
-              // For ranges, we still add to local database
-              console.log('Adding range to local database');
-              
-              const collections = ipam.collections || { sections: [], datacenters: [], ranges: [] };
-              
-              const newRange = {
-                id: `range_${Date.now()}`,
-                sectionId: body.sectionId,
-                name: body.name || body.description || '',
-                description: body.description || '',
-                metadata: body.metadata || {}
-              };
-              
-              collections.ranges.push(newRange);
-              
-              await db.replaceIpamCollections(ipamId, collections);
-              
-              sendJson(res, 201, {
-                message: 'Range added successfully',
-                range: newRange
+              // Enqueue add_range for subnet creation (background)
+              const queueItem = await addToQueue({
+                type: 'add_range',
+                ipamId: ipamId,
+                data: {
+                  cidr,
+                  description: body.description || body.name || '',
+                  sectionId: body.sectionId,
+                  parentSubnetId: body.metadata?.subnetId ? parseInt(body.metadata.subnetId, 10) : null,
+                  parentRangeCidr
+                }
               });
+              (async () => { await processQueuedOperation(queueItem); })();
+              sendJson(res, 202, { message: 'Add range queued for processing', status: 'queued', queueId: queueItem.id });
             }
           } catch (error) {
             console.error('Add IP/Range error:', error);
@@ -5808,26 +5930,8 @@ const bootstrap = async () => {
                 }
               });
               
-              await updateQueueStatus(queueItem.id, 'processing');
-              
-              try {
-                await phpIpamFetch(ipam, `subnets/${numericRangeId}/`, {
-                  method: 'DELETE'
-                });
-                console.log(`✅ Deleted subnet ${numericRangeId} from PHP-IPAM`);
-                
-                // Verify deletion
-                const verificationResult = deletedIpAddress && deletedSubnetId 
-                  ? await verifyDeleteIp(ipam, deletedIpAddress, deletedSubnetId)
-                  : { success: true, message: 'Deleted (no verification needed)', details: {} };
-                
-                await moveToLog(queueItem, verificationResult);
-                console.log('✅ Delete operation logged with verification:', verificationResult.success ? 'SUCCESS' : 'FAILED');
-                
-              } catch (error) {
-                console.log(`⚠️ Could not delete from PHP-IPAM: ${error.message}`);
-                await updateQueueStatus(queueItem.id, 'failed', error.message);
-              }
+              // Process in background via queue processor
+              (async () => { await processQueuedOperation(queueItem); })();
             }
             
             // Respond as queued (deletion processed in background)

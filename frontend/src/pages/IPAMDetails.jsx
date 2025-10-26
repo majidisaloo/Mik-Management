@@ -1853,7 +1853,13 @@ const IPAMDetails = () => {
                       })
                     });
                     
-                    if (response.ok) {
+                    if (response.status === 202) {
+                      showToast('Queued: add operation is processing. See Queue & Logs.', 'info');
+                      setShowEditModal(false);
+                      setShowAddModal(false);
+                      setActiveTab('queue-logs');
+                      await loadQueueAndLogs();
+                    } else if (response.ok) {
                       showToast('IP added successfully', 'success');
                       await loadIpamDetails();
                       setShowEditModal(false);
