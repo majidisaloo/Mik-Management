@@ -1562,10 +1562,10 @@ const IPAMDetails = () => {
                     key={idx}
                     onClick={() => {
                       if (!option.canSplit) {
-                        alert(`Cannot split: ${option.reason}`);
+                        showToast(`Cannot split: ${option.reason}`, 'error');
                         return;
                       }
-                      alert(`Selected: Split into ${option.subnetCount} subnets of /${option.newMask} (${formattedCount} IPs each)`);
+                      showToast(`Selected: Split into ${option.subnetCount} subnets of /${option.newMask} (${formattedCount} IPs each)`, 'info');
                       setShowSplitModal(false);
                     }}
                     disabled={!option.canSplit}
