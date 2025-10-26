@@ -5373,14 +5373,20 @@ const bootstrap = async () => {
               // Make API call to PHP-IPAM
               // Use the subnet-specific endpoint to add IP to correct subnet
               let endpoint = 'addresses/';
+              let finalPayload = { ...addressData };
+              
               if (subnetId) {
                 endpoint = `subnets/${subnetId}/addresses/`;
                 console.log(`Using subnet-specific endpoint: ${endpoint}`);
+                // Remove subnetId from payload when using subnet-specific endpoint
+                delete finalPayload.subnetId;
               }
+              
+              console.log('Final payload:', JSON.stringify(finalPayload, null, 2));
               
               const phpIpamResponse = await phpIpamFetch(ipam, endpoint, {
                 method: 'POST',
-                body: JSON.stringify(addressData)
+                body: JSON.stringify(finalPayload)
               });
               
               console.log('PHP-IPAM response:', JSON.stringify(phpIpamResponse, null, 2));
