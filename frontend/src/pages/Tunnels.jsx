@@ -70,6 +70,7 @@ const emptyTunnelForm = () => ({
   name: '',
   type: 'GRE',
   status: 'up',
+  groupId: '',
   sourceDeviceId: '',
   targetDeviceId: '',
   sourceInterface: '',
@@ -115,6 +116,8 @@ const Tunnels = () => {
   const [ipams, setIpams] = useState([]);
   const [sectionOptions, setSectionOptions] = useState([]);
   const [rangeOptions, setRangeOptions] = useState([]);
+  const [sourceInterfaces, setSourceInterfaces] = useState([]);
+  const [targetInterfaces, setTargetInterfaces] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', message: '' });
   const [selectedId, setSelectedId] = useState(null);
@@ -225,6 +228,26 @@ const Tunnels = () => {
     }
   };
 
+  const loadInterfaces = async (deviceId, side) => {
+    try {
+      if (!deviceId) {
+        if (side === 'source') setSourceInterfaces([]);
+        else setTargetInterfaces([]);
+        return;
+      }
+      const res = await fetch(`/api/mikrotiks/${deviceId}/interfaces`);
+      if (res.ok) {
+        const data = await res.json();
+        const list = data?.interfaces || [];
+        if (side === 'source') setSourceInterfaces(list);
+        else setTargetInterfaces(list);
+      }
+    } catch (e) {
+      if (side === 'source') setSourceInterfaces([]);
+      else setTargetInterfaces([]);
+    }
+  };
+
   const loadIpams = async () => {
     try {
       const res = await fetch('/api/ipams');
@@ -261,6 +284,7 @@ const Tunnels = () => {
           name: form.name,
           connectionType: form.type,
           status: form.status,
+          groupId: form.groupId || undefined,
           sourceId: form.sourceDeviceId,
           targetId: form.targetDeviceId,
           notes: form.comment,
@@ -729,6 +753,20 @@ const Tunnels = () => {
             <h3 className="text-lg font-semibold text-primary">Basic Information</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="form-group">
+            <label htmlFor="tunnel-group" className="form-label">Group</label>
+            <select
+              id="tunnel-group"
+              className="form-input form-select"
+              value={form.groupId || ''}
+              onChange={(e) => setForm({ ...form, groupId: e.target.value })}
+            >
+              <option value="">None</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
               <div className="form-group">
                 <label htmlFor="tunnel-name" className="form-label">
                   Tunnel Name *
@@ -796,7 +834,11 @@ const Tunnels = () => {
                   id="source-device"
                   className="form-input form-select"
                   value={form.sourceDeviceId}
-                  onChange={(e) => setForm({ ...form, sourceDeviceId: e.target.value })}
+                  onChange={async (e) => {
+                    const v = e.target.value;
+                    setForm({ ...form, sourceDeviceId: v, sourceInterface: '' });
+                    await loadInterfaces(v, 'source');
+                  }}
                   required
                 >
                   <option value="">Select source device</option>
@@ -816,7 +858,11 @@ const Tunnels = () => {
                   id="target-device"
                   className="form-input form-select"
                   value={form.targetDeviceId}
-                  onChange={(e) => setForm({ ...form, targetDeviceId: e.target.value })}
+                  onChange={async (e) => {
+                    const v = e.target.value;
+                    setForm({ ...form, targetDeviceId: v, targetInterface: '' });
+                    await loadInterfaces(v, 'target');
+                  }}
                   required
                 >
                   <option value="">Select target device</option>
@@ -834,28 +880,56 @@ const Tunnels = () => {
                 <label htmlFor="source-interface" className="form-label">
                   Source Interface
                   </label>
-                    <input
-                  id="source-interface"
-                  type="text"
-                  className="form-input"
-                  value={form.sourceInterface}
-                  onChange={(e) => setForm({ ...form, sourceInterface: e.target.value })}
-                  placeholder="e.g., ether1"
-                />
+                {sourceInterfaces.length > 0 ? (
+                  <select
+                    id="source-interface"
+                    className="form-input form-select"
+                    value={form.sourceInterface}
+                    onChange={(e) => setForm({ ...form, sourceInterface: e.target.value })}
+                  >
+                    <option value="">Select interface</option>
+                    {sourceInterfaces.map((iface) => (
+                      <option key={iface.name} value={iface.name}>{iface.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    id="source-interface"
+                    type="text"
+                    className="form-input"
+                    value={form.sourceInterface}
+                    onChange={(e) => setForm({ ...form, sourceInterface: e.target.value })}
+                    placeholder="e.g., ether1"
+                  />
+                )}
               </div>
 
               <div className="form-group">
                 <label htmlFor="target-interface" className="form-label">
                   Target Interface
                   </label>
-                    <input
-                  id="target-interface"
-                  type="text"
-                  className="form-input"
-                  value={form.targetInterface}
-                  onChange={(e) => setForm({ ...form, targetInterface: e.target.value })}
-                  placeholder="e.g., ether1"
-                />
+                {targetInterfaces.length > 0 ? (
+                  <select
+                    id="target-interface"
+                    className="form-input form-select"
+                    value={form.targetInterface}
+                    onChange={(e) => setForm({ ...form, targetInterface: e.target.value })}
+                  >
+                    <option value="">Select interface</option>
+                    {targetInterfaces.map((iface) => (
+                      <option key={iface.name} value={iface.name}>{iface.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    id="target-interface"
+                    type="text"
+                    className="form-input"
+                    value={form.targetInterface}
+                    onChange={(e) => setForm({ ...form, targetInterface: e.target.value })}
+                    placeholder="e.g., ether1"
+                  />
+                )}
             </div>
           </div>
 
