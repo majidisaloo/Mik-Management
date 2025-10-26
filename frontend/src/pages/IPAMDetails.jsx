@@ -616,7 +616,19 @@ const IPAMDetails = () => {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
+      // First sync with PHP-IPAM to get latest data
+      await fetch(`/api/ipams/${id}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      // Then reload IPAM details
       await loadIpamDetails();
+      
+      showToast('IPAM data refreshed successfully', 'success');
+    } catch (error) {
+      console.error('Refresh error:', error);
+      showToast('Failed to refresh IPAM data', 'error');
     } finally {
       setRefreshing(false);
     }
@@ -2020,9 +2032,40 @@ const IPAMDetails = () => {
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  alert('Range deleted successfully');
-                  setShowDeleteModal(false);
+                onClick={async () => {
+                  try {
+                    const response = await fetch(`/api/ipams/${ipam.id}/ranges/${selectedRangeForDelete.id}`, {
+                      method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                      showToast('Range deleted successfully. Syncing...', 'success');
+                      setShowDeleteModal(false);
+                      
+                      // Sync IPAM data from PHP-IPAM
+                      try {
+                        const syncResponse = await fetch(`/api/ipams/${ipam.id}/sync`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' }
+                        });
+                        
+                        if (syncResponse.ok) {
+                          console.log('IPAM data synced after delete');
+                          await new Promise(resolve => setTimeout(resolve, 500));
+                        }
+                      } catch (syncError) {
+                        console.error('Error syncing after delete:', syncError);
+                      }
+                      
+                      // Reload IPAM details
+                      await loadIpamDetails();
+                    } else {
+                      const errorData = await response.json();
+                      showToast(errorData.message || 'Failed to delete range', 'error');
+                    }
+                  } catch (error) {
+                    showToast('Error deleting range: ' + error.message, 'error');
+                  }
                 }}
                 style={{
                   padding: '10px 20px',

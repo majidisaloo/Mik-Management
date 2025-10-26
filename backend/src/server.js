@@ -798,7 +798,8 @@ const syncPhpIpamStructure = async (ipam) => {
       );
       console.log(`📊 Subnets for section ${sectionId}:`, JSON.stringify(rawRanges, null, 2));
 
-      for (const entry of rawRanges) {
+      // Process all subnets recursively (including nested ones)
+      const processSubnet = async (entry, parentSectionId) => {
         const identifier = resolvePhpIpamId(entry, ['subnetId', 'subnet']);
         const rangeId = Number.parseInt(identifier, 10);
 
@@ -809,7 +810,7 @@ const syncPhpIpamStructure = async (ipam) => {
 
         const metadata = {
           cidr: cidr || '',
-          sectionId,
+          sectionId: parentSectionId,
           vlanId: entry.vlanId ?? entry.vlanid ?? entry.vlan ?? null,
           masterSubnetId: entry.masterSubnetId ?? entry.masterSubnet ?? entry.parent ?? null,
           isFolder: entry.isFolder ?? entry.is_folder ?? entry.folder ?? false,
@@ -824,31 +825,6 @@ const syncPhpIpamStructure = async (ipam) => {
 
         // Fetch IPs within this range
         let ips = [];
-        
-        // Add mock data for testing (temporary)
-        const baseIp = subnet ? subnet.split('/')[0] : '192.168.1';
-        ips = [
-          {
-            id: 1,
-            ip: `${baseIp}.${Math.floor(Math.random() * 254) + 1}`,
-            hostname: `server${rangeId}.onlineserver.co`,
-            description: `Server ${rangeId}`,
-            state: 'active',
-            owner: 'Admin',
-            mac: `00:11:22:33:44:${String(rangeId).padStart(2, '0')}`
-          },
-          {
-            id: 2,
-            ip: `${baseIp}.${Math.floor(Math.random() * 254) + 1}`,
-            hostname: `backup${rangeId}.onlineserver.co`,
-            description: `Backup ${rangeId}`,
-            state: 'active',
-            owner: 'Admin',
-            mac: `00:11:22:33:44:${String(rangeId + 1).padStart(2, '0')}`
-          }
-        ];
-        
-        console.log(`📊 Mock IPs for range ${rangeId}:`, JSON.stringify(ips, null, 2));
         
         try {
           console.log(`📊 Fetching IPs for range ${rangeId}: ${ipam.baseUrl}/api/subnets/${rangeId}/addresses/`);
@@ -887,6 +863,29 @@ const syncPhpIpamStructure = async (ipam) => {
           metadata,
           ips: ips
         });
+
+        // Fetch and process nested subnets (slaves)
+        try {
+          if (Number.isInteger(rangeId)) {
+            console.log(`📊 Fetching nested subnets for ${rangeId}...`);
+            const nestedSubnets = normalisePhpIpamList(
+              await phpIpamFetch(ipam, `subnets/${rangeId}/slaves/`, { allowNotFound: true })
+            );
+            
+            if (nestedSubnets.length > 0) {
+              console.log(`📊 Found ${nestedSubnets.length} nested subnets under ${rangeId}`);
+              for (const nestedEntry of nestedSubnets) {
+                await processSubnet(nestedEntry, parentSectionId);
+              }
+            }
+          }
+        } catch (error) {
+          console.log(`⚠️ Error fetching nested subnets for ${rangeId}:`, error.message);
+        }
+      };
+
+      for (const entry of rawRanges) {
+        await processSubnet(entry, sectionId);
       }
     } catch (error) {
       console.log(`❌ Error fetching subnets for section ${sectionId}:`, error.message);
