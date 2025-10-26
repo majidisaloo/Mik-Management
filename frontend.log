@@ -1,0 +1,67 @@
+
+> mik-management-frontend@3.48.0 dev
+> vite
+
+
+  VITE v5.4.20  ready in 235 ms
+
+  ➜  Local:   http://localhost:5174/
+  ➜  Network: use --host to expose
+9:48:35 PM [vite] hmr update /src/App.jsx
+9:48:35 PM [vite] hmr update /src/components/BrandMark.jsx
+9:48:35 PM [vite] hmr update /src/components/Modal.jsx
+9:48:35 PM [vite] hmr update /src/context/AuthContext.jsx
+9:48:35 PM [vite] hmr update /src/context/ThemeContext.jsx
+9:48:35 PM [vite] hmr update /src/context/UpdateContext.jsx
+9:48:35 PM [vite] hmr update /src/pages/DeviceDetails.jsx
+9:48:35 PM [vite] hmr update /src/pages/Groups.css
+9:48:35 PM [vite] hmr update /src/pages/Groups.jsx
+9:48:35 PM [vite] hmr update /src/pages/IPAM.jsx
+9:48:35 PM [vite] hmr update /src/pages/Mikrotiks.jsx
+9:48:35 PM [vite] hmr update /src/pages/Register.jsx
+9:48:35 PM [vite] hmr update /src/pages/Settings.jsx
+9:48:35 PM [vite] hmr update /src/pages/Tunnels.jsx
+9:48:35 PM [vite] vite.config.js changed, restarting server...
+9:48:35 PM [vite] hmr update /src/pages/IPAMDetails.css
+9:48:35 PM [vite] hmr update /src/pages/IPAMDetails.jsx
+9:48:35 PM [vite] hmr update /src/pages/Mikrotiks.jsx
+Re-optimizing dependencies because lockfile has changed
+9:48:35 PM [vite] server restarted.
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+9:48:38 PM [vite] vite.config.js changed, restarting server...
+9:48:38 PM [vite] server restarted.
+
+  ➜  Local:   http://localhost:5174/
+  ➜  Network: use --host to expose
+10:13:09 PM [vite] hmr update /src/pages/IPAMDetails.jsx
+10:13:34 PM [vite] hmr update /src/pages/IPAMDetails.jsx
+10:13:40 PM [vite] hmr update /src/pages/IPAMDetails.jsx
+11:22:15 PM [vite] hmr update /src/pages/IPAMDetails.jsx
+11:22:29 PM [vite] hmr update /src/pages/IPAMDetails.jsx
+11:38:49 PM [vite] hmr update /src/pages/IPAMDetails.jsx
+11:38:57 PM [vite] hmr update /src/pages/IPAMDetails.jsx
+11:40:07 PM [vite] hmr update /src/pages/IPAMDetails.jsx
+11:47:59 PM [vite] hmr update /src/pages/IPAMDetails.jsx
+11:48:36 PM [vite] hmr update /src/pages/IPAMDetails.jsx
+11:55:07 PM [vite] http proxy error: /api/ipams/2/sync
+Error: socket hang up
+    at Socket.socketOnEnd (node:_http_client:598:25)
+    at Socket.emit (node:events:520:35)
+    at endReadableNT (node:internal/streams/readable:1701:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+11:55:07 PM [vite] http proxy error: /api/ipams/2
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+11:55:12 PM [vite] http proxy error: /api/ipams/2
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+11:58:03 PM [vite] hmr update /src/pages/IPAMDetails.jsx
+11:58:15 PM [vite] hmr update /src/pages/IPAMDetails.jsx
+11:58:15 PM [vite] hmr update /src/pages/IPAMDetails.jsx
+11:58:23 PM [vite] hmr update /src/pages/IPAMDetails.jsx
+12:02:16 AM [vite] hmr update /src/pages/IPAMDetails.jsx
+12:06:34 AM [vite] hmr update /src/pages/IPAMDetails.jsx

@@ -1,0 +1,129 @@
+{
+  "lastUserId": 1,
+  "lastRoleId": 1,
+  "lastGroupId": 1,
+  "lastMikrotikId": 7,
+  "lastTunnelId": 0,
+  "lastAddressListId": 0,
+  "lastFirewallFilterId": 0,
+  "lastRouteId": 0,
+  "users": [
+    {
+      "id": 1,
+      "firstName": "Admin",
+      "lastName": "User",
+      "email": "admin@example.com",
+      "passwordHash": "$2b$10$y/Qar7Ud0QKKfJa8nH3M4eXxsXcHcs11DHeg.FqD5V3/660n61m9G",
+      "createdAt": "2025-10-19T19:55:18.706Z",
+      "roles": [
+        1
+      ]
+    },
+    {
+      "id": 2,
+      "firstName": "Majid",
+      "lastName": "User",
+      "email": "m@m.com",
+      "passwordHash": "$2b$10$thT0aVUSl/xHAQL9GNO5B.L5rNSrPXfP/CEWR0wHWZ8f5XJD5LZrC",
+      "createdAt": "2025-10-19T20:25:00.117Z",
+      "roles": [
+        1
+      ]
+    },
+    {
+      "id": 3,
+      "firstName": "Test",
+      "lastName": "User",
+      "email": "test@test.com",
+      "passwordHash": "$2b$10$abQHStDKlDtBm7QrfEk86utkjJuvopPVDvRbQtXgOeLs3ahW7Bd3K",
+      "createdAt": "2025-10-19T20:25:28.439Z",
+      "roles": [
+        1
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "id": 1,
+      "name": "Administrator",
+      "permissions": {
+        "dashboard": true,
+        "users": true,
+        "roles": true,
+        "groups": true,
+        "mikrotiks": true,
+        "tunnels": true,
+        "settings": true
+      },
+      "createdAt": "2025-10-19T19:50:17.937Z",
+      "updatedAt": "2025-10-19T19:50:17.937Z"
+    }
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "name": "Mik-Group Root",
+      "parentId": null,
+      "createdAt": "2025-10-19T19:50:17.938Z",
+      "updatedAt": "2025-10-19T19:50:17.938Z"
+    }
+  ],
+  "mikrotiks": [
+    {
+      "id": 7,
+      "name": "Test",
+      "host": "45.90.72.45",
+      "groupId": 1,
+      "tags": [
+        "management"
+      ],
+      "notes": "test",
+      "routeros": {
+        "apiEnabled": false,
+        "apiPort": 8728,
+        "apiSSL": false,
+        "apiUsername": "",
+        "apiPassword": "",
+        "verifyTLS": true,
+        "apiTimeout": 5000,
+        "apiRetries": 1,
+        "allowInsecureCiphers": false,
+        "preferredApiFirst": true,
+        "firmwareVersion": "7.17.2",
+        "sshEnabled": true,
+        "sshPort": 22,
+        "sshUsername": "admin",
+        "sshPassword": "urfDGV822",
+        "sshAcceptNewHostKeys": true,
+        "autoAcceptFingerprints": false,
+        "apiOutput": null,
+        "sshOutput": "SSH port is accessible. Connection test successful."
+      },
+      "status": {
+        "updateStatus": "updated",
+        "lastAuditAt": "2025-10-20T00:19:05.955Z"
+      },
+      "connectivity": {
+        "api": {
+          "status": "disabled",
+          "lastCheckedAt": "2025-10-21T23:51:23.878Z",
+          "lastError": null
+        },
+        "ssh": {
+          "status": "online",
+          "lastCheckedAt": "2025-10-21T23:51:23.878Z",
+          "fingerprint": "a180:bb59:f226:26ea:f996:8fef:e416:ace5:70e3:ae40:da71:f1f1:eefd:87bb:a766:8112",
+          "lastError": null
+        }
+      },
+      "createdAt": "2025-10-20T00:15:38.854Z",
+      "updatedAt": "2025-10-21T23:51:23.878Z"
+    }
+  ],
+  "tunnels": [],
+  "routes": [],
+  "addressLists": [],
+  "firewallFilters": [],
+  "ipams": [],
+  "lastIpamId": 0
+}
