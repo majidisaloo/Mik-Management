@@ -582,7 +582,7 @@ const phpIpamFetch = async (ipam, endpoint, options = {}) => {
   console.log(`🔑 Using App Code: ${ipam.appCode ?? 'none'}`);
 
   try {
-    response = await fetchImpl(url, {
+    const fetchOptions = {
       method: options.method || 'GET',
       headers: {
         Accept: 'application/json',
@@ -592,7 +592,15 @@ const phpIpamFetch = async (ipam, endpoint, options = {}) => {
         ...(options.headers || {})
       },
       signal: controller.signal
-    });
+    };
+    
+    // Add body for POST, PUT, PATCH requests
+    if (options.body && ['POST', 'PUT', 'PATCH'].includes(options.method || '')) {
+      fetchOptions.body = options.body;
+      console.log('📤 Request body:', options.body);
+    }
+    
+    response = await fetchImpl(url, fetchOptions);
   } catch (error) {
     if (error.name === 'AbortError') {
       throw new Error('phpIPAM request timed out');
@@ -5297,36 +5305,143 @@ const bootstrap = async () => {
             }
 
             const body = await parseJsonBody(req);
-            console.log('Add range - Request body:', JSON.stringify(body, null, 2));
+            console.log('Add IP - Request body:', JSON.stringify(body, null, 2));
             
-            // Get current collections
-            const collections = ipam.collections || { sections: [], datacenters: [], ranges: [] };
-            console.log('Add range - Current ranges count:', collections.ranges.length);
+            const cidr = body.metadata?.cidr || '';
+            const hostname = body.name || body.description || '';
+            const subnetId = body.metadata?.subnetId || '';
             
-            // Add new range
-            const newRange = {
-              id: `range_${Date.now()}`,
-              sectionId: body.sectionId,
-              name: body.name || body.description || '',
-              description: body.description || '',
-              metadata: body.metadata || {}
-            };
+            // Parse CIDR to get IP address
+            const [ipAddress] = cidr.split('/');
             
-            console.log('Add range - New range:', JSON.stringify(newRange, null, 2));
+            if (!ipAddress) {
+              sendJson(res, 400, { message: 'Invalid CIDR format' });
+              return;
+            }
             
-            collections.ranges.push(newRange);
+            // Check if it's a single IP (/32 for IPv4 or /128 for IPv6)
+            const mask = cidr.split('/')[1];
+            const isSingleIP = mask === '32' || mask === '128';
             
-            // Update collections in database
-            const result = await db.replaceIpamCollections(ipamId, collections);
-            console.log('Add range - Replace result:', result.success ? 'Success' : 'Failed');
-            
-            sendJson(res, 201, {
-              message: 'Range added successfully',
-              range: newRange
-            });
+            if (isSingleIP) {
+              // Add single IP address to PHP-IPAM
+              console.log(`Adding IP address: ${ipAddress} (from free range)`);
+              
+              const addressData = {
+                ip: ipAddress,
+                hostname: hostname,
+                description: body.description || ''
+              };
+              
+              // Extract parent range ID from cidr metadata
+              const cidrNet = cidr.split('/')[0];
+              const parentRangeCidr = body.metadata?.parentRangeCidr;
+              
+              console.log('Looking for parent subnet with CIDR:', parentRangeCidr || cidr);
+              console.log(`Total ranges in collections: ${ipam.collections?.ranges?.length || 0}`);
+              
+              // First, try to get the actual subnet ID from PHP-IPAM by searching for the IP's subnet
+              let foundSubnetId = null;
+              
+              try {
+                // Try to query PHP-IPAM directly for subnets matching this IP
+                const subnetsResponse = await phpIpamFetch(ipam, 'subnets/', { allowNotFound: true });
+                const subnets = normalisePhpIpamList(subnetsResponse);
+                
+                console.log(`Found ${subnets.length} subnets in PHP-IPAM`);
+                
+                // Find the subnet that contains this IP
+                const matchingSubnet = subnets.find(subnet => {
+                  const subnetCidr = subnet.subnet && subnet.mask ? `${subnet.subnet}/${subnet.mask}` : '';
+                  return subnetCidr === parentRangeCidr;
+                });
+                
+                if (matchingSubnet && matchingSubnet.id) {
+                  foundSubnetId = parseInt(matchingSubnet.id);
+                  console.log(`✅ Found subnet ID from PHP-IPAM: ${foundSubnetId} for CIDR: ${parentRangeCidr}`);
+                }
+              } catch (error) {
+                console.log(`❌ Error querying PHP-IPAM for subnets: ${error.message}`);
+              }
+              
+              // If we didn't find it from PHP-IPAM, try local collections
+              if (!foundSubnetId) {
+                const parentSubnet = ipam.collections?.ranges?.find(range => {
+                  const rangeCidr = range.metadata?.cidr || '';
+                  
+                  console.log(`Checking range CIDR: ${rangeCidr} against parent: ${parentRangeCidr}`);
+                  
+                  // Skip single IP addresses
+                  if (rangeCidr.includes('/128') || rangeCidr.includes('/32')) {
+                    return false;
+                  }
+                  
+                  // Try to match by checking if the CIDRs are exactly the same
+                  if (parentRangeCidr && rangeCidr === parentRangeCidr) {
+                    console.log(`Exact match found: ${rangeCidr}`);
+                    return true;
+                  }
+                  
+                  return false;
+                });
+                
+                if (parentSubnet && parentSubnet.id) {
+                  foundSubnetId = parseInt(parentSubnet.id);
+                  console.log(`✅ Found parent subnet ID from local: ${foundSubnetId} for CIDR: ${parentSubnet.metadata?.cidr}`);
+                }
+              }
+              
+              if (foundSubnetId) {
+                addressData.subnetId = foundSubnetId;
+              } else {
+                console.log('❌ Could not find parent subnet, PHP-IPAM will auto-detect');
+              }
+              
+              console.log('Address data to send:', JSON.stringify(addressData, null, 2));
+              
+              // Make API call to PHP-IPAM
+              const phpIpamResponse = await phpIpamFetch(ipam, 'addresses/', {
+                method: 'POST',
+                body: JSON.stringify(addressData)
+              });
+              
+              console.log('PHP-IPAM response:', JSON.stringify(phpIpamResponse, null, 2));
+              
+              // Re-sync IPAM data to update local database
+              console.log('Re-syncing IPAM data after adding IP...');
+              // Don't re-sync automatically, let frontend handle it
+              // This is too slow and may timeout
+              
+              sendJson(res, 201, {
+                message: 'IP address added successfully',
+                data: phpIpamResponse
+              });
+            } else {
+              // For ranges, we still add to local database
+              console.log('Adding range to local database');
+              
+              const collections = ipam.collections || { sections: [], datacenters: [], ranges: [] };
+              
+              const newRange = {
+                id: `range_${Date.now()}`,
+                sectionId: body.sectionId,
+                name: body.name || body.description || '',
+                description: body.description || '',
+                metadata: body.metadata || {}
+              };
+              
+              collections.ranges.push(newRange);
+              
+              await db.replaceIpamCollections(ipamId, collections);
+              
+              sendJson(res, 201, {
+                message: 'Range added successfully',
+                range: newRange
+              });
+            }
           } catch (error) {
-            console.error('Add range error', error);
-            sendJson(res, 500, { message: 'Unable to add range.' });
+            console.error('Add IP/Range error:', error);
+            sendJson(res, 500, { message: `Unable to add IP/Range: ${error.message}` });
           }
           return;
         }

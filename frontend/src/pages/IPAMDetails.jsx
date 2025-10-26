@@ -61,7 +61,8 @@ const ipamStyles = {
     borderBottom: '2px solid transparent',
     backgroundColor: 'transparent',
     cursor: 'pointer',
-    transition: 'all 0.2s'
+    transition: 'all 0.2s',
+    color: '#333' // Light mode default
   },
   tabButtonActive: {
     color: '#007bff',
@@ -193,6 +194,51 @@ const IPAMDetails = () => {
   const [selectedRangeForDelete, setSelectedRangeForDelete] = useState(null);
   const [toast, setToast] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Check for dark mode
+  useEffect(() => {
+    const checkDarkMode = () => {
+      const root = document.documentElement;
+      const theme = root.getAttribute('data-theme');
+      setIsDarkMode(theme === 'dark');
+    };
+    
+    checkDarkMode();
+    
+    // Watch for theme changes
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    
+    return () => observer.disconnect();
+  }, []);
+
+  const getTabButtonStyle = (isActive) => {
+    const baseStyle = {
+      padding: '8px 16px',
+      fontSize: '14px',
+      fontWeight: '500',
+      border: 'none',
+      borderBottom: '2px solid transparent',
+      backgroundColor: 'transparent',
+      cursor: 'pointer',
+      transition: 'all 0.2s'
+    };
+
+    if (isActive) {
+      return {
+        ...baseStyle,
+        color: '#007bff',
+        borderBottomColor: '#007bff'
+      };
+    }
+
+    // Inactive tab - white text in dark mode
+    return {
+      ...baseStyle,
+      color: isDarkMode ? '#ffffff' : '#333'
+    };
+  };
 
   const toggleSection = (sectionId) => {
     const newExpanded = new Set(expandedSections);
@@ -903,7 +949,10 @@ const IPAMDetails = () => {
                     e.stopPropagation();
                     // For single IP, open add modal directly
                     setSelectedRangeForEdit({ 
-                      metadata: { cidr: `${item.freeRange.start}/${cidrMask}` },
+                      metadata: { 
+                        cidr: `${item.freeRange.start}/${cidrMask}`,
+                        parentRangeCidr: range.metadata?.cidr || ''
+                      },
                       name: '',
                       description: ''
                     });
@@ -1097,10 +1146,7 @@ const IPAMDetails = () => {
            <button
              key={tab.id}
              onClick={() => setActiveTab(tab.id)}
-             style={{
-               ...ipamStyles.tabButton,
-               ...(activeTab === tab.id ? ipamStyles.tabButtonActive : {})
-             }}
+             style={getTabButtonStyle(activeTab === tab.id)}
            >
              {tab.label}
            </button>
@@ -1785,29 +1831,57 @@ const IPAMDetails = () => {
                       return;
                     }
                     
+                    // Find the parent subnet ID for this IP
+                    let subnetId = selectedSection?.id || null;
+                    
+                    // Get parent range CIDR from selectedRangeForEdit metadata
+                    const parentRangeCidr = selectedRangeForEdit?.metadata?.parentRangeCidr || '';
+                    
                     const response = await fetch(`/api/ipams/${ipam.id}/ranges`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
                         sectionId: selectedSection?.id,
-                        metadata: { cidr },
+                        metadata: { 
+                          cidr,
+                          subnetId: subnetId,
+                          parentRangeCidr: parentRangeCidr
+                        },
                         description,
                         name: description
                       })
                     });
                     
+                    const responseData = await response.json();
+                    
                     if (response.ok) {
-                      showToast('IP added successfully', 'success');
+                      showToast('IP added successfully. Syncing data...', 'success');
                       setShowAddModal(false);
-                      // Force reload the data
+                      
+                      // Clear inputs
+                      document.getElementById('add-description').value = '';
+                      
+                      // Sync IPAM data from PHP-IPAM
+                      try {
+                        const syncResponse = await fetch(`/api/ipams/${ipam.id}/sync`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' }
+                        });
+                        
+                        if (syncResponse.ok) {
+                          console.log('IPAM data synced successfully');
+                          // Wait a bit for sync to complete
+                          await new Promise(resolve => setTimeout(resolve, 500));
+                        }
+                      } catch (syncError) {
+                        console.error('Error syncing IPAM data:', syncError);
+                      }
+                      
+                      // Reload IPAM details
                       await loadIpamDetails();
-                      // Small delay to ensure data is refreshed
-                      setTimeout(async () => {
-                        await loadIpamDetails();
-                      }, 500);
+                      console.log('Data reloaded after adding IP');
                     } else {
-                      const errorData = await response.json().catch(() => ({}));
-                      showToast(errorData.message || 'Failed to add IP. Please try again.', 'error');
+                      showToast(responseData.message || 'Failed to add IP. Please try again.', 'error');
                     }
                   } catch (error) {
                     showToast('Error adding IP: ' + error.message, 'error');

@@ -429,6 +429,84 @@
   color: #999;
 }
 
+/* Dark Mode - Improve text visibility */
+[data-theme="dark"] .text-tertiary,
+[data-theme="dark"] .text-sm.text-tertiary {
+  color: #c0c0c0 !important;
+}
+
+[data-theme="dark"] .text-primary {
+  color: #f0f0f0 !important;
+}
+
+[data-theme="dark"] h3.text-primary {
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .bg-surface-secondary {
+  background-color: #2a2a2a !important;
+}
+
+[data-theme="dark"] .border-border {
+  border-color: #404040 !important;
+}
+
+[data-theme="dark"] .ipam-submenu-container button {
+  color: #e0e0e0 !important;
+  background-color: #2a2a2a !important;
+  border-color: #404040 !important;
+}
+
+[data-theme="dark"] .ipam-submenu-container button:hover {
+  background-color: #333 !important;
+  border-color: #007bff !important;
+}
+
+[data-theme="dark"] .ipam-submenu-container button.active,
+[data-theme="dark"] .ipam-submenu-container button[style*="background-color: rgb(0, 123, 255)"] {
+  background-color: #007bff !important;
+  color: #ffffff !important;
+}
+
+/* Fix section menu visibility */
+[data-theme="dark"] .ipam-section-menu {
+  color: #e0e0e0 !important;
+}
+
+/* Fix "Please select" message visibility */
+[data-theme="dark"] .card__content p.text-center {
+  color: #c0c0c0 !important;
+}
+
+/* Dark Mode - Fix tab buttons visibility */
+[data-theme="dark"] .ipam-tab-button {
+  background-color: #2a2a2a !important;
+  border-color: #404040 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .ipam-tab-button:hover {
+  background-color: #333 !important;
+  border-color: #555 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .ipam-tab-button.active {
+  background-color: #007bff !important;
+  color: #ffffff !important;
+  border-color: #007bff !important;
+}
+
+[data-theme="dark"] .ipam-tab-button.active:hover {
+  background-color: #0069d9 !important;
+  border-color: #0069d9 !important;
+}
+
+/* Dark Mode - Fix tab navigation container */
+[data-theme="dark"] .ipam-tab-nav {
+  border-bottom-color: #404040 !important;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .ipam-stats-grid {
