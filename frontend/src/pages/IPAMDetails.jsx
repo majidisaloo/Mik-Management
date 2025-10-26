@@ -501,12 +501,15 @@ const IPAMDetails = () => {
         const freeEnd = numberToIP(childInfo.startNum - BigInt(1), parentInfo.isIPv6);
         const freeCount = childInfo.startNum - currentPos;
         
-        freeRanges.push({
-          start: freeStart,
-          end: freeEnd,
-          type: 'free',
-          count: freeCount.toString()
-        });
+        // Guard: avoid phantom 1-IP free block at exact parent start when a /128 child exists
+        if (!(freeCount === BigInt(1) && freeStart === parentInfo.startIP)) {
+          freeRanges.push({
+            start: freeStart,
+            end: freeEnd,
+            type: 'free',
+            count: freeCount.toString()
+          });
+        }
       }
       
       // Move current position to end of this child
@@ -1383,8 +1386,9 @@ const IPAMDetails = () => {
                onScroll={handleSubmenuScroll}
                style={{ ...ipamStyles.tabNav, gap: '0' }}
              >
-               {sections.map((section) => {
-                 const sectionRangesList = sectionRanges[section.id] || [];
+              {sections.map((section) => {
+                const sectionRangesList = sectionRanges[section.id] || [];
+                const topLevelCount = sectionRangesList.filter(r => !r?.metadata?.masterSubnetId || r?.metadata?.masterSubnetId == 0).length;
                  return (
                    <button
                      key={section.id}
@@ -1398,8 +1402,8 @@ const IPAMDetails = () => {
                        ...(selectedSection?.id === section.id ? ipamStyles.tabButtonActive : {}),
                        whiteSpace: 'nowrap'
                      }}
-                   >
-                     {section.name} ({sectionRangesList.length})
+                  >
+                    {section.name} ({topLevelCount})
                    </button>
                  );
                })}
@@ -1470,13 +1474,19 @@ const IPAMDetails = () => {
           <div className="card__header">
             <h2 className="card__title flex items-center gap-2">
               <DatabaseIcon />
-              IP Ranges ({ipam.collections?.ranges?.length || 0})
+              {(() => {
+                const list = ipam.collections?.ranges || [];
+                const top = list.filter(r => !r?.metadata?.masterSubnetId || r?.metadata?.masterSubnetId == 0);
+                return `IP Ranges (${top.length})`;
+              })()}
             </h2>
           </div>
           <div className="card__content">
-            {ipam.collections?.ranges && ipam.collections.ranges.length > 0 ? (
+            {(() => {
+              const list = (ipam.collections?.ranges || []).filter(r => !r?.metadata?.masterSubnetId || r?.metadata?.masterSubnetId == 0);
+              return list.length > 0 ? (
                           <div className="space-y-2">
-                {ipam.collections.ranges.map((range) => {
+                {list.map((range) => {
                   const isExpanded = expandedRanges.has(range.id);
                               
                               return (
