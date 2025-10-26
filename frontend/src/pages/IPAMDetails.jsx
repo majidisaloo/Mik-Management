@@ -1452,7 +1452,7 @@ const IPAMDetails = () => {
                     const topOnly = list.filter(r => !r?.metadata?.masterSubnetId || r?.metadata?.masterSubnetId == 0);
                     return topOnly.length > 0 ? (
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {buildRangeHierarchy(topOnly).map((range) => 
+                      {buildRangeHierarchy(list).map((range) => 
                          renderRangeItem(range, 0)
                        )}
                      </div>
