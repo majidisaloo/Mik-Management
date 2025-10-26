@@ -5313,11 +5313,25 @@ const bootstrap = async () => {
             const parentRangeCidr = body.metadata?.parentRangeCidr;
             
             // Parse CIDR to get IP address
-            const [ipAddress] = cidr.split('/');
+            let ipAddress = cidr.split('/')[0];
             
             if (!ipAddress) {
               sendJson(res, 400, { message: 'Invalid CIDR format' });
               return;
+            }
+            
+            // Expand IPv6 shorthand notation (e.g., ::1 becomes 0:0:0:0:0:0:0:1)
+            if (ipAddress.includes('::')) {
+              const parts = ipAddress.split('::');
+              const left = parts[0].split(':').filter(p => p);
+              const right = parts[1] ? parts[1].split(':').filter(p => p) : [];
+              const totalParts = 8;
+              const missingParts = totalParts - left.length - right.length;
+              
+              const expanded = [...left, ...Array(missingParts).fill('0'), ...right]
+                .join(':')
+                .replace(/:+/g, ':');
+              ipAddress = expanded;
             }
             
             // Check if it's a single IP (/32 for IPv4 or /128 for IPv6)
