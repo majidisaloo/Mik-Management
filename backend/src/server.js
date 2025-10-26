@@ -26,7 +26,10 @@ import {
   getQueue,
   getLogs,
   deleteQueueItem,
-  deleteLogEntry
+  deleteLogEntry,
+  verifyAddIp,
+  verifyDeleteIp,
+  verifySync
 } from './database.js';
 import { 
   applyFirewallRuleToGroup, 
@@ -5184,7 +5187,18 @@ const bootstrap = async () => {
 
         // Sync in background without blocking
         (async () => {
+          // Add to queue
+          const queueItem = await addToQueue({
+            type: 'sync',
+            ipamId: ipamId,
+            data: {
+              timestamp: new Date().toISOString()
+            }
+          });
+          
           try {
+            await updateQueueStatus(queueItem.id, 'processing');
+            
             console.log(`🔄 Background sync started for IPAM ${ipamId}`);
             const collections = await syncPhpIpamStructure(ipam);
             await db.replaceIpamCollections(ipamId, collections);
@@ -5195,8 +5209,23 @@ const bootstrap = async () => {
               datacenters: collections.datacenters.length,
               ranges: collections.ranges.length
             });
+            
+            // Verify sync
+            const verificationResult = await verifySync(ipam);
+            verificationResult.details.collections = {
+              sections: collections.sections.length,
+              datacenters: collections.datacenters.length,
+              ranges: collections.ranges.length
+            };
+            
+            await moveToLog(queueItem, verificationResult);
+            console.log('✅ Sync operation logged with verification:', verificationResult.success ? 'SUCCESS' : 'FAILED');
+            
           } catch (error) {
             console.error('Background sync error for IPAM', ipamId, error);
+            
+            await updateQueueStatus(queueItem.id, 'failed', error.message);
+            
             if (Number.isInteger(ipamId) && ipamId > 0) {
               try {
                 await db.updateIpamStatus(ipamId, { status: 'failed', checkedAt: new Date().toISOString() });
@@ -5545,8 +5574,34 @@ const bootstrap = async () => {
               
               console.log('IP addition response:', JSON.stringify(ipResponse, null, 2));
               
+              // Add to queue for verification
+              const queueItem = await addToQueue({
+                type: 'add_ip',
+                ipamId: ipamId,
+                data: {
+                  ipAddress,
+                  subnetId: newSubnetId,
+                  cidr,
+                  hostname,
+                  description: body.description
+                }
+              });
+              
+              // Mark as processing
+              await updateQueueStatus(queueItem.id, 'processing');
+              
+              // Verify the operation
+              const verificationResult = await verifyAddIp(ipam, ipAddress, newSubnetId);
+              
+              // Move to log with verification result
+              await moveToLog(queueItem, verificationResult);
+              
+              console.log('✅ Operation logged with verification:', verificationResult.success ? 'SUCCESS' : 'FAILED');
+              
               sendJson(res, 201, {
                 message: 'IP address added successfully as nested subnet',
+                verified: verificationResult.success,
+                verification: verificationResult,
                 data: {
                   subnet: subnetResponse,
                   ip: ipResponse
@@ -5595,17 +5650,54 @@ const bootstrap = async () => {
             
             // Check if this is a PHP-IPAM subnet (numeric ID)
             const numericRangeId = parseInt(rangeId);
+            let deletedIpAddress = null;
+            let deletedSubnetId = null;
+            
             if (!isNaN(numericRangeId)) {
+              // Get subnet info before deleting for verification
+              try {
+                const subnetInfo = await phpIpamFetch(ipam, `subnets/${numericRangeId}/`, { allowNotFound: true });
+                if (subnetInfo && subnetInfo.subnet) {
+                  deletedIpAddress = subnetInfo.subnet;
+                  deletedSubnetId = subnetInfo.masterSubnetId || numericRangeId;
+                }
+              } catch (e) {
+                console.log('Could not fetch subnet info:', e.message);
+              }
+              
               // Delete from PHP-IPAM
               console.log(`Deleting subnet ${numericRangeId} from PHP-IPAM`);
+              
+              // Add to queue
+              const queueItem = await addToQueue({
+                type: 'delete_ip',
+                ipamId: ipamId,
+                data: {
+                  rangeId: numericRangeId,
+                  ipAddress: deletedIpAddress,
+                  subnetId: deletedSubnetId
+                }
+              });
+              
+              await updateQueueStatus(queueItem.id, 'processing');
               
               try {
                 await phpIpamFetch(ipam, `subnets/${numericRangeId}/`, {
                   method: 'DELETE'
                 });
                 console.log(`✅ Deleted subnet ${numericRangeId} from PHP-IPAM`);
+                
+                // Verify deletion
+                const verificationResult = deletedIpAddress && deletedSubnetId 
+                  ? await verifyDeleteIp(ipam, deletedIpAddress, deletedSubnetId)
+                  : { success: true, message: 'Deleted (no verification needed)', details: {} };
+                
+                await moveToLog(queueItem, verificationResult);
+                console.log('✅ Delete operation logged with verification:', verificationResult.success ? 'SUCCESS' : 'FAILED');
+                
               } catch (error) {
                 console.log(`⚠️ Could not delete from PHP-IPAM: ${error.message}`);
+                await updateQueueStatus(queueItem.id, 'failed', error.message);
               }
             }
             
