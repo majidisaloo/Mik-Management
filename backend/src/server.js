@@ -1055,6 +1055,39 @@ const processQueuedOperation = async (queueItem) => {
         await moveToLog(queueItem, verificationResult);
         break;
       }
+      case 'provision_tunnel': {
+        const { tunnelId, parentSubnetId: inputParentSubnetId, parentRangeCidr, mask = 30, description } = queueItem.data || {};
+        let parentSubnetId = inputParentSubnetId;
+        // Resolve parent subnet ID if not provided
+        if (!parentSubnetId && parentRangeCidr) {
+          try {
+            const subnets = normalisePhpIpamList(await phpIpamFetch(ipam, 'subnets/', { allowNotFound: true }));
+            const match = subnets.find((s) => `${s.subnet}/${s.mask}` === parentRangeCidr);
+            if (match && match.id) parentSubnetId = Number.parseInt(match.id, 10);
+          } catch (e) {}
+        }
+        if (!parentSubnetId) throw new Error('Parent subnet could not be resolved');
+
+        // Create first available /30 under parent
+        const createFirst = await phpIpamFetch(ipam, `subnets/${parentSubnetId}/first_subnet/${mask}/`, { method: 'POST', body: JSON.stringify({ description: description || `Tunnel ${tunnelId}` }) });
+        const newSubnetId = createFirst?.id || createFirst;
+
+        // Allocate two first-free IPs in the new subnet for endpoints
+        const addrA = await phpIpamFetch(ipam, 'addresses/first_free/', { method: 'POST', body: JSON.stringify({ subnetId: newSubnetId, hostname: `tunnel-${tunnelId}-A` }) });
+        const addrB = await phpIpamFetch(ipam, 'addresses/first_free/', { method: 'POST', body: JSON.stringify({ subnetId: newSubnetId, hostname: `tunnel-${tunnelId}-B` }) });
+
+        const ipA = addrA?.data?.ip || addrA?.ip || addrA?.address || addrA;
+        const ipB = addrB?.data?.ip || addrB?.ip || addrB?.address || addrB;
+
+        const verificationResult = {
+          success: Boolean(newSubnetId && ipA && ipB),
+          message: newSubnetId && ipA && ipB ? `Provisioned /${mask} with ${ipA} and ${ipB}` : 'Provision result uncertain',
+          details: { tunnelId, parentSubnetId, newSubnetId, ipA, ipB }
+        };
+
+        await moveToLog(queueItem, verificationResult);
+        break;
+      }
       case 'delete_ip': {
         const { rangeId, ipAddress, subnetId } = queueItem.data || {};
         try {
@@ -6226,6 +6259,31 @@ const bootstrap = async () => {
         if (method === 'DELETE') {
           await handleDeleteTunnel(tunnelId);
           return;
+        }
+      }
+
+      // Provision tunnel (allocate /30 from IPAM and queue)
+      if (resourceSegments[0] === 'tunnels' && resourceSegments.length === 3 && resourceSegments[2] === 'provision' && method === 'POST') {
+        const tunnelId = Number.parseInt(resourceSegments[1], 10);
+        try {
+          if (!Number.isInteger(tunnelId) || tunnelId <= 0) {
+            return sendJson(res, 400, { message: 'Valid tunnel id is required' });
+          }
+          const body = await parseJsonBody(req);
+          const { ipamId, parentSubnetId, parentRangeCidr, mask = 30, description } = body || {};
+          if (!Number.isInteger(ipamId)) {
+            return sendJson(res, 400, { message: 'ipamId is required' });
+          }
+          const queueItem = await addToQueue({
+            type: 'provision_tunnel',
+            ipamId,
+            data: { tunnelId, parentSubnetId: parentSubnetId ? Number.parseInt(parentSubnetId, 10) : null, parentRangeCidr, mask: Number.parseInt(mask, 10) || 30, description: description || `Tunnel ${tunnelId}` }
+          });
+          (async () => { await processQueuedOperation(queueItem); })();
+          return sendJson(res, 202, { message: 'Provision queued', status: 'queued', queueId: queueItem.id });
+        } catch (e) {
+          console.error('Provision tunnel error:', e);
+          return sendJson(res, 500, { message: 'Unable to queue provision' });
         }
       }
 
