@@ -5327,7 +5327,7 @@ const bootstrap = async () => {
             
             const cidr = body.metadata?.cidr || '';
             const hostname = body.name || body.description || '';
-            let subnetId = body.metadata?.subnetId;
+            let subnetId = body.metadata?.subnetId ? parseInt(body.metadata.subnetId, 10) : null;
             const parentRangeCidr = body.metadata?.parentRangeCidr;
             
             // Parse CIDR to get IP address

@@ -623,22 +623,33 @@ const IPAMDetails = () => {
       });
       
       if (syncResponse.ok || syncResponse.status === 202) {
-        showToast('Syncing data from PHP-IPAM...', 'info');
+        showToast('Syncing data from PHP-IPAM... Please wait', 'info');
         
-        // Wait a bit for sync to complete
+        // Poll for completion (check every 5 seconds, max 60 seconds)
+        const maxAttempts = 12;
+        let attempts = 0;
+        
+        const pollInterval = setInterval(async () => {
+          attempts++;
+          await loadIpamDetails();
+          console.log(`Refresh sync check: ${attempts}/${maxAttempts}`);
+          
+          if (attempts >= maxAttempts) {
+            clearInterval(pollInterval);
+            setRefreshing(false);
+            showToast('IPAM data refreshed', 'success');
+          }
+        }, 5000);
+        
+        // Initial load after 2 seconds
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Then reload IPAM details
         await loadIpamDetails();
-        
-        showToast('IPAM data refreshed successfully', 'success');
       } else {
         throw new Error('Sync failed');
       }
     } catch (error) {
       console.error('Refresh error:', error);
       showToast('Failed to refresh IPAM data', 'error');
-    } finally {
       setRefreshing(false);
     }
   };
@@ -1904,15 +1915,37 @@ const IPAMDetails = () => {
                           headers: { 'Content-Type': 'application/json' }
                         });
                         
-                        // Wait a bit for sync to complete (reduced from 500ms)
-                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        showToast('Syncing in background... Data will appear shortly', 'info');
+                        
+                        // Poll for sync completion (check every 3 seconds, max 30 seconds)
+                        const maxAttempts = 10;
+                        let attempts = 0;
+                        
+                        const pollSync = async () => {
+                          attempts++;
+                          await new Promise(resolve => setTimeout(resolve, 3000));
+                          await loadIpamDetails();
+                          
+                          if (attempts < maxAttempts) {
+                            // Check if data is loaded, if not continue polling
+                            const currentData = await fetch(`/api/ipams/${ipam.id}`);
+                            if (currentData.ok) {
+                              console.log(`Sync check attempt ${attempts}/${maxAttempts}`);
+                            }
+                          }
+                        };
+                        
+                        // Start polling without blocking
+                        pollSync();
+                        
                       } catch (syncError) {
                         console.error('Error syncing IPAM data:', syncError);
                       }
                       
-                      // Reload IPAM details
+                      // Initial quick reload to show any immediate changes
+                      await new Promise(resolve => setTimeout(resolve, 500));
                       await loadIpamDetails();
-                      console.log('Data reloaded after adding IP');
+                      console.log('Initial data reload after adding IP');
                     } else {
                       showToast(responseData.message || 'Failed to add IP. Please try again.', 'error');
                     }
@@ -2055,13 +2088,28 @@ const IPAMDetails = () => {
                           headers: { 'Content-Type': 'application/json' }
                         });
                         
+                        showToast('Syncing in background... Changes will reflect shortly', 'info');
                         console.log('IPAM sync started after delete');
-                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        
+                        // Poll for sync completion
+                        const maxAttempts = 10;
+                        let attempts = 0;
+                        
+                        const pollSync = async () => {
+                          attempts++;
+                          await new Promise(resolve => setTimeout(resolve, 3000));
+                          await loadIpamDetails();
+                          console.log(`Sync check after delete: attempt ${attempts}/${maxAttempts}`);
+                        };
+                        
+                        pollSync();
+                        
                       } catch (syncError) {
                         console.error('Error syncing after delete:', syncError);
                       }
                       
-                      // Reload IPAM details
+                      // Initial quick reload
+                      await new Promise(resolve => setTimeout(resolve, 500));
                       await loadIpamDetails();
                     } else {
                       const errorData = await response.json();
