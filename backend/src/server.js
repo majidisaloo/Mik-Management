@@ -5320,7 +5320,7 @@ const bootstrap = async () => {
               return;
             }
             
-            // Expand IPv6 shorthand notation (e.g., ::1 becomes 0:0:0:0:0:0:0:1)
+            // Expand IPv6 shorthand notation and pad with zeros (e.g., 2001:41d0:a:1918::0 becomes 2001:41d0:a:1918:0000:0000:0000:0000)
             if (ipAddress.includes('::')) {
               const parts = ipAddress.split('::');
               const left = parts[0].split(':').filter(p => p);
@@ -5329,9 +5329,12 @@ const bootstrap = async () => {
               const missingParts = totalParts - left.length - right.length;
               
               const expanded = [...left, ...Array(missingParts).fill('0'), ...right]
-                .join(':')
-                .replace(/:+/g, ':');
+                .map(part => part.padStart(4, '0'))
+                .join(':');
               ipAddress = expanded;
+            } else {
+              // Pad existing parts if not using shorthand
+              ipAddress = ipAddress.split(':').map(part => part.padStart(4, '0')).join(':');
             }
             
             // Check if it's a single IP (/32 for IPv4 or /128 for IPv6)
