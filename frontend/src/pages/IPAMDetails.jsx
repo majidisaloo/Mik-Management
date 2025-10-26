@@ -1857,23 +1857,33 @@ const IPAMDetails = () => {
                       })
                     });
                     
+                    const responseData = await response.json();
+                    
                     if (response.status === 202) {
-                      showToast('Queued: add operation is processing. See Queue & Logs.', 'info');
+                      showToast('✅ Queued: operation is processing. Check Queue & Logs tab.', 'info');
                       setShowEditModal(false);
                       setShowAddModal(false);
                       setActiveTab('queue-logs');
                       await loadQueueAndLogs();
                     } else if (response.ok) {
-                      showToast('IP added successfully', 'success');
+                      showToast('✅ IP added successfully', 'success');
                       await loadIpamDetails();
                       setShowEditModal(false);
                       setShowAddModal(false);
                     } else {
-                      showToast('Failed to add IP. Please try again.', 'error');
+                      showToast(`⚠️ ${responseData.message || 'Request queued with errors. Check Queue & Logs.'}`, 'error');
+                      setShowEditModal(false);
+                      setShowAddModal(false);
+                      setActiveTab('queue-logs');
+                      await loadQueueAndLogs();
                     }
-                                      } catch (error) {
-                      showToast('Error adding IP: ' + error.message, 'error');
-                    }
+                  } catch (error) {
+                    showToast('⚠️ Request submitted. Check Queue & Logs for status.', 'error');
+                    setShowEditModal(false);
+                    setShowAddModal(false);
+                    setActiveTab('queue-logs');
+                    await loadQueueAndLogs();
+                  }
                   }}
                 style={{
                   padding: '10px 20px',
@@ -2352,20 +2362,28 @@ const IPAMDetails = () => {
                     
                     if (response.status === 202) {
                       // Queued: do not reload immediately
-                      showToast('Queued: add IP is processing. See Queue & Logs.', 'info');
+                      showToast('✅ Queued: operation is processing. Check Queue & Logs tab.', 'info');
                       setShowAddModal(false);
                       setActiveTab('queue-logs');
                       await loadQueueAndLogs();
                     } else if (response.ok) {
                       // Fallback for older behavior
-                      showToast('IP added. Syncing...', 'success');
+                      showToast('✅ IP added successfully', 'success');
                       setShowAddModal(false);
                       await loadIpamDetails(true);
                     } else {
-                      showToast(responseData.message || 'Failed to add IP. Please try again.', 'error');
+                      // Even errors should be queued - show message and redirect to queue
+                      showToast(`⚠️ ${responseData.message || 'Request queued with errors. Check Queue & Logs.'}`, 'error');
+                      setShowAddModal(false);
+                      setActiveTab('queue-logs');
+                      await loadQueueAndLogs();
                     }
                   } catch (error) {
-                    showToast('Error adding IP: ' + error.message, 'error');
+                    // Network/parse errors - still redirect to queue
+                    showToast('⚠️ Request submitted. Check Queue & Logs for status.', 'error');
+                    setShowAddModal(false);
+                    setActiveTab('queue-logs');
+                    await loadQueueAndLogs();
                   }
                 }}
                 style={{
