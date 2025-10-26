@@ -5452,6 +5452,50 @@ const bootstrap = async () => {
           }
           return;
         }
+
+        if (resourceSegments.length === 4 && method === 'DELETE' && resourceSegments[2] === 'ranges') {
+          try {
+            const ipam = await db.getIpamById(ipamId);
+            if (!ipam) {
+              sendJson(res, 404, { message: 'IPAM integration not found.' });
+              return;
+            }
+
+            const rangeId = resourceSegments[3];
+            console.log('Delete range - Range ID:', rangeId);
+            
+            // Check if this is a PHP-IPAM subnet (numeric ID)
+            const numericRangeId = parseInt(rangeId);
+            if (!isNaN(numericRangeId)) {
+              // Delete from PHP-IPAM
+              console.log(`Deleting subnet ${numericRangeId} from PHP-IPAM`);
+              
+              try {
+                await phpIpamFetch(ipam, `subnets/${numericRangeId}/`, {
+                  method: 'DELETE'
+                });
+                console.log(`✅ Deleted subnet ${numericRangeId} from PHP-IPAM`);
+              } catch (error) {
+                console.log(`⚠️ Could not delete from PHP-IPAM: ${error.message}`);
+              }
+            }
+            
+            // Also remove from local database collections
+            const collections = ipam.collections || { sections: [], datacenters: [], ranges: [] };
+            collections.ranges = collections.ranges.filter(r => r.id != rangeId);
+            await db.replaceIpamCollections(ipamId, collections);
+            
+            console.log(`✅ Deleted range ${rangeId} from local database`);
+            
+            sendJson(res, 200, {
+              message: 'Range deleted successfully'
+            });
+          } catch (error) {
+            console.error('Delete range error:', error);
+            sendJson(res, 500, { message: `Unable to delete range: ${error.message}` });
+          }
+          return;
+        }
       }
 
       if (method === 'GET' && (canonicalPath === '/api/config-info' || resourcePath === '/config-info')) {
