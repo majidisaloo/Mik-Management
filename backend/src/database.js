@@ -7142,6 +7142,13 @@ const moveToLog = async (queueItem, verificationResult) => {
   };
   
   state.operationLogs.push(logEntry);
+  // Prune logs older than 30 days
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  state.operationLogs = state.operationLogs.filter(l => {
+    const t = Date.parse(l.completedAt || l.createdAt || new Date().toISOString());
+    return !Number.isNaN(t) && (now - t) <= THIRTY_DAYS_MS;
+  });
   
   // Remove from queue
   state.operationQueue = state.operationQueue.filter(q => q.id !== queueItem.id);
