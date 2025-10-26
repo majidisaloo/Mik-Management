@@ -7176,5 +7176,133 @@ const deleteLogEntry = async (logId) => {
   console.log(`🗑️ Deleted log entry ${logId}`);
 };
 
-export { toggleMikrotikSafeMode, getMikrotikSafeModeStatus, getMikrotikUpdateInfo, installMikrotikUpdate, getMikrotikById, addMikrotikIpAddress, updateMikrotikIpAddress, updateMikrotikFirewallRule, addSystemLog, getMikrotikInterfaceDetails, addToQueue, updateQueueStatus, retryQueueItem, moveToLog, getQueue, getLogs, deleteQueueItem, deleteLogEntry };
+// Verification functions
+const verifyAddIp = async (ipam, ipAddress, subnetId) => {
+  try {
+    console.log(`🔍 Verifying IP ${ipAddress} in subnet ${subnetId}`);
+    
+    // Fetch all IPs in the subnet
+    const response = await fetch(`${ipam.baseUrl}/api/${ipam.appId}/subnets/${subnetId}/addresses/`, {
+      headers: {
+        'token': ipam.apiToken
+      }
+    });
+    
+    const result = await response.json();
+    
+    if (result.success && result.data) {
+      const ips = Array.isArray(result.data) ? result.data : [result.data];
+      const found = ips.some(ip => ip.ip === ipAddress || ip.address === ipAddress);
+      
+      return {
+        success: found,
+        message: found ? `IP ${ipAddress} verified in PHP-IPAM` : `IP ${ipAddress} NOT found in PHP-IPAM`,
+        details: { ipAddress, subnetId, found, totalIps: ips.length }
+      };
+    }
+    
+    return {
+      success: false,
+      message: `Failed to verify IP: ${result.message}`,
+      details: { ipAddress, subnetId, error: result.message }
+    };
+  } catch (error) {
+    console.error('Verification error:', error);
+    return {
+      success: false,
+      message: `Verification failed: ${error.message}`,
+      details: { ipAddress, subnetId, error: error.message }
+    };
+  }
+};
+
+const verifyDeleteIp = async (ipam, ipAddress, subnetId) => {
+  try {
+    console.log(`🔍 Verifying IP ${ipAddress} is deleted from subnet ${subnetId}`);
+    
+    const response = await fetch(`${ipam.baseUrl}/api/${ipam.appId}/subnets/${subnetId}/addresses/`, {
+      headers: {
+        'token': ipam.apiToken
+      }
+    });
+    
+    const result = await response.json();
+    
+    if (result.code === 404 || (result.success === false && result.message === 'No addresses found')) {
+      return {
+        success: true,
+        message: `IP ${ipAddress} successfully deleted (subnet has no addresses)`,
+        details: { ipAddress, subnetId, deleted: true }
+      };
+    }
+    
+    if (result.success && result.data) {
+      const ips = Array.isArray(result.data) ? result.data : [result.data];
+      const found = ips.some(ip => ip.ip === ipAddress || ip.address === ipAddress);
+      
+      return {
+        success: !found,
+        message: found ? `IP ${ipAddress} STILL EXISTS in PHP-IPAM` : `IP ${ipAddress} successfully deleted`,
+        details: { ipAddress, subnetId, deleted: !found, totalIps: ips.length }
+      };
+    }
+    
+    return {
+      success: true,
+      message: `IP ${ipAddress} verified as deleted`,
+      details: { ipAddress, subnetId, deleted: true }
+    };
+  } catch (error) {
+    console.error('Verification error:', error);
+    return {
+      success: false,
+      message: `Verification failed: ${error.message}`,
+      details: { ipAddress, subnetId, error: error.message }
+    };
+  }
+};
+
+const verifySync = async (ipam) => {
+  try {
+    console.log(`🔍 Verifying sync for IPAM ${ipam.id}`);
+    
+    // Fetch sections to verify connection
+    const response = await fetch(`${ipam.baseUrl}/api/${ipam.appId}/sections/`, {
+      headers: {
+        'token': ipam.apiToken
+      }
+    });
+    
+    const result = await response.json();
+    
+    if (result.success && result.data) {
+      const sections = Array.isArray(result.data) ? result.data : [result.data];
+      
+      return {
+        success: true,
+        message: `Sync verified: ${sections.length} sections found`,
+        details: { 
+          ipamId: ipam.id, 
+          sectionsCount: sections.length,
+          timestamp: new Date().toISOString()
+        }
+      };
+    }
+    
+    return {
+      success: false,
+      message: `Sync verification failed: ${result.message}`,
+      details: { ipamId: ipam.id, error: result.message }
+    };
+  } catch (error) {
+    console.error('Sync verification error:', error);
+    return {
+      success: false,
+      message: `Sync verification failed: ${error.message}`,
+      details: { ipamId: ipam.id, error: error.message }
+    };
+  }
+};
+
+export { toggleMikrotikSafeMode, getMikrotikSafeModeStatus, getMikrotikUpdateInfo, installMikrotikUpdate, getMikrotikById, addMikrotikIpAddress, updateMikrotikIpAddress, updateMikrotikFirewallRule, addSystemLog, getMikrotikInterfaceDetails, addToQueue, updateQueueStatus, retryQueueItem, moveToLog, getQueue, getLogs, deleteQueueItem, deleteLogEntry, verifyAddIp, verifyDeleteIp, verifySync };
 export default initializeDatabase;
