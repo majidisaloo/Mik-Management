@@ -1440,20 +1440,28 @@ const IPAMDetails = () => {
                  </div>
 
                  <div>
-                   <h4 style={{ fontSize: '15px', fontWeight: '600', color: '#333', marginBottom: '12px' }}>
-                     IP Ranges ({sectionRanges[selectedSection.id]?.length || 0})
-                   </h4>
-                   {sectionRanges[selectedSection.id] && sectionRanges[selectedSection.id].length > 0 ? (
+                  <h4 style={{ fontSize: '15px', fontWeight: '600', color: '#333', marginBottom: '12px' }}>
+                    {(() => {
+                      const list = sectionRanges[selectedSection.id] || [];
+                      const topOnly = list.filter(r => !r?.metadata?.masterSubnetId || r?.metadata?.masterSubnetId == 0);
+                      return `IP Ranges (${topOnly.length})`;
+                    })()}
+                  </h4>
+                  {(() => {
+                    const list = sectionRanges[selectedSection.id] || [];
+                    const topOnly = list.filter(r => !r?.metadata?.masterSubnetId || r?.metadata?.masterSubnetId == 0);
+                    return topOnly.length > 0 ? (
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                       {buildRangeHierarchy(sectionRanges[selectedSection.id]).map((range) => 
+                      {buildRangeHierarchy(topOnly).map((range) => 
                          renderRangeItem(range, 0)
                        )}
                      </div>
-                   ) : (
+                  ) : (
                      <p style={{ textAlign: 'center', color: '#666', padding: '32px' }}>
                        No ranges in this section
                      </p>
-                   )}
+                  );
+                  })()}
                  </div>
                </div>
              </div>
