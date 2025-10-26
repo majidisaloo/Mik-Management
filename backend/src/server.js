@@ -5342,14 +5342,8 @@ const bootstrap = async () => {
             const isSingleIP = mask === '32' || mask === '128';
             
             if (isSingleIP) {
-              // Add single IP address to PHP-IPAM
+              // Add single IP address to PHP-IPAM as a nested subnet
               console.log(`Adding IP address: ${ipAddress} from CIDR: ${cidr}`);
-              
-              const addressData = {
-                ip: ipAddress,  // Send just the IP address, not the CIDR format
-                hostname: hostname,
-                description: body.description || ''
-              };
               
               console.log('Parent range CIDR:', parentRangeCidr);
               console.log('Initial subnetId from body:', subnetId);
@@ -5378,43 +5372,56 @@ const bootstrap = async () => {
                 }
               }
               
-              if (subnetId) {
-                addressData.subnetId = subnetId;
-                console.log(`✅ Using subnet ID: ${subnetId}`);
-              } else {
-                console.log('⚠️ No subnet ID found, PHP-IPAM will auto-detect the subnet');
+              if (!subnetId) {
+                throw new Error('Parent subnet ID is required to add nested IP');
               }
               
-              console.log('Address data to send:', JSON.stringify(addressData, null, 2));
+              // Step 1: Create a /128 (IPv6) or /32 (IPv4) subnet for this single IP
+              console.log(`Step 1: Creating nested subnet ${cidr}`);
+              const subnetPayload = {
+                subnet: ipAddress,
+                mask: mask,
+                sectionId: body.sectionId,
+                description: body.description || hostname,
+                masterSubnetId: subnetId
+              };
               
-              // Make API call to PHP-IPAM using general addresses endpoint with subnetId in body
-              // PHP-IPAM doesn't support /subnets/{id}/addresses/ - use general endpoint instead
-              let endpoint = 'addresses/';
-              let finalPayload = { ...addressData };
+              console.log('Creating subnet with payload:', JSON.stringify(subnetPayload, null, 2));
               
-              if (subnetId) {
-                finalPayload.subnetId = subnetId;
-                console.log(`Using subnet ID: ${subnetId} in payload`);
-              }
-              
-              console.log('Final payload:', JSON.stringify(finalPayload, null, 2));
-              console.log('Using endpoint:', endpoint);
-              
-              const phpIpamResponse = await phpIpamFetch(ipam, endpoint, {
+              const subnetResponse = await phpIpamFetch(ipam, 'subnets/', {
                 method: 'POST',
-                body: JSON.stringify(finalPayload)
+                body: JSON.stringify(subnetPayload)
               });
               
-              console.log('PHP-IPAM response:', JSON.stringify(phpIpamResponse, null, 2));
+              console.log('Subnet creation response:', JSON.stringify(subnetResponse, null, 2));
               
-              // Re-sync IPAM data to update local database
-              console.log('Re-syncing IPAM data after adding IP...');
-              // Don't re-sync automatically, let frontend handle it
-              // This is too slow and may timeout
+              const newSubnetId = subnetResponse.id || subnetResponse;
+              console.log(`✅ Created nested subnet with ID: ${newSubnetId}`);
+              
+              // Step 2: Add IP address to the newly created subnet
+              console.log(`Step 2: Adding IP ${ipAddress} to subnet ${newSubnetId}`);
+              const addressData = {
+                ip: ipAddress,
+                hostname: hostname,
+                description: body.description || '',
+                subnetId: newSubnetId
+              };
+              
+              console.log('Adding IP with payload:', JSON.stringify(addressData, null, 2));
+              
+              const ipResponse = await phpIpamFetch(ipam, 'addresses/', {
+                method: 'POST',
+                body: JSON.stringify(addressData)
+              });
+              
+              console.log('IP addition response:', JSON.stringify(ipResponse, null, 2));
               
               sendJson(res, 201, {
-                message: 'IP address added successfully',
-                data: phpIpamResponse
+                message: 'IP address added successfully as nested subnet',
+                data: {
+                  subnet: subnetResponse,
+                  ip: ipResponse
+                }
               });
             } else {
               // For ranges, we still add to local database

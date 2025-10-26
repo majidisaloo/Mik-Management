@@ -574,6 +574,35 @@ const IPAMDetails = () => {
       }
     });
     
+    // Add IPs as children to their parent ranges
+    ranges.forEach(range => {
+      if (range.ips && Array.isArray(range.ips) && range.ips.length > 0) {
+        const rangeObj = rangeMap.get(range.id);
+        
+        // Convert each IP to a child range object
+        range.ips.forEach(ip => {
+          const ipCIDR = `${ip.ip}/128`; // Single IP addresses are /128 for IPv6 or /32 for IPv4
+          const ipChild = {
+            id: `ip_${ip.id}`,
+            name: ip.hostname || ip.description || ip.ip,
+            description: ip.description || ip.hostname || '',
+            metadata: {
+              cidr: ipCIDR,
+              sectionId: range.metadata?.sectionId,
+              masterSubnetId: range.id,
+              isFolder: 0,
+              isFull: 1,
+              ipData: ip // Store original IP data
+            },
+            children: [],
+            ips: []
+          };
+          
+          rangeObj.children.push(ipChild);
+        });
+      }
+    });
+    
     // Sort children by CIDR
     const sortChildren = (node) => {
       if (node.children.length > 0) {
