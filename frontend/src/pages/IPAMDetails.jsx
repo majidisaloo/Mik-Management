@@ -594,14 +594,19 @@ const IPAMDetails = () => {
     return roots;
   };
 
-  const loadIpamDetails = useCallback(async () => {
+  const loadIpamDetails = useCallback(async (useLive = false) => {
     if (!id) return;
     try {
       setLoading(true);
-      const response = await fetch(`/api/ipams/${id}`);
+      // Use /live endpoint to fetch directly from PHP-IPAM without cache
+      const endpoint = useLive ? `/api/ipams/${id}/live` : `/api/ipams/${id}`;
+      console.log(`Loading IPAM details from: ${endpoint} (live mode: ${useLive})`);
+      
+      const response = await fetch(endpoint);
       if (response.ok) {
         const data = await response.json();
         setIpam(data);
+        console.log(`✅ Loaded ${data.collections?.ranges?.length || 0} ranges from ${useLive ? 'PHP-IPAM directly' : 'local cache'}`);
       } else {
         setError('Failed to load IPAM details');
       }
@@ -616,40 +621,16 @@ const IPAMDetails = () => {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      // Start sync in background (returns immediately)
-      const syncResponse = await fetch(`/api/ipams/${id}/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
+      showToast('Loading live data from PHP-IPAM...', 'info');
       
-      if (syncResponse.ok || syncResponse.status === 202) {
-        showToast('Syncing data from PHP-IPAM... Please wait', 'info');
-        
-        // Poll for completion (check every 5 seconds, max 60 seconds)
-        const maxAttempts = 12;
-        let attempts = 0;
-        
-        const pollInterval = setInterval(async () => {
-          attempts++;
-          await loadIpamDetails();
-          console.log(`Refresh sync check: ${attempts}/${maxAttempts}`);
-          
-          if (attempts >= maxAttempts) {
-            clearInterval(pollInterval);
-            setRefreshing(false);
-            showToast('IPAM data refreshed', 'success');
-          }
-        }, 5000);
-        
-        // Initial load after 2 seconds
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        await loadIpamDetails();
-      } else {
-        throw new Error('Sync failed');
-      }
+      // Load directly from PHP-IPAM without cache (no sync needed)
+      await loadIpamDetails(true); // useLive = true
+      
+      showToast('IPAM data refreshed from PHP-IPAM', 'success');
     } catch (error) {
       console.error('Refresh error:', error);
       showToast('Failed to refresh IPAM data', 'error');
+    } finally {
       setRefreshing(false);
     }
   };
@@ -659,7 +640,8 @@ const IPAMDetails = () => {
       navigate('/login');
       return;
     }
-    loadIpamDetails();
+    // Always load live data on initial load
+    loadIpamDetails(true); // useLive = true
   }, [user, navigate, loadIpamDetails]);
 
   // Handle route parameters for sections and ranges
@@ -1908,44 +1890,11 @@ const IPAMDetails = () => {
                       // Clear inputs
                       document.getElementById('add-description').value = '';
                       
-                      // Sync IPAM data from PHP-IPAM (background sync, returns immediately)
-                      try {
-                        await fetch(`/api/ipams/${ipam.id}/sync`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' }
-                        });
-                        
-                        showToast('Syncing in background... Data will appear shortly', 'info');
-                        
-                        // Poll for sync completion (check every 3 seconds, max 30 seconds)
-                        const maxAttempts = 10;
-                        let attempts = 0;
-                        
-                        const pollSync = async () => {
-                          attempts++;
-                          await new Promise(resolve => setTimeout(resolve, 3000));
-                          await loadIpamDetails();
-                          
-                          if (attempts < maxAttempts) {
-                            // Check if data is loaded, if not continue polling
-                            const currentData = await fetch(`/api/ipams/${ipam.id}`);
-                            if (currentData.ok) {
-                              console.log(`Sync check attempt ${attempts}/${maxAttempts}`);
-                            }
-                          }
-                        };
-                        
-                        // Start polling without blocking
-                        pollSync();
-                        
-                      } catch (syncError) {
-                        console.error('Error syncing IPAM data:', syncError);
-                      }
-                      
-                      // Initial quick reload to show any immediate changes
-                      await new Promise(resolve => setTimeout(resolve, 500));
-                      await loadIpamDetails();
-                      console.log('Initial data reload after adding IP');
+                      // Reload live data from PHP-IPAM
+                      showToast('Reloading from PHP-IPAM...', 'info');
+                      await new Promise(resolve => setTimeout(resolve, 1000));
+                      await loadIpamDetails(true); // useLive = true
+                      console.log('Live data reloaded after adding IP');
                     } else {
                       showToast(responseData.message || 'Failed to add IP. Please try again.', 'error');
                     }
@@ -2081,36 +2030,11 @@ const IPAMDetails = () => {
                       showToast('Range deleted successfully. Syncing...', 'success');
                       setShowDeleteModal(false);
                       
-                      // Sync IPAM data from PHP-IPAM (background sync, returns immediately)
-                      try {
-                        await fetch(`/api/ipams/${ipam.id}/sync`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' }
-                        });
-                        
-                        showToast('Syncing in background... Changes will reflect shortly', 'info');
-                        console.log('IPAM sync started after delete');
-                        
-                        // Poll for sync completion
-                        const maxAttempts = 10;
-                        let attempts = 0;
-                        
-                        const pollSync = async () => {
-                          attempts++;
-                          await new Promise(resolve => setTimeout(resolve, 3000));
-                          await loadIpamDetails();
-                          console.log(`Sync check after delete: attempt ${attempts}/${maxAttempts}`);
-                        };
-                        
-                        pollSync();
-                        
-                      } catch (syncError) {
-                        console.error('Error syncing after delete:', syncError);
-                      }
-                      
-                      // Initial quick reload
+                      // Reload live data from PHP-IPAM
+                      showToast('Reloading from PHP-IPAM...', 'info');
+                      console.log('Reloading after delete');
                       await new Promise(resolve => setTimeout(resolve, 500));
-                      await loadIpamDetails();
+                      await loadIpamDetails(true); // useLive = true
                     } else {
                       const errorData = await response.json();
                       showToast(errorData.message || 'Failed to delete range', 'error');

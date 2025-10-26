@@ -5272,6 +5272,39 @@ const bootstrap = async () => {
           }
         }
 
+        if (resourceSegments.length === 3 && method === 'GET' && resourceSegments[2] === 'live') {
+          // Get data directly from PHP-IPAM without cache
+          try {
+            const ipam = await db.getIpamById(ipamId);
+            if (!ipam) {
+              sendJson(res, 404, { message: 'IPAM integration not found.' });
+              return;
+            }
+
+            console.log('🔴 LIVE MODE: Fetching directly from PHP-IPAM without cache');
+            
+            // Fetch fresh data from PHP-IPAM
+            const collections = await syncPhpIpamStructure(ipam);
+            
+            // Return directly without saving to database
+            sendJson(res, 200, {
+              id: ipam.id,
+              name: ipam.name,
+              description: ipam.description,
+              type: ipam.type,
+              baseUrl: ipam.baseUrl,
+              appId: ipam.appId,
+              status: ipam.status,
+              lastCheckedAt: new Date().toISOString(),
+              collections: collections
+            });
+          } catch (error) {
+            console.error('Live fetch error:', error);
+            sendJson(res, 500, { message: 'Unable to fetch live data from PHP-IPAM' });
+          }
+          return;
+        }
+
         if (resourceSegments.length === 3 && method === 'POST') {
           const action = resourceSegments[2];
 
