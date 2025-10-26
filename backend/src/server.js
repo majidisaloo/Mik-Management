@@ -47,10 +47,10 @@ import {
   promoteBetaToStable 
 } from './version-manager.js';
 
-// Basic in-memory rate limiting for mutating requests
+// Basic in-memory rate limiting for mutating requests (very generous for admin panel)
 const rateLimitBuckets = new Map(); // key: ip => { tokens, last }
-const RATE_LIMIT_CAPACITY = 120; // tokens
-const RATE_LIMIT_REFILL_PER_SEC = 2; // tokens per second
+const RATE_LIMIT_CAPACITY = 1000; // tokens - very high for admin operations
+const RATE_LIMIT_REFILL_PER_SEC = 20; // tokens per second - generous refill
 const isMutatingMethod = (m) => m === 'POST' || m === 'PUT' || m === 'DELETE' || m === 'PATCH';
 const allowRequest = (ip, nowMs) => {
   const nowSec = Math.floor(nowMs / 1000);
