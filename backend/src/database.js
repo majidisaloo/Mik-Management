@@ -29,6 +29,8 @@ const defaultState = () => ({
   lastAddressListId: 0,
   lastFirewallFilterId: 0,
   lastRouteId: 0,
+  lastQueueId: 0,
+  lastLogId: 0,
   users: [],
   roles: [],
   groups: [],
@@ -36,7 +38,9 @@ const defaultState = () => ({
   tunnels: [],
   routes: [],
   addressLists: [],
-  firewallFilters: []
+  firewallFilters: [],
+  operationQueue: [],
+  operationLogs: []
 });
 
 const normalizeGroupName = (name, fallback) => {
@@ -7062,5 +7066,115 @@ async function updateMikrotikFirewallRule(deviceId, ruleData) {
   }
 }
 
-export { toggleMikrotikSafeMode, getMikrotikSafeModeStatus, getMikrotikUpdateInfo, installMikrotikUpdate, getMikrotikById, addMikrotikIpAddress, updateMikrotikIpAddress, updateMikrotikFirewallRule, addSystemLog, getMikrotikInterfaceDetails };
+// ===========================
+// Operation Queue & Logs
+// ===========================
+
+const addToQueue = async (operation) => {
+  const state = await loadState();
+  const id = ++state.lastQueueId;
+  
+  const queueItem = {
+    id,
+    type: operation.type, // 'add_ip', 'delete_ip', 'update_ip'
+    ipamId: operation.ipamId,
+    data: operation.data,
+    status: 'pending', // 'pending', 'processing', 'completed', 'failed'
+    retryCount: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    error: null
+  };
+  
+  state.operationQueue.push(queueItem);
+  await saveState(state);
+  
+  console.log(`✅ Added operation to queue: ID=${id}, Type=${operation.type}`);
+  return queueItem;
+};
+
+const updateQueueStatus = async (queueId, status, error = null) => {
+  const state = await loadState();
+  const item = state.operationQueue.find(q => q.id === queueId);
+  
+  if (item) {
+    item.status = status;
+    item.updatedAt = new Date().toISOString();
+    if (error) {
+      item.error = error;
+    }
+    await saveState(state);
+    console.log(`📝 Updated queue item ${queueId}: status=${status}`);
+  }
+};
+
+const retryQueueItem = async (queueId) => {
+  const state = await loadState();
+  const item = state.operationQueue.find(q => q.id === queueId);
+  
+  if (item) {
+    item.retryCount++;
+    item.status = 'pending';
+    item.updatedAt = new Date().toISOString();
+    item.error = null;
+    await saveState(state);
+    console.log(`🔄 Retry queue item ${queueId}: attempt #${item.retryCount}`);
+    return item;
+  }
+  return null;
+};
+
+const moveToLog = async (queueItem, verificationResult) => {
+  const state = await loadState();
+  const id = ++state.lastLogId;
+  
+  const logEntry = {
+    id,
+    queueId: queueItem.id,
+    type: queueItem.type,
+    ipamId: queueItem.ipamId,
+    data: queueItem.data,
+    status: verificationResult.success ? 'success' : 'failed',
+    verificationDetails: verificationResult,
+    retryCount: queueItem.retryCount,
+    createdAt: queueItem.createdAt,
+    completedAt: new Date().toISOString()
+  };
+  
+  state.operationLogs.push(logEntry);
+  
+  // Remove from queue
+  state.operationQueue = state.operationQueue.filter(q => q.id !== queueItem.id);
+  
+  await saveState(state);
+  console.log(`📋 Moved to logs: Queue ID=${queueItem.id} -> Log ID=${id}`);
+  
+  return logEntry;
+};
+
+const getQueue = async () => {
+  const state = await loadState();
+  return state.operationQueue || [];
+};
+
+const getLogs = async () => {
+  const state = await loadState();
+  return state.operationLogs || [];
+};
+
+const deleteQueueItem = async (queueId) => {
+  const state = await loadState();
+  state.operationQueue = state.operationQueue.filter(q => q.id !== queueId);
+  await saveState(state);
+  console.log(`🗑️ Deleted queue item ${queueId}`);
+};
+
+const deleteLogEntry = async (logId) => {
+  const state = await loadState();
+  state.operationLogs = state.operationLogs.filter(l => l.id !== logId);
+  await saveState(state);
+  console.log(`🗑️ Deleted log entry ${logId}`);
+};
+
+export { toggleMikrotikSafeMode, getMikrotikSafeModeStatus, getMikrotikUpdateInfo, installMikrotikUpdate, getMikrotikById, addMikrotikIpAddress, updateMikrotikIpAddress, updateMikrotikFirewallRule, addSystemLog, getMikrotikInterfaceDetails, addToQueue, updateQueueStatus, retryQueueItem, moveToLog, getQueue, getLogs, deleteQueueItem, deleteLogEntry };
 export default initializeDatabase;

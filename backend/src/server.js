@@ -18,7 +18,15 @@ import {
   updateMikrotikIpAddress,
   updateMikrotikFirewallRule,
   addSystemLog,
-  getMikrotikInterfaceDetails
+  getMikrotikInterfaceDetails,
+  addToQueue,
+  updateQueueStatus,
+  retryQueueItem,
+  moveToLog,
+  getQueue,
+  getLogs,
+  deleteQueueItem,
+  deleteLogEntry
 } from './database.js';
 import { 
   applyFirewallRuleToGroup, 
@@ -5317,6 +5325,76 @@ const bootstrap = async () => {
             await handleSyncIpam(ipamId);
             return;
           }
+        }
+
+        // Queue endpoints
+        if (resourceSegments.length === 3 && method === 'GET' && resourceSegments[2] === 'queue') {
+          try {
+            const queue = await getQueue();
+            const ipamQueue = queue.filter(q => q.ipamId === ipamId);
+            sendJson(res, 200, ipamQueue);
+          } catch (error) {
+            console.error('Get queue error:', error);
+            sendJson(res, 500, { message: 'Unable to get queue' });
+          }
+          return;
+        }
+
+        // Logs endpoints
+        if (resourceSegments.length === 3 && method === 'GET' && resourceSegments[2] === 'logs') {
+          try {
+            const logs = await getLogs();
+            const ipamLogs = logs.filter(l => l.ipamId === ipamId);
+            sendJson(res, 200, ipamLogs);
+          } catch (error) {
+            console.error('Get logs error:', error);
+            sendJson(res, 500, { message: 'Unable to get logs' });
+          }
+          return;
+        }
+
+        // Retry queue item
+        if (resourceSegments.length === 5 && method === 'POST' && resourceSegments[2] === 'queue' && resourceSegments[4] === 'retry') {
+          try {
+            const queueId = parseInt(resourceSegments[3], 10);
+            const item = await retryQueueItem(queueId);
+            
+            if (item) {
+              sendJson(res, 200, { message: 'Queue item set for retry', item });
+            } else {
+              sendJson(res, 404, { message: 'Queue item not found' });
+            }
+          } catch (error) {
+            console.error('Retry queue item error:', error);
+            sendJson(res, 500, { message: 'Unable to retry queue item' });
+          }
+          return;
+        }
+
+        // Delete queue item
+        if (resourceSegments.length === 4 && method === 'DELETE' && resourceSegments[2] === 'queue') {
+          try {
+            const queueId = parseInt(resourceSegments[3], 10);
+            await deleteQueueItem(queueId);
+            sendJson(res, 200, { message: 'Queue item deleted' });
+          } catch (error) {
+            console.error('Delete queue item error:', error);
+            sendJson(res, 500, { message: 'Unable to delete queue item' });
+          }
+          return;
+        }
+
+        // Delete log entry
+        if (resourceSegments.length === 4 && method === 'DELETE' && resourceSegments[2] === 'logs') {
+          try {
+            const logId = parseInt(resourceSegments[3], 10);
+            await deleteLogEntry(logId);
+            sendJson(res, 200, { message: 'Log entry deleted' });
+          } catch (error) {
+            console.error('Delete log entry error:', error);
+            sendJson(res, 500, { message: 'Unable to delete log entry' });
+          }
+          return;
         }
 
         if (resourceSegments.length === 3 && method === 'PUT' && resourceSegments[2] === 'collections') {
