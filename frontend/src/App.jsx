@@ -35,6 +35,8 @@ const managementRoutes = [
   { path: 'firewall', Component: Firewall },
   { path: 'ipam', Component: IPAM },
   { path: 'ipam/:id', Component: IPAMDetails },
+  { path: 'ipam/:id/sections/:sectionId', Component: IPAMDetails },
+  { path: 'ipam/:id/sections/:sectionId/ranges/:rangeId', Component: IPAMDetails },
   { path: 'settings', Component: Settings }
 ];
 

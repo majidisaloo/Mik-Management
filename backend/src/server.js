@@ -48,6 +48,56 @@ const getCommitCount = async () => {
   }
 };
 
+// Helper function to calculate possible subnets
+const calculatePossibleSubnets = (subnet, currentMask, newCidr) => {
+  const newMask = parseInt(newCidr.replace('/', ''));
+  const currentMaskNum = parseInt(currentMask);
+  
+  if (newMask <= currentMaskNum) {
+    return [];
+  }
+  
+  const possibleSubnets = [];
+  const subnetBits = newMask - currentMaskNum;
+  const numSubnets = Math.pow(2, subnetBits);
+  
+  // Parse IP address
+  const ipParts = subnet.split('.');
+  const ipNum = (parseInt(ipParts[0]) << 24) + (parseInt(ipParts[1]) << 16) + 
+                (parseInt(ipParts[2]) << 8) + parseInt(ipParts[3]);
+  
+  const subnetSize = Math.pow(2, 32 - newMask);
+  
+  for (let i = 0; i < numSubnets; i++) {
+    const startIP = ipNum + (i * subnetSize);
+    const endIP = startIP + subnetSize - 1;
+    
+    const startIPStr = [
+      (startIP >>> 24) & 0xFF,
+      (startIP >>> 16) & 0xFF,
+      (startIP >>> 8) & 0xFF,
+      startIP & 0xFF
+    ].join('.');
+    
+    const endIPStr = [
+      (endIP >>> 24) & 0xFF,
+      (endIP >>> 16) & 0xFF,
+      (endIP >>> 8) & 0xFF,
+      endIP & 0xFF
+    ].join('.');
+    
+    possibleSubnets.push({
+      subnet: `${startIPStr}/${newMask}`,
+      startIP: startIPStr,
+      endIP: endIPStr,
+      size: subnetSize,
+      available: true
+    });
+  }
+  
+  return possibleSubnets;
+};
+
 const getLatestCommitCount = async () => {
   try {
     const { execSync } = await import('child_process');
@@ -538,8 +588,7 @@ const phpIpamFetch = async (ipam, endpoint, options = {}) => {
         Accept: 'application/json',
         'Content-Type': 'application/json',
         'User-Agent': 'Mik-Management/1.0',
-        'phpipam-token': ipam.appCode ?? '',
-        'Authorization': `Bearer ${ipam.appCode ?? ''}`,
+        'token': ipam.appCode ?? '',
         ...(options.headers || {})
       },
       signal: controller.signal
@@ -4997,7 +5046,7 @@ const bootstrap = async () => {
           appId: ipam.appId,
           appPermissions: ipam.appPermissions,
           appSecurity: ipam.appSecurity,
-          status: ipam.lastStatus || ipam.status || 'unknown',
+          status: ipam.status || 'unknown',
           checkedAt: ipam.checkedAt,
           lastSyncAt: ipam.lastSyncAt,
           createdAt: ipam.createdAt,
@@ -5209,6 +5258,77 @@ const bootstrap = async () => {
             await handleSyncIpam(ipamId);
             return;
           }
+        }
+
+        if (resourceSegments.length === 3 && method === 'PUT' && resourceSegments[2] === 'collections') {
+          try {
+            const ipam = await db.getIpamById(ipamId);
+            if (!ipam) {
+              sendJson(res, 404, { message: 'IPAM integration not found.' });
+              return;
+            }
+
+            const body = await parseJsonBody(req);
+            const collections = body.collections || body;
+
+            await db.replaceIpamCollections(ipamId, collections);
+            const timestamp = new Date().toISOString();
+            await db.updateIpamStatus(ipamId, { status: 'connected', checkedAt: timestamp, syncedAt: timestamp });
+
+            sendJson(res, 200, {
+              message: 'Collections updated successfully',
+              sections: collections.sections?.length || 0,
+              datacenters: collections.datacenters?.length || 0,
+              ranges: collections.ranges?.length || 0
+            });
+          } catch (error) {
+            console.error('Update collections error', error);
+            sendJson(res, 500, { message: 'Unable to update collections.' });
+          }
+          return;
+        }
+
+        if (resourceSegments.length === 3 && method === 'POST' && resourceSegments[2] === 'ranges') {
+          try {
+            const ipam = await db.getIpamById(ipamId);
+            if (!ipam) {
+              sendJson(res, 404, { message: 'IPAM integration not found.' });
+              return;
+            }
+
+            const body = await parseJsonBody(req);
+            console.log('Add range - Request body:', JSON.stringify(body, null, 2));
+            
+            // Get current collections
+            const collections = ipam.collections || { sections: [], datacenters: [], ranges: [] };
+            console.log('Add range - Current ranges count:', collections.ranges.length);
+            
+            // Add new range
+            const newRange = {
+              id: `range_${Date.now()}`,
+              sectionId: body.sectionId,
+              name: body.name || body.description || '',
+              description: body.description || '',
+              metadata: body.metadata || {}
+            };
+            
+            console.log('Add range - New range:', JSON.stringify(newRange, null, 2));
+            
+            collections.ranges.push(newRange);
+            
+            // Update collections in database
+            const result = await db.replaceIpamCollections(ipamId, collections);
+            console.log('Add range - Replace result:', result.success ? 'Success' : 'Failed');
+            
+            sendJson(res, 201, {
+              message: 'Range added successfully',
+              range: newRange
+            });
+          } catch (error) {
+            console.error('Add range error', error);
+            sendJson(res, 500, { message: 'Unable to add range.' });
+          }
+          return;
         }
       }
 
@@ -5723,6 +5843,7 @@ async function handleApplyFirewallRuleToGroup() {
     sendJson(res, 500, { message: 'Failed to apply firewall rule to group' });
   }
 }
+
 
 bootstrap().catch((error) => {
   console.error('Failed to start server', error);

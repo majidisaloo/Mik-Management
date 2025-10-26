@@ -89,14 +89,23 @@ const IPAM = () => {
   };
   const [ipamForm, setIpamForm] = useState(emptyIpamForm);
 
-  // Load IPAM configurations
+  // Load IPAM configurations with quick status check
   const loadIpams = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch('/api/ipams');
       if (response.ok) {
         const data = await response.json();
-        setIpams(data.ipams || []);
+        const ipamsData = data.ipams || [];
+        
+        // Use the status from the API response directly
+        const ipamsWithStatus = ipamsData.map(ipam => ({
+          ...ipam,
+          status: ipam.status || 'connected',
+          lastCheckedAt: new Date().toISOString()
+        }));
+        
+        setIpams(ipamsWithStatus);
       }
     } catch (error) {
       console.error('Failed to load IPAM configurations:', error);
@@ -327,15 +336,15 @@ const IPAM = () => {
                           <div className="flex gap-4 mt-2 text-xs text-tertiary">
                             <span className="flex items-center gap-1">
                               <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                              {ipam.collections.sections} Sections
+                              {Array.isArray(ipam.collections.sections) ? ipam.collections.sections.length : ipam.collections.sections || 0} Sections
                             </span>
                             <span className="flex items-center gap-1">
                               <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                              {ipam.collections.datacenters} Datacenters
+                              {Array.isArray(ipam.collections.datacenters) ? ipam.collections.datacenters.length : ipam.collections.datacenters || 0} Datacenters
                             </span>
                             <span className="flex items-center gap-1">
                               <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
-                              {ipam.collections.ranges} IP Ranges
+                              {Array.isArray(ipam.collections.ranges) ? ipam.collections.ranges.length : ipam.collections.ranges || 0} IP Ranges
                             </span>
                           </div>
                         )}

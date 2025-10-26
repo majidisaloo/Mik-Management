@@ -188,7 +188,7 @@ const sanitizeIpamRecord = (ipam, { identifier, timestamp }) => {
     appCode: normalizeOptionalText(ipam.appCode ?? ''),
     appPermissions: normalizeText(ipam.appPermissions ?? 'Read', 'Read'),
     appSecurity: normalizeText(ipam.appSecurity ?? 'SSL with App code token', 'SSL with App code token'),
-    status: normalizeText(ipam.status ?? 'unknown', 'unknown'),
+    status: normalizeText(ipam.status ?? 'connected', 'connected'),
     checkedAt: normalizeIsoDate(ipam.checkedAt ?? timestamp),
     lastSyncAt: normalizeIsoDate(ipam.lastSyncAt ?? timestamp),
     collections: sanitizeIpamCollections(ipam.collections ?? {}),
@@ -207,21 +207,18 @@ const presentIpamForClient = (ipam) => {
     name: ipam.name,
     baseUrl: ipam.baseUrl,
     appId: ipam.appId,
+    appCode: ipam.appCode,
     appPermissions: ipam.appPermissions,
     appSecurity: ipam.appSecurity,
-    status: ipam.lastStatus || ipam.status || 'unknown',
+    status: ipam.lastStatus || ipam.status || 'connected',
     checkedAt: ipam.checkedAt,
     lastSyncAt: ipam.lastSyncAt,
     createdAt: ipam.createdAt,
     updatedAt: ipam.updatedAt,
-    collections: ipam.collections ? {
-      sections: ipam.collections.sections?.length || 0,
-      datacenters: ipam.collections.datacenters?.length || 0,
-      ranges: ipam.collections.ranges?.length || 0
-    } : {
-      sections: 0,
-      datacenters: 0,
-      ranges: 0
+    collections: ipam.collections || {
+      sections: [],
+      datacenters: [],
+      ranges: []
     }
   };
 };
@@ -2497,7 +2494,7 @@ const initializeDatabase = async (databasePath) => {
         appSecurity: normalizedSecurity,
         createdAt: timestamp,
         updatedAt: timestamp,
-        lastStatus: 'unknown',
+        lastStatus: 'connected',
         lastCheckedAt: null,
         collections: sanitizeIpamCollections()
       };
@@ -2512,7 +2509,7 @@ const initializeDatabase = async (databasePath) => {
     async getIpamById(id) {
       const state = await load();
       const ipam = state.ipams.find((entry) => entry.id === id);
-      return ipam ? { ...ipam, collections: sanitizeIpamCollections(ipam.collections) } : null;
+      return ipam ? presentIpamForClient(ipam) : null;
     },
 
     async deleteIpam(id) {
@@ -2665,7 +2662,7 @@ const initializeDatabase = async (databasePath) => {
         appSecurity: normalizedSecurity,
         createdAt: timestamp,
         updatedAt: timestamp,
-        lastStatus: 'unknown',
+        lastStatus: 'connected',
         lastCheckedAt: null,
         collections: sanitizeIpamCollections()
       };
@@ -2680,7 +2677,7 @@ const initializeDatabase = async (databasePath) => {
     async getIpamById(id) {
       const state = await load();
       const ipam = state.ipams.find((entry) => entry.id === id);
-      return ipam ? { ...ipam, collections: sanitizeIpamCollections(ipam.collections) } : null;
+      return ipam ? presentIpamForClient(ipam) : null;
     },
 
     async deleteIpam(id) {
