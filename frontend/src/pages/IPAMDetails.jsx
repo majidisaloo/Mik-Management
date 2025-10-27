@@ -508,7 +508,9 @@ const IPAMDetails = () => {
             start: freeStart,
             end: freeEnd,
             type: 'free',
-            count: freeCount.toString()
+            count: freeCount.toString(),
+            parentId: parentRange.id,  // Add parent ID for API requests
+            parentRangeCidr: cidr
           });
         }
       }
@@ -527,7 +529,9 @@ const IPAMDetails = () => {
         start: freeStart,
         end: freeEnd,
         type: 'free',
-        count: freeCount.toString()
+        count: freeCount.toString(),
+        parentId: parentRange.id,  // Add parent ID for API requests
+        parentRangeCidr: cidr
       });
     }
     
@@ -750,15 +754,33 @@ const IPAMDetails = () => {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      showToast('Loading live data from PHP-IPAM...', 'info');
+      console.log('🔄 Starting refresh - will queue sync operation...');
+      showToast('🔄 Refresh queued - check Queue & Logs tab', 'info');
       
-      // Load directly from PHP-IPAM without cache (no sync needed)
-      await loadIpamDetails(true); // useLive = true
+      // Queue a sync operation instead of loading directly
+      const response = await fetch(`/api/ipams/${id}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
       
-      showToast('IPAM data refreshed from PHP-IPAM', 'success');
+      if (response.status === 202) {
+        showToast('✅ Refresh operation queued successfully', 'success');
+        setActiveTab('queue-logs');
+        await loadQueueAndLogs();
+      } else if (response.ok) {
+        showToast('✅ Refresh completed', 'success');
+        await loadIpamDetails(false);
+      } else {
+        const errorData = await response.json();
+        showToast(`⚠️ Refresh queued with status: ${errorData.message || response.statusText}`, 'warning');
+        setActiveTab('queue-logs');
+        await loadQueueAndLogs();
+      }
     } catch (error) {
-      console.error('Refresh error:', error);
-      showToast('Failed to refresh IPAM data', 'error');
+      console.error('❌ Refresh error:', error);
+      showToast('⚠️ Refresh request sent - check Queue & Logs', 'warning');
+      setActiveTab('queue-logs');
+      await loadQueueAndLogs();
     } finally {
       setRefreshing(false);
     }
@@ -1098,10 +1120,12 @@ const IPAMDetails = () => {
                                             onClick={(e) => {
                     e.stopPropagation();
                     // For single IP, open add modal directly
+                    console.log('📝 Opening Add IP modal for free space:', item.freeRange);
                     setSelectedRangeForEdit({ 
                       metadata: { 
                         cidr: `${item.freeRange.start}/${cidrMask}`,
-                        parentRangeCidr: range.metadata?.cidr || ''
+                        parentRangeCidr: range.metadata?.cidr || '',
+                        parentId: item.freeRange.parentId || range.id  // Use parentId from freeRange
                       },
                       name: '',
                       description: ''
@@ -1264,17 +1288,7 @@ const IPAMDetails = () => {
             )}
         <button 
           onClick={async () => {
-            if (activeTab === 'sections' && selectedSection?.id) {
-              setRefreshing(true);
-              try {
-                showToast('Refreshing selected section (live)...', 'info');
-                await loadSectionRanges(selectedSection.id, true);
-              } finally {
-                setRefreshing(false);
-              }
-            } else {
-              await handleRefresh();
-            }
+            await handleRefresh();
           }}
           disabled={refreshing}
               className="ipam-refresh-button"
@@ -2358,7 +2372,14 @@ const IPAMDetails = () => {
                     // Find the actual parent subnet ID from the IPAM collections
                     // This is the subnet/range that contains this free space
                     let parentSubnetId = null;
-                    if (parentRangeCidr) {
+                    
+                    // First check if selectedRangeForEdit has a parent ID directly
+                    if (selectedRangeForEdit?.metadata?.parentId) {
+                      parentSubnetId = parseInt(selectedRangeForEdit.metadata.parentId);
+                      console.log(`📌 Using parent ID from metadata: ${parentSubnetId}`);
+                    }
+                    // Otherwise try to find by CIDR
+                    else if (parentRangeCidr) {
                       const parentSubnet = ipam.collections?.ranges?.find(range => {
                         const rangeCidr = range.metadata?.cidr || '';
                         return rangeCidr === parentRangeCidr;
@@ -2366,9 +2387,23 @@ const IPAMDetails = () => {
                       
                       if (parentSubnet && parentSubnet.id) {
                         parentSubnetId = parseInt(parentSubnet.id);
-                        console.log(`Found parent subnet ID: ${parentSubnetId} for CIDR: ${parentRangeCidr}`);
+                        console.log(`📌 Found parent subnet ID by CIDR: ${parentSubnetId} for CIDR: ${parentRangeCidr}`);
                       }
                     }
+                    
+                    // If still no parent, check if we're adding within selectedSection
+                    if (!parentSubnetId && selectedSection?.ranges?.[0]?.id) {
+                      parentSubnetId = parseInt(selectedSection.ranges[0].id);
+                      console.log(`📌 Using first range from section as parent: ${parentSubnetId}`);
+                    }
+                    
+                    console.log('📋 Add IP Request:', {
+                      cidr,
+                      description,
+                      parentSubnetId,
+                      parentRangeCidr,
+                      sectionId: selectedSection?.id
+                    });
                     
                     const response = await fetch(`/api/ipams/${ipam.id}/ranges`, {
                       method: 'POST',
@@ -2533,25 +2568,33 @@ const IPAMDetails = () => {
               <button
                 onClick={async () => {
                   try {
+                    console.log('🗑️ Deleting range:', selectedRangeForDelete.id);
                     const response = await fetch(`/api/ipams/${ipam.id}/ranges/${selectedRangeForDelete.id}`, {
                       method: 'DELETE'
                     });
                     
-                    if (response.ok) {
-                      showToast('Range deleted successfully. Syncing...', 'success');
+                    const responseData = await response.json();
+                    
+                    if (response.status === 202) {
+                      showToast('✅ Delete queued - check Queue & Logs tab', 'success');
                       setShowDeleteModal(false);
-                      
-                      // Reload live data from PHP-IPAM
-                      showToast('Reloading from PHP-IPAM...', 'info');
-                      console.log('Reloading after delete');
-                      await new Promise(resolve => setTimeout(resolve, 500));
-                      await loadIpamDetails(true); // useLive = true
+                      setActiveTab('queue-logs');
+                      await loadQueueAndLogs();
+                    } else if (response.ok) {
+                      showToast('✅ Range deleted successfully', 'success');
+                      setShowDeleteModal(false);
+                      await loadIpamDetails(false);
                     } else {
-                      const errorData = await response.json();
-                      showToast(errorData.message || 'Failed to delete range', 'error');
+                      showToast(`⚠️ ${responseData.message || 'Delete queued with errors. Check Queue & Logs.'}`, 'error');
+                      setShowDeleteModal(false);
+                      setActiveTab('queue-logs');
+                      await loadQueueAndLogs();
                     }
                   } catch (error) {
-                    showToast('Error deleting range: ' + error.message, 'error');
+                    showToast('⚠️ Delete request sent - check Queue & Logs', 'warning');
+                    setShowDeleteModal(false);
+                    setActiveTab('queue-logs');
+                    await loadQueueAndLogs();
                   }
                 }}
                 style={{
