@@ -1054,6 +1054,41 @@ const syncPhpIpamSection = async (ipam, sectionId) => {
 // ============================================
 
 /**
+ * Get all queue items
+ */
+const getQueue = async () => {
+  return await db.getQueue();
+};
+
+/**
+ * Get all log entries
+ */
+const getLogs = async () => {
+  return await db.getLogs();
+};
+
+/**
+ * Retry a failed queue item
+ */
+const retryQueueItem = async (queueId) => {
+  return await db.retryQueueItem(queueId);
+};
+
+/**
+ * Delete a queue item
+ */
+const deleteQueueItem = async (queueId) => {
+  return await db.deleteQueueItem(queueId);
+};
+
+/**
+ * Delete a log entry
+ */
+const deleteLogEntry = async (logId) => {
+  return await db.deleteLogEntry(logId);
+};
+
+/**
  * Add an operation to the queue for background processing
  */
 const addToQueue = async (operation) => {
@@ -5878,6 +5913,41 @@ const bootstrap = async () => {
           } catch (error) {
             console.error('Get logs error:', error);
             sendJson(res, 500, { message: 'Unable to get logs' });
+          }
+          return;
+        }
+
+        // Sync/Refresh endpoint - Queue a sync operation
+        if (resourceSegments.length === 3 && method === 'POST' && resourceSegments[2] === 'sync') {
+          try {
+            const ipam = await db.getIpamById(ipamId);
+            if (!ipam) {
+              sendJson(res, 404, { message: 'IPAM integration not found' });
+              return;
+            }
+
+            console.log(`🔄 Queueing sync operation for IPAM ${ipamId}...`);
+            
+            // Add to queue
+            const queueItem = await addToQueue({
+              type: 'sync',
+              ipamId: ipamId,
+              data: { initiatedBy: 'user', at: new Date().toISOString() }
+            });
+
+            // Process in background
+            (async () => {
+              await processQueuedOperation(queueItem);
+            })();
+
+            sendJson(res, 202, {
+              message: 'Sync operation queued',
+              status: 'queued',
+              queueId: queueItem.id
+            });
+          } catch (error) {
+            console.error('Sync queue error:', error);
+            sendJson(res, 500, { message: `Unable to queue sync: ${error.message}` });
           }
           return;
         }
