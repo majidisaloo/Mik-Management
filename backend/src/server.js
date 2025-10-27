@@ -1063,7 +1063,7 @@ const syncPhpIpamSection = async (ipam, sectionId) => {
 // Queue Processor
 // ============================================
 
-const processQueuedOperation = async (queueItem) => {
+const processQueuedOperation = async (queueItem, db) => {
   try {
     const ipamId = queueItem.ipamId;
     const ipam = await db.getIpamById(ipamId);
@@ -1194,6 +1194,38 @@ const processQueuedOperation = async (queueItem) => {
         };
 
         await moveToLog(queueItem, verificationResult);
+        break;
+      }
+      case 'update_ip': {
+        const { rangeId, description, hostname, cidr, subnetId } = queueItem.data || {};
+        try {
+          // Update subnet description/hostname in phpIPAM
+          const updatePayload = {};
+          if (description) updatePayload.description = description;
+          if (hostname) updatePayload.hostname = hostname;
+          
+          if (Object.keys(updatePayload).length > 0) {
+            await phpIpamFetch(ipam, `subnets/${rangeId}/`, {
+              method: 'PATCH',
+              body: JSON.stringify(updatePayload)
+            });
+          }
+          
+          // Verify the update
+          const verificationResult = {
+            success: true,
+            message: `Updated range ${rangeId} (${cidr || 'N/A'})`,
+            details: { rangeId, description, hostname, cidr }
+          };
+          await moveToLog(queueItem, verificationResult);
+        } catch (error) {
+          const verificationResult = {
+            success: false,
+            message: `Failed to update range ${rangeId}: ${error.message}`,
+            details: { rangeId, error: error.message }
+          };
+          await moveToLog(queueItem, verificationResult);
+        }
         break;
       }
       case 'delete_ip': {
@@ -5720,7 +5752,7 @@ const bootstrap = async () => {
             // Log a non-blocking refresh in the background
             try {
               const queueItem = await addToQueue({ type: 'refresh', ipamId, data: { scope: 'live', at: new Date().toISOString() } });
-              (async () => { await processQueuedOperation(queueItem); })();
+              (async () => { await processQueuedOperation(queueItem, db); })();
             } catch (_) {}
 
             // Return directly without saving to database
@@ -5805,7 +5837,7 @@ const bootstrap = async () => {
 
             // Process in background
             (async () => {
-              await processQueuedOperation(queueItem);
+              await processQueuedOperation(queueItem, db);
             })();
 
             sendJson(res, 202, {
@@ -5901,8 +5933,38 @@ const bootstrap = async () => {
             }
 
             const body = await parseJsonBody(req);
-            console.log('Add IP - Request body:', JSON.stringify(body, null, 2));
+            console.log('Add/Edit IP - Request body:', JSON.stringify(body, null, 2));
             
+            // Check if this is an edit/update operation
+            const isEdit = Boolean(body?.isEdit || body?.rangeId);
+            const rangeId = body?.rangeId;
+            
+            if (isEdit && rangeId) {
+              // This is an UPDATE operation - queue as update_ip
+              console.log(`📝 Queuing UPDATE operation for range ${rangeId}`);
+              
+              const queueItem = await addToQueue({
+                type: 'update_ip',
+                ipamId: ipamId,
+                data: {
+                  rangeId,
+                  description: body.description || body.name || body.hostname,
+                  hostname: body.hostname || body.name || body.description,
+                  cidr: body.metadata?.cidr,
+                  subnetId: body.metadata?.subnetId ? parseInt(body.metadata.subnetId, 10) : null
+                }
+              });
+              
+              (async () => { await processQueuedOperation(queueItem, db); })();
+              
+              return sendJson(res, 202, {
+                message: 'Update operation queued',
+                status: 'queued',
+                queueId: queueItem.id
+              });
+            }
+            
+            // Otherwise, continue with ADD operation
             const cidr = body.metadata?.cidr || '';
             const hostname = body.name || body.description || '';
             let subnetId = body.metadata?.subnetId ? parseInt(body.metadata.subnetId, 10) : null;
@@ -5955,7 +6017,7 @@ const bootstrap = async () => {
               });
               // Background processing
               (async () => {
-                await processQueuedOperation(queueItem);
+                await processQueuedOperation(queueItem, db);
               })();
 
               sendJson(res, 202, {
@@ -5976,7 +6038,7 @@ const bootstrap = async () => {
                   parentRangeCidr
                 }
               });
-              (async () => { await processQueuedOperation(queueItem); })();
+              (async () => { await processQueuedOperation(queueItem, db); })();
               sendJson(res, 202, { message: 'Add range queued for processing', status: 'queued', queueId: queueItem.id });
             }
           } catch (error) {
@@ -6029,7 +6091,7 @@ const bootstrap = async () => {
               });
               
               // Process in background via queue processor
-              (async () => { await processQueuedOperation(queueItem); })();
+              (async () => { await processQueuedOperation(queueItem, db); })();
             }
             
             // Respond as queued (deletion processed in background)
@@ -6489,7 +6551,7 @@ const bootstrap = async () => {
             ipamId,
             data: { tunnelId, parentSubnetId: parentSubnetId ? Number.parseInt(parentSubnetId, 10) : null, parentRangeCidr, mask: Number.parseInt(mask, 10) || 30, description: description || `Tunnel ${tunnelId}` }
           });
-          (async () => { await processQueuedOperation(queueItem); })();
+          (async () => { await processQueuedOperation(queueItem, db); })();
           return sendJson(res, 202, { message: 'Provision queued', status: 'queued', queueId: queueItem.id });
         } catch (e) {
           console.error('Provision tunnel error:', e);

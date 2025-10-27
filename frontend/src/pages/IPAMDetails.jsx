@@ -1889,14 +1889,31 @@ const IPAMDetails = () => {
                     const description = document.querySelector('input[type="text"]').value;
                     const cidr = document.querySelectorAll('input[type="text"]')[1].value;
                     
+                    // Check if this is an edit (has existing range ID)
+                    const isEdit = Boolean(selectedRangeForEdit?.id);
+                    const rangeId = selectedRangeForEdit?.id;
+                    
+                    console.log(`📝 ${isEdit ? 'Updating' : 'Adding'} range:`, {
+                      isEdit,
+                      rangeId,
+                      cidr,
+                      description
+                    });
+                    
                     const response = await fetch(`/api/ipams/${ipam.id}/ranges`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
+                        rangeId: isEdit ? rangeId : undefined, // Include rangeId for updates
+                        isEdit, // Flag to indicate this is an update
                         sectionId: selectedSection?.id,
-                        metadata: { cidr },
+                        metadata: { 
+                          cidr,
+                          subnetId: selectedRangeForEdit?.metadata?.subnetId
+                        },
                         description,
-                        name: description
+                        name: description,
+                        hostname: description
                       })
                     });
                     

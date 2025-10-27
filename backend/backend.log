@@ -9,6 +9,3 @@ Available Firewall Rules:
 - Block Malicious Traffic: drop from blocked-sites to 
 - Allow Internal Communication: accept from 192.168.0.0/16 to 192.168.0.0/16
 API server ready at http://0.0.0.0:5002
-📋 GET /api/ipams/2/queue - Fetching queue items...
-📋 Total queue items: 0
-📋 Queue items for IPAM 2: 0
