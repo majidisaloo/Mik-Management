@@ -2065,6 +2065,25 @@ const ensureStateShape = async (databaseFile) => {
 
   normalized.users = normalizedUsers;
 
+  // Ensure operation queue and logs exist
+  if (!Array.isArray(normalized.operationQueue)) {
+    normalized.operationQueue = [];
+    mutated = true;
+  }
+
+  if (!Array.isArray(normalized.operationLogs)) {
+    normalized.operationLogs = [];
+    mutated = true;
+  }
+
+  if (!Number.isInteger(normalized.lastQueueId)) {
+    normalized.lastQueueId = normalized.operationQueue.reduce(
+      (max, item) => Math.max(max, Number.parseInt(item.id, 10) || 0),
+      0
+    );
+    mutated = true;
+  }
+
   if (mutated) {
     await writeDatabase(databaseFile, normalized);
   }
@@ -2077,6 +2096,9 @@ const initializeDatabase = async (databasePath) => {
 
   await ensureDirectory(databaseFile);
   await ensureStateShape(databaseFile);
+
+  // Set global database path for queue/logs functions
+  setGlobalDatabasePath(databaseFile);
 
   const load = () => readDatabase(databaseFile);
   const persist = (state) => writeDatabase(databaseFile, state);
@@ -7069,6 +7091,27 @@ async function updateMikrotikFirewallRule(deviceId, ruleData) {
 // ===========================
 // Operation Queue & Logs
 // ===========================
+
+// Global state access helpers for queue/logs
+let _globalDatabasePath = null;
+
+const setGlobalDatabasePath = (path) => {
+  _globalDatabasePath = path;
+};
+
+const loadState = async () => {
+  if (!_globalDatabasePath) {
+    throw new Error('Database path not initialized. Call initializeDatabase first.');
+  }
+  return await readDatabase(_globalDatabasePath);
+};
+
+const saveState = async (state) => {
+  if (!_globalDatabasePath) {
+    throw new Error('Database path not initialized. Call initializeDatabase first.');
+  }
+  await writeDatabase(_globalDatabasePath, state);
+};
 
 const addToQueue = async (operation) => {
   const state = await loadState();

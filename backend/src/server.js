@@ -5758,12 +5758,15 @@ const bootstrap = async () => {
 
         // Queue endpoints
         if (resourceSegments.length === 3 && method === 'GET' && resourceSegments[2] === 'queue') {
+          console.log(`📋 GET /api/ipams/${ipamId}/queue - Fetching queue items...`);
           try {
             const queue = await getQueue();
+            console.log(`📋 Total queue items: ${queue.length}`);
             const ipamQueue = queue.filter(q => q.ipamId === ipamId);
+            console.log(`📋 Queue items for IPAM ${ipamId}: ${ipamQueue.length}`);
             sendJson(res, 200, ipamQueue);
           } catch (error) {
-            console.error('Get queue error:', error);
+            console.error('❌ Get queue error:', error);
             sendJson(res, 500, { message: 'Unable to get queue' });
           }
           return;
@@ -6037,6 +6040,35 @@ const bootstrap = async () => {
           }
           return;
         }
+
+        // Per-section fetch (cached)
+        if (resourceSegments.length >= 4 && method === 'GET' && resourceSegments[2] === 'sections') {
+          const sectionId = Number.parseInt(resourceSegments[3], 10);
+          const live = resourceSegments[4] === 'live';
+          try {
+            const ipam = await db.getIpamById(ipamId);
+            if (!ipam) return sendJson(res, 404, { message: 'IPAM integration not found.' });
+
+            if (live) {
+              const { ranges } = await syncPhpIpamSection(ipam, sectionId);
+              return sendJson(res, 200, { sectionId, ranges, live: true, ts: new Date().toISOString() });
+            }
+
+            const key = `${ipamId}:${sectionId}`;
+            const now = Date.now();
+            const cached = sectionCache.get(key);
+            if (cached && now - cached.ts < SECTION_TTL_MS) {
+              return sendJson(res, 200, { sectionId, ranges: cached.ranges, live: false, cached: true, ts: new Date(cached.ts).toISOString() });
+            }
+
+            const { ranges } = await syncPhpIpamSection(ipam, sectionId);
+            sectionCache.set(key, { ts: now, ranges });
+            return sendJson(res, 200, { sectionId, ranges, live: false, cached: false, ts: new Date().toISOString() });
+          } catch (error) {
+            console.error('Section fetch error:', error);
+            return sendJson(res, 500, { message: 'Unable to fetch section data' });
+          }
+        }
       }
 
       if (method === 'GET' && (canonicalPath === '/api/config-info' || resourcePath === '/config-info')) {
@@ -6048,35 +6080,6 @@ const bootstrap = async () => {
           }
         });
         return;
-      }
-
-      // Per-section fetch (cached)
-      if (resourceSegments.length >= 4 && method === 'GET' && resourceSegments[2] === 'sections') {
-        const sectionId = Number.parseInt(resourceSegments[3], 10);
-        const live = resourceSegments[4] === 'live';
-        try {
-          const ipam = await db.getIpamById(ipamId);
-          if (!ipam) return sendJson(res, 404, { message: 'IPAM integration not found.' });
-
-          if (live) {
-            const { ranges } = await syncPhpIpamSection(ipam, sectionId);
-            return sendJson(res, 200, { sectionId, ranges, live: true, ts: new Date().toISOString() });
-          }
-
-          const key = `${ipamId}:${sectionId}`;
-          const now = Date.now();
-          const cached = sectionCache.get(key);
-          if (cached && now - cached.ts < SECTION_TTL_MS) {
-            return sendJson(res, 200, { sectionId, ranges: cached.ranges, live: false, cached: true, ts: new Date(cached.ts).toISOString() });
-          }
-
-          const { ranges } = await syncPhpIpamSection(ipam, sectionId);
-          sectionCache.set(key, { ts: now, ranges });
-          return sendJson(res, 200, { sectionId, ranges, live: false, cached: false, ts: new Date().toISOString() });
-        } catch (error) {
-          console.error('Section fetch error:', error);
-          return sendJson(res, 500, { message: 'Unable to fetch section data' });
-        }
       }
 
       if (method === 'POST' && (canonicalPath === '/api/check-updates' || resourcePath === '/check-updates')) {
