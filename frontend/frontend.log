@@ -1,0 +1,10 @@
+
+> mik-management-frontend@3.48.0 dev
+> vite
+
+
+  VITE v5.4.20  ready in 202 ms
+
+  ➜  Local:   http://localhost:5174/
+  ➜  Network: use --host to expose
+3:32:13 AM [vite] hmr update /src/pages/IPAMDetails.jsx

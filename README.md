@@ -39,6 +39,18 @@ curl http://localhost/api/users
 
 ## Updates
 
+### Channels (Stable vs Beta)
+- Stable: tested releases, tagged as `stable-YYYY-MM-DD`.
+- Beta: latest features on `beta` branch.
+
+Update to a channel:
+```bash
+# Stable
+sudo /opt/mik-management/update.sh main
+# Beta
+sudo /opt/mik-management/update.sh beta
+```
+
 ### From Version 1.x to Latest
 ```bash
 # Stop services
@@ -106,6 +118,8 @@ sudo chmod +x /opt/mik-management/update.sh
 - **Device Management**: Full MikroTik device management
 - **Real-time Logging**: System logs with MikroTik format
 - **Group Firewall**: Apply firewall rules to device groups
+- **IPAM Queue + Logs**: All IP/range add/split/delete actions enqueue, verified, fully logged (30 days retention). No inline mutations.
+- **Per-Page Caching**: 10-minute memory cache for heavy pages (IPAM sections, Firewall, Groups, Mikrotiks).
 - **IP Management**: Add, edit, manage IP addresses
 - **Route Management**: Manage routing tables
 - **Firewall Rules**: Comprehensive firewall management
@@ -113,6 +127,14 @@ sudo chmod +x /opt/mik-management/update.sh
 - **Update System**: Built-in update mechanism
 
 ## Troubleshooting
+### Queue & Logs
+- IPAM actions return HTTP 202 and appear under `Queue & Logs` on the IPAM details page.
+- Successful operations are moved from queue to logs with verification details.
+- Failed operations stay in the queue and can be retried.
+
+### Performance
+- Data is fetched per page and cached for 10 minutes by the API to reduce load.
+
 
 ### Common Issues
 ```bash

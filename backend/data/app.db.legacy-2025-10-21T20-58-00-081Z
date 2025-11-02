@@ -1,0 +1,93 @@
+{
+  "lastUserId": 0,
+  "lastRoleId": 1,
+  "lastGroupId": 1,
+  "lastMikrotikId": 1,
+  "lastTunnelId": 0,
+  "lastAddressListId": 0,
+  "lastFirewallFilterId": 0,
+  "lastRouteId": 0,
+  "users": [],
+  "roles": [
+    {
+      "id": 1,
+      "name": "Administrator",
+      "permissions": {
+        "dashboard": true,
+        "users": true,
+        "roles": true,
+        "groups": true,
+        "mikrotiks": true,
+        "tunnels": true,
+        "settings": true
+      },
+      "createdAt": "2025-10-20T21:17:26.954Z",
+      "updatedAt": "2025-10-20T21:17:26.954Z"
+    }
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "name": "Mik-Group Root",
+      "parentId": null,
+      "createdAt": "2025-10-20T21:17:26.954Z",
+      "updatedAt": "2025-10-20T21:17:26.954Z"
+    }
+  ],
+  "mikrotiks": [
+    {
+      "id": 1,
+      "name": "Test",
+      "host": "45.90.72.45",
+      "groupId": null,
+      "tags": [],
+      "notes": "",
+      "routeros": {
+        "apiEnabled": false,
+        "apiPort": 8728,
+        "apiSSL": false,
+        "apiUsername": "",
+        "apiPassword": "",
+        "verifyTLS": true,
+        "apiTimeout": 5000,
+        "apiRetries": 1,
+        "allowInsecureCiphers": false,
+        "preferredApiFirst": true,
+        "firmwareVersion": "7.20.1",
+        "sshEnabled": true,
+        "sshPort": 22,
+        "sshUsername": "admin",
+        "sshPassword": "urfDGV822",
+        "sshAcceptNewHostKeys": true,
+        "autoAcceptFingerprints": false,
+        "apiOutput": null,
+        "sshOutput": "SSH port is accessible. Connection test successful."
+      },
+      "status": {
+        "updateStatus": "updated",
+        "lastAuditAt": "2025-10-20T21:12:06.888Z"
+      },
+      "connectivity": {
+        "api": {
+          "status": "disabled",
+          "lastCheckedAt": "2025-10-21T20:57:58.624Z",
+          "lastError": null
+        },
+        "ssh": {
+          "status": "online",
+          "lastCheckedAt": "2025-10-21T20:57:58.624Z",
+          "fingerprint": "a180:bb59:f226:26ea:f996:8fef:e416:ace5:70e3:ae40:da71:f1f1:eefd:87bb:a766:8112",
+          "lastError": null
+        }
+      },
+      "createdAt": "2025-10-20T21:12:06.888Z",
+      "updatedAt": "2025-10-21T20:57:58.624Z"
+    }
+  ],
+  "tunnels": [],
+  "routes": [],
+  "addressLists": [],
+  "firewallFilters": [],
+  "ipams": [],
+  "lastIpamId": 0
+}

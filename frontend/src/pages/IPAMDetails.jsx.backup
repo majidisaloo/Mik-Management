@@ -1,0 +1,1705 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+
+// Icons
+const BackIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M19 12H5m7-7l-7 7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const RefreshIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 0 0-6.05 2.75L3 9h5V4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M6.35 17.65A7.95 7.95 0 0 0 12 20a8 8 0 0 0 6.05-2.75L21 15h-5v5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const NetworkIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+    <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1" stroke="currentColor" strokeWidth="2"/>
+  </svg>
+);
+
+const BuildingIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 21h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M5 21V7l8-4v18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M19 21V11l-6-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const DatabaseIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
+    <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2"/>
+    <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2"/>
+  </svg>
+);
+
+const FolderIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const IPAMDetails = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { id } = useParams();
+  const [ipam, setIpam] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [expandedSections, setExpandedSections] = useState(new Set());
+  const [selectedRange, setSelectedRange] = useState(null);
+  const [expandedRanges, setExpandedRanges] = useState(new Set());
+  const [selectedIP, setSelectedIP] = useState(null);
+
+  const loadIpamDetails = useCallback(async () => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/ipams/${id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setIpam(data);
+      } else {
+        setError('Failed to load IPAM details');
+      }
+    } catch (err) {
+      setError('Error loading IPAM details');
+      console.error('Error loading IPAM details:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await loadIpamDetails();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const toggleSection = useCallback((sectionId) => {
+    setExpandedSections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(sectionId)) {
+        newSet.delete(sectionId);
+      } else {
+        newSet.add(sectionId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const getRangesForSection = useCallback((sectionId) => {
+    if (!ipam?.collections?.ranges) return [];
+    return ipam.collections.ranges.filter(range => range.metadata?.sectionId === sectionId);
+  }, [ipam]);
+
+  const getChildRanges = useCallback((parentRangeId) => {
+    if (!ipam?.collections?.ranges) return [];
+    return ipam.collections.ranges.filter(range => range.metadata?.masterSubnetId === parentRangeId);
+  }, [ipam]);
+
+  const toggleRange = useCallback((rangeId) => {
+    setExpandedRanges(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(rangeId)) {
+        newSet.delete(rangeId);
+      } else {
+        newSet.add(rangeId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const selectIP = useCallback((ip) => {
+    setSelectedIP(ip);
+  }, []);
+
+  const assignIP = useCallback(async (ipId, hostname, description, owner, mac, switchName, port) => {
+    try {
+      const response = await fetch(`/api/ipams/${id}/ip/${ipId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hostname, description, owner, mac, switch: switchName, port })
+      });
+      
+      if (response.ok) {
+        console.log('IP assigned successfully');
+        await loadIpamDetails(); // Refresh data
+      } else {
+        console.error('Failed to assign IP');
+      }
+    } catch (error) {
+      console.error('Error assigning IP:', error);
+    }
+  }, [id, loadIpamDetails]);
+
+  const splitRange = useCallback(async (rangeId, newCidr, newName) => {
+    try {
+      const response = await fetch(`/api/ipams/${id}/range/${rangeId}/split`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newCidr, newName })
+      });
+      
+      if (response.ok) {
+        console.log('Range split successfully');
+        await loadIpamDetails(); // Refresh data
+      } else {
+        console.error('Failed to split range');
+      }
+    } catch (error) {
+      console.error('Error splitting range:', error);
+    }
+  }, [id, loadIpamDetails]);
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    loadIpamDetails();
+  }, [user, navigate, loadIpamDetails]);
+
+  if (loading) {
+    return (
+      <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          minHeight: '400px',
+          textAlign: 'center'
+        }}>
+          <div>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              border: '4px solid #f3f3f3',
+              borderTop: '4px solid #007bff',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto 16px'
+            }}></div>
+            <p style={{ color: '#666', fontSize: '16px' }}>Loading IPAM details...</p>
+          </div>
+        </div>
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          minHeight: '400px',
+          textAlign: 'center'
+        }}>
+          <div>
+            <p style={{ color: '#dc3545', fontSize: '18px', marginBottom: '16px' }}>{error}</p>
+            <button 
+              onClick={() => navigate('/ipam')}
+              style={{
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                fontSize: '16px',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseOver={(e) => e.target.style.backgroundColor = '#0056b3'}
+              onMouseOut={(e) => e.target.style.backgroundColor = '#007bff'}
+            >
+              Back to IPAM List
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!ipam) {
+    return (
+      <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          minHeight: '400px',
+          textAlign: 'center'
+        }}>
+          <div>
+            <p style={{ color: '#666', fontSize: '18px', marginBottom: '16px' }}>IPAM not found</p>
+            <button 
+              onClick={() => navigate('/ipam')}
+              style={{
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                fontSize: '16px',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseOver={(e) => e.target.style.backgroundColor = '#0056b3'}
+              onMouseOut={(e) => e.target.style.backgroundColor = '#007bff'}
+            >
+              Back to IPAM List
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const containerStyle = {
+    padding: '20px',
+    maxWidth: '1200px',
+    margin: '0 auto',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    backgroundColor: '#f8f9fa',
+    minHeight: '100vh'
+  };
+
+  const headerCardStyle = {
+    background: 'linear-gradient(135deg, rgba(0,123,255,0.1) 0%, rgba(0,123,255,0.05) 100%)',
+    border: '1px solid rgba(0,123,255,0.2)',
+    borderRadius: '16px',
+    padding: '32px',
+    marginBottom: '32px',
+    position: 'relative',
+    overflow: 'hidden'
+  };
+
+  const statusBadgeStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '6px 12px',
+    borderRadius: '20px',
+    fontSize: '14px',
+    fontWeight: '500',
+    border: '1px solid',
+    backgroundColor: ipam?.status === 'connected' ? 'rgba(40,167,69,0.1)' : 'rgba(220,53,69,0.1)',
+    color: ipam?.status === 'connected' ? '#28a745' : '#dc3545',
+    borderColor: ipam?.status === 'connected' ? 'rgba(40,167,69,0.3)' : 'rgba(220,53,69,0.3)'
+  };
+
+  const statusDotStyle = {
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+    backgroundColor: ipam?.status === 'connected' ? '#28a745' : '#dc3545'
+  };
+
+  const refreshButtonStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '12px 24px',
+    backgroundColor: '#007bff',
+    color: 'white',
+    border: 'none',
+    borderRadius: '12px',
+    fontSize: '16px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 4px 12px rgba(0,123,255,0.3)'
+  };
+
+  const tabButtonStyle = (isActive) => ({
+    padding: '24px',
+    borderRadius: '16px',
+    border: '1px solid #e9ecef',
+    background: isActive ? 'linear-gradient(135deg, #007bff 0%, rgba(0,123,255,0.8) 100%)' : 'white',
+    color: isActive ? 'white' : '#333',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    transform: 'scale(1)',
+    boxShadow: isActive ? '0 8px 25px rgba(0,123,255,0.3)' : '0 2px 8px rgba(0,0,0,0.1)'
+  });
+
+  const statCardStyle = (color) => ({
+    background: `linear-gradient(135deg, ${color}10 0%, ${color}05 100%)`,
+    border: `1px solid ${color}30`,
+    borderRadius: '16px',
+    padding: '32px',
+    textAlign: 'center',
+    transition: 'all 0.3s ease',
+    cursor: 'pointer'
+  });
+
+  const iconStyle = (color) => ({
+    width: '64px',
+    height: '64px',
+    background: `linear-gradient(135deg, ${color} 0%, ${color}cc 100%)`,
+    borderRadius: '16px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: '0 auto 16px',
+    boxShadow: `0 8px 20px ${color}40`
+  });
+
+  return (
+    <div style={containerStyle}>
+      {/* Modern Header Card */}
+      <div style={headerCardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            <button 
+              onClick={() => navigate('/ipam')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '48px',
+                height: '48px',
+                borderRadius: '12px',
+                backgroundColor: 'rgba(255,255,255,0.8)',
+                border: '1px solid rgba(0,123,255,0.2)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = 'white';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.8)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <BackIcon />
+            </button>
+            <div>
+              <h1 style={{ fontSize: '32px', fontWeight: 'bold', color: '#007bff', margin: '0 0 8px 0' }}>
+                {ipam?.name || 'Loading...'}
+              </h1>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={statusBadgeStyle}>
+                  <div style={statusDotStyle}></div>
+                  {ipam?.status || 'unknown'}
+                </div>
+                <span style={{ 
+                  fontSize: '14px', 
+                  color: '#666', 
+                  backgroundColor: 'rgba(255,255,255,0.6)',
+                  padding: '4px 12px',
+                  borderRadius: '20px'
+                }}>
+                  {ipam?.baseUrl || ''}
+                </span>
+              </div>
+            </div>
+          </div>
+          <button 
+            onClick={handleRefresh}
+            disabled={refreshing}
+            style={refreshButtonStyle}
+            onMouseOver={(e) => {
+              if (!refreshing) {
+                e.currentTarget.style.backgroundColor = '#0056b3';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,123,255,0.4)';
+              }
+            }}
+            onMouseOut={(e) => {
+              if (!refreshing) {
+                e.currentTarget.style.backgroundColor = '#007bff';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,123,255,0.3)';
+              }
+            }}
+          >
+            {refreshing ? (
+              <>
+                <div style={{
+                  width: '20px',
+                  height: '20px',
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  borderTop: '2px solid white',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }}></div>
+                <span>Refreshing...</span>
+              </>
+            ) : (
+              <>
+                <RefreshIcon />
+                <span>Refresh Data</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Modern Tab Navigation */}
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '32px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', maxWidth: '1000px', width: '100%' }}>
+          {[
+            { id: 'overview', label: 'Overview', desc: 'Summary & Stats', icon: '📊' },
+            { id: 'datacenters', label: 'Datacenters', desc: 'Data Centers', icon: '🏢' },
+            { id: 'sections', label: 'Sections', desc: 'Network Sections', icon: '🌐' },
+            { id: 'ranges', label: 'IP Ranges', desc: 'IP Address Ranges', icon: '📡' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              style={tabButtonStyle(activeTab === tab.id)}
+              onClick={() => setActiveTab(tab.id)}
+              onMouseOver={(e) => {
+                if (activeTab !== tab.id) {
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.15)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (activeTab !== tab.id) {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                }
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: activeTab === tab.id ? 'rgba(255,255,255,0.2)' : 'rgba(0,123,255,0.1)',
+                  color: activeTab === tab.id ? 'white' : '#007bff',
+                  fontSize: '24px'
+                }}>
+                  {tab.icon}
+                </div>
+                <div>
+                  <h3 style={{ 
+                    fontSize: '18px', 
+                    fontWeight: 'bold', 
+                    margin: '0 0 4px 0',
+                    color: activeTab === tab.id ? 'white' : '#333'
+                  }}>
+                    {tab.label}
+                  </h3>
+                  <p style={{ 
+                    fontSize: '14px', 
+                    margin: '0',
+                    color: activeTab === tab.id ? 'rgba(255,255,255,0.8)' : '#666'
+                  }}>
+                    {tab.desc}
+                  </p>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'overview' && (
+        <div>
+          {/* Modern Statistics Grid */}
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px', maxWidth: '1200px', width: '100%' }}>
+              {[
+                { label: 'Sections', count: Array.isArray(ipam?.collections?.sections) ? ipam.collections.sections.length : (ipam?.collections?.sections || 0), color: '#007bff', icon: <NetworkIcon /> },
+                { label: 'Datacenters', count: Array.isArray(ipam?.collections?.datacenters) ? ipam.collections.datacenters.length : (ipam?.collections?.datacenters || 0), color: '#28a745', icon: <BuildingIcon /> },
+                { label: 'IP Ranges', count: Array.isArray(ipam?.collections?.ranges) ? ipam.collections.ranges.length : (ipam?.collections?.ranges || 0), color: '#6f42c1', icon: <DatabaseIcon /> },
+                { label: 'Total IPs', count: Array.isArray(ipam?.collections?.ranges) ? ipam.collections.ranges.reduce((total, range) => total + (range.ips?.length || 256), 0) : ((ipam?.collections?.ranges || 0) * 256), color: '#fd7e14', icon: <FolderIcon /> }
+              ].map((stat, index) => (
+                <div
+                  key={index}
+                  style={{
+                    ...statCardStyle(stat.color),
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => {
+                    if (stat.label === 'Sections') {
+                      setActiveTab('sections');
+                    } else if (stat.label === 'Datacenters') {
+                      setActiveTab('datacenters');
+                    } else if (stat.label === 'IP Ranges' || stat.label === 'Total IPs') {
+                      setActiveTab('ranges');
+                    }
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.05) translateY(-4px)';
+                    e.currentTarget.style.boxShadow = `0 12px 30px ${stat.color}30`;
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'scale(1) translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                >
+                  <div style={iconStyle(stat.color)}>
+                    {stat.icon}
+                  </div>
+                  <div style={{ fontSize: '48px', fontWeight: 'bold', color: stat.color, marginBottom: '8px' }}>
+                    {stat.count}
+                  </div>
+                  <p style={{ fontSize: '16px', fontWeight: '500', color: stat.color, margin: '0' }}>
+                    {stat.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'datacenters' && (
+        <div style={{
+          background: 'white',
+          border: '1px solid #e9ecef',
+          borderRadius: '16px',
+          padding: '32px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white'
+            }}>
+              <BuildingIcon />
+            </div>
+            <div>
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#333', margin: '0 0 4px 0' }}>Datacenters</h2>
+              <p style={{ fontSize: '16px', color: '#666', margin: '0' }}>Data center information and management</p>
+            </div>
+          </div>
+          {Array.isArray(ipam?.collections?.datacenters) && ipam.collections.datacenters.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+              {ipam.collections.datacenters.map((datacenter, index) => (
+                <div key={datacenter.id || index} style={{
+                  background: 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)',
+                  borderRadius: '12px',
+                  padding: '24px',
+                  border: '1px solid #c3e6cb',
+                  transition: 'all 0.2s ease'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '12px',
+                      background: 'rgba(255,255,255,0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '24px'
+                    }}>
+                      🏢
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#155724', margin: '0 0 4px 0' }}>
+                        {datacenter.name || `Datacenter ${datacenter.id || index + 1}`}
+                      </h3>
+                      {datacenter.description && (
+                        <p style={{ fontSize: '14px', color: '#28a745', margin: '0' }}>
+                          {datacenter.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {datacenter.metadata && Object.keys(datacenter.metadata).length > 0 && (
+                    <div style={{ marginTop: '16px' }}>
+                      <h4 style={{ fontSize: '14px', fontWeight: '600', color: '#155724', margin: '0 0 8px 0' }}>
+                        Details:
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {Object.entries(datacenter.metadata).map(([key, value]) => (
+                          <div key={key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                            <span style={{ color: '#28a745', fontWeight: '500' }}>{key}:</span>
+                            <span style={{ color: '#155724' }}>{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{
+              background: '#f8f9fa',
+              borderRadius: '12px',
+              padding: '32px',
+              textAlign: 'center'
+            }}>
+              <p style={{ fontSize: '18px', color: '#666', margin: '0' }}>No datacenters found</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'sections' && (
+        <div style={{
+          background: 'white',
+          border: '1px solid #e9ecef',
+          borderRadius: '16px',
+          padding: '32px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              background: 'linear-gradient(135deg, #007bff 0%, #0056b3 100%)',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white'
+            }}>
+              <NetworkIcon />
+            </div>
+            <div>
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#333', margin: '0 0 4px 0' }}>Sections</h2>
+              <p style={{ fontSize: '16px', color: '#666', margin: '0' }}>Network sections and configurations</p>
+            </div>
+          </div>
+          {Array.isArray(ipam?.collections?.sections) && ipam.collections.sections.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {ipam.collections.sections.map((section, index) => {
+                const isExpanded = expandedSections.has(section.id);
+                const ranges = getRangesForSection(section.id);
+                const hasChildren = ranges.length > 0;
+                
+                return (
+                  <div key={section.id || index} style={{
+                    background: 'white',
+                    borderRadius: '12px',
+                    border: '1px solid #e9ecef',
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    transition: 'all 0.2s ease'
+                  }}>
+                    <div 
+                      style={{
+                        padding: '20px',
+                        cursor: hasChildren ? 'pointer' : 'default',
+                        background: isExpanded ? '#f8f9fa' : 'white',
+                        borderBottom: isExpanded ? '1px solid #e9ecef' : 'none',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onClick={() => hasChildren && toggleSection(section.id)}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{
+                          width: '48px',
+                          height: '48px',
+                          borderRadius: '12px',
+                          background: 'linear-gradient(135deg, #007bff 0%, #0056b3 100%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: '20px'
+                        }}>
+                          🌐
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#333', margin: '0' }}>
+                              {section.name || `Section ${section.id || index + 1}`}
+                            </h3>
+                            {hasChildren && (
+                              <span style={{
+                                fontSize: '12px',
+                                background: '#007bff',
+                                color: 'white',
+                                padding: '2px 8px',
+                                borderRadius: '12px'
+                              }}>
+                                {ranges.length} ranges
+                              </span>
+                            )}
+                          </div>
+                          <p style={{ fontSize: '14px', color: '#666', margin: '4px 0 0 0' }}>
+                            {section.description || 'No description'}
+                          </p>
+                        </div>
+                        {hasChildren && (
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            background: '#f8f9fa',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'transform 0.2s ease',
+                            transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
+                          }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {isExpanded && hasChildren && (
+                      <div style={{ padding: '0 20px 20px 20px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {ranges.map((range, rangeIndex) => {
+                            const childRanges = getChildRanges(range.id);
+                            const hasChildRanges = childRanges.length > 0;
+                            
+                            return (
+                              <div key={range.id || rangeIndex} style={{
+                                background: '#f8f9fa',
+                                borderRadius: '8px',
+                                padding: '16px',
+                                border: '1px solid #e9ecef'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                                  <div style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
+                                    background: '#28a745',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'white',
+                                    fontSize: '16px'
+                                  }}>
+                                    📡
+                                  </div>
+                                  <div style={{ flex: 1 }}>
+                                    <h4 style={{ fontSize: '16px', fontWeight: 'bold', color: '#333', margin: '0' }}>
+                                      {range.metadata?.cidr || 'No CIDR'}
+                                    </h4>
+                                    <p style={{ fontSize: '12px', color: '#666', margin: '2px 0 0 0' }}>
+                                      {range.name}
+                                    </p>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: '8px' }}>
+                                    <span style={{
+                                      fontSize: '11px',
+                                      background: '#28a745',
+                                      color: 'white',
+                                      padding: '2px 6px',
+                                      borderRadius: '8px'
+                                    }}>
+                                      {range.ips?.length || 0} IPs
+                                    </span>
+                                    {hasChildRanges && (
+                                      <span style={{
+                                        fontSize: '11px',
+                                        background: '#ffc107',
+                                        color: '#333',
+                                        padding: '2px 6px',
+                                        borderRadius: '8px'
+                                      }}>
+                                        {childRanges.length} nested
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {range.description && (
+                                  <p style={{ fontSize: '12px', color: '#666', margin: '0 0 8px 0' }}>
+                                    {range.description}
+                                  </p>
+                                )}
+                                
+                                <div style={{ marginTop: '8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                    <h5 style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', margin: '0' }}>
+                                      Range Analysis:
+                                    </h5>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                      <button
+                                        onClick={() => toggleRange(range.id)}
+                                        style={{
+                                          fontSize: '10px',
+                                          padding: '4px 8px',
+                                          background: '#007bff',
+                                          color: 'white',
+                                          border: 'none',
+                                          borderRadius: '4px',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        {expandedRanges.has(range.id) ? 'Hide Details' : 'Show Details'}
+                                      </button>
+                                      <button
+                                        onClick={() => setSelectedRange(range)}
+                                        style={{
+                                          fontSize: '10px',
+                                          padding: '4px 8px',
+                                          background: '#28a745',
+                                          color: 'white',
+                                          border: 'none',
+                                          borderRadius: '4px',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        Split Range
+                                      </button>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Range Summary */}
+                                  <div style={{ 
+                                    background: '#f8f9fa', 
+                                    borderRadius: '6px', 
+                                    padding: '12px', 
+                                    marginBottom: '8px',
+                                    border: '1px solid #e9ecef'
+                                  }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px', fontSize: '11px' }}>
+                                      <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontWeight: 'bold', color: '#333' }}>Total IPs</div>
+                                        <div style={{ color: '#666' }}>256</div>
+                                      </div>
+                                      <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontWeight: 'bold', color: '#28a745' }}>Available</div>
+                                        <div style={{ color: '#666' }}>254</div>
+                                      </div>
+                                      <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontWeight: 'bold', color: '#dc3545' }}>Used</div>
+                                        <div style={{ color: '#666' }}>2</div>
+                                      </div>
+                                      <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontWeight: 'bold', color: '#ffc107' }}>Free Ranges</div>
+                                        <div style={{ color: '#666' }}>3</div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Free IP Ranges */}
+                                  <div style={{ marginBottom: '8px' }}>
+                                    <h6 style={{ fontSize: '11px', fontWeight: 'bold', color: '#333', margin: '0 0 6px 0' }}>
+                                      Free IP Ranges:
+                                    </h6>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <div style={{ 
+                                        background: '#d4edda', 
+                                        borderRadius: '4px', 
+                                        padding: '6px 8px', 
+                                        fontSize: '10px',
+                                        border: '1px solid #c3e6cb'
+                                      }}>
+                                        <span style={{ fontWeight: 'bold', color: '#155724' }}>Range 1:</span> 
+                                        <span style={{ color: '#155724' }}> 37.187.25.1 - 37.187.25.126 (126 IPs)</span>
+                                      </div>
+                                      <div style={{ 
+                                        background: '#d4edda', 
+                                        borderRadius: '4px', 
+                                        padding: '6px 8px', 
+                                        fontSize: '10px',
+                                        border: '1px solid #c3e6cb'
+                                      }}>
+                                        <span style={{ fontWeight: 'bold', color: '#155724' }}>Range 2:</span> 
+                                        <span style={{ color: '#155724' }}> 37.187.25.129 - 37.187.25.254 (126 IPs)</span>
+                                      </div>
+                                      <div style={{ 
+                                        background: '#d4edda', 
+                                        borderRadius: '4px', 
+                                        padding: '6px 8px', 
+                                        fontSize: '10px',
+                                        border: '1px solid #c3e6cb'
+                                      }}>
+                                        <span style={{ fontWeight: 'bold', color: '#155724' }}>Range 3:</span> 
+                                        <span style={{ color: '#155724' }}> 37.187.25.128 (1 IP)</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {range.ips && range.ips.length > 0 && (
+                                    <div>
+                                      <h6 style={{ fontSize: '11px', fontWeight: 'bold', color: '#333', margin: '0 0 6px 0' }}>
+                                        Used IP Addresses ({range.ips.length}):
+                                      </h6>
+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
+                                        {range.ips.slice(0, expandedRanges.has(range.id) ? range.ips.length : 6).map((ip, ipIndex) => (
+                                        <div key={ip.id || ipIndex} style={{
+                                          background: 'white',
+                                          borderRadius: '6px',
+                                          padding: '8px',
+                                          border: '1px solid #e9ecef',
+                                          fontSize: '11px',
+                                          cursor: 'pointer',
+                                          transition: 'all 0.2s ease'
+                                        }}
+                                        onClick={() => selectIP(ip)}
+                                        onMouseOver={(e) => {
+                                          e.currentTarget.style.borderColor = '#007bff';
+                                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,123,255,0.2)';
+                                        }}
+                                        onMouseOut={(e) => {
+                                          e.currentTarget.style.borderColor = '#e9ecef';
+                                          e.currentTarget.style.boxShadow = 'none';
+                                        }}
+                                        >
+                                          <div style={{ fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>{ip.ip}</div>
+                                          
+                                          {expandedRanges.has(range.id) ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                              {ip.hostname && (
+                                                <div style={{ color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                  <span>📡</span>
+                                                  <span>{ip.hostname}</span>
+                                                </div>
+                                              )}
+                                              {ip.description && (
+                                                <div style={{ color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                  <span>📝</span>
+                                                  <span>{ip.description}</span>
+                                                </div>
+                                              )}
+                                              {ip.mac && (
+                                                <div style={{ color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                  <span>🔗</span>
+                                                  <span>{ip.mac}</span>
+                                                </div>
+                                              )}
+                                              {ip.lastSeen && (
+                                                <div style={{ color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                  <span>⏰</span>
+                                                  <span>{new Date(ip.lastSeen).toLocaleDateString()}</span>
+                                                </div>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <div>
+                                              {ip.hostname && (
+                                                <div style={{ color: '#666' }}>📡 {ip.hostname}</div>
+                                              )}
+                                              {ip.description && (
+                                                <div style={{ color: '#666' }}>📝 {ip.description}</div>
+                                              )}
+                                            </div>
+                                          )}
+                                          
+                                          <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                            <span style={{
+                                              background: ip.state === 'active' ? '#28a745' : '#dc3545',
+                                              color: 'white',
+                                              padding: '1px 4px',
+                                              borderRadius: '4px',
+                                              fontSize: '10px'
+                                            }}>
+                                              {ip.state}
+                                            </span>
+                                            {ip.owner && (
+                                              <span style={{
+                                                background: '#6c757d',
+                                                color: 'white',
+                                                padding: '1px 4px',
+                                                borderRadius: '4px',
+                                                fontSize: '10px'
+                                              }}>
+                                                {ip.owner}
+                                              </span>
+                                            )}
+                                            {ip.switch && (
+                                              <span style={{
+                                                background: '#17a2b8',
+                                                color: 'white',
+                                                padding: '1px 4px',
+                                                borderRadius: '4px',
+                                                fontSize: '10px'
+                                              }}>
+                                                {ip.switch}
+                                              </span>
+                                            )}
+                                            {ip.port && (
+                                              <span style={{
+                                                background: '#fd7e14',
+                                                color: 'white',
+                                                padding: '1px 4px',
+                                                borderRadius: '4px',
+                                                fontSize: '10px'
+                                              }}>
+                                                {ip.port}
+                                              </span>
+                                            )}
+                                          </div>
+                                          
+                                          {expandedRanges.has(range.id) && (
+                                            <div style={{ marginTop: '8px', display: 'flex', gap: '4px' }}>
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  const newHostname = prompt('Enter hostname:', ip.hostname || '');
+                                                  if (newHostname !== null) {
+                                                    assignIP(ip.id, newHostname, ip.description);
+                                                  }
+                                                }}
+                                                style={{
+                                                  fontSize: '9px',
+                                                  padding: '2px 6px',
+                                                  background: '#007bff',
+                                                  color: 'white',
+                                                  border: 'none',
+                                                  borderRadius: '3px',
+                                                  cursor: 'pointer'
+                                                }}
+                                              >
+                                                Edit
+                                              </button>
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  const newDescription = prompt('Enter description:', ip.description || '');
+                                                  if (newDescription !== null) {
+                                                    assignIP(ip.id, ip.hostname, newDescription);
+                                                  }
+                                                }}
+                                                style={{
+                                                  fontSize: '9px',
+                                                  padding: '2px 6px',
+                                                  background: '#28a745',
+                                                  color: 'white',
+                                                  border: 'none',
+                                                  borderRadius: '3px',
+                                                  cursor: 'pointer'
+                                                }}
+                                              >
+                                                Assign
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
+                                      
+                                      {!expandedRanges.has(range.id) && range.ips.length > 6 && (
+                                        <div style={{
+                                          background: '#f8f9fa',
+                                          borderRadius: '6px',
+                                          padding: '8px',
+                                          border: '1px solid #e9ecef',
+                                          fontSize: '11px',
+                                          textAlign: 'center',
+                                          color: '#666',
+                                          cursor: 'pointer'
+                                        }}
+                                        onClick={() => toggleRange(range.id)}
+                                        >
+                                          +{range.ips.length - 6} more IPs
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {hasChildRanges && (
+                                  <div style={{ marginTop: '12px' }}>
+                                    <h5 style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', margin: '0 0 8px 0' }}>
+                                      Nested Ranges ({childRanges.length}):
+                                    </h5>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                      {childRanges.map((childRange, childIndex) => (
+                                        <div key={childRange.id || childIndex} style={{
+                                          background: 'white',
+                                          borderRadius: '6px',
+                                          padding: '8px',
+                                          border: '1px solid #e9ecef',
+                                          fontSize: '11px'
+                                        }}>
+                                          <div style={{ fontWeight: 'bold', color: '#333' }}>{childRange.name}</div>
+                                          <div style={{ color: '#666' }}>{childRange.metadata?.cidr || 'No CIDR'}</div>
+                                          <div style={{ color: '#666' }}>{childRange.ips?.length || 0} IPs</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{
+              background: '#f8f9fa',
+              borderRadius: '12px',
+              padding: '32px',
+              textAlign: 'center'
+            }}>
+              <p style={{ fontSize: '18px', color: '#666', margin: '0' }}>No sections found</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* IP Details Modal */}
+      {selectedIP && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '24px',
+            maxWidth: '500px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#333', margin: '0' }}>
+                IP Address Details
+              </h3>
+              <button
+                onClick={() => setSelectedIP(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#666'
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', marginBottom: '4px', display: 'block' }}>
+                    IP Address:
+                  </label>
+                  <div style={{ padding: '8px', background: '#f8f9fa', borderRadius: '4px', fontSize: '14px' }}>
+                    {selectedIP.ip}
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', marginBottom: '4px', display: 'block' }}>
+                    State:
+                  </label>
+                  <div style={{ padding: '8px', background: '#f8f9fa', borderRadius: '4px', fontSize: '14px' }}>
+                    {selectedIP.state}
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', marginBottom: '4px', display: 'block' }}>
+                  Hostname:
+                </label>
+                <input
+                  type="text"
+                  defaultValue={selectedIP.hostname || ''}
+                  placeholder="Enter hostname"
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+              
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', marginBottom: '4px', display: 'block' }}>
+                  Description:
+                </label>
+                <textarea
+                  defaultValue={selectedIP.description || ''}
+                  placeholder="Enter description"
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', marginBottom: '4px', display: 'block' }}>
+                    Owner:
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue={selectedIP.owner || ''}
+                    placeholder="Enter owner"
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', marginBottom: '4px', display: 'block' }}>
+                    MAC Address:
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue={selectedIP.mac || ''}
+                    placeholder="Enter MAC address"
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', marginBottom: '4px', display: 'block' }}>
+                    Switch:
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue={selectedIP.switch || ''}
+                    placeholder="Enter switch"
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', marginBottom: '4px', display: 'block' }}>
+                    Port:
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue={selectedIP.port || ''}
+                    placeholder="Enter port"
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+                <button
+                  onClick={async () => {
+                    const hostname = document.querySelector('input[type="text"]').value;
+                    const description = document.querySelector('textarea').value;
+                    const owner = document.querySelectorAll('input[type="text"]')[1].value;
+                    const mac = document.querySelectorAll('input[type="text"]')[2].value;
+                    const switchName = document.querySelectorAll('input[type="text"]')[3].value;
+                    const port = document.querySelectorAll('input[type="text"]')[4].value;
+                    
+                    await assignIP(selectedIP.id, hostname, description, owner, mac, switchName, port);
+                    setSelectedIP(null);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Save Changes
+                </button>
+                <button
+                  onClick={() => setSelectedIP(null)}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: '#6c757d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Range Split Modal */}
+      {selectedRange && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '24px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#333', margin: '0' }}>
+                Split Range
+              </h3>
+              <button
+                onClick={() => setSelectedRange(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#666'
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', marginBottom: '4px', display: 'block' }}>
+                  Current Range:
+                </label>
+                <div style={{ padding: '8px', background: '#f8f9fa', borderRadius: '4px', fontSize: '14px' }}>
+                  {selectedRange.name} ({selectedRange.metadata?.cidr})
+                </div>
+              </div>
+              
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', marginBottom: '4px', display: 'block' }}>
+                  New CIDR (e.g., /30):
+                </label>
+                <select
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '14px'
+                  }}
+                  onChange={(e) => {
+                    const newCidr = e.target.value;
+                    if (newCidr) {
+                      // TODO: Fetch possible subnets from API
+                      console.log('Selected CIDR:', newCidr);
+                    }
+                  }}
+                >
+                  <option value="">Select CIDR...</option>
+                  <option value="/25">/25 (128 IPs)</option>
+                  <option value="/26">/26 (64 IPs)</option>
+                  <option value="/27">/27 (32 IPs)</option>
+                  <option value="/28">/28 (16 IPs)</option>
+                  <option value="/29">/29 (8 IPs)</option>
+                  <option value="/30">/30 (4 IPs)</option>
+                  <option value="/31">/31 (2 IPs)</option>
+                </select>
+              </div>
+              
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', marginBottom: '4px', display: 'block' }}>
+                  Possible Subnets:
+                </label>
+                <div style={{ 
+                  maxHeight: '200px', 
+                  overflow: 'auto', 
+                  border: '1px solid #ddd', 
+                  borderRadius: '4px',
+                  background: '#f8f9fa'
+                }}>
+                  <div style={{ padding: '8px', fontSize: '12px', color: '#666' }}>
+                    Select a CIDR above to see possible subnets...
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', marginBottom: '4px', display: 'block' }}>
+                  New Range Name:
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter new range name"
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+              
+              <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+                <button
+                  onClick={async () => {
+                    const newCidr = document.querySelector('input[placeholder="/30"]').value;
+                    const newName = document.querySelector('input[placeholder="Enter new range name"]').value;
+                    
+                    if (newCidr && newName) {
+                      await splitRange(selectedRange.id, newCidr, newName);
+                      setSelectedRange(null);
+                    } else {
+                      alert('Please fill in all fields');
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: '#28a745',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Split Range
+                </button>
+                <button
+                  onClick={() => setSelectedRange(null)}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: '#6c757d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'ranges' && (
+        <div style={{
+          background: 'white',
+          border: '1px solid #e9ecef',
+          borderRadius: '16px',
+          padding: '32px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              background: 'linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%)',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white'
+            }}>
+              <DatabaseIcon />
+            </div>
+            <div>
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#333', margin: '0 0 4px 0' }}>IP Ranges</h2>
+              <p style={{ fontSize: '16px', color: '#666', margin: '0' }}>IP address ranges and allocations</p>
+            </div>
+          </div>
+          {Array.isArray(ipam?.collections?.ranges) && ipam.collections.ranges.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+              {ipam.collections.ranges.map((range, index) => (
+                <div key={range.id || index} style={{
+                  background: 'linear-gradient(135deg, #e2d9f3 0%, #d4c5e8 100%)',
+                  borderRadius: '12px',
+                  padding: '24px',
+                  border: '1px solid #d4c5e8',
+                  transition: 'all 0.2s ease'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '12px',
+                      background: 'rgba(255,255,255,0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '24px'
+                    }}>
+                      📡
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#3d1a78', margin: '0 0 4px 0' }}>
+                        {range.name || `IP Range ${range.id || index + 1}`}
+                      </h3>
+                      {range.description && (
+                        <p style={{ fontSize: '14px', color: '#6f42c1', margin: '0' }}>
+                          {range.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {range.metadata && Object.keys(range.metadata).length > 0 && (
+                    <div style={{ marginTop: '16px' }}>
+                      <h4 style={{ fontSize: '14px', fontWeight: '600', color: '#3d1a78', margin: '0 0 8px 0' }}>
+                        Details:
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {Object.entries(range.metadata).map(([key, value]) => (
+                          <div key={key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                            <span style={{ color: '#6f42c1', fontWeight: '500' }}>{key}:</span>
+                            <span style={{ color: '#3d1a78' }}>{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {Array.isArray(range.ips) && range.ips.length > 0 && (
+                    <div style={{ marginTop: '16px' }}>
+                      <h4 style={{ fontSize: '14px', fontWeight: '600', color: '#3d1a78', margin: '0 0 8px 0' }}>
+                        IP Addresses ({range.ips.length}):
+                      </h4>
+                      <div style={{ 
+                        maxHeight: '120px', 
+                        overflowY: 'auto', 
+                        background: 'rgba(255,255,255,0.3)', 
+                        borderRadius: '8px', 
+                        padding: '8px' 
+                      }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '4px' }}>
+                          {range.ips.slice(0, 20).map((ip, ipIndex) => (
+                            <div key={ipIndex} style={{ 
+                              fontSize: '12px', 
+                              color: '#3d1a78', 
+                              padding: '2px 6px', 
+                              background: 'rgba(255,255,255,0.5)', 
+                              borderRadius: '4px',
+                              textAlign: 'center'
+                            }}>
+                              {ip}
+                            </div>
+                          ))}
+                          {range.ips.length > 20 && (
+                            <div style={{ 
+                              fontSize: '12px', 
+                              color: '#6f42c1', 
+                              padding: '2px 6px', 
+                              background: 'rgba(255,255,255,0.5)', 
+                              borderRadius: '4px',
+                              textAlign: 'center',
+                              fontStyle: 'italic'
+                            }}>
+                              +{range.ips.length - 20} more
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{
+              background: '#f8f9fa',
+              borderRadius: '12px',
+              padding: '32px',
+              textAlign: 'center'
+            }}>
+              <p style={{ fontSize: '18px', color: '#666', margin: '0' }}>No IP ranges found</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        * {
+          box-sizing: border-box;
+        }
+        body {
+          margin: 0;
+          padding: 0;
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default IPAMDetails;

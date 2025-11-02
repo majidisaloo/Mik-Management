@@ -70,6 +70,7 @@ const emptyTunnelForm = () => ({
   name: '',
   type: 'GRE',
   status: 'up',
+  groupId: '',
   sourceDeviceId: '',
   targetDeviceId: '',
   sourceInterface: '',
@@ -80,7 +81,11 @@ const emptyTunnelForm = () => ({
   keepalive: '10s,10',
   comment: '',
   tags: '',
-  failoverCandidates: []
+  failoverCandidates: [],
+  allocateFromIpam: false,
+  ipamId: '',
+  parentRangeCidr: '',
+  mask: '30'
 });
 
 const formatDateTime = (value) => {
@@ -108,6 +113,11 @@ const Tunnels = () => {
   const [tunnels, setTunnels] = useState([]);
   const [devices, setDevices] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [ipams, setIpams] = useState([]);
+  const [sectionOptions, setSectionOptions] = useState([]);
+  const [rangeOptions, setRangeOptions] = useState([]);
+  const [sourceInterfaces, setSourceInterfaces] = useState([]);
+  const [targetInterfaces, setTargetInterfaces] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', message: '' });
   const [selectedId, setSelectedId] = useState(null);
@@ -218,6 +228,39 @@ const Tunnels = () => {
     }
   };
 
+  const loadInterfaces = async (deviceId, side) => {
+    try {
+      if (!deviceId) {
+        if (side === 'source') setSourceInterfaces([]);
+        else setTargetInterfaces([]);
+        return;
+      }
+      const res = await fetch(`/api/mikrotiks/${deviceId}/interfaces`);
+      if (res.ok) {
+        const data = await res.json();
+        const list = data?.interfaces || [];
+        if (side === 'source') setSourceInterfaces(list);
+        else setTargetInterfaces(list);
+      }
+    } catch (e) {
+      if (side === 'source') setSourceInterfaces([]);
+      else setTargetInterfaces([]);
+    }
+  };
+
+  const loadIpams = async () => {
+    try {
+      const res = await fetch('/api/ipams');
+      if (res.ok) {
+        const data = await res.json();
+        setIpams(Array.isArray(data) ? data : (data.items || []));
+      }
+    } catch (e) {
+      console.error('Failed to load IPAMs', e);
+      setIpams([]);
+    }
+  };
+
   useEffect(() => {
     if (!user) {
       navigate('/login', { replace: true });
@@ -227,6 +270,7 @@ const Tunnels = () => {
     loadTunnels();
     loadDevices();
     loadGroups();
+    loadIpams();
   }, [navigate, user]);
 
   const handleCreateTunnel = async () => {
@@ -236,7 +280,16 @@ const Tunnels = () => {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(form)
+        body: JSON.stringify({
+          name: form.name,
+          connectionType: form.type,
+          status: form.status,
+          groupId: form.groupId || undefined,
+          sourceId: form.sourceDeviceId,
+          targetId: form.targetDeviceId,
+          notes: form.comment,
+          tags: form.tags
+        })
       });
 
       if (!response.ok) {
@@ -244,13 +297,34 @@ const Tunnels = () => {
         throw new Error(payload.message || 'Unable to create tunnel.');
       }
 
+      const created = await response.json();
+      const tunnelId = created?.tunnel?.id;
+
+      // If IPAM allocation requested, queue provision call
+      if (form.allocateFromIpam && tunnelId && form.ipamId && (form.parentRangeCidr)) {
+        try {
+          const prov = await fetch(`/api/tunnels/${tunnelId}/provision`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ipamId: Number(form.ipamId),
+              parentRangeCidr: form.parentRangeCidr,
+              mask: Number(form.mask) || 30,
+              description: `Tunnel ${form.name}`
+            })
+          });
+          if (prov.status === 202) {
+            setStatus({ type: 'info', message: 'Provision queued. See Queue & Logs.' });
+          }
+        } catch (e) {
+          console.error('Provision queue failed', e);
+        }
+      }
+
       setForm(emptyTunnelForm());
       setShowModal(false);
       await loadTunnels();
-      setStatus({
-        type: 'success',
-        message: 'Tunnel created successfully.'
-      });
+      setStatus({ type: 'success', message: 'Tunnel created successfully.' });
     } catch (error) {
       setStatus({
         type: 'error',
@@ -679,6 +753,20 @@ const Tunnels = () => {
             <h3 className="text-lg font-semibold text-primary">Basic Information</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="form-group">
+            <label htmlFor="tunnel-group" className="form-label">Group</label>
+            <select
+              id="tunnel-group"
+              className="form-input form-select"
+              value={form.groupId || ''}
+              onChange={(e) => setForm({ ...form, groupId: e.target.value })}
+            >
+              <option value="">None</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
               <div className="form-group">
                 <label htmlFor="tunnel-name" className="form-label">
                   Tunnel Name *
@@ -746,7 +834,11 @@ const Tunnels = () => {
                   id="source-device"
                   className="form-input form-select"
                   value={form.sourceDeviceId}
-                  onChange={(e) => setForm({ ...form, sourceDeviceId: e.target.value })}
+                  onChange={async (e) => {
+                    const v = e.target.value;
+                    setForm({ ...form, sourceDeviceId: v, sourceInterface: '' });
+                    await loadInterfaces(v, 'source');
+                  }}
                   required
                 >
                   <option value="">Select source device</option>
@@ -766,7 +858,11 @@ const Tunnels = () => {
                   id="target-device"
                   className="form-input form-select"
                   value={form.targetDeviceId}
-                  onChange={(e) => setForm({ ...form, targetDeviceId: e.target.value })}
+                  onChange={async (e) => {
+                    const v = e.target.value;
+                    setForm({ ...form, targetDeviceId: v, targetInterface: '' });
+                    await loadInterfaces(v, 'target');
+                  }}
                   required
                 >
                   <option value="">Select target device</option>
@@ -784,28 +880,56 @@ const Tunnels = () => {
                 <label htmlFor="source-interface" className="form-label">
                   Source Interface
                   </label>
-                    <input
-                  id="source-interface"
-                  type="text"
-                  className="form-input"
-                  value={form.sourceInterface}
-                  onChange={(e) => setForm({ ...form, sourceInterface: e.target.value })}
-                  placeholder="e.g., ether1"
-                />
+                {sourceInterfaces.length > 0 ? (
+                  <select
+                    id="source-interface"
+                    className="form-input form-select"
+                    value={form.sourceInterface}
+                    onChange={(e) => setForm({ ...form, sourceInterface: e.target.value })}
+                  >
+                    <option value="">Select interface</option>
+                    {sourceInterfaces.map((iface) => (
+                      <option key={iface.name} value={iface.name}>{iface.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    id="source-interface"
+                    type="text"
+                    className="form-input"
+                    value={form.sourceInterface}
+                    onChange={(e) => setForm({ ...form, sourceInterface: e.target.value })}
+                    placeholder="e.g., ether1"
+                  />
+                )}
               </div>
 
               <div className="form-group">
                 <label htmlFor="target-interface" className="form-label">
                   Target Interface
                   </label>
-                    <input
-                  id="target-interface"
-                  type="text"
-                  className="form-input"
-                  value={form.targetInterface}
-                  onChange={(e) => setForm({ ...form, targetInterface: e.target.value })}
-                  placeholder="e.g., ether1"
-                />
+                {targetInterfaces.length > 0 ? (
+                  <select
+                    id="target-interface"
+                    className="form-input form-select"
+                    value={form.targetInterface}
+                    onChange={(e) => setForm({ ...form, targetInterface: e.target.value })}
+                  >
+                    <option value="">Select interface</option>
+                    {targetInterfaces.map((iface) => (
+                      <option key={iface.name} value={iface.name}>{iface.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    id="target-interface"
+                    type="text"
+                    className="form-input"
+                    value={form.targetInterface}
+                    onChange={(e) => setForm({ ...form, targetInterface: e.target.value })}
+                    placeholder="e.g., ether1"
+                  />
+                )}
             </div>
           </div>
 
@@ -902,8 +1026,106 @@ const Tunnels = () => {
               />
                 </div>
               </div>
+
+          {/* IPAM Provisioning (Optional) */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-primary">IPAM Provisioning (Optional)</h3>
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.allocateFromIpam}
+                onChange={(e) => setForm({ ...form, allocateFromIpam: e.target.checked })}
+              />
+              <span className="text-sm text-secondary">Allocate /30 (or custom) from PHP‑IPAM</span>
+            </label>
+
+            {form.allocateFromIpam && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="form-group">
+                    <label className="form-label">IPAM</label>
+                    <select
+                      className="form-input form-select"
+                      value={form.ipamId}
+                      onChange={async (e) => {
+                        const ipamId = e.target.value;
+                        setForm({ ...form, ipamId, parentRangeCidr: '' });
+                        setSectionOptions([]);
+                        setRangeOptions([]);
+                        if (ipamId) {
+                          const res = await fetch(`/api/ipams/${ipamId}`);
+                          if (res.ok) {
+                            const data = await res.json();
+                            setSectionOptions(data.collections?.sections || []);
+                          }
+                        }
+                      }}
+                    >
+                      <option value="">Select IPAM</option>
+                      {ipams.map((i) => (
+                        <option key={i.id} value={i.id}>{i.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Mask</label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      value={form.mask}
+                      onChange={(e) => setForm({ ...form, mask: e.target.value })}
+                      placeholder="30"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="form-group">
+                    <label className="form-label">Section</label>
+                    <select
+                      className="form-input form-select"
+                      value={form.sectionId || ''}
+                      onChange={async (e) => {
+                        const sectionId = e.target.value;
+                        setForm({ ...form, sectionId, parentRangeCidr: '' });
+                        setRangeOptions([]);
+                        if (form.ipamId && sectionId) {
+                          const res = await fetch(`/api/ipams/${form.ipamId}/sections/${sectionId}`);
+                          if (res.ok) {
+                            const data = await res.json();
+                            const roots = (data.ranges || []).filter(r => !r?.metadata?.masterSubnetId || r?.metadata?.masterSubnetId == 0);
+                            setRangeOptions(roots);
+                          }
+                        }
+                      }}
+                    >
+                      <option value="">Select section</option>
+                      {sectionOptions.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Parent Range</label>
+                    <select
+                      className="form-input form-select"
+                      value={form.parentRangeCidr}
+                      onChange={(e) => setForm({ ...form, parentRangeCidr: e.target.value })}
+                    >
+                      <option value="">Select parent range</option>
+                      {rangeOptions.map((r) => (
+                        <option key={r.id} value={r.metadata?.cidr || ''}>{r.metadata?.cidr || r.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </form>
       </Modal>
+
+      {/* IPAM Provisioning Options inside modal body */}
     </div>
   );
 };

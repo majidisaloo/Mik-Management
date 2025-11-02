@@ -1,0 +1,11 @@
+=== Group Firewall Management System ===
+Available Address Lists:
+- trusted-hosts: 192.168.1.0/24, 10.0.0.0/8, 172.16.0.0/12
+- blocked-sites: 8.8.8.8, 1.1.1.1
+- dmz-servers: 192.168.100.0/24
+
+Available Firewall Rules:
+- Allow Trusted to DMZ: accept from trusted-hosts to dmz-servers
+- Block Malicious Traffic: drop from blocked-sites to 
+- Allow Internal Communication: accept from 192.168.0.0/16 to 192.168.0.0/16
+API server ready at http://0.0.0.0:5002

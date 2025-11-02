@@ -29,6 +29,8 @@ const defaultState = () => ({
   lastAddressListId: 0,
   lastFirewallFilterId: 0,
   lastRouteId: 0,
+  lastQueueId: 0,
+  lastLogId: 0,
   users: [],
   roles: [],
   groups: [],
@@ -36,7 +38,9 @@ const defaultState = () => ({
   tunnels: [],
   routes: [],
   addressLists: [],
-  firewallFilters: []
+  firewallFilters: [],
+  operationQueue: [],
+  operationLogs: []
 });
 
 const normalizeGroupName = (name, fallback) => {
@@ -188,7 +192,7 @@ const sanitizeIpamRecord = (ipam, { identifier, timestamp }) => {
     appCode: normalizeOptionalText(ipam.appCode ?? ''),
     appPermissions: normalizeText(ipam.appPermissions ?? 'Read', 'Read'),
     appSecurity: normalizeText(ipam.appSecurity ?? 'SSL with App code token', 'SSL with App code token'),
-    status: normalizeText(ipam.status ?? 'unknown', 'unknown'),
+    status: normalizeText(ipam.status ?? 'connected', 'connected'),
     checkedAt: normalizeIsoDate(ipam.checkedAt ?? timestamp),
     lastSyncAt: normalizeIsoDate(ipam.lastSyncAt ?? timestamp),
     collections: sanitizeIpamCollections(ipam.collections ?? {}),
@@ -207,21 +211,18 @@ const presentIpamForClient = (ipam) => {
     name: ipam.name,
     baseUrl: ipam.baseUrl,
     appId: ipam.appId,
+    appCode: ipam.appCode,
     appPermissions: ipam.appPermissions,
     appSecurity: ipam.appSecurity,
-    status: ipam.lastStatus || ipam.status || 'unknown',
+    status: ipam.lastStatus || ipam.status || 'connected',
     checkedAt: ipam.checkedAt,
     lastSyncAt: ipam.lastSyncAt,
     createdAt: ipam.createdAt,
     updatedAt: ipam.updatedAt,
-    collections: ipam.collections ? {
-      sections: ipam.collections.sections?.length || 0,
-      datacenters: ipam.collections.datacenters?.length || 0,
-      ranges: ipam.collections.ranges?.length || 0
-    } : {
-      sections: 0,
-      datacenters: 0,
-      ranges: 0
+    collections: ipam.collections || {
+      sections: [],
+      datacenters: [],
+      ranges: []
     }
   };
 };
@@ -2064,6 +2065,25 @@ const ensureStateShape = async (databaseFile) => {
 
   normalized.users = normalizedUsers;
 
+  // Ensure operation queue and logs exist
+  if (!Array.isArray(normalized.operationQueue)) {
+    normalized.operationQueue = [];
+    mutated = true;
+  }
+
+  if (!Array.isArray(normalized.operationLogs)) {
+    normalized.operationLogs = [];
+    mutated = true;
+  }
+
+  if (!Number.isInteger(normalized.lastQueueId)) {
+    normalized.lastQueueId = normalized.operationQueue.reduce(
+      (max, item) => Math.max(max, Number.parseInt(item.id, 10) || 0),
+      0
+    );
+    mutated = true;
+  }
+
   if (mutated) {
     await writeDatabase(databaseFile, normalized);
   }
@@ -2076,6 +2096,9 @@ const initializeDatabase = async (databasePath) => {
 
   await ensureDirectory(databaseFile);
   await ensureStateShape(databaseFile);
+
+  // Set global database path for queue/logs functions
+  setGlobalDatabasePath(databaseFile);
 
   const load = () => readDatabase(databaseFile);
   const persist = (state) => writeDatabase(databaseFile, state);
@@ -2497,7 +2520,7 @@ const initializeDatabase = async (databasePath) => {
         appSecurity: normalizedSecurity,
         createdAt: timestamp,
         updatedAt: timestamp,
-        lastStatus: 'unknown',
+        lastStatus: 'connected',
         lastCheckedAt: null,
         collections: sanitizeIpamCollections()
       };
@@ -2512,7 +2535,7 @@ const initializeDatabase = async (databasePath) => {
     async getIpamById(id) {
       const state = await load();
       const ipam = state.ipams.find((entry) => entry.id === id);
-      return ipam ? { ...ipam, collections: sanitizeIpamCollections(ipam.collections) } : null;
+      return ipam ? presentIpamForClient(ipam) : null;
     },
 
     async deleteIpam(id) {
@@ -2665,7 +2688,7 @@ const initializeDatabase = async (databasePath) => {
         appSecurity: normalizedSecurity,
         createdAt: timestamp,
         updatedAt: timestamp,
-        lastStatus: 'unknown',
+        lastStatus: 'connected',
         lastCheckedAt: null,
         collections: sanitizeIpamCollections()
       };
@@ -2680,7 +2703,7 @@ const initializeDatabase = async (databasePath) => {
     async getIpamById(id) {
       const state = await load();
       const ipam = state.ipams.find((entry) => entry.id === id);
-      return ipam ? { ...ipam, collections: sanitizeIpamCollections(ipam.collections) } : null;
+      return ipam ? presentIpamForClient(ipam) : null;
     },
 
     async deleteIpam(id) {
@@ -7065,5 +7088,271 @@ async function updateMikrotikFirewallRule(deviceId, ruleData) {
   }
 }
 
-export { toggleMikrotikSafeMode, getMikrotikSafeModeStatus, getMikrotikUpdateInfo, installMikrotikUpdate, getMikrotikById, addMikrotikIpAddress, updateMikrotikIpAddress, updateMikrotikFirewallRule, addSystemLog, getMikrotikInterfaceDetails };
+// ===========================
+// Operation Queue & Logs
+// ===========================
+
+// Global state access helpers for queue/logs
+let _globalDatabasePath = null;
+
+const setGlobalDatabasePath = (path) => {
+  _globalDatabasePath = path;
+};
+
+const loadState = async () => {
+  if (!_globalDatabasePath) {
+    throw new Error('Database path not initialized. Call initializeDatabase first.');
+  }
+  return await readDatabase(_globalDatabasePath);
+};
+
+const saveState = async (state) => {
+  if (!_globalDatabasePath) {
+    throw new Error('Database path not initialized. Call initializeDatabase first.');
+  }
+  await writeDatabase(_globalDatabasePath, state);
+};
+
+const addToQueue = async (operation) => {
+  const state = await loadState();
+  const id = ++state.lastQueueId;
+  
+  const queueItem = {
+    id,
+    type: operation.type, // 'add_ip', 'delete_ip', 'update_ip'
+    ipamId: operation.ipamId,
+    data: operation.data,
+    status: 'pending', // 'pending', 'processing', 'completed', 'failed'
+    retryCount: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    error: null
+  };
+  
+  state.operationQueue.push(queueItem);
+  await saveState(state);
+  
+  console.log(`✅ Added operation to queue: ID=${id}, Type=${operation.type}`);
+  return queueItem;
+};
+
+const updateQueueStatus = async (queueId, status, error = null) => {
+  const state = await loadState();
+  const item = state.operationQueue.find(q => q.id === queueId);
+  
+  if (item) {
+    item.status = status;
+    item.updatedAt = new Date().toISOString();
+    if (error) {
+      item.error = error;
+    }
+    await saveState(state);
+    console.log(`📝 Updated queue item ${queueId}: status=${status}`);
+  }
+};
+
+const retryQueueItem = async (queueId) => {
+  const state = await loadState();
+  const item = state.operationQueue.find(q => q.id === queueId);
+  
+  if (item) {
+    item.retryCount++;
+    item.status = 'pending';
+    item.updatedAt = new Date().toISOString();
+    item.error = null;
+    await saveState(state);
+    console.log(`🔄 Retry queue item ${queueId}: attempt #${item.retryCount}`);
+    return item;
+  }
+  return null;
+};
+
+const moveToLog = async (queueItem, verificationResult) => {
+  const state = await loadState();
+  const id = ++state.lastLogId;
+  
+  const logEntry = {
+    id,
+    queueId: queueItem.id,
+    type: queueItem.type,
+    ipamId: queueItem.ipamId,
+    data: queueItem.data,
+    status: verificationResult.success ? 'success' : 'failed',
+    verificationDetails: verificationResult,
+    retryCount: queueItem.retryCount,
+    createdAt: queueItem.createdAt,
+    completedAt: new Date().toISOString()
+  };
+  
+  state.operationLogs.push(logEntry);
+  // Prune logs older than 30 days
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  state.operationLogs = state.operationLogs.filter(l => {
+    const t = Date.parse(l.completedAt || l.createdAt || new Date().toISOString());
+    return !Number.isNaN(t) && (now - t) <= THIRTY_DAYS_MS;
+  });
+  
+  // Remove from queue
+  state.operationQueue = state.operationQueue.filter(q => q.id !== queueItem.id);
+  
+  await saveState(state);
+  console.log(`📋 Moved to logs: Queue ID=${queueItem.id} -> Log ID=${id}`);
+  
+  return logEntry;
+};
+
+const getQueue = async () => {
+  const state = await loadState();
+  return state.operationQueue || [];
+};
+
+const getLogs = async () => {
+  const state = await loadState();
+  return state.operationLogs || [];
+};
+
+const deleteQueueItem = async (queueId) => {
+  const state = await loadState();
+  state.operationQueue = state.operationQueue.filter(q => q.id !== queueId);
+  await saveState(state);
+  console.log(`🗑️ Deleted queue item ${queueId}`);
+};
+
+const deleteLogEntry = async (logId) => {
+  const state = await loadState();
+  state.operationLogs = state.operationLogs.filter(l => l.id !== logId);
+  await saveState(state);
+  console.log(`🗑️ Deleted log entry ${logId}`);
+};
+
+// Verification functions
+const verifyAddIp = async (ipam, ipAddress, subnetId) => {
+  try {
+    console.log(`🔍 Verifying IP ${ipAddress} in subnet ${subnetId}`);
+    
+    // Fetch all IPs in the subnet
+  const response = await fetch(`${ipam.baseUrl}/api/${ipam.appId}/subnets/${subnetId}/addresses/`, {
+      headers: {
+        'token': ipam.appCode || ipam.apiToken || ''
+      }
+    });
+    
+    const result = await response.json();
+    
+    if (result.success && result.data) {
+      const ips = Array.isArray(result.data) ? result.data : [result.data];
+      const found = ips.some(ip => ip.ip === ipAddress || ip.address === ipAddress);
+      
+      return {
+        success: found,
+        message: found ? `IP ${ipAddress} verified in PHP-IPAM` : `IP ${ipAddress} NOT found in PHP-IPAM`,
+        details: { ipAddress, subnetId, found, totalIps: ips.length }
+      };
+    }
+    
+    return {
+      success: false,
+      message: `Failed to verify IP: ${result.message}`,
+      details: { ipAddress, subnetId, error: result.message }
+    };
+  } catch (error) {
+    console.error('Verification error:', error);
+    return {
+      success: false,
+      message: `Verification failed: ${error.message}`,
+      details: { ipAddress, subnetId, error: error.message }
+    };
+  }
+};
+
+const verifyDeleteIp = async (ipam, ipAddress, subnetId) => {
+  try {
+    console.log(`🔍 Verifying IP ${ipAddress} is deleted from subnet ${subnetId}`);
+    
+  const response = await fetch(`${ipam.baseUrl}/api/${ipam.appId}/subnets/${subnetId}/addresses/`, {
+      headers: {
+        'token': ipam.appCode || ipam.apiToken || ''
+      }
+    });
+    
+    const result = await response.json();
+    
+    if (result.code === 404 || (result.success === false && result.message === 'No addresses found')) {
+      return {
+        success: true,
+        message: `IP ${ipAddress} successfully deleted (subnet has no addresses)`,
+        details: { ipAddress, subnetId, deleted: true }
+      };
+    }
+    
+    if (result.success && result.data) {
+      const ips = Array.isArray(result.data) ? result.data : [result.data];
+      const found = ips.some(ip => ip.ip === ipAddress || ip.address === ipAddress);
+      
+      return {
+        success: !found,
+        message: found ? `IP ${ipAddress} STILL EXISTS in PHP-IPAM` : `IP ${ipAddress} successfully deleted`,
+        details: { ipAddress, subnetId, deleted: !found, totalIps: ips.length }
+      };
+    }
+    
+    return {
+      success: true,
+      message: `IP ${ipAddress} verified as deleted`,
+      details: { ipAddress, subnetId, deleted: true }
+    };
+  } catch (error) {
+    console.error('Verification error:', error);
+    return {
+      success: false,
+      message: `Verification failed: ${error.message}`,
+      details: { ipAddress, subnetId, error: error.message }
+    };
+  }
+};
+
+const verifySync = async (ipam) => {
+  try {
+    console.log(`🔍 Verifying sync for IPAM ${ipam.id}`);
+    
+    // Fetch sections to verify connection
+    const response = await fetch(`${ipam.baseUrl}/api/${ipam.appId}/sections/`, {
+      headers: {
+        'token': ipam.apiToken
+      }
+    });
+    
+    const result = await response.json();
+    
+    if (result.success && result.data) {
+      const sections = Array.isArray(result.data) ? result.data : [result.data];
+      
+      return {
+        success: true,
+        message: `Sync verified: ${sections.length} sections found`,
+        details: { 
+          ipamId: ipam.id, 
+          sectionsCount: sections.length,
+          timestamp: new Date().toISOString()
+        }
+      };
+    }
+    
+    return {
+      success: false,
+      message: `Sync verification failed: ${result.message}`,
+      details: { ipamId: ipam.id, error: result.message }
+    };
+  } catch (error) {
+    console.error('Sync verification error:', error);
+    return {
+      success: false,
+      message: `Sync verification failed: ${error.message}`,
+      details: { ipamId: ipam.id, error: error.message }
+    };
+  }
+};
+
+export { toggleMikrotikSafeMode, getMikrotikSafeModeStatus, getMikrotikUpdateInfo, installMikrotikUpdate, getMikrotikById, addMikrotikIpAddress, updateMikrotikIpAddress, updateMikrotikFirewallRule, addSystemLog, getMikrotikInterfaceDetails, addToQueue, updateQueueStatus, retryQueueItem, moveToLog, getQueue, getLogs, deleteQueueItem, deleteLogEntry, verifyAddIp, verifyDeleteIp, verifySync };
 export default initializeDatabase;

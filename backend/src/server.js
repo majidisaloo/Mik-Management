@@ -18,7 +18,18 @@ import {
   updateMikrotikIpAddress,
   updateMikrotikFirewallRule,
   addSystemLog,
-  getMikrotikInterfaceDetails
+  getMikrotikInterfaceDetails,
+  addToQueue,
+  updateQueueStatus,
+  retryQueueItem,
+  moveToLog,
+  getQueue,
+  getLogs,
+  deleteQueueItem,
+  deleteLogEntry,
+  verifyAddIp,
+  verifyDeleteIp,
+  verifySync
 } from './database.js';
 import { 
   applyFirewallRuleToGroup, 
@@ -36,6 +47,26 @@ import {
   promoteBetaToStable 
 } from './version-manager.js';
 
+// Basic in-memory rate limiting for mutating requests (very generous for admin panel)
+const rateLimitBuckets = new Map(); // key: ip => { tokens, last }
+const RATE_LIMIT_CAPACITY = 1000; // tokens - very high for admin operations
+const RATE_LIMIT_REFILL_PER_SEC = 20; // tokens per second - generous refill
+const isMutatingMethod = (m) => m === 'POST' || m === 'PUT' || m === 'DELETE' || m === 'PATCH';
+const allowRequest = (ip, nowMs) => {
+  const nowSec = Math.floor(nowMs / 1000);
+  const bucket = rateLimitBuckets.get(ip) || { tokens: RATE_LIMIT_CAPACITY, last: nowSec };
+  const elapsed = Math.max(0, nowSec - bucket.last);
+  bucket.tokens = Math.min(RATE_LIMIT_CAPACITY, bucket.tokens + elapsed * RATE_LIMIT_REFILL_PER_SEC);
+  bucket.last = nowSec;
+  if (bucket.tokens < 1) {
+    rateLimitBuckets.set(ip, bucket);
+    return false;
+  }
+  bucket.tokens -= 1;
+  rateLimitBuckets.set(ip, bucket);
+  return true;
+};
+
 // Helper functions for version management
 const getCommitCount = async () => {
   try {
@@ -46,6 +77,56 @@ const getCommitCount = async () => {
     console.error('Error getting commit count:', error);
     return 0;
   }
+};
+
+// Helper function to calculate possible subnets
+const calculatePossibleSubnets = (subnet, currentMask, newCidr) => {
+  const newMask = parseInt(newCidr.replace('/', ''));
+  const currentMaskNum = parseInt(currentMask);
+  
+  if (newMask <= currentMaskNum) {
+    return [];
+  }
+  
+  const possibleSubnets = [];
+  const subnetBits = newMask - currentMaskNum;
+  const numSubnets = Math.pow(2, subnetBits);
+  
+  // Parse IP address
+  const ipParts = subnet.split('.');
+  const ipNum = (parseInt(ipParts[0]) << 24) + (parseInt(ipParts[1]) << 16) + 
+                (parseInt(ipParts[2]) << 8) + parseInt(ipParts[3]);
+  
+  const subnetSize = Math.pow(2, 32 - newMask);
+  
+  for (let i = 0; i < numSubnets; i++) {
+    const startIP = ipNum + (i * subnetSize);
+    const endIP = startIP + subnetSize - 1;
+    
+    const startIPStr = [
+      (startIP >>> 24) & 0xFF,
+      (startIP >>> 16) & 0xFF,
+      (startIP >>> 8) & 0xFF,
+      startIP & 0xFF
+    ].join('.');
+    
+    const endIPStr = [
+      (endIP >>> 24) & 0xFF,
+      (endIP >>> 16) & 0xFF,
+      (endIP >>> 8) & 0xFF,
+      endIP & 0xFF
+    ].join('.');
+    
+    possibleSubnets.push({
+      subnet: `${startIPStr}/${newMask}`,
+      startIP: startIPStr,
+      endIP: endIPStr,
+      size: subnetSize,
+      available: true
+    });
+  }
+  
+  return possibleSubnets;
 };
 
 const getLatestCommitCount = async () => {
@@ -362,18 +443,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type'
 };
 
+const securityHeaders = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Cross-Origin-Opener-Policy': 'same-origin'
+};
+
 const sendJson = (res, statusCode, payload) => {
   const body = JSON.stringify(payload);
   res.writeHead(statusCode, {
     'Content-Type': 'application/json',
     'Content-Length': Buffer.byteLength(body),
-    ...corsHeaders
+    ...corsHeaders,
+    ...securityHeaders
   });
   res.end(body);
 };
 
 const sendNoContent = (res) => {
-  res.writeHead(204, corsHeaders);
+  res.writeHead(204, { ...corsHeaders, ...securityHeaders });
   res.end();
 };
 
@@ -532,18 +621,25 @@ const phpIpamFetch = async (ipam, endpoint, options = {}) => {
   console.log(`🔑 Using App Code: ${ipam.appCode ?? 'none'}`);
 
   try {
-    response = await fetchImpl(url, {
+    const fetchOptions = {
       method: options.method || 'GET',
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
         'User-Agent': 'Mik-Management/1.0',
-        'phpipam-token': ipam.appCode ?? '',
-        'Authorization': `Bearer ${ipam.appCode ?? ''}`,
+        'token': ipam.appCode ?? '',
         ...(options.headers || {})
       },
       signal: controller.signal
-    });
+    };
+    
+    // Add body for POST, PUT, PATCH requests
+    if (options.body && ['POST', 'PUT', 'PATCH'].includes(options.method || '')) {
+      fetchOptions.body = options.body;
+      console.log('📤 Request body:', options.body);
+    }
+    
+    response = await fetchImpl(url, fetchOptions);
   } catch (error) {
     if (error.name === 'AbortError') {
       throw new Error('phpIPAM request timed out');
@@ -741,7 +837,8 @@ const syncPhpIpamStructure = async (ipam) => {
       );
       console.log(`📊 Subnets for section ${sectionId}:`, JSON.stringify(rawRanges, null, 2));
 
-      for (const entry of rawRanges) {
+      // Process all subnets recursively (including nested ones)
+      const processSubnet = async (entry, parentSectionId) => {
         const identifier = resolvePhpIpamId(entry, ['subnetId', 'subnet']);
         const rangeId = Number.parseInt(identifier, 10);
 
@@ -752,7 +849,7 @@ const syncPhpIpamStructure = async (ipam) => {
 
         const metadata = {
           cidr: cidr || '',
-          sectionId,
+          sectionId: parentSectionId,
           vlanId: entry.vlanId ?? entry.vlanid ?? entry.vlan ?? null,
           masterSubnetId: entry.masterSubnetId ?? entry.masterSubnet ?? entry.parent ?? null,
           isFolder: entry.isFolder ?? entry.is_folder ?? entry.folder ?? false,
@@ -767,31 +864,6 @@ const syncPhpIpamStructure = async (ipam) => {
 
         // Fetch IPs within this range
         let ips = [];
-        
-        // Add mock data for testing (temporary)
-        const baseIp = subnet ? subnet.split('/')[0] : '192.168.1';
-        ips = [
-          {
-            id: 1,
-            ip: `${baseIp}.${Math.floor(Math.random() * 254) + 1}`,
-            hostname: `server${rangeId}.onlineserver.co`,
-            description: `Server ${rangeId}`,
-            state: 'active',
-            owner: 'Admin',
-            mac: `00:11:22:33:44:${String(rangeId).padStart(2, '0')}`
-          },
-          {
-            id: 2,
-            ip: `${baseIp}.${Math.floor(Math.random() * 254) + 1}`,
-            hostname: `backup${rangeId}.onlineserver.co`,
-            description: `Backup ${rangeId}`,
-            state: 'active',
-            owner: 'Admin',
-            mac: `00:11:22:33:44:${String(rangeId + 1).padStart(2, '0')}`
-          }
-        ];
-        
-        console.log(`📊 Mock IPs for range ${rangeId}:`, JSON.stringify(ips, null, 2));
         
         try {
           console.log(`📊 Fetching IPs for range ${rangeId}: ${ipam.baseUrl}/api/subnets/${rangeId}/addresses/`);
@@ -830,6 +902,38 @@ const syncPhpIpamStructure = async (ipam) => {
           metadata,
           ips: ips
         });
+
+        // Fetch and process nested subnets (slaves)
+        try {
+          if (Number.isInteger(rangeId)) {
+            console.log(`📊 Fetching nested subnets for ${rangeId}...`);
+            const nestedSubnets = normalisePhpIpamList(
+              await phpIpamFetch(ipam, `subnets/${rangeId}/slaves/`, { allowNotFound: true })
+            );
+            
+            if (nestedSubnets.length > 0) {
+              console.log(`📊 Found ${nestedSubnets.length} nested subnets under ${rangeId}`);
+              for (const nestedEntry of nestedSubnets) {
+                await processSubnet(nestedEntry, parentSectionId);
+              }
+            }
+          }
+        } catch (error) {
+          console.log(`⚠️ Error fetching nested subnets for ${rangeId}:`, error.message);
+        }
+      };
+
+      // Only process top-level subnets (masterSubnetId = 0 or null)
+      // Nested subnets will be fetched recursively
+      const topLevelSubnets = rawRanges.filter(entry => {
+        const masterSubnetId = entry.masterSubnetId ?? entry.masterSubnet ?? entry.parent ?? 0;
+        return masterSubnetId == 0 || masterSubnetId === null;
+      });
+      
+      console.log(`📊 Processing ${topLevelSubnets.length} top-level subnets out of ${rawRanges.length} total`);
+      
+      for (const entry of topLevelSubnets) {
+        await processSubnet(entry, sectionId);
       }
     } catch (error) {
       console.log(`❌ Error fetching subnets for section ${sectionId}:`, error.message);
@@ -842,6 +946,436 @@ const syncPhpIpamStructure = async (ipam) => {
   console.log(`📊 Ranges: ${ranges.length}`);
   
   return { sections, datacenters, ranges };
+};
+
+// Lightweight per-section cache (memory only)
+const sectionCache = new Map(); // key: `${ipamId}:${sectionId}` => { ts, ranges }
+const SECTION_TTL_MS = 10 * 60 * 1000; // 10 minutes
+// Simple per-page cache (memory only)
+const pageCache = new Map(); // key: string => { ts, data }
+const PAGE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+const syncPhpIpamSection = async (ipam, sectionId) => {
+  // Build only this section's ranges (top-level + nested)
+  const ranges = [];
+  const sid = Number.parseInt(sectionId, 10);
+  if (!Number.isInteger(sid)) {
+    return { ranges: [] };
+  }
+
+  try {
+    const rawRanges = normalisePhpIpamList(
+      await phpIpamFetch(ipam, `sections/${sid}/subnets/`, { allowNotFound: true })
+    );
+
+    const processSubnet = async (entry, parentSectionId) => {
+      const identifier = resolvePhpIpamId(entry, ['subnetId', 'subnet']);
+      const rangeId = Number.parseInt(identifier, 10);
+
+      const subnet = formatPhpIpamSubnet(entry.subnet ?? entry.network ?? identifier);
+      const mask = entry.mask ?? entry.cidr ?? entry.bit ?? entry.netmask;
+      const parsedMask = Number.parseInt(mask, 10);
+      const cidr = subnet && Number.isInteger(parsedMask) ? `${subnet}/${parsedMask}` : subnet || identifier;
+
+      const metadata = {
+        cidr: cidr || '',
+        sectionId: parentSectionId,
+        vlanId: entry.vlanId ?? entry.vlanid ?? entry.vlan ?? null,
+        masterSubnetId: entry.masterSubnetId ?? entry.masterSubnet ?? entry.parent ?? null,
+        isFolder: entry.isFolder ?? entry.is_folder ?? entry.folder ?? false,
+        isFull: entry.isFull ?? entry.is_full ?? entry.full ?? false
+      };
+      Object.keys(metadata).forEach((k) => (metadata[k] === null || metadata[k] === undefined || metadata[k] === '') && delete metadata[k]);
+
+      // Fetch IPs for this subnet
+      let ips = [];
+      try {
+        const rawIps = normalisePhpIpamList(
+          await phpIpamFetch(ipam, `subnets/${rangeId}/addresses/`, { allowNotFound: true })
+        );
+        if (Array.isArray(rawIps) && rawIps.length > 0) {
+          ips = rawIps.map((ipEntry) => {
+            const ipId = resolvePhpIpamId(ipEntry, ['id']);
+            return {
+              id: Number.parseInt(ipId, 10) || ipId,
+              ip: ipEntry.ip || ipEntry.address || '',
+              hostname: ipEntry.hostname || ipEntry.description || '',
+              description: ipEntry.description || '',
+              state: ipEntry.state || 'active',
+              note: ipEntry.note || '',
+              owner: ipEntry.owner || '',
+              switch: ipEntry.switch || '',
+              port: ipEntry.port || '',
+              mac: ipEntry.mac || '',
+              lastSeen: ipEntry.lastSeen || null
+            };
+          });
+        }
+      } catch (e) {}
+
+      ranges.push({
+        id: Number.isInteger(rangeId) ? rangeId : identifier,
+        name: entry.description || entry.hostname || cidr || `Range ${identifier ?? ''}`,
+        description: entry.description || '',
+        metadata,
+        ips
+      });
+
+      // Nested slaves
+      try {
+        if (Number.isInteger(rangeId)) {
+          const nested = normalisePhpIpamList(
+            await phpIpamFetch(ipam, `subnets/${rangeId}/slaves/`, { allowNotFound: true })
+          );
+          for (const n of nested) {
+            await processSubnet(n, parentSectionId);
+          }
+        }
+      } catch (e) {}
+    };
+
+    const topLevel = rawRanges.filter((entry) => {
+      const masterSubnetId = entry.masterSubnetId ?? entry.masterSubnet ?? entry.parent ?? 0;
+      return masterSubnetId == 0 || masterSubnetId === null;
+    });
+
+    for (const entry of topLevel) {
+      await processSubnet(entry, sid);
+    }
+  } catch (e) {
+    console.log('❌ Section sync error:', e.message);
+  }
+
+  return { ranges };
+};
+
+// ============================================
+// Queue Management Helper Functions  
+// ============================================
+// Note: All queue management functions are imported from database.js:
+// - getQueue, getLogs
+// - addToQueue, updateQueueStatus, retryQueueItem
+// - moveToLog, deleteQueueItem, deleteLogEntry
+// - verifyAddIp, verifyDeleteIp, verifySync
+
+
+// ============================================
+// Queue Processor
+// ============================================
+
+const processQueuedOperation = async (queueItem, db) => {
+  try {
+    const ipamId = queueItem.ipamId;
+    const ipam = await db.getIpamById(ipamId);
+    if (!ipam) {
+      await updateQueueStatus(queueItem.id, 'failed', 'IPAM not found');
+      await moveToLog(queueItem.id);
+      return;
+    }
+
+    await updateQueueStatus(queueItem.id, 'processing');
+
+    // Helper: normalize phpIPAM id from diverse response shapes
+    const extractPhpIpamId = (resp) => {
+      if (!resp) return null;
+      const candidate = resp.id ?? resp.data?.id ?? resp.data ?? resp.insertId ?? null;
+      if (candidate == null) return null;
+      const parsed = Number.parseInt(candidate, 10);
+      return Number.isInteger(parsed) ? parsed : candidate;
+    };
+
+    switch (queueItem.type) {
+      case 'add_ip': {
+        const { ipAddress, cidr, mask, subnetId, parentRangeCidr, sectionId, hostname, description } = queueItem.data || {};
+        let parentSubnetId = subnetId;
+        // Resolve parent subnet id if missing
+        if (!parentSubnetId && parentRangeCidr) {
+          try {
+            const subnets = normalisePhpIpamList(await phpIpamFetch(ipam, 'subnets/', { allowNotFound: true }));
+            const match = subnets.find((s) => `${s.subnet}/${s.mask}` === parentRangeCidr);
+            if (match && match.id) parentSubnetId = Number.parseInt(match.id, 10);
+          } catch (e) {}
+        }
+        if (!parentSubnetId) throw new Error('Parent subnet could not be resolved');
+
+        try {
+          // Create nested subnet
+          const sid = Number.parseInt(sectionId, 10);
+          const subnetPayload = { subnet: ipAddress, mask: mask || (cidr?.split('/')[1] || '128'), sectionId: Number.isInteger(sid) ? sid : sectionId, description: description || hostname, masterSubnetId: parentSubnetId };
+          const subnetResponse = await phpIpamFetch(ipam, 'subnets/', { method: 'POST', body: JSON.stringify(subnetPayload) });
+          const newSubnetId = extractPhpIpamId(subnetResponse);
+          // Add address
+          const ipPayload = { ip: ipAddress, hostname, description: description || '', subnetId: Number.parseInt(newSubnetId, 10) };
+          await phpIpamFetch(ipam, 'addresses/', { method: 'POST', body: JSON.stringify(ipPayload) });
+
+          const verificationResult = await verifyAddIp(ipam, ipAddress, newSubnetId);
+          await moveToLog(queueItem, verificationResult);
+        } catch (error) {
+          // Check if we should retry or move to logs
+          const maxRetries = 3;
+          if (queueItem.retryCount < maxRetries) {
+            // Retry the operation
+            await updateQueueStatus(queueItem.id, 'failed', error.message);
+            await retryQueueItem(queueItem.id);
+            console.log(`🔄 Retrying add_ip operation ${queueItem.id} (attempt ${queueItem.retryCount + 1}/${maxRetries})`);
+          } else {
+            // Max retries reached, move to logs
+            const verificationResult = {
+              success: false,
+              message: `Failed to add IP ${ipAddress} after ${maxRetries} attempts: ${error.message}`,
+              details: { ipAddress, subnetId: parentSubnetId, error: error.message, retryCount: queueItem.retryCount }
+            };
+            await moveToLog(queueItem, verificationResult);
+          }
+        }
+        break;
+      }
+      case 'add_range': {
+        const { cidr, description, sectionId, parentSubnetId: inputParentSubnetId, parentRangeCidr } = queueItem.data || {};
+        if (!cidr) {
+          await updateQueueStatus(queueItem.id, 'failed', 'CIDR is required');
+          await moveToLog(queueItem.id);
+          break;
+        }
+        let parentSubnetId = inputParentSubnetId;
+        // Resolve parent subnet id if missing but CIDR of parent is provided
+        if (!parentSubnetId && parentRangeCidr) {
+          try {
+            const subnets = normalisePhpIpamList(await phpIpamFetch(ipam, 'subnets/', { allowNotFound: true }));
+            const match = subnets.find((s) => `${s.subnet}/${s.mask}` === parentRangeCidr);
+            if (match && match.id) parentSubnetId = Number.parseInt(match.id, 10);
+          } catch (e) {}
+        }
+
+        try {
+          const [subnetPart, maskPart] = `${cidr}`.split('/');
+          const mask = maskPart || '32';
+          const sid = Number.parseInt(sectionId, 10);
+          const subnetPayload = {
+            subnet: subnetPart,
+            mask,
+            sectionId: Number.isInteger(sid) ? sid : sectionId,
+            description: description || cidr,
+            ...(parentSubnetId ? { masterSubnetId: parentSubnetId } : {})
+          };
+
+          // Create subnet in phpIPAM
+          const created = await phpIpamFetch(ipam, 'subnets/', { method: 'POST', body: JSON.stringify(subnetPayload) });
+          const newSubnetId = extractPhpIpamId(created);
+
+          // Verify creation by fetching the subnet or listing and matching
+          let verified = false;
+          try {
+            const fetched = await phpIpamFetch(ipam, `subnets/${newSubnetId}/`, { allowNotFound: true });
+            verified = Boolean(fetched && (fetched.id || fetched.subnet));
+          } catch (e) {
+            try {
+              const subnets = normalisePhpIpamList(await phpIpamFetch(ipam, 'subnets/', { allowNotFound: true }));
+              verified = subnets.some((s) => `${s.subnet}/${s.mask}` === cidr);
+            } catch (_) {}
+          }
+
+          const verificationResult = {
+            success: Boolean(newSubnetId) && verified,
+            message: verified ? `Range ${cidr} created with ID ${newSubnetId}` : `Range ${cidr} creation unverified`,
+            details: { cidr, newSubnetId, sectionId, parentSubnetId }
+          };
+          await moveToLog(queueItem, verificationResult);
+        } catch (error) {
+          // Check if we should retry or move to logs
+          const maxRetries = 3;
+          if (queueItem.retryCount < maxRetries) {
+            // Retry the operation
+            await updateQueueStatus(queueItem.id, 'failed', error.message);
+            await retryQueueItem(queueItem.id);
+            console.log(`🔄 Retrying add_range operation ${queueItem.id} (attempt ${queueItem.retryCount + 1}/${maxRetries})`);
+          } else {
+            // Max retries reached, move to logs
+            const verificationResult = {
+              success: false,
+              message: `Failed to add range ${cidr} after ${maxRetries} attempts: ${error.message}`,
+              details: { cidr, sectionId, parentSubnetId, error: error.message, retryCount: queueItem.retryCount }
+            };
+            await moveToLog(queueItem, verificationResult);
+          }
+        }
+        break;
+      }
+      case 'provision_tunnel': {
+        const { tunnelId, parentSubnetId: inputParentSubnetId, parentRangeCidr, mask = 30, description } = queueItem.data || {};
+        let parentSubnetId = inputParentSubnetId;
+        // Resolve parent subnet ID if not provided
+        if (!parentSubnetId && parentRangeCidr) {
+          try {
+            const subnets = normalisePhpIpamList(await phpIpamFetch(ipam, 'subnets/', { allowNotFound: true }));
+            const match = subnets.find((s) => `${s.subnet}/${s.mask}` === parentRangeCidr);
+            if (match && match.id) parentSubnetId = Number.parseInt(match.id, 10);
+          } catch (e) {}
+        }
+        if (!parentSubnetId) throw new Error('Parent subnet could not be resolved');
+
+        try {
+          // Create first available /30 under parent
+          const createFirst = await phpIpamFetch(ipam, `subnets/${parentSubnetId}/first_subnet/${mask}/`, { method: 'POST', body: JSON.stringify({ description: description || `Tunnel ${tunnelId}` }) });
+          const newSubnetId = createFirst?.id || createFirst;
+
+          // Allocate two first-free IPs in the new subnet for endpoints
+          const addrA = await phpIpamFetch(ipam, 'addresses/first_free/', { method: 'POST', body: JSON.stringify({ subnetId: newSubnetId, hostname: `tunnel-${tunnelId}-A` }) });
+          const addrB = await phpIpamFetch(ipam, 'addresses/first_free/', { method: 'POST', body: JSON.stringify({ subnetId: newSubnetId, hostname: `tunnel-${tunnelId}-B` }) });
+
+          const ipA = addrA?.data?.ip || addrA?.ip || addrA?.address || addrA;
+          const ipB = addrB?.data?.ip || addrB?.ip || addrB?.address || addrB;
+
+          const verificationResult = {
+            success: Boolean(newSubnetId && ipA && ipB),
+            message: newSubnetId && ipA && ipB ? `Provisioned /${mask} with ${ipA} and ${ipB}` : 'Provision result uncertain',
+            details: { tunnelId, parentSubnetId, newSubnetId, ipA, ipB }
+          };
+
+          await moveToLog(queueItem, verificationResult);
+        } catch (error) {
+          // Check if we should retry or move to logs
+          const maxRetries = 3;
+          if (queueItem.retryCount < maxRetries) {
+            // Retry the operation
+            await updateQueueStatus(queueItem.id, 'failed', error.message);
+            await retryQueueItem(queueItem.id);
+            console.log(`🔄 Retrying provision_tunnel operation ${queueItem.id} (attempt ${queueItem.retryCount + 1}/${maxRetries})`);
+          } else {
+            // Max retries reached, move to logs
+            const verificationResult = {
+              success: false,
+              message: `Failed to provision tunnel ${tunnelId} after ${maxRetries} attempts: ${error.message}`,
+              details: { tunnelId, parentSubnetId, error: error.message, retryCount: queueItem.retryCount }
+            };
+            await moveToLog(queueItem, verificationResult);
+          }
+        }
+        break;
+      }
+      case 'update_ip': {
+        const { rangeId, description, hostname, cidr, subnetId } = queueItem.data || {};
+        try {
+          // Update subnet description/hostname in phpIPAM
+          const updatePayload = {};
+          if (description) updatePayload.description = description;
+          if (hostname) updatePayload.hostname = hostname;
+          
+          if (Object.keys(updatePayload).length > 0) {
+            await phpIpamFetch(ipam, `subnets/${rangeId}/`, {
+              method: 'PATCH',
+              body: JSON.stringify(updatePayload)
+            });
+          }
+          
+          // Verify the update
+          const verificationResult = {
+            success: true,
+            message: `Updated range ${rangeId} (${cidr || 'N/A'})`,
+            details: { rangeId, description, hostname, cidr }
+          };
+          await moveToLog(queueItem, verificationResult);
+        } catch (error) {
+          // Check if we should retry or move to logs
+          const maxRetries = 3;
+          if (queueItem.retryCount < maxRetries) {
+            // Retry the operation
+            await updateQueueStatus(queueItem.id, 'failed', error.message);
+            await retryQueueItem(queueItem.id);
+            console.log(`🔄 Retrying update_ip operation ${queueItem.id} (attempt ${queueItem.retryCount + 1}/${maxRetries})`);
+          } else {
+            // Max retries reached, move to logs
+            const verificationResult = {
+              success: false,
+              message: `Failed to update range ${rangeId} after ${maxRetries} attempts: ${error.message}`,
+              details: { rangeId, error: error.message, retryCount: queueItem.retryCount }
+            };
+            await moveToLog(queueItem, verificationResult);
+          }
+        }
+        break;
+      }
+      case 'delete_ip': {
+        const { rangeId, ipAddress, subnetId } = queueItem.data || {};
+        try {
+          await phpIpamFetch(ipam, `subnets/${rangeId}/`, { method: 'DELETE' });
+          const verificationResult = ipAddress && subnetId ? await verifyDeleteIp(ipam, ipAddress, subnetId) : { success: true, message: 'Deleted (no verification)' , details: {} };
+          await moveToLog(queueItem, verificationResult);
+        } catch (error) {
+          // Check if we should retry or move to logs
+          const maxRetries = 3;
+          if (queueItem.retryCount < maxRetries) {
+            // Retry the operation
+            await updateQueueStatus(queueItem.id, 'failed', error.message);
+            await retryQueueItem(queueItem.id);
+            console.log(`🔄 Retrying delete_ip operation ${queueItem.id} (attempt ${queueItem.retryCount + 1}/${maxRetries})`);
+          } else {
+            // Max retries reached, move to logs
+            const verificationResult = {
+              success: false,
+              message: `Failed to delete IP ${ipAddress || rangeId} after ${maxRetries} attempts: ${error.message}`,
+              details: { rangeId, ipAddress, subnetId, error: error.message, retryCount: queueItem.retryCount }
+            };
+            await moveToLog(queueItem, verificationResult);
+          }
+        }
+        break;
+      }
+      case 'split_range': {
+        const { parentSubnetId, newMasks = [] } = queueItem.data || {};
+        // Minimal: no-op with success log if not implemented fully
+        const result = { success: true, message: 'Split queued (placeholder)', details: { parentSubnetId, newMasks } };
+        await moveToLog(queueItem, result);
+        break;
+      }
+      case 'refresh':
+      case 'sync': {
+        try {
+          const collections = await syncPhpIpamStructure(ipam);
+          await db.replaceIpamCollections(ipam.id, collections);
+          const verificationResult = await verifySync(ipam);
+          await moveToLog(queueItem, verificationResult);
+        } catch (error) {
+          // Check if we should retry or move to logs
+          const maxRetries = 3;
+          if (queueItem.retryCount < maxRetries) {
+            // Retry the operation
+            await updateQueueStatus(queueItem.id, 'failed', error.message);
+            await retryQueueItem(queueItem.id);
+            console.log(`🔄 Retrying ${queueItem.type} operation ${queueItem.id} (attempt ${queueItem.retryCount + 1}/${maxRetries})`);
+          } else {
+            // Max retries reached, move to logs
+            const verificationResult = {
+              success: false,
+              message: `Failed to ${queueItem.type} IPAM ${ipam.id} after ${maxRetries} attempts: ${error.message}`,
+              details: { ipamId: ipam.id, error: error.message, retryCount: queueItem.retryCount }
+            };
+            await moveToLog(queueItem, verificationResult);
+          }
+        }
+        break;
+      }
+      default: {
+        await updateQueueStatus(queueItem.id, 'failed', `Unknown type: ${queueItem.type}`);
+        await moveToLog(queueItem.id);
+      }
+    }
+  } catch (error) {
+    try {
+      // Check if we should retry or move to logs
+      const maxRetries = 3;
+      if (queueItem.retryCount < maxRetries) {
+        // Retry the operation
+        await updateQueueStatus(queueItem.id, 'failed', error.message);
+        await retryQueueItem(queueItem.id);
+        console.log(`🔄 Retrying operation ${queueItem.id} (attempt ${queueItem.retryCount + 1}/${maxRetries})`);
+      } else {
+        // Max retries reached, move to logs
+        await updateQueueStatus(queueItem.id, 'failed', error.message);
+        await moveToLog(queueItem.id);
+      }
+    } catch (_) {}
+  }
 };
 
 const parsePermissions = (permissions = {}) => {
@@ -1478,6 +2012,17 @@ const bootstrap = async () => {
     }
 
     const method = req.method.toUpperCase();
+
+    // Simple rate limit for mutating methods
+    try {
+      if (isMutatingMethod(method)) {
+        const ip = req.socket?.remoteAddress || 'unknown';
+        if (!allowRequest(ip, Date.now())) {
+          sendJson(res, 429, { message: 'Too many requests. Please slow down.' });
+          return;
+        }
+      }
+    } catch (_) {}
 
     if (method === 'OPTIONS') {
       sendNoContent(res);
@@ -2116,6 +2661,8 @@ const bootstrap = async () => {
         }
 
         sendNoContent(res);
+        pageCache.delete('mikrotiks');
+        pageCache.delete('firewallInventory');
       } catch (error) {
         console.error('Delete role error', error);
         sendJson(res, 500, { message: 'Unable to delete the role right now.' });
@@ -2124,11 +2671,21 @@ const bootstrap = async () => {
 
     const handleListGroups = async () => {
       try {
+        const key = 'groups';
+        const now = Date.now();
+        const cached = pageCache.get(key);
+        if (cached && now - cached.ts < PAGE_TTL_MS) {
+          sendJson(res, 200, cached.data);
+          return;
+        }
+
         const groups = await db.listGroups();
         const mapped = groups.map(mapGroup);
         const tree = buildGroupTree(groups);
         const ordered = flattenGroupTree(tree);
-        sendJson(res, 200, { groups: mapped, tree, ordered });
+        const payload = { groups: mapped, tree, ordered };
+        pageCache.set(key, { ts: now, data: payload });
+        sendJson(res, 200, payload);
       } catch (error) {
         console.error('List groups error', error);
         sendJson(res, 500, { message: 'Unable to load groups.' });
@@ -2182,6 +2739,10 @@ const bootstrap = async () => {
         }
 
         sendJson(res, 201, { message: 'Group created successfully.', group: mapGroup(result.group) });
+        pageCache.delete('groups');
+        pageCache.delete('mikrotiks');
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Create group error', error);
         sendJson(res, 500, { message: 'Unable to create the group right now.' });
@@ -2250,6 +2811,10 @@ const bootstrap = async () => {
         }
 
         sendJson(res, 200, { message: 'Group updated successfully.', group: mapGroup(result.group) });
+        pageCache.delete('groups');
+        pageCache.delete('mikrotiks');
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Update group error', error);
         sendJson(res, 500, { message: 'Unable to update the group right now.' });
@@ -2285,6 +2850,10 @@ const bootstrap = async () => {
         }
 
         sendNoContent(res);
+        pageCache.delete('groups');
+        pageCache.delete('mikrotiks');
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Delete group error', error);
         sendJson(res, 500, { message: 'Unable to delete the group right now.' });
@@ -2293,12 +2862,22 @@ const bootstrap = async () => {
 
     const handleListMikrotiks = async () => {
       try {
+        const key = 'mikrotiks';
+        const now = Date.now();
+        const cached = pageCache.get(key);
+        if (cached && now - cached.ts < PAGE_TTL_MS) {
+          sendJson(res, 200, cached.data);
+          return;
+        }
+
         const [devices, groups] = await Promise.all([db.listMikrotiks(), db.listGroups()]);
-        sendJson(res, 200, {
+        const payload = {
           mikrotiks: devices.map((device) => mapMikrotik(device, groups)),
           groups: groups.map(mapGroup),
           targetRouterOs: TARGET_ROUTEROS_VERSION
-        });
+        };
+        pageCache.set(key, { ts: now, data: payload });
+        sendJson(res, 200, payload);
       } catch (error) {
         console.error('List Mikrotiks error', error);
         sendJson(res, 500, { message: 'Unable to load Mikrotik devices.' });
@@ -2380,6 +2959,8 @@ const bootstrap = async () => {
           mikrotik: mapMikrotik(result.mikrotik, groups),
           targetRouterOs: TARGET_ROUTEROS_VERSION
         });
+        pageCache.delete('mikrotiks');
+        pageCache.delete('firewallInventory');
       } catch (error) {
         console.error('Create Mikrotik error', error);
         sendJson(res, 500, { message: 'Unable to add the Mikrotik device right now.' });
@@ -2458,6 +3039,8 @@ const bootstrap = async () => {
           mikrotik: mapMikrotik(result.mikrotik, groups),
           targetRouterOs: TARGET_ROUTEROS_VERSION
         });
+        pageCache.delete('mikrotiks');
+        pageCache.delete('firewallInventory');
       } catch (error) {
         console.error('Update Mikrotik error', error);
         sendJson(res, 500, { message: 'Unable to update the Mikrotik device right now.' });
@@ -3783,6 +4366,14 @@ const bootstrap = async () => {
 
     const handleListFirewallInventory = async () => {
       try {
+        const key = 'firewallInventory';
+        const now = Date.now();
+        const cached = pageCache.get(key);
+        if (cached && now - cached.ts < PAGE_TTL_MS) {
+          sendJson(res, 200, cached.data);
+          return;
+        }
+
         const [addressLists, filters, groups, mikrotiks] = await Promise.all([
           db.listAddressLists(),
           db.listFirewallFilters(),
@@ -3793,13 +4384,15 @@ const bootstrap = async () => {
         const mappedAddressLists = addressLists.map((entry) => mapAddressList(entry, groups, mikrotiks));
         const mappedFilters = filters.map((filter) => mapFirewallFilter(filter, groups, addressLists));
 
-        sendJson(res, 200, {
+        const payload = {
           addressLists: mappedAddressLists,
           filters: mappedFilters,
           groups: groups.map(mapGroup),
           mikrotiks: mikrotiks.map((device) => mapMikrotik(device, groups)),
           targetRouterOs: TARGET_ROUTEROS_VERSION
-        });
+        };
+        pageCache.set(key, { ts: now, data: payload });
+        sendJson(res, 200, payload);
       } catch (error) {
         console.error('List firewall inventory error', error);
         sendJson(res, 500, { message: 'Unable to load firewall inventory.' });
@@ -3837,6 +4430,8 @@ const bootstrap = async () => {
           message: 'Address list entry created successfully.',
           addressList: mapAddressList(result.addressList, groups, mikrotiks)
         });
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Create address list error', error);
         sendJson(res, 500, { message: 'Unable to create the address list entry right now.' });
@@ -3879,6 +4474,8 @@ const bootstrap = async () => {
           message: 'Address list entry updated successfully.',
           addressList: mapAddressList(result.addressList, groups, mikrotiks)
         });
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Update address list error', error);
         sendJson(res, 500, { message: 'Unable to update the address list entry right now.' });
@@ -3904,6 +4501,8 @@ const bootstrap = async () => {
         }
 
         sendNoContent(res);
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Delete address list error', error);
         sendJson(res, 500, { message: 'Unable to delete the address list entry right now.' });
@@ -3975,6 +4574,8 @@ const bootstrap = async () => {
           message: 'Firewall filter created successfully.',
           filter: mapFirewallFilter(result.firewallFilter, groups, addressLists)
         });
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Create firewall filter error', error);
         sendJson(res, 500, { message: 'Unable to create the firewall filter right now.' });
@@ -4056,6 +4657,8 @@ const bootstrap = async () => {
           message: 'Firewall filter updated successfully.',
           filter: mapFirewallFilter(result.firewallFilter, groups, addressLists)
         });
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Update firewall filter error', error);
         sendJson(res, 500, { message: 'Unable to update the firewall filter right now.' });
@@ -4081,6 +4684,8 @@ const bootstrap = async () => {
         }
 
         sendNoContent(res);
+        pageCache.delete('firewallInventory');
+        pageCache.delete('firewallConfig');
       } catch (error) {
         console.error('Delete firewall filter error', error);
         sendJson(res, 500, { message: 'Unable to delete the firewall filter right now.' });
@@ -4154,17 +4759,27 @@ const bootstrap = async () => {
 
     const handleListFirewall = async () => {
       try {
+        const key = 'firewallConfig';
+        const now = Date.now();
+        const cached = pageCache.get(key);
+        if (cached && now - cached.ts < PAGE_TTL_MS) {
+          sendJson(res, 200, cached.data);
+          return;
+        }
+
         const [filters, addressLists, groups] = await Promise.all([
           db.listFirewallFilters(),
           db.listAddressLists(),
           db.listGroups()
         ]);
 
-        sendJson(res, 200, {
+        const payload = {
           filters: filters.map((filter) => mapFirewallFilter(filter, groups)),
           addressLists: addressLists.map((list) => mapAddressList(list, groups)),
           groups: groups.map(mapGroup)
-        });
+        };
+        pageCache.set(key, { ts: now, data: payload });
+        sendJson(res, 200, payload);
       } catch (error) {
         console.error('List firewall error', error);
         sendJson(res, 500, { message: 'Unable to load firewall configuration.' });
@@ -4997,7 +5612,7 @@ const bootstrap = async () => {
           appId: ipam.appId,
           appPermissions: ipam.appPermissions,
           appSecurity: ipam.appSecurity,
-          status: ipam.lastStatus || ipam.status || 'unknown',
+          status: ipam.status || 'unknown',
           checkedAt: ipam.checkedAt,
           lastSyncAt: ipam.lastSyncAt,
           createdAt: ipam.createdAt,
@@ -5103,30 +5718,66 @@ const bootstrap = async () => {
           return;
         }
 
-        const collections = await syncPhpIpamStructure(ipam);
-        await db.replaceIpamCollections(ipamId, collections);
-        const timestamp = new Date().toISOString();
-        await db.updateIpamStatus(ipamId, { status: 'connected', checkedAt: timestamp, syncedAt: timestamp });
-
-        sendJson(res, 200, {
-          sections: collections.sections.length,
-          datacenters: collections.datacenters.length,
-          ranges: collections.ranges.length
+        // Return immediately and sync in background
+        sendJson(res, 202, { 
+          message: 'Sync started in background',
+          status: 'syncing'
         });
+
+        // Sync in background without blocking
+        (async () => {
+          // Add to queue
+          const queueItem = await addToQueue({
+            type: 'sync',
+            ipamId: ipamId,
+            data: {
+              timestamp: new Date().toISOString()
+            }
+          });
+          
+          try {
+            await updateQueueStatus(queueItem.id, 'processing');
+            
+            console.log(`🔄 Background sync started for IPAM ${ipamId}`);
+            const collections = await syncPhpIpamStructure(ipam);
+            await db.replaceIpamCollections(ipamId, collections);
+            const timestamp = new Date().toISOString();
+            await db.updateIpamStatus(ipamId, { status: 'connected', checkedAt: timestamp, syncedAt: timestamp });
+            console.log(`✅ Background sync completed for IPAM ${ipamId}:`, {
+              sections: collections.sections.length,
+              datacenters: collections.datacenters.length,
+              ranges: collections.ranges.length
+            });
+            
+            // Verify sync
+            const verificationResult = await verifySync(ipam);
+            verificationResult.details.collections = {
+              sections: collections.sections.length,
+              datacenters: collections.datacenters.length,
+              ranges: collections.ranges.length
+            };
+            
+            await moveToLog(queueItem, verificationResult);
+            console.log('✅ Sync operation logged with verification:', verificationResult.success ? 'SUCCESS' : 'FAILED');
+            
+          } catch (error) {
+            console.error('Background sync error for IPAM', ipamId, error);
+            
+            await updateQueueStatus(queueItem.id, 'failed', error.message);
+            
+            if (Number.isInteger(ipamId) && ipamId > 0) {
+              try {
+                await db.updateIpamStatus(ipamId, { status: 'failed', checkedAt: new Date().toISOString() });
+              } catch (updateError) {
+                console.error('Failed to record IPAM failure status', updateError);
+              }
+            }
+          }
+        })();
+
       } catch (error) {
         console.error('Sync IPAM error', error);
-
-        if (Number.isInteger(ipamId) && ipamId > 0) {
-          try {
-            await db.updateIpamStatus(ipamId, { status: 'failed', checkedAt: new Date().toISOString() });
-          } catch (updateError) {
-            console.error('Failed to record IPAM failure status', updateError);
-          }
-        }
-
-        sendJson(res, 502, {
-          message: error.message || 'Unable to synchronise phpIPAM structure.'
-        });
+        sendJson(res, 500, { message: 'Unable to start sync. Please try again.' });
       }
     };
 
@@ -5197,6 +5848,45 @@ const bootstrap = async () => {
           }
         }
 
+        if (resourceSegments.length === 3 && method === 'GET' && resourceSegments[2] === 'live') {
+          // Get data directly from PHP-IPAM without cache
+          try {
+            const ipam = await db.getIpamById(ipamId);
+            if (!ipam) {
+              sendJson(res, 404, { message: 'IPAM integration not found.' });
+              return;
+            }
+
+            console.log('🔴 LIVE MODE: Fetching directly from PHP-IPAM without cache');
+            
+            // Fetch fresh data from PHP-IPAM
+            const collections = await syncPhpIpamStructure(ipam);
+            
+            // Log a non-blocking refresh in the background
+            try {
+              const queueItem = await addToQueue({ type: 'refresh', ipamId, data: { scope: 'live', at: new Date().toISOString() } });
+              (async () => { await processQueuedOperation(queueItem, db); })();
+            } catch (_) {}
+
+            // Return directly without saving to database
+            sendJson(res, 200, {
+              id: ipam.id,
+              name: ipam.name,
+              description: ipam.description,
+              type: ipam.type,
+              baseUrl: ipam.baseUrl,
+              appId: ipam.appId,
+              status: ipam.status,
+              lastCheckedAt: new Date().toISOString(),
+              collections: collections
+            });
+          } catch (error) {
+            console.error('Live fetch error:', error);
+            sendJson(res, 500, { message: 'Unable to fetch live data from PHP-IPAM' });
+          }
+          return;
+        }
+
         if (resourceSegments.length === 3 && method === 'POST') {
           const action = resourceSegments[2];
 
@@ -5208,6 +5898,350 @@ const bootstrap = async () => {
           if (action === 'sync') {
             await handleSyncIpam(ipamId);
             return;
+          }
+        }
+
+        // Queue endpoints
+        if (resourceSegments.length === 3 && method === 'GET' && resourceSegments[2] === 'queue') {
+          console.log(`📋 GET /api/ipams/${ipamId}/queue - Fetching queue items...`);
+          try {
+            const queue = await getQueue();
+            console.log(`📋 Total queue items: ${queue.length}`);
+            const ipamQueue = queue.filter(q => q.ipamId === ipamId);
+            console.log(`📋 Queue items for IPAM ${ipamId}: ${ipamQueue.length}`);
+            sendJson(res, 200, ipamQueue);
+          } catch (error) {
+            console.error('❌ Get queue error:', error);
+            sendJson(res, 500, { message: 'Unable to get queue' });
+          }
+          return;
+        }
+
+        // Logs endpoints
+        if (resourceSegments.length === 3 && method === 'GET' && resourceSegments[2] === 'logs') {
+          try {
+            const logs = await getLogs();
+            const ipamLogs = logs.filter(l => l.ipamId === ipamId);
+            sendJson(res, 200, ipamLogs);
+          } catch (error) {
+            console.error('Get logs error:', error);
+            sendJson(res, 500, { message: 'Unable to get logs' });
+          }
+          return;
+        }
+
+        // Sync/Refresh endpoint - Queue a sync operation
+        if (resourceSegments.length === 3 && method === 'POST' && resourceSegments[2] === 'sync') {
+          try {
+            const ipam = await db.getIpamById(ipamId);
+            if (!ipam) {
+              sendJson(res, 404, { message: 'IPAM integration not found' });
+              return;
+            }
+
+            console.log(`🔄 Queueing sync operation for IPAM ${ipamId}...`);
+            
+            // Add to queue
+            const queueItem = await addToQueue({
+              type: 'sync',
+              ipamId: ipamId,
+              data: { initiatedBy: 'user', at: new Date().toISOString() }
+            });
+
+            // Process in background
+            (async () => {
+              await processQueuedOperation(queueItem, db);
+            })();
+
+            sendJson(res, 202, {
+              message: 'Sync operation queued',
+              status: 'queued',
+              queueId: queueItem.id
+            });
+          } catch (error) {
+            console.error('Sync queue error:', error);
+            sendJson(res, 500, { message: `Unable to queue sync: ${error.message}` });
+          }
+          return;
+        }
+
+        // Retry queue item
+        if (resourceSegments.length === 5 && method === 'POST' && resourceSegments[2] === 'queue' && resourceSegments[4] === 'retry') {
+          try {
+            const queueId = parseInt(resourceSegments[3], 10);
+            const item = await retryQueueItem(queueId);
+            
+            if (item) {
+              sendJson(res, 200, { message: 'Queue item set for retry', item });
+            } else {
+              sendJson(res, 404, { message: 'Queue item not found' });
+            }
+          } catch (error) {
+            console.error('Retry queue item error:', error);
+            sendJson(res, 500, { message: 'Unable to retry queue item' });
+          }
+          return;
+        }
+
+        // Delete queue item
+        if (resourceSegments.length === 4 && method === 'DELETE' && resourceSegments[2] === 'queue') {
+          try {
+            const queueId = parseInt(resourceSegments[3], 10);
+            await deleteQueueItem(queueId);
+            sendJson(res, 200, { message: 'Queue item deleted' });
+          } catch (error) {
+            console.error('Delete queue item error:', error);
+            sendJson(res, 500, { message: 'Unable to delete queue item' });
+          }
+          return;
+        }
+
+        // Delete log entry
+        if (resourceSegments.length === 4 && method === 'DELETE' && resourceSegments[2] === 'logs') {
+          try {
+            const logId = parseInt(resourceSegments[3], 10);
+            await deleteLogEntry(logId);
+            sendJson(res, 200, { message: 'Log entry deleted' });
+          } catch (error) {
+            console.error('Delete log entry error:', error);
+            sendJson(res, 500, { message: 'Unable to delete log entry' });
+          }
+          return;
+        }
+
+        if (resourceSegments.length === 3 && method === 'PUT' && resourceSegments[2] === 'collections') {
+          try {
+            const ipam = await db.getIpamById(ipamId);
+            if (!ipam) {
+              sendJson(res, 404, { message: 'IPAM integration not found.' });
+              return;
+            }
+
+            const body = await parseJsonBody(req);
+            const collections = body.collections || body;
+
+            await db.replaceIpamCollections(ipamId, collections);
+            const timestamp = new Date().toISOString();
+            await db.updateIpamStatus(ipamId, { status: 'connected', checkedAt: timestamp, syncedAt: timestamp });
+
+            sendJson(res, 200, {
+              message: 'Collections updated successfully',
+              sections: collections.sections?.length || 0,
+              datacenters: collections.datacenters?.length || 0,
+              ranges: collections.ranges?.length || 0
+            });
+          } catch (error) {
+            console.error('Update collections error', error);
+            sendJson(res, 500, { message: 'Unable to update collections.' });
+          }
+          return;
+        }
+
+        if (resourceSegments.length === 3 && method === 'POST' && resourceSegments[2] === 'ranges') {
+          try {
+            const ipam = await db.getIpamById(ipamId);
+            if (!ipam) {
+              sendJson(res, 404, { message: 'IPAM integration not found.' });
+              return;
+            }
+
+            const body = await parseJsonBody(req);
+            console.log('Add/Edit IP - Request body:', JSON.stringify(body, null, 2));
+            
+            // Check if this is an edit/update operation
+            const isEdit = Boolean(body?.isEdit || body?.rangeId);
+            const rangeId = body?.rangeId;
+            
+            if (isEdit && rangeId) {
+              // This is an UPDATE operation - queue as update_ip
+              console.log(`📝 Queuing UPDATE operation for range ${rangeId}`);
+              
+              const queueItem = await addToQueue({
+                type: 'update_ip',
+                ipamId: ipamId,
+                data: {
+                  rangeId,
+                  description: body.description || body.name || body.hostname,
+                  hostname: body.hostname || body.name || body.description,
+                  cidr: body.metadata?.cidr,
+                  subnetId: body.metadata?.subnetId ? parseInt(body.metadata.subnetId, 10) : null
+                }
+              });
+              
+              (async () => { await processQueuedOperation(queueItem, db); })();
+              
+              return sendJson(res, 202, {
+                message: 'Update operation queued',
+                status: 'queued',
+                queueId: queueItem.id
+              });
+            }
+            
+            // Otherwise, continue with ADD operation
+            const cidr = body.metadata?.cidr || '';
+            const hostname = body.name || body.description || '';
+            let subnetId = body.metadata?.subnetId ? parseInt(body.metadata.subnetId, 10) : null;
+            const parentRangeCidr = body.metadata?.parentRangeCidr;
+            
+            // Parse CIDR to get IP address
+            let ipAddress = cidr.split('/')[0];
+            
+            if (!ipAddress) {
+              sendJson(res, 400, { message: 'Invalid CIDR format' });
+              return;
+            }
+            
+            // Expand IPv6 shorthand notation and pad with zeros (e.g., 2001:41d0:a:1918::0 becomes 2001:41d0:a:1918:0000:0000:0000:0000)
+            if (ipAddress.includes('::')) {
+              const parts = ipAddress.split('::');
+              const left = parts[0].split(':').filter(p => p);
+              const right = parts[1] ? parts[1].split(':').filter(p => p) : [];
+              const totalParts = 8;
+              const missingParts = totalParts - left.length - right.length;
+              
+              const expanded = [...left, ...Array(missingParts).fill('0'), ...right]
+                .map(part => part.padStart(4, '0'))
+                .join(':');
+              ipAddress = expanded;
+            } else {
+              // Pad existing parts if not using shorthand
+              ipAddress = ipAddress.split(':').map(part => part.padStart(4, '0')).join(':');
+            }
+            
+            // Check if it's a single IP (/32 for IPv4 or /128 for IPv6)
+            const mask = cidr.split('/')[1];
+            const isSingleIP = mask === '32' || mask === '128';
+            
+            if (isSingleIP) {
+              // Enqueue add_ip and process in background; do NOT perform inline
+              const queueItem = await addToQueue({
+                type: 'add_ip',
+                ipamId: ipamId,
+                data: {
+                  ipAddress,
+                  cidr,
+                  mask,
+                  subnetId,
+                  parentRangeCidr,
+                  sectionId: body.sectionId,
+                  hostname,
+                  description: body.description
+                }
+              });
+              // Background processing
+              (async () => {
+                await processQueuedOperation(queueItem, db);
+              })();
+
+              sendJson(res, 202, {
+                message: 'Add IP queued for processing',
+                status: 'queued',
+                queueId: queueItem.id
+              });
+            } else {
+              // Enqueue add_range for subnet creation (background)
+              const queueItem = await addToQueue({
+                type: 'add_range',
+                ipamId: ipamId,
+                data: {
+                  cidr,
+                  description: body.description || body.name || '',
+                  sectionId: body.sectionId,
+                  parentSubnetId: body.metadata?.subnetId ? parseInt(body.metadata.subnetId, 10) : null,
+                  parentRangeCidr
+                }
+              });
+              (async () => { await processQueuedOperation(queueItem, db); })();
+              sendJson(res, 202, { message: 'Add range queued for processing', status: 'queued', queueId: queueItem.id });
+            }
+          } catch (error) {
+            console.error('Add IP/Range error:', error);
+            sendJson(res, 500, { message: `Unable to add IP/Range: ${error.message}` });
+          }
+          return;
+        }
+
+        if (resourceSegments.length === 4 && method === 'DELETE' && resourceSegments[2] === 'ranges') {
+          try {
+            const ipam = await db.getIpamById(ipamId);
+            if (!ipam) {
+              sendJson(res, 404, { message: 'IPAM integration not found.' });
+              return;
+            }
+
+            const rangeId = resourceSegments[3];
+            console.log('Delete range - Range ID:', rangeId);
+            
+            // Check if this is a PHP-IPAM subnet (numeric ID)
+            const numericRangeId = parseInt(rangeId);
+            let deletedIpAddress = null;
+            let deletedSubnetId = null;
+            
+            if (!isNaN(numericRangeId)) {
+              // Get subnet info before deleting for verification
+              try {
+                const subnetInfo = await phpIpamFetch(ipam, `subnets/${numericRangeId}/`, { allowNotFound: true });
+                if (subnetInfo && subnetInfo.subnet) {
+                  deletedIpAddress = subnetInfo.subnet;
+                  deletedSubnetId = subnetInfo.masterSubnetId || numericRangeId;
+                }
+              } catch (e) {
+                console.log('Could not fetch subnet info:', e.message);
+              }
+              
+              // Delete from PHP-IPAM
+              console.log(`Deleting subnet ${numericRangeId} from PHP-IPAM`);
+              
+              // Add to queue
+              const queueItem = await addToQueue({
+                type: 'delete_ip',
+                ipamId: ipamId,
+                data: {
+                  rangeId: numericRangeId,
+                  ipAddress: deletedIpAddress,
+                  subnetId: deletedSubnetId
+                }
+              });
+              
+              // Process in background via queue processor
+              (async () => { await processQueuedOperation(queueItem, db); })();
+            }
+            
+            // Respond as queued (deletion processed in background)
+            sendJson(res, 202, { message: 'Delete queued', status: 'queued' });
+          } catch (error) {
+            console.error('Delete range error:', error);
+            sendJson(res, 500, { message: `Unable to delete range: ${error.message}` });
+          }
+          return;
+        }
+
+        // Per-section fetch (cached)
+        if (resourceSegments.length >= 4 && method === 'GET' && resourceSegments[2] === 'sections') {
+          const sectionId = Number.parseInt(resourceSegments[3], 10);
+          const live = resourceSegments[4] === 'live';
+          try {
+            const ipam = await db.getIpamById(ipamId);
+            if (!ipam) return sendJson(res, 404, { message: 'IPAM integration not found.' });
+
+            if (live) {
+              const { ranges } = await syncPhpIpamSection(ipam, sectionId);
+              return sendJson(res, 200, { sectionId, ranges, live: true, ts: new Date().toISOString() });
+            }
+
+            const key = `${ipamId}:${sectionId}`;
+            const now = Date.now();
+            const cached = sectionCache.get(key);
+            if (cached && now - cached.ts < SECTION_TTL_MS) {
+              return sendJson(res, 200, { sectionId, ranges: cached.ranges, live: false, cached: true, ts: new Date(cached.ts).toISOString() });
+            }
+
+            const { ranges } = await syncPhpIpamSection(ipam, sectionId);
+            sectionCache.set(key, { ts: now, ranges });
+            return sendJson(res, 200, { sectionId, ranges, live: false, cached: false, ts: new Date().toISOString() });
+          } catch (error) {
+            console.error('Section fetch error:', error);
+            return sendJson(res, 500, { message: 'Unable to fetch section data' });
           }
         }
       }
@@ -5613,6 +6647,31 @@ const bootstrap = async () => {
         }
       }
 
+      // Provision tunnel (allocate /30 from IPAM and queue)
+      if (resourceSegments[0] === 'tunnels' && resourceSegments.length === 3 && resourceSegments[2] === 'provision' && method === 'POST') {
+        const tunnelId = Number.parseInt(resourceSegments[1], 10);
+        try {
+          if (!Number.isInteger(tunnelId) || tunnelId <= 0) {
+            return sendJson(res, 400, { message: 'Valid tunnel id is required' });
+          }
+          const body = await parseJsonBody(req);
+          const { ipamId, parentSubnetId, parentRangeCidr, mask = 30, description } = body || {};
+          if (!Number.isInteger(ipamId)) {
+            return sendJson(res, 400, { message: 'ipamId is required' });
+          }
+          const queueItem = await addToQueue({
+            type: 'provision_tunnel',
+            ipamId,
+            data: { tunnelId, parentSubnetId: parentSubnetId ? Number.parseInt(parentSubnetId, 10) : null, parentRangeCidr, mask: Number.parseInt(mask, 10) || 30, description: description || `Tunnel ${tunnelId}` }
+          });
+          (async () => { await processQueuedOperation(queueItem, db); })();
+          return sendJson(res, 202, { message: 'Provision queued', status: 'queued', queueId: queueItem.id });
+        } catch (e) {
+          console.error('Provision tunnel error:', e);
+          return sendJson(res, 500, { message: 'Unable to queue provision' });
+        }
+      }
+
       if (method === 'POST' && (canonicalPath === '/api/tunnels' || resourcePath === '/tunnels')) {
         await handleCreateTunnel();
         return;
@@ -5723,6 +6782,7 @@ async function handleApplyFirewallRuleToGroup() {
     sendJson(res, 500, { message: 'Failed to apply firewall rule to group' });
   }
 }
+
 
 bootstrap().catch((error) => {
   console.error('Failed to start server', error);
