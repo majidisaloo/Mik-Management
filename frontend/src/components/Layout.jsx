@@ -138,11 +138,9 @@ const Layout = () => {
 
   // Get version from UpdateContext to ensure consistency
   const { updateInfo } = useUpdate();
-  const stableVersion = updateInfo?.stableVersion || updateInfo?.currentVersion?.replace('-beta', '') || 'Loading...';
-  const betaVersion = updateInfo?.betaVersion || updateInfo?.currentVersion || 'Loading...';
+  const currentVersion = updateInfo?.currentVersion || 'Loading...';
   
-  console.log('Layout - Stable version:', stableVersion);
-  console.log('Layout - Beta version:', betaVersion);
+  console.log('Layout - Current version:', currentVersion);
 
   // Navigation items
   const navigation = useMemo(() => [
@@ -335,13 +333,10 @@ const Layout = () => {
                   <div className="app-sidebar-version">
                     <div className="flex flex-col items-center space-y-1">
                       <div className="flex items-center space-x-2">
-                        <span className="app-version-display">V {betaVersion.replace(/^v/, '').replace('-beta', '')}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
-                          BETA
-                        </span>
+                        <span className="app-version-display">V {currentVersion.replace(/^v/, '').replace('-beta', '')}</span>
                       </div>
                       <div className="text-xs text-gray-500">
-                        Stable: V {stableVersion.replace(/^v/, '').replace('-beta', '')}
+                        Latest Version
                       </div>
                     </div>
                     <button
@@ -397,13 +392,10 @@ const Layout = () => {
                   <div className="app-sidebar-version">
                     <div className="flex flex-col items-center space-y-1">
                       <div className="flex items-center space-x-2">
-                        <span className="app-version-display">V {betaVersion.replace(/^v/, '').replace('-beta', '')}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
-                          BETA
-                        </span>
+                        <span className="app-version-display">V {currentVersion.replace(/^v/, '').replace('-beta', '')}</span>
                       </div>
                       <div className="text-xs text-gray-500">
-                        Stable: V {stableVersion.replace(/^v/, '').replace('-beta', '')}
+                        Latest Version
                       </div>
                     </div>
                     <button

@@ -11,11 +11,10 @@ export const useUpdate = () => {
 };
 
 export const UpdateProvider = ({ children }) => {
-  const [updateChannel, setUpdateChannel] = useState('beta');
   const [updateInfo, setUpdateInfo] = useState({
     currentVersion: null, // Will be loaded from API
     updateAvailable: false,
-    channel: 'beta'
+    channel: 'latest'
   });
   const [autoCheckEnabled, setAutoCheckEnabled] = useState(true);
   const [checkInterval, setCheckInterval] = useState(300); // 5 minutes default
@@ -28,7 +27,6 @@ export const UpdateProvider = ({ children }) => {
 
     try {
       console.log(`=== Frontend Update Check ===`);
-      console.log(`Channel: ${updateChannel}`);
       console.log(`Auto-check enabled: ${autoCheckEnabled}`);
       
       const response = await fetch('/api/check-updates', {
@@ -36,7 +34,6 @@ export const UpdateProvider = ({ children }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ channel: updateChannel }),
       });
 
       const data = await response.json();
@@ -65,7 +62,7 @@ export const UpdateProvider = ({ children }) => {
       // Silent fail for auto-check
       console.log('Auto-update check failed:', error);
     }
-  }, [autoCheckEnabled, updateChannel, updateInfo?.updateAvailable]);
+  }, [autoCheckEnabled, updateInfo?.updateAvailable]);
 
   // Set up auto-check interval
   useEffect(() => {
@@ -82,11 +79,9 @@ export const UpdateProvider = ({ children }) => {
 
   // Load settings from localStorage
   useEffect(() => {
-    const savedChannel = localStorage.getItem('updateChannel');
     const savedAutoCheck = localStorage.getItem('autoCheckEnabled');
     const savedInterval = localStorage.getItem('checkInterval');
 
-    if (savedChannel) setUpdateChannel(savedChannel);
     if (savedAutoCheck !== null) setAutoCheckEnabled(savedAutoCheck === 'true');
     if (savedInterval) setCheckInterval(Number(savedInterval));
   }, []);
@@ -95,13 +90,12 @@ export const UpdateProvider = ({ children }) => {
   useEffect(() => {
     const loadInitialVersion = async () => {
       try {
-        console.log('Loading initial version for channel:', updateChannel);
+        console.log('Loading initial version');
         const response = await fetch('/api/check-updates', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ channel: updateChannel }),
         });
 
         const data = await response.json();
@@ -120,18 +114,15 @@ export const UpdateProvider = ({ children }) => {
 
     // Load immediately on mount
     loadInitialVersion();
-  }, [updateChannel]);
+  }, []);
 
   // Save settings to localStorage
   useEffect(() => {
-    localStorage.setItem('updateChannel', updateChannel);
     localStorage.setItem('autoCheckEnabled', autoCheckEnabled.toString());
     localStorage.setItem('checkInterval', checkInterval.toString());
-  }, [updateChannel, autoCheckEnabled, checkInterval]);
+  }, [autoCheckEnabled, checkInterval]);
 
   const value = {
-    updateChannel,
-    setUpdateChannel,
     updateInfo,
     setUpdateInfo,
     autoCheckEnabled,

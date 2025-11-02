@@ -84,8 +84,6 @@ const Settings = () => {
 
   // Update context
   const {
-    updateChannel,
-    setUpdateChannel,
     updateInfo,
     setUpdateInfo,
     autoCheckEnabled,
@@ -175,14 +173,12 @@ const Settings = () => {
     try {
       setUpdateLoading(true);
       console.log(`=== Manual Update Check ===`);
-      console.log(`Channel: ${updateChannel}`);
       
       const response = await fetch('/api/check-updates', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ channel: updateChannel }),
       });
 
       const data = await response.json();
@@ -224,7 +220,6 @@ const Settings = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ channel: updateChannel }),
       });
 
       const data = await response.json();
@@ -462,46 +457,9 @@ const Settings = () => {
           <div className="card">
             <div className="card__header">
               <h2 className="card__title">System Updates</h2>
-              <p className="card__subtitle">Manage system updates and version channels</p>
+              <p className="card__subtitle">Check for the latest version</p>
             </div>
             <div className="card__content space-y-8">
-              {/* Update Channel Selection */}
-              <div className="space-y-4">
-                <div>
-                  <label className="form-label text-base font-semibold">Update Channel</label>
-                  <p className="text-sm text-gray-600 mt-1">Choose your preferred update channel</p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <label className="flex items-start p-4 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer">
-                  <input
-                      type="radio"
-                      name="updateChannel"
-                      value="stable"
-                      checked={updateChannel === 'stable'}
-                      onChange={(e) => setUpdateChannel(e.target.value)}
-                      className="mt-1 mr-3 text-primary focus:ring-primary"
-                    />
-                    <div>
-                      <div className="font-medium text-gray-900">Stable</div>
-                      <div className="text-sm text-gray-500 mt-1">Recommended for production environments</div>
-                    </div>
-                </label>
-                  <label className="flex items-start p-4 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer">
-                  <input
-                      type="radio"
-                      name="updateChannel"
-                      value="beta"
-                      checked={updateChannel === 'beta'}
-                      onChange={(e) => setUpdateChannel(e.target.value)}
-                      className="mt-1 mr-3 text-primary focus:ring-primary"
-                    />
-                    <div>
-                      <div className="font-medium text-gray-900">Beta</div>
-                      <div className="text-sm text-gray-500 mt-1">Latest features, may be unstable</div>
-                    </div>
-                </label>
-                </div>
-              </div>
 
               {/* Auto-Check Settings */}
               <div className="space-y-4">
@@ -550,37 +508,15 @@ const Settings = () => {
                   <label className="form-label text-base font-semibold">Current Version</label>
                   <p className="text-sm text-gray-600 mt-1">Your current system version</p>
                 </div>
-                <div className="bg-white border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-gray-600">Current Version:</span>
-                    <span className="font-medium text-gray-900">{updateInfo?.currentVersion || 'Loading...'}</span>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Stable Version */}
-                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="font-mono text-lg font-bold text-green-900">
-                          {updateInfo?.updateInfo?.stableVersion || updateInfo?.stableVersion || updateInfo?.currentVersion?.replace('-beta', '') || 'Loading...'}
-                        </span>
-                        <div className="text-sm text-green-600 mt-1">Stable Version</div>
-                      </div>
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-mono text-lg font-bold text-blue-900">
+                        {updateInfo?.currentVersion || 'Loading...'}
+                      </span>
+                      <div className="text-sm text-blue-600 mt-1">Latest Version</div>
                     </div>
-                  </div>
-                  
-                  {/* Beta Version */}
-                  <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="font-mono text-lg font-bold text-orange-900">
-                          {updateInfo?.updateInfo?.betaVersion || updateInfo?.betaVersion || updateInfo?.currentVersion || 'Loading...'}
-                        </span>
-                        <div className="text-sm text-orange-600 mt-1">Beta Version</div>
-                      </div>
-                      <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                    </div>
+                    <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
                   </div>
                 </div>
                 {lastCheckTime && (
@@ -620,16 +556,12 @@ const Settings = () => {
                   </div>
                   <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
                     <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-gray-600">Channel:</span>
-                      <span className="font-medium text-gray-900 capitalize">{updateInfo.channel}</span>
+                      <span className="text-gray-600">Current Version:</span>
+                      <span className="font-medium text-gray-900">{updateInfo?.currentVersion || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-gray-600">Latest Stable:</span>
-                      <span className="font-medium text-gray-900">{updateInfo?.updateInfo?.stableVersion || updateInfo?.stableVersion || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-gray-600">Latest Beta:</span>
-                      <span className="font-medium text-gray-900">{updateInfo?.updateInfo?.betaVersion || updateInfo?.betaVersion || 'N/A'}</span>
+                      <span className="text-gray-600">Latest Version:</span>
+                      <span className="font-medium text-gray-900">{updateInfo?.latestVersion || 'N/A'}</span>
                     </div>
                     {updateInfo.updateAvailable ? (
                       <>

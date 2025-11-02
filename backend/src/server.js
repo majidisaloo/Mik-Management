@@ -41,10 +41,7 @@ import { ensureDatabaseConfig, getConfigFilePath } from './config.js';
 import getProjectVersion from './version.js';
 import { 
   getVersionInfo, 
-  getStableVersion, 
-  getBetaVersion, 
-  isBetaAhead, 
-  promoteBetaToStable 
+  getCurrentVersion
 } from './version-manager.js';
 
 // Basic in-memory rate limiting for mutating requests (very generous for admin panel)
@@ -2150,55 +2147,18 @@ const bootstrap = async () => {
     const handleCheckUpdates = async () => {
       try {
         const versionInfo = getVersionInfo();
-        const body = await parseJsonBody(req);
-        const channel = body?.channel || 'stable';
         
         console.log(`=== Update Check Request ===`);
-        console.log(`Channel: ${channel}`);
-        console.log(`Stable version: ${versionInfo.stableVersion}`);
-        console.log(`Beta version: ${versionInfo.betaVersion}`);
-        console.log(`Beta ahead: ${versionInfo.isBetaAhead}`);
+        console.log(`Current version: ${versionInfo.currentVersion}`);
+        console.log(`Latest version: ${versionInfo.latestVersion}`);
         
-        let updateInfo = null;
-        let updateAvailable = false;
-        
-        if (channel === 'beta') {
-          // For beta channel, show beta version as current
-          updateInfo = {
-            currentVersion: versionInfo.betaVersion,
-            latestVersion: versionInfo.betaVersion,
-            channel: 'beta',
-            stableVersion: versionInfo.stableVersion,
-            betaVersion: versionInfo.betaVersion,
-            isBetaAhead: versionInfo.isBetaAhead,
-            message: 'You are on the latest beta version!'
-          };
-        } else {
-          // For stable channel, show stable version as current
-          updateInfo = {
-            currentVersion: versionInfo.stableVersion,
-            latestVersion: versionInfo.stableVersion,
-            channel: 'stable',
-            stableVersion: versionInfo.stableVersion,
-            betaVersion: versionInfo.betaVersion,
-            isBetaAhead: versionInfo.isBetaAhead,
-            message: 'You are on the latest stable version!'
-          };
-          
-          // Check if there's a newer beta available
-          if (versionInfo.isBetaAhead) {
-            updateAvailable = true;
-            updateInfo.latestVersion = versionInfo.betaVersion;
-            updateInfo.message = `New beta version available: ${versionInfo.betaVersion}`;
-          }
-        }
-        
+        // Simple single version system - always up to date
         sendJson(res, 200, {
-          updateAvailable,
-          currentVersion: updateInfo.currentVersion,
-          latestVersion: updateInfo.latestVersion,
-          channel,
-          updateInfo
+          updateAvailable: false,
+          currentVersion: versionInfo.currentVersion,
+          latestVersion: versionInfo.latestVersion,
+          channel: 'latest',
+          message: 'You are on the latest version!'
         });
       } catch (error) {
         console.error('Check updates error:', error);
