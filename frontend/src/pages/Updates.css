@@ -1,0 +1,438 @@
+/* Updates Page Styles - Isolated from other components */
+
+/* Main Updates Container */
+.updates-page {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Card Styles */
+.update-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+  margin-bottom: 24px;
+}
+
+.update-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.update-card__header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.update-card__title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 4px 0;
+}
+
+.update-card__subtitle {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.update-card__content {
+  padding: 24px;
+}
+
+/* Auto-Check Section */
+.update-auto-check {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.update-auto-check__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.update-auto-check__icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #3b82f6;
+  border-radius: 8px;
+  color: white;
+}
+
+.update-auto-check__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.update-auto-check__description {
+  font-size: 14px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+.update-checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.update-checkbox-wrapper:hover {
+  background: #f3f4f6;
+}
+
+.update-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
+
+.update-checkbox-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  cursor: pointer;
+}
+
+.update-interval-wrapper {
+  margin-top: 16px;
+  padding-left: 30px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.update-interval-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  color: #111827;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.update-interval-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Version Card */
+.update-version-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 12px;
+  padding: 24px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.update-version-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  animation: pulse 3s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.update-version-card__content {
+  position: relative;
+  z-index: 1;
+}
+
+.update-version-card__label {
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0.9;
+  margin-bottom: 8px;
+}
+
+.update-version-card__version {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Courier New', monospace;
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.update-version-card__status {
+  font-size: 12px;
+  margin-top: 8px;
+  opacity: 0.85;
+}
+
+.update-version-card__last-check {
+  font-size: 12px;
+  margin-top: 16px;
+  opacity: 0.8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Update Info Grid */
+.update-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.update-info-item {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.update-info-item:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+}
+
+.update-info-item__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.update-info-item__value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Courier New', monospace;
+}
+
+.update-info-item__value--success {
+  color: #10b981;
+}
+
+.update-info-item__value--warning {
+  color: #f59e0b;
+}
+
+/* Status Badge */
+.update-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.update-status-badge--available {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.update-status-badge--up-to-date {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+/* Update Actions */
+.update-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.update-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.update-btn--secondary {
+  background: white;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.update-btn--secondary:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.update-btn--primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.update-btn--primary:hover {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  transform: translateY(-1px);
+}
+
+.update-btn--primary:active {
+  transform: translateY(0);
+}
+
+.update-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.update-btn__icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Notification Banner */
+.update-notification {
+  padding: 16px 20px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.update-notification--success {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.update-notification--error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.update-notification--info {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #93c5fd;
+}
+
+.update-notification__dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.update-notification__dismiss:hover {
+  opacity: 0.8;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .update-card__header {
+    padding: 16px 20px;
+  }
+
+  .update-card__content {
+    padding: 20px;
+  }
+
+  .update-info-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .update-actions {
+    flex-direction: column;
+  }
+
+  .update-btn {
+    width: 100%;
+  }
+}
+
+/* Dark Mode Support */
+[data-theme="dark"] .update-card {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+[data-theme="dark"] .update-card__header {
+  border-color: #374151;
+}
+
+[data-theme="dark"] .update-card__title {
+  color: #f9fafb;
+}
+
+[data-theme="dark"] .update-card__subtitle {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .update-auto-check {
+  background: #111827;
+  border-color: #374151;
+}
+
+[data-theme="dark"] .update-info-item {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+[data-theme="dark"] .update-info-item__value {
+  color: #f9fafb;
+}
+
+[data-theme="dark"] .update-btn--secondary {
+  background: #1f2937;
+  color: #f9fafb;
+  border-color: #374151;
+}
+
+[data-theme="dark"] .update-btn--secondary:hover {
+  background: #374151;
+}
+

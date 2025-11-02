@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useUpdate } from '../context/UpdateContext.jsx';
 import UpdateStatusIcon from '../components/UpdateStatusIcon';
 import './Settings.css';
+import './Updates.css';
 
 // Modern Icons
 const PlusIcon = () => (
@@ -453,167 +454,196 @@ const Settings = () => {
 
       {/* Updates Tab */}
       {activeTab === 'updates' && (
-        <div className="space-y-6">
-          <div className="card">
-            <div className="card__header">
-              <h2 className="card__title">System Updates</h2>
-              <p className="card__subtitle">Check for the latest version</p>
+        <div className="updates-page">
+          {/* Auto-Check Card */}
+          <div className="update-card">
+            <div className="update-card__header">
+              <h2 className="update-card__title">Automatic Update Checking</h2>
+              <p className="update-card__subtitle">Configure automatic background update checks</p>
             </div>
-            <div className="card__content space-y-8">
-
-              {/* Auto-Check Settings */}
-              <div className="space-y-4">
-                <div>
-                  <label className="form-label text-base font-semibold">Automatic Update Checking</label>
-                  <p className="text-sm text-gray-600 mt-1">Configure automatic background update checks</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                  <label className="auto-check-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={autoCheckEnabled}
-                      onChange={(e) => setAutoCheckEnabled(e.target.checked)}
-                      className="auto-check-input"
-                    />
-                    <span className="auto-check-label">Enable automatic update checking</span>
-                  </label>
-                  
-                  {autoCheckEnabled && (
-                    <div className="ml-6 space-y-3">
-                      <div>
-                        <label className="form-label text-sm font-medium">Check Interval</label>
-                        <select
-                          value={checkInterval}
-                          onChange={(e) => setCheckInterval(Number(e.target.value))}
-                          className="form-input mt-1"
-                        >
-                          <option value={60}>Every 1 minute</option>
-                          <option value={300}>Every 5 minutes</option>
-                          <option value={900}>Every 15 minutes</option>
-                          <option value={1800}>Every 30 minutes</option>
-                          <option value={3600}>Every 1 hour</option>
-                        </select>
-                      </div>
-                      <p className="text-sm text-gray-500">
-                        System will automatically check for updates in the background
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Current Version */}
-              <div className="space-y-4">
-                <div>
-                  <label className="form-label text-base font-semibold">Current Version</label>
-                  <p className="text-sm text-gray-600 mt-1">Your current system version</p>
-                </div>
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="font-mono text-lg font-bold text-blue-900">
-                        {updateInfo?.currentVersion || 'Loading...'}
-                      </span>
-                      <div className="text-sm text-blue-600 mt-1">Latest Version</div>
-                    </div>
-                    <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+            <div className="update-card__content">
+              <div className="update-auto-check">
+                <div className="update-auto-check__header">
+                  <div className="update-auto-check__icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M21 3v5h-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M3 21v-5h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="update-auto-check__title">Automatic Checks</h3>
+                    <p className="update-auto-check__description">Enable automatic background update checking</p>
                   </div>
                 </div>
-                {lastCheckTime && (
-                  <div className="text-right">
-                    <div className="text-xs text-blue-500">
-                      Last checked: {new Date(lastCheckTime).toLocaleTimeString()}
-                    </div>
+                
+                <label className="update-checkbox-wrapper">
+                  <input
+                    type="checkbox"
+                    checked={autoCheckEnabled}
+                    onChange={(e) => setAutoCheckEnabled(e.target.checked)}
+                    className="update-checkbox"
+                  />
+                  <span className="update-checkbox-label">Enable automatic update checking</span>
+                </label>
+                
+                {autoCheckEnabled && (
+                  <div className="update-interval-wrapper">
+                    <label className="update-info-item__label" style={{display: 'block', marginBottom: '8px'}}>
+                      Check Interval
+                    </label>
+                    <select
+                      value={checkInterval}
+                      onChange={(e) => setCheckInterval(Number(e.target.value))}
+                      className="update-interval-select"
+                    >
+                      <option value={60}>Every 1 minute</option>
+                      <option value={300}>Every 5 minutes</option>
+                      <option value={900}>Every 15 minutes</option>
+                      <option value={1800}>Every 30 minutes</option>
+                      <option value={3600}>Every 1 hour</option>
+                    </select>
+                    <p style={{fontSize: '12px', color: '#6b7280', marginTop: '8px'}}>
+                      System will automatically check for updates in the background
+                    </p>
                   </div>
                 )}
               </div>
+            </div>
+          </div>
 
-              {/* Update Status */}
-              {(updateStatus.message || updateNotification) && (
-                <div className={`p-4 rounded-lg ${
-                  (updateStatus.type === 'success' || updateNotification?.type === 'success') ? 'bg-green-50 text-green-700 border border-green-200' :
-                  (updateStatus.type === 'error' || updateNotification?.type === 'error') ? 'bg-red-50 text-red-700 border border-red-200' :
-                  'bg-blue-50 text-blue-700 border border-blue-200'
-                }`}>
-                  {updateStatus.message || updateNotification?.message}
-                  {updateNotification && (
-                    <button
-                      onClick={() => setUpdateNotification(null)}
-                      className="ml-2 text-xs underline hover:no-underline"
-                    >
-                      Dismiss
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Update Info */}
-              {updateInfo && (
-                <div className="space-y-4">
-                      <div>
-                    <label className="form-label text-base font-semibold">Update Information</label>
-                    <p className="text-sm text-gray-600 mt-1">Current update status and available versions</p>
-                  </div>
-                  <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-gray-600">Current Version:</span>
-                      <span className="font-medium text-gray-900">{updateInfo?.currentVersion || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-gray-600">Latest Version:</span>
-                      <span className="font-medium text-gray-900">{updateInfo?.latestVersion || 'N/A'}</span>
-                    </div>
-                    {updateInfo.updateAvailable ? (
-                      <>
-                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                          <span className="text-gray-600">Update Available:</span>
-                          <span className="font-medium text-green-600">Yes</span>
-                        </div>
-                        <div className="flex justify-between items-center py-2">
-                          <span className="text-gray-600">Target Version:</span>
-                          <span className="font-medium text-green-600">{updateInfo.latestVersion}</span>
-                        </div>
-                        {updateInfo.updateInfo?.updateSize && (
-                          <div className="flex justify-between items-center py-2">
-                            <span className="text-gray-600">Commits Behind:</span>
-                            <span className="font-medium text-orange-600">{updateInfo.updateInfo.updateSize}</span>
-                          </div>
-                        )}
-                      </>
+          {/* Version Card */}
+          <div className="update-card">
+            <div className="update-card__header">
+              <h2 className="update-card__title">Current Version</h2>
+              <p className="update-card__subtitle">Your current system version</p>
+            </div>
+            <div className="update-card__content">
+              <div className="update-version-card">
+                <div className="update-version-card__content">
+                  <div className="update-version-card__label">Latest Version</div>
+                  <h3 className="update-version-card__version">
+                    {updateInfo?.currentVersion || 'Loading...'}
+                  </h3>
+                  <div className="update-version-card__status">
+                    {updateInfo?.updateAvailable ? (
+                      <span className="update-status-badge update-status-badge--available">
+                        Update Available
+                      </span>
                     ) : (
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-gray-600">Update Available:</span>
-                        <span className="font-medium text-green-600">No</span>
-                      </div>
+                      <span className="update-status-badge update-status-badge--up-to-date">
+                        Up to Date
+                      </span>
                     )}
                   </div>
+                  {lastCheckTime && (
+                    <div className="update-version-card__last-check">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                        <polyline points="12 6 12 12 16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      Last checked: {new Date(lastCheckTime).toLocaleTimeString()}
+                    </div>
+                  )}
                 </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  className="btn btn--secondary flex items-center justify-center"
-                  onClick={checkForUpdates}
-                  disabled={updateLoading}
-                >
-                  <RefreshIcon />
-                  <span className="ml-2">{updateLoading ? 'Checking...' : 'Check for Updates'}</span>
-                </button>
-                {updateInfo?.updateAvailable && (
-                  <button
-                    type="button"
-                    className="btn btn--primary flex items-center justify-center"
-                    onClick={performUpdate}
-                    disabled={updateLoading}
-                  >
-                    <UpdateIcon />
-                    <span className="ml-2">{updateLoading ? 'Updating...' : 'Update Now'}</span>
-                  </button>
-                )}
               </div>
             </div>
+          </div>
+
+          {/* Update Status Notification */}
+          {(updateStatus.message || updateNotification) && (
+            <div className={`update-notification ${
+              (updateStatus.type === 'success' || updateNotification?.type === 'success') ? 'update-notification--success' :
+              (updateStatus.type === 'error' || updateNotification?.type === 'error') ? 'update-notification--error' :
+              'update-notification--info'
+            }`}>
+              <span>{updateStatus.message || updateNotification?.message}</span>
+              {updateNotification && (
+                <button
+                  onClick={() => setUpdateNotification(null)}
+                  className="update-notification__dismiss"
+                >
+                  Dismiss
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Update Info Card */}
+          {updateInfo && (
+            <div className="update-card">
+              <div className="update-card__header">
+                <h2 className="update-card__title">Update Information</h2>
+                <p className="update-card__subtitle">Current update status and available versions</p>
+              </div>
+              <div className="update-card__content">
+                <div className="update-info-grid">
+                  <div className="update-info-item">
+                    <div className="update-info-item__label">Current Version</div>
+                    <div className="update-info-item__value">
+                      {updateInfo?.currentVersion || 'N/A'}
+                    </div>
+                  </div>
+                  
+                  <div className="update-info-item">
+                    <div className="update-info-item__label">Latest Version</div>
+                    <div className="update-info-item__value update-info-item__value--success">
+                      {updateInfo?.latestVersion || 'N/A'}
+                    </div>
+                  </div>
+                  
+                  <div className="update-info-item">
+                    <div className="update-info-item__label">Update Status</div>
+                    <div className="update-info-item__value">
+                      {updateInfo?.updateAvailable ? (
+                        <span className="update-status-badge update-status-badge--available">
+                          Available
+                        </span>
+                      ) : (
+                        <span className="update-status-badge update-status-badge--up-to-date">
+                          Up to Date
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {updateInfo.updateAvailable && updateInfo.updateInfo?.updateSize && (
+                    <div className="update-info-item">
+                      <div className="update-info-item__label">Commits Behind</div>
+                      <div className="update-info-item__value update-info-item__value--warning">
+                        {updateInfo.updateInfo.updateSize}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="update-actions">
+            <button
+              type="button"
+              className="update-btn update-btn--secondary"
+              onClick={checkForUpdates}
+              disabled={updateLoading}
+            >
+              <RefreshIcon />
+              <span>{updateLoading ? 'Checking...' : 'Check for Updates'}</span>
+            </button>
+            
+            {updateInfo?.updateAvailable && (
+              <button
+                type="button"
+                className="update-btn update-btn--primary"
+                onClick={performUpdate}
+                disabled={updateLoading}
+              >
+                <UpdateIcon />
+                <span>{updateLoading ? 'Updating...' : 'Update Now'}</span>
+              </button>
+            )}
           </div>
         </div>
       )}
