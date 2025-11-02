@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal.jsx';
 import pingService from '../services/pingService.js';
@@ -341,7 +341,7 @@ const Mikrotiks = () => {
     return filtered;
   }, [devices, searchTerm, filterGroup]);
 
-  const loadDevices = async () => {
+  const loadDevices = useCallback(async () => {
       try {
         setLoading(true);
       const response = await fetch(`/api/mikrotiks?t=${Date.now()}`);
@@ -379,9 +379,9 @@ const Mikrotiks = () => {
       } finally {
         setLoading(false);
       }
-    };
+    }, []);
 
-  const loadGroups = async () => {
+  const loadGroups = useCallback(async () => {
     try {
       console.log('Loading groups for Mikrotiks...');
       const response = await fetch('/api/groups');
@@ -407,7 +407,7 @@ const Mikrotiks = () => {
       console.error('Failed to load groups:', error);
       setGroups([]);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -424,7 +424,7 @@ const Mikrotiks = () => {
     }, 30000);
     
     return () => clearInterval(interval);
-  }, [navigate, user]);
+  }, [navigate, user, loadDevices, loadGroups]);
 
   // Set initial loading states and run auto tests when devices are loaded
   useEffect(() => {
@@ -460,6 +460,7 @@ const Mikrotiks = () => {
         setConnectivityLoading(new Set());
       }, 5000);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [devices.length]);
 
   const handleCreateDevice = async () => {
@@ -571,7 +572,7 @@ const Mikrotiks = () => {
   };
 
   // Run connectivity test in background without popup
-  const runBackgroundConnectivityTest = async (device) => {
+  const runBackgroundConnectivityTest = useCallback(async (device) => {
     try {
       const response = await fetch(`/api/mikrotiks/${device.id}/test-connectivity`, {
         method: 'POST'
@@ -589,7 +590,7 @@ const Mikrotiks = () => {
     } catch (error) {
       console.error('Background connectivity test error for device:', device.name, error);
     }
-  };
+  }, [loadDevices]);
 
   const handleTestConnectivity = async (device) => {
     console.log('Testing connectivity for device:', device.name, 'Host:', device.host);
@@ -1562,6 +1563,7 @@ const Mikrotiks = () => {
                 overflow: 'hidden',
                 cursor: 'pointer'
               }}
+              onClick={() => handleDeviceClick(device)}
               onMouseEnter={(e) => {
                 e.target.style.transform = 'translateY(-8px) scale(1.02)';
                 e.target.style.boxShadow = '0 25px 50px -12px rgba(59, 130, 246, 0.1)';

@@ -1098,17 +1098,36 @@ const processQueuedOperation = async (queueItem, db) => {
         }
         if (!parentSubnetId) throw new Error('Parent subnet could not be resolved');
 
-        // Create nested subnet
-        const sid = Number.parseInt(sectionId, 10);
-        const subnetPayload = { subnet: ipAddress, mask: mask || (cidr?.split('/')[1] || '128'), sectionId: Number.isInteger(sid) ? sid : sectionId, description: description || hostname, masterSubnetId: parentSubnetId };
-        const subnetResponse = await phpIpamFetch(ipam, 'subnets/', { method: 'POST', body: JSON.stringify(subnetPayload) });
-        const newSubnetId = extractPhpIpamId(subnetResponse);
-        // Add address
-        const ipPayload = { ip: ipAddress, hostname, description: description || '', subnetId: Number.parseInt(newSubnetId, 10) };
-        await phpIpamFetch(ipam, 'addresses/', { method: 'POST', body: JSON.stringify(ipPayload) });
+        try {
+          // Create nested subnet
+          const sid = Number.parseInt(sectionId, 10);
+          const subnetPayload = { subnet: ipAddress, mask: mask || (cidr?.split('/')[1] || '128'), sectionId: Number.isInteger(sid) ? sid : sectionId, description: description || hostname, masterSubnetId: parentSubnetId };
+          const subnetResponse = await phpIpamFetch(ipam, 'subnets/', { method: 'POST', body: JSON.stringify(subnetPayload) });
+          const newSubnetId = extractPhpIpamId(subnetResponse);
+          // Add address
+          const ipPayload = { ip: ipAddress, hostname, description: description || '', subnetId: Number.parseInt(newSubnetId, 10) };
+          await phpIpamFetch(ipam, 'addresses/', { method: 'POST', body: JSON.stringify(ipPayload) });
 
-        const verificationResult = await verifyAddIp(ipam, ipAddress, newSubnetId);
-        await moveToLog(queueItem, verificationResult);
+          const verificationResult = await verifyAddIp(ipam, ipAddress, newSubnetId);
+          await moveToLog(queueItem, verificationResult);
+        } catch (error) {
+          // Check if we should retry or move to logs
+          const maxRetries = 3;
+          if (queueItem.retryCount < maxRetries) {
+            // Retry the operation
+            await updateQueueStatus(queueItem.id, 'failed', error.message);
+            await retryQueueItem(queueItem.id);
+            console.log(`🔄 Retrying add_ip operation ${queueItem.id} (attempt ${queueItem.retryCount + 1}/${maxRetries})`);
+          } else {
+            // Max retries reached, move to logs
+            const verificationResult = {
+              success: false,
+              message: `Failed to add IP ${ipAddress} after ${maxRetries} attempts: ${error.message}`,
+              details: { ipAddress, subnetId: parentSubnetId, error: error.message, retryCount: queueItem.retryCount }
+            };
+            await moveToLog(queueItem, verificationResult);
+          }
+        }
         break;
       }
       case 'add_range': {
@@ -1128,39 +1147,58 @@ const processQueuedOperation = async (queueItem, db) => {
           } catch (e) {}
         }
 
-        const [subnetPart, maskPart] = `${cidr}`.split('/');
-        const mask = maskPart || '32';
-        const sid = Number.parseInt(sectionId, 10);
-        const subnetPayload = {
-          subnet: subnetPart,
-          mask,
-          sectionId: Number.isInteger(sid) ? sid : sectionId,
-          description: description || cidr,
-          ...(parentSubnetId ? { masterSubnetId: parentSubnetId } : {})
-        };
-
-        // Create subnet in phpIPAM
-        const created = await phpIpamFetch(ipam, 'subnets/', { method: 'POST', body: JSON.stringify(subnetPayload) });
-        const newSubnetId = extractPhpIpamId(created);
-
-        // Verify creation by fetching the subnet or listing and matching
-        let verified = false;
         try {
-          const fetched = await phpIpamFetch(ipam, `subnets/${newSubnetId}/`, { allowNotFound: true });
-          verified = Boolean(fetched && (fetched.id || fetched.subnet));
-        } catch (e) {
-          try {
-            const subnets = normalisePhpIpamList(await phpIpamFetch(ipam, 'subnets/', { allowNotFound: true }));
-            verified = subnets.some((s) => `${s.subnet}/${s.mask}` === cidr);
-          } catch (_) {}
-        }
+          const [subnetPart, maskPart] = `${cidr}`.split('/');
+          const mask = maskPart || '32';
+          const sid = Number.parseInt(sectionId, 10);
+          const subnetPayload = {
+            subnet: subnetPart,
+            mask,
+            sectionId: Number.isInteger(sid) ? sid : sectionId,
+            description: description || cidr,
+            ...(parentSubnetId ? { masterSubnetId: parentSubnetId } : {})
+          };
 
-        const verificationResult = {
-          success: Boolean(newSubnetId) && verified,
-          message: verified ? `Range ${cidr} created with ID ${newSubnetId}` : `Range ${cidr} creation unverified`,
-          details: { cidr, newSubnetId, sectionId, parentSubnetId }
-        };
-        await moveToLog(queueItem, verificationResult);
+          // Create subnet in phpIPAM
+          const created = await phpIpamFetch(ipam, 'subnets/', { method: 'POST', body: JSON.stringify(subnetPayload) });
+          const newSubnetId = extractPhpIpamId(created);
+
+          // Verify creation by fetching the subnet or listing and matching
+          let verified = false;
+          try {
+            const fetched = await phpIpamFetch(ipam, `subnets/${newSubnetId}/`, { allowNotFound: true });
+            verified = Boolean(fetched && (fetched.id || fetched.subnet));
+          } catch (e) {
+            try {
+              const subnets = normalisePhpIpamList(await phpIpamFetch(ipam, 'subnets/', { allowNotFound: true }));
+              verified = subnets.some((s) => `${s.subnet}/${s.mask}` === cidr);
+            } catch (_) {}
+          }
+
+          const verificationResult = {
+            success: Boolean(newSubnetId) && verified,
+            message: verified ? `Range ${cidr} created with ID ${newSubnetId}` : `Range ${cidr} creation unverified`,
+            details: { cidr, newSubnetId, sectionId, parentSubnetId }
+          };
+          await moveToLog(queueItem, verificationResult);
+        } catch (error) {
+          // Check if we should retry or move to logs
+          const maxRetries = 3;
+          if (queueItem.retryCount < maxRetries) {
+            // Retry the operation
+            await updateQueueStatus(queueItem.id, 'failed', error.message);
+            await retryQueueItem(queueItem.id);
+            console.log(`🔄 Retrying add_range operation ${queueItem.id} (attempt ${queueItem.retryCount + 1}/${maxRetries})`);
+          } else {
+            // Max retries reached, move to logs
+            const verificationResult = {
+              success: false,
+              message: `Failed to add range ${cidr} after ${maxRetries} attempts: ${error.message}`,
+              details: { cidr, sectionId, parentSubnetId, error: error.message, retryCount: queueItem.retryCount }
+            };
+            await moveToLog(queueItem, verificationResult);
+          }
+        }
         break;
       }
       case 'provision_tunnel': {
@@ -1176,24 +1214,43 @@ const processQueuedOperation = async (queueItem, db) => {
         }
         if (!parentSubnetId) throw new Error('Parent subnet could not be resolved');
 
-        // Create first available /30 under parent
-        const createFirst = await phpIpamFetch(ipam, `subnets/${parentSubnetId}/first_subnet/${mask}/`, { method: 'POST', body: JSON.stringify({ description: description || `Tunnel ${tunnelId}` }) });
-        const newSubnetId = createFirst?.id || createFirst;
+        try {
+          // Create first available /30 under parent
+          const createFirst = await phpIpamFetch(ipam, `subnets/${parentSubnetId}/first_subnet/${mask}/`, { method: 'POST', body: JSON.stringify({ description: description || `Tunnel ${tunnelId}` }) });
+          const newSubnetId = createFirst?.id || createFirst;
 
-        // Allocate two first-free IPs in the new subnet for endpoints
-        const addrA = await phpIpamFetch(ipam, 'addresses/first_free/', { method: 'POST', body: JSON.stringify({ subnetId: newSubnetId, hostname: `tunnel-${tunnelId}-A` }) });
-        const addrB = await phpIpamFetch(ipam, 'addresses/first_free/', { method: 'POST', body: JSON.stringify({ subnetId: newSubnetId, hostname: `tunnel-${tunnelId}-B` }) });
+          // Allocate two first-free IPs in the new subnet for endpoints
+          const addrA = await phpIpamFetch(ipam, 'addresses/first_free/', { method: 'POST', body: JSON.stringify({ subnetId: newSubnetId, hostname: `tunnel-${tunnelId}-A` }) });
+          const addrB = await phpIpamFetch(ipam, 'addresses/first_free/', { method: 'POST', body: JSON.stringify({ subnetId: newSubnetId, hostname: `tunnel-${tunnelId}-B` }) });
 
-        const ipA = addrA?.data?.ip || addrA?.ip || addrA?.address || addrA;
-        const ipB = addrB?.data?.ip || addrB?.ip || addrB?.address || addrB;
+          const ipA = addrA?.data?.ip || addrA?.ip || addrA?.address || addrA;
+          const ipB = addrB?.data?.ip || addrB?.ip || addrB?.address || addrB;
 
-        const verificationResult = {
-          success: Boolean(newSubnetId && ipA && ipB),
-          message: newSubnetId && ipA && ipB ? `Provisioned /${mask} with ${ipA} and ${ipB}` : 'Provision result uncertain',
-          details: { tunnelId, parentSubnetId, newSubnetId, ipA, ipB }
-        };
+          const verificationResult = {
+            success: Boolean(newSubnetId && ipA && ipB),
+            message: newSubnetId && ipA && ipB ? `Provisioned /${mask} with ${ipA} and ${ipB}` : 'Provision result uncertain',
+            details: { tunnelId, parentSubnetId, newSubnetId, ipA, ipB }
+          };
 
-        await moveToLog(queueItem, verificationResult);
+          await moveToLog(queueItem, verificationResult);
+        } catch (error) {
+          // Check if we should retry or move to logs
+          const maxRetries = 3;
+          if (queueItem.retryCount < maxRetries) {
+            // Retry the operation
+            await updateQueueStatus(queueItem.id, 'failed', error.message);
+            await retryQueueItem(queueItem.id);
+            console.log(`🔄 Retrying provision_tunnel operation ${queueItem.id} (attempt ${queueItem.retryCount + 1}/${maxRetries})`);
+          } else {
+            // Max retries reached, move to logs
+            const verificationResult = {
+              success: false,
+              message: `Failed to provision tunnel ${tunnelId} after ${maxRetries} attempts: ${error.message}`,
+              details: { tunnelId, parentSubnetId, error: error.message, retryCount: queueItem.retryCount }
+            };
+            await moveToLog(queueItem, verificationResult);
+          }
+        }
         break;
       }
       case 'update_ip': {
@@ -1219,12 +1276,22 @@ const processQueuedOperation = async (queueItem, db) => {
           };
           await moveToLog(queueItem, verificationResult);
         } catch (error) {
-          const verificationResult = {
-            success: false,
-            message: `Failed to update range ${rangeId}: ${error.message}`,
-            details: { rangeId, error: error.message }
-          };
-          await moveToLog(queueItem, verificationResult);
+          // Check if we should retry or move to logs
+          const maxRetries = 3;
+          if (queueItem.retryCount < maxRetries) {
+            // Retry the operation
+            await updateQueueStatus(queueItem.id, 'failed', error.message);
+            await retryQueueItem(queueItem.id);
+            console.log(`🔄 Retrying update_ip operation ${queueItem.id} (attempt ${queueItem.retryCount + 1}/${maxRetries})`);
+          } else {
+            // Max retries reached, move to logs
+            const verificationResult = {
+              success: false,
+              message: `Failed to update range ${rangeId} after ${maxRetries} attempts: ${error.message}`,
+              details: { rangeId, error: error.message, retryCount: queueItem.retryCount }
+            };
+            await moveToLog(queueItem, verificationResult);
+          }
         }
         break;
       }
@@ -1232,9 +1299,26 @@ const processQueuedOperation = async (queueItem, db) => {
         const { rangeId, ipAddress, subnetId } = queueItem.data || {};
         try {
           await phpIpamFetch(ipam, `subnets/${rangeId}/`, { method: 'DELETE' });
-        } catch (e) {}
-        const verificationResult = ipAddress && subnetId ? await verifyDeleteIp(ipam, ipAddress, subnetId) : { success: true, message: 'Deleted (no verification)' , details: {} };
-        await moveToLog(queueItem, verificationResult);
+          const verificationResult = ipAddress && subnetId ? await verifyDeleteIp(ipam, ipAddress, subnetId) : { success: true, message: 'Deleted (no verification)' , details: {} };
+          await moveToLog(queueItem, verificationResult);
+        } catch (error) {
+          // Check if we should retry or move to logs
+          const maxRetries = 3;
+          if (queueItem.retryCount < maxRetries) {
+            // Retry the operation
+            await updateQueueStatus(queueItem.id, 'failed', error.message);
+            await retryQueueItem(queueItem.id);
+            console.log(`🔄 Retrying delete_ip operation ${queueItem.id} (attempt ${queueItem.retryCount + 1}/${maxRetries})`);
+          } else {
+            // Max retries reached, move to logs
+            const verificationResult = {
+              success: false,
+              message: `Failed to delete IP ${ipAddress || rangeId} after ${maxRetries} attempts: ${error.message}`,
+              details: { rangeId, ipAddress, subnetId, error: error.message, retryCount: queueItem.retryCount }
+            };
+            await moveToLog(queueItem, verificationResult);
+          }
+        }
         break;
       }
       case 'split_range': {
@@ -1246,10 +1330,29 @@ const processQueuedOperation = async (queueItem, db) => {
       }
       case 'refresh':
       case 'sync': {
-        const collections = await syncPhpIpamStructure(ipam);
-        await db.replaceIpamCollections(ipam.id, collections);
-        const verificationResult = await verifySync(ipam);
-        await moveToLog(queueItem, verificationResult);
+        try {
+          const collections = await syncPhpIpamStructure(ipam);
+          await db.replaceIpamCollections(ipam.id, collections);
+          const verificationResult = await verifySync(ipam);
+          await moveToLog(queueItem, verificationResult);
+        } catch (error) {
+          // Check if we should retry or move to logs
+          const maxRetries = 3;
+          if (queueItem.retryCount < maxRetries) {
+            // Retry the operation
+            await updateQueueStatus(queueItem.id, 'failed', error.message);
+            await retryQueueItem(queueItem.id);
+            console.log(`🔄 Retrying ${queueItem.type} operation ${queueItem.id} (attempt ${queueItem.retryCount + 1}/${maxRetries})`);
+          } else {
+            // Max retries reached, move to logs
+            const verificationResult = {
+              success: false,
+              message: `Failed to ${queueItem.type} IPAM ${ipam.id} after ${maxRetries} attempts: ${error.message}`,
+              details: { ipamId: ipam.id, error: error.message, retryCount: queueItem.retryCount }
+            };
+            await moveToLog(queueItem, verificationResult);
+          }
+        }
         break;
       }
       default: {
@@ -1259,8 +1362,18 @@ const processQueuedOperation = async (queueItem, db) => {
     }
   } catch (error) {
     try {
-      await updateQueueStatus(queueItem.id, 'failed', error.message);
-      await moveToLog(queueItem.id);
+      // Check if we should retry or move to logs
+      const maxRetries = 3;
+      if (queueItem.retryCount < maxRetries) {
+        // Retry the operation
+        await updateQueueStatus(queueItem.id, 'failed', error.message);
+        await retryQueueItem(queueItem.id);
+        console.log(`🔄 Retrying operation ${queueItem.id} (attempt ${queueItem.retryCount + 1}/${maxRetries})`);
+      } else {
+        // Max retries reached, move to logs
+        await updateQueueStatus(queueItem.id, 'failed', error.message);
+        await moveToLog(queueItem.id);
+      }
     } catch (_) {}
   }
 };
