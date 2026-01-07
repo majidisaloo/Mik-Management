@@ -244,6 +244,22 @@ const normalizeHeaderInit = (headersInit = {}) => {
   return headers;
 };
 
+const resolveRepoRoot = (startDir) => {
+  let currentDir = startDir;
+  for (let i = 0; i < 6; i += 1) {
+    const candidate = path.join(currentDir, '.git');
+    if (fs.existsSync(candidate)) {
+      return currentDir;
+    }
+    const parent = path.dirname(currentDir);
+    if (parent === currentDir) {
+      break;
+    }
+    currentDir = parent;
+  }
+  return startDir;
+};
+
 const createNodeFetch = () => {
   return (input, init = {}) =>
     new Promise((resolve, reject) => {
@@ -2210,22 +2226,26 @@ const bootstrap = async () => {
       try {
         const body = await parseJsonBody(req);
         const channel = body?.channel || 'stable';
+        const updateBranch = channel === 'beta' ? 'beta' : 'main';
+        const backendDir = resolveRepoRoot(process.cwd());
+        const frontendDir = path.join(backendDir, 'frontend');
+        const backendPackageDir = path.join(backendDir, 'backend');
         
-        console.log(`Performing update for channel: ${channel}`);
+        console.log(`Performing update for channel: ${channel} (branch: ${updateBranch})`);
         
         // Check if we're running as root or with sudo
         const isRoot = process.getuid && process.getuid() === 0;
         const useSudo = !isRoot;
         
         // Try without sudo first, then with sudo if needed
-        let gitCommand = `git pull origin ${channel}`;
-        let backendInstallCommand = `npm install`;
+        let gitCommand = `git pull origin ${updateBranch}`;
+        const backendInstallCommand = `npm install`;
         
         // Perform actual git pull
         try {
           // Try without sudo first
           console.log(`Trying git pull without sudo...`);
-          execSync(gitCommand, { cwd: process.cwd(), stdio: 'pipe' });
+          execSync(gitCommand, { cwd: backendDir, stdio: 'pipe' });
           console.log(`Git pull successful without sudo`);
         } catch (gitError) {
           console.log(`Git pull failed without sudo: ${gitError.message}`);
@@ -2233,9 +2253,9 @@ const bootstrap = async () => {
           if (useSudo) {
             try {
               // Try with sudo
-              gitCommand = `sudo -n git pull origin ${channel}`;
+              gitCommand = `sudo -n git pull origin ${updateBranch}`;
               console.log(`Trying git pull with sudo...`);
-              execSync(gitCommand, { cwd: process.cwd(), stdio: 'pipe' });
+              execSync(gitCommand, { cwd: backendDir, stdio: 'pipe' });
               console.log(`Git pull successful with sudo`);
             } catch (sudoError) {
               console.error(`Git pull failed with sudo: ${sudoError.message}`);
@@ -2249,7 +2269,7 @@ const bootstrap = async () => {
         // Install backend dependencies
         try {
           console.log(`Installing backend dependencies...`);
-          execSync(backendInstallCommand, { cwd: process.cwd(), stdio: 'pipe' });
+          execSync(backendInstallCommand, { cwd: backendPackageDir, stdio: 'pipe' });
           console.log(`Backend dependencies installed successfully`);
         } catch (installError) {
           console.error(`Backend install failed: ${installError.message}`);
@@ -2257,16 +2277,15 @@ const bootstrap = async () => {
         }
         
         // For frontend updates
-        const frontendPath = path.join(process.cwd(), 'frontend');
-        if (fs.existsSync(frontendPath)) {
+        if (fs.existsSync(frontendDir)) {
           try {
             const frontendInstallCommand = `npm install`;
             const frontendBuildCommand = `npm run build`;
             
             console.log(`Installing frontend dependencies...`);
-            execSync(frontendInstallCommand, { cwd: frontendPath, stdio: 'pipe' });
+            execSync(frontendInstallCommand, { cwd: frontendDir, stdio: 'pipe' });
             console.log(`Building frontend...`);
-            execSync(frontendBuildCommand, { cwd: frontendPath, stdio: 'pipe' });
+            execSync(frontendBuildCommand, { cwd: frontendDir, stdio: 'pipe' });
             console.log(`Frontend build completed successfully`);
           } catch (frontendError) {
             console.error(`Frontend update failed: ${frontendError.message}`);
@@ -6788,4 +6807,3 @@ bootstrap().catch((error) => {
   console.error('Failed to start server', error);
   process.exit(1);
 });
-
