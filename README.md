@@ -37,6 +37,66 @@ curl http://localhost/api/users
 
 **Access**: Open `http://your-server-ip/` and register the first admin user.
 
+### Fresh Ubuntu install (from zero)
+Use these steps on a clean Ubuntu 20.04/22.04 server.
+
+```bash
+# 1) Update OS and install prerequisites
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y nginx nodejs npm git rpm
+
+# 2) Clone the project
+sudo mkdir -p /opt
+sudo rm -rf /opt/mik-management
+sudo git clone https://github.com/majidisaloo/Mik-Management.git /opt/mik-management
+
+# 3) Backend setup
+cd /opt/mik-management/backend
+sudo npm install
+sudo npm run prepare:db
+
+# 4) Frontend setup
+cd /opt/mik-management/frontend
+sudo npm install
+sudo npm run build
+
+# 5) Install and enable the backend service
+sudo cp /opt/mik-management/deploy/mik-management-backend.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now mik-management-backend
+
+# 6) Configure Nginx
+sudo cp /opt/mik-management/deploy/nginx.conf.example /etc/nginx/sites-available/mik-management
+sudo ln -sf /etc/nginx/sites-available/mik-management /etc/nginx/sites-enabled/mik-management
+sudo nginx -t && sudo systemctl reload nginx
+
+# 7) Verify
+curl http://localhost/api/users
+```
+
+#### npm install fails with ENETUNREACH (IPv6)
+If you see an error like:
+```
+npm ERR! request to https://registry.npmjs.org/... failed, reason: connect ENETUNREACH 2606:4700::6810:22:443
+```
+Force npm to use IPv4 and retry:
+```bash
+npm config set prefer-ipv4 true
+npm config set registry https://registry.npmjs.org/
+npm install
+```
+If your host has no IPv6 connectivity, you can also disable IPv6 temporarily:
+```bash
+sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+```
+
+If you deploy from GitLab instead of GitHub, set your origin before updating:
+```bash
+cd /opt/mik-management
+sudo git remote set-url origin <YOUR_GITLAB_REPO_URL>
+```
+
 ## Updates
 
 ### Channels (Stable vs Beta)
@@ -112,6 +172,10 @@ sudo chmod +x /opt/mik-management/update.sh
 # sudo /opt/mik-management/update.sh beta    # Update to beta
 # sudo /opt/mik-management/update.sh stable  # Update to stable
 ```
+
+### In-app update troubleshooting
+- The update button pulls from the git branch (`main` for stable, `beta` for beta).
+- Ensure the backend service user can run `git pull`, `npm install`, and `npm run build` in `/opt/mik-management`.
 
 ## Features
 
