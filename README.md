@@ -40,26 +40,7 @@ curl http://localhost/api/users
 ### Fresh Ubuntu install (from zero)
 Use these steps on a clean Ubuntu 20.04/22.04 server.
 
-#### Quick install (recommended)
 ```bash
-sudo bash /opt/install-mik-management.sh
-```
-Create the installer file:
-```bash
-sudo tee /opt/install-mik-management.sh <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-
-curl -fsSL https://raw.githubusercontent.com/majidisaloo/Mik-Management/main/deploy/install-ubuntu.sh | sudo bash
-EOF
-sudo chmod +x /opt/install-mik-management.sh
-```
-
-```bash
-# 0) (Optional) Force IPv4 for apt if IPv6 is unreachable
-echo 'Acquire::ForceIPv4 "true";' | sudo tee /etc/apt/apt.conf.d/99force-ipv4
-echo "precedence ::ffff:0:0/96  100" | sudo tee -a /etc/gai.conf
-
 # 1) Update OS and install prerequisites
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y nginx nodejs npm git rpm
@@ -71,17 +52,11 @@ sudo git clone https://github.com/majidisaloo/Mik-Management.git /opt/mik-manage
 
 # 3) Backend setup
 cd /opt/mik-management/backend
-sudo npm config set prefer-ipv4 true
-sudo npm config set registry https://registry.npmjs.org/
-sudo npm config set node-options "--dns-result-order=ipv4first"
 sudo npm install
 sudo npm run prepare:db
 
 # 4) Frontend setup
 cd /opt/mik-management/frontend
-sudo npm config set prefer-ipv4 true
-sudo npm config set registry https://registry.npmjs.org/
-sudo npm config set node-options "--dns-result-order=ipv4first"
 sudo npm install
 sudo npm run build
 
@@ -97,50 +72,6 @@ sudo nginx -t && sudo systemctl reload nginx
 
 # 7) Verify
 curl http://localhost/api/users
-```
-
-#### npm install fails with ENETUNREACH (IPv6)
-If you see an error like:
-```
-npm ERR! request to https://registry.npmjs.org/... failed, reason: connect ENETUNREACH 2606:4700::6810:22:443
-```
-If your host has no IPv6 connectivity, disable IPv6 before running `apt` and `npm`:
-```bash
-sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
-sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
-```
-Also ensure IPv4 is preferred for DNS:
-```bash
-echo "precedence ::ffff:0:0/96  100" | sudo tee -a /etc/gai.conf
-```
-To make it persistent across reboots:
-```bash
-echo "net.ipv6.conf.all.disable_ipv6=1" | sudo tee /etc/sysctl.d/99-disable-ipv6.conf
-echo "net.ipv6.conf.default.disable_ipv6=1" | sudo tee -a /etc/sysctl.d/99-disable-ipv6.conf
-sudo sysctl --system
-```
-Then force npm to use IPv4 and retry:
-```bash
-npm config set prefer-ipv4 true
-npm config set registry https://registry.npmjs.org/
-npm config set node-options "--dns-result-order=ipv4first"
-npm install
-```
-
-#### ERR_MODULE_NOT_FOUND or "vite: not found"
-These errors usually mean `npm install` did not finish successfully.
-```bash
-cd /opt/mik-management/backend
-sudo rm -rf node_modules package-lock.json
-sudo npm cache clean --force
-sudo npm install
-sudo npm run prepare:db
-
-cd /opt/mik-management/frontend
-sudo rm -rf node_modules package-lock.json
-sudo npm cache clean --force
-sudo npm install
-sudo npm run build
 ```
 
 If you deploy from GitLab instead of GitHub, set your origin before updating:
