@@ -23,22 +23,18 @@ if [[ "${FORCE_IPV4}" == "1" ]]; then
 fi
 
 apt update && apt upgrade -y
-apt install -y nginx nodejs npm git rpm curl ca-certificates build-essential
+apt install -y nginx nodejs npm git rpm
 
 mkdir -p /opt
 rm -rf "${INSTALL_DIR}"
 git clone "${REPO_URL}" "${INSTALL_DIR}"
 
-export NODE_OPTIONS="--dns-result-order=ipv4first"
 echo "➡️  Backend install"
 cd "${INSTALL_DIR}/backend"
 npm config set prefer-ipv4 true
 npm config set registry https://registry.npmjs.org/
 npm config set node-options "--dns-result-order=ipv4first"
-if ! npm install; then
-  echo "❌ Backend npm install failed. Check network connectivity and IPv4 settings."
-  exit 1
-fi
+npm install
 npm run prepare:db
 
 echo "➡️  Frontend build"
@@ -46,10 +42,7 @@ cd "${INSTALL_DIR}/frontend"
 npm config set prefer-ipv4 true
 npm config set registry https://registry.npmjs.org/
 npm config set node-options "--dns-result-order=ipv4first"
-if ! npm install; then
-  echo "❌ Frontend npm install failed. Check network connectivity and IPv4 settings."
-  exit 1
-fi
+npm install
 npm run build
 
 echo "➡️  Systemd service"
