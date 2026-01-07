@@ -74,23 +74,6 @@ sudo nginx -t && sudo systemctl reload nginx
 curl http://localhost/api/users
 ```
 
-#### npm install fails with ENETUNREACH (IPv6)
-If you see an error like:
-```
-npm ERR! request to https://registry.npmjs.org/... failed, reason: connect ENETUNREACH 2606:4700::6810:22:443
-```
-If your host has no IPv6 connectivity, disable IPv6 before running `apt` and `npm`:
-```bash
-sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
-sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
-```
-Then force npm to use IPv4 and retry:
-```bash
-npm config set prefer-ipv4 true
-npm config set registry https://registry.npmjs.org/
-npm install
-```
-
 If you deploy from GitLab instead of GitHub, set your origin before updating:
 ```bash
 cd /opt/mik-management
